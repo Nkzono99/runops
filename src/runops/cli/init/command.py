@@ -12,8 +12,7 @@ from typing import Annotated, Any, Optional
 
 import typer
 
-from runops.cli.init_bootstrap import _bootstrap_environment
-from runops.cli.init_scaffold import (
+from runops.cli.init.scaffold import (
     _create_materials_skeleton,
     _create_notes_skeleton,
     _create_runops_skeleton,
@@ -740,7 +739,9 @@ def init(
         sim_names = simulators
         sim_content = _build_simulators_toml(simulators)
     elif interactive:
-        sim_names, sim_configs = _prompt_simulators()
+        import runops.cli.init as init_facade
+
+        sim_names, sim_configs = init_facade._prompt_simulators()
         if sim_configs:
             sim_content = _build_simulators_toml_from_configs(sim_configs)
         else:
@@ -758,7 +759,9 @@ def init(
     # launchers.toml
     site_profile: _BundledSiteProfile | None = None
     if interactive:
-        launcher_configs, site_profile = _prompt_launchers()
+        import runops.cli.init as init_facade
+
+        launcher_configs, site_profile = init_facade._prompt_launchers()
         launcher_content = _build_launchers_toml(launcher_configs)
     else:
         launcher_configs = {
@@ -874,7 +877,9 @@ def init(
 
     # Interactive knowledge source selection
     if interactive:
-        knowledge_sources = _prompt_knowledge_sources(project_dir)
+        import runops.cli.init as init_facade
+
+        knowledge_sources = init_facade._prompt_knowledge_sources(project_dir)
         if knowledge_sources:
             from runops.core.knowledge_source import save_knowledge_source
 
@@ -882,7 +887,15 @@ def init(
                 save_knowledge_source(project_dir, ks)
 
     # Bootstrap: .venv + tools/runops + editable install
-    _bootstrap_environment(project_dir, sim_names, runops_repo, created, skipped)
+    import runops.cli.init as init_facade
+
+    init_facade._bootstrap_environment(
+        project_dir,
+        sim_names,
+        runops_repo,
+        created,
+        skipped,
+    )
 
     # Discover agent docs after bootstrap so tools/runops/docs/ can be imported.
     knowledge_imports_path = _prepare_knowledge_imports(

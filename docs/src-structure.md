@@ -71,5 +71,6 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 - `src/runops/launchers/base.py`: Launcher.from_config() による launcher factory と profile 読み込み。
 - `src/runops/jobgen/generator.py`: site 固有の module / directive を含む最終的な Slurm job script 生成。
 - `src/runops/slurm/query.py`: Slurm state の問い合わせと runops RunState への写像。
-- `src/runops/cli/init.py`: init 時の対話 UX、project scaffold、site preset 書き出し。
-- `src/runops/cli/init_bootstrap.py`: init 後の `.venv`、`tools/runops`、editable install bootstrap。
+- `src/runops/cli/init/command.py`: init 時の対話 UX、project scaffold、site preset 書き出し。
+- `src/runops/cli/init/bootstrap.py`: init 後の `.venv`、`tools/runops`、editable install bootstrap。
+- `src/runops/cli/init/scaffold.py`: init/setup で共有する scaffold helper。
