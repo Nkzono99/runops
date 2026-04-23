@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import shutil
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
@@ -18,10 +20,14 @@ from runops.core.case import (
     resolve_case,
 )
 from runops.core.discovery import collect_existing_run_ids
-from runops.core.exceptions import ParameterValidationError, ProjectConfigError
+from runops.core.exceptions import (
+    DuplicateRunIdError,
+    ParameterValidationError,
+    ProjectConfigError,
+)
 from runops.core.manifest import ManifestData, write_manifest
 from runops.core.project import ProjectConfig, find_project_root, load_project
-from runops.core.run import RunInfo, create_run
+from runops.core.run import RunInfo, create_run_directory, next_run_id
 from runops.core.site import SiteProfile, load_site_profile
 from runops.core.survey import expand_survey, generate_display_name, load_survey
 from runops.jobgen.generator import generate_job_script
@@ -353,6 +359,16 @@ def _merge_site_modules(
     )
 
 
+def _rewrite_staging_paths(
+    values: list[str],
+    staging_run_dir: Path,
+    final_run_dir: Path,
+) -> list[str]:
+    staging = str(staging_run_dir)
+    final = str(final_run_dir)
+    return [value.replace(staging, final) for value in values]
+
+
 def create_prepared_run(
     parent_dir: Path,
     case_data: CaseData,
@@ -388,65 +404,88 @@ def create_prepared_run(
     if known_ids is None:
         known_ids = collect_existing_run_ids(project.root_dir / "runs")
 
-    run_info = create_run(
-        parent_dir,
-        known_ids,
+    run_id = next_run_id(known_ids)
+    final_run_dir = (parent_dir / run_id).resolve()
+    if final_run_dir.exists():
+        raise DuplicateRunIdError(run_id, [str(final_run_dir)])
+
+    staging_name = f".tmp-{run_id}-{uuid4().hex}"
+    staging_run_dir = create_run_directory(parent_dir, staging_name)
+    created_at = datetime.now(tz=timezone.utc).isoformat()
+    final_run_info = RunInfo(
+        run_id=run_id,
+        run_dir=final_run_dir,
         display_name=display_name,
         params=effective_params,
+        created_at=created_at,
     )
+    committed = False
+    try:
+        _copy_case_files(case_data.case_dir, staging_run_dir / "input")
+        adapter.render_inputs(validation_data, staging_run_dir)
 
-    _copy_case_files(case_data.case_dir, run_info.run_dir / "input")
-    adapter.render_inputs(validation_data, run_info.run_dir)
+        sim_config = _get_simulator_config(project, case_data.simulator)
+        resolver_mode = sim_config.get("resolver_mode", "package")
+        runtime_info = adapter.resolve_runtime(sim_config, resolver_mode)
+        program_cmd = adapter.build_program_command(runtime_info, staging_run_dir)
+        program_cmd = _rewrite_staging_paths(
+            program_cmd,
+            staging_run_dir,
+            final_run_dir,
+        )
+        version_commands = adapter.build_version_capture_commands(
+            runtime_info,
+            program_cmd,
+            final_run_dir,
+        )
 
-    sim_config = _get_simulator_config(project, case_data.simulator)
-    resolver_mode = sim_config.get("resolver_mode", "package")
-    runtime_info = adapter.resolve_runtime(sim_config, resolver_mode)
-    program_cmd = adapter.build_program_command(runtime_info, run_info.run_dir)
-    version_commands = adapter.build_version_capture_commands(
-        runtime_info,
-        program_cmd,
-        run_info.run_dir,
-    )
+        effective_site = _merge_site_modules(site, case_data.simulator, sim_config)
+        ntasks = (
+            case_data.job.processes
+            if _is_rsc_site(effective_site)
+            else case_data.job.ntasks
+        )
+        exec_line = launcher.build_exec_line(program_cmd, ntasks)
+        job_config = _build_job_config(case_data.job, effective_site)
 
-    effective_site = _merge_site_modules(site, case_data.simulator, sim_config)
-    ntasks = (
-        case_data.job.processes
-        if _is_rsc_site(effective_site)
-        else case_data.job.ntasks
-    )
-    exec_line = launcher.build_exec_line(program_cmd, ntasks)
-    job_config = _build_job_config(case_data.job, effective_site)
+        extra_setup: list[str] = []
+        venv_activate = project.root_dir / ".venv" / "bin" / "activate"
+        if venv_activate.exists():
+            extra_setup.append(f"source {venv_activate}")
 
-    extra_setup: list[str] = []
-    venv_activate = project.root_dir / ".venv" / "bin" / "activate"
-    if venv_activate.exists():
-        extra_setup.append(f"source {venv_activate}")
+        generate_job_script(
+            staging_run_dir,
+            job_config,
+            exec_line,
+            run_id=final_run_info.run_id,
+            site=effective_site,
+            simulator_name=case_data.simulator,
+            extra_setup_commands=extra_setup,
+            version_commands=version_commands,
+            script_run_dir=final_run_dir,
+        )
 
-    generate_job_script(
-        run_info.run_dir,
-        job_config,
-        exec_line,
-        run_id=run_info.run_id,
-        site=effective_site,
-        simulator_name=case_data.simulator,
-        extra_setup_commands=extra_setup,
-        version_commands=version_commands,
-    )
+        manifest = _build_manifest(
+            final_run_info,
+            case_data,
+            project,
+            runtime_info,
+            adapter,
+            effective_site,
+            survey_id=survey_id,
+            variation_keys=variation_keys,
+        )
+        write_manifest(staging_run_dir, manifest)
+        if final_run_dir.exists():
+            raise DuplicateRunIdError(run_id, [str(final_run_dir)])
+        staging_run_dir.rename(final_run_dir)
+        committed = True
+    finally:
+        if not committed and staging_run_dir.exists():
+            shutil.rmtree(staging_run_dir, ignore_errors=True)
 
-    manifest = _build_manifest(
-        run_info,
-        case_data,
-        project,
-        runtime_info,
-        adapter,
-        effective_site,
-        survey_id=survey_id,
-        variation_keys=variation_keys,
-    )
-    write_manifest(run_info.run_dir, manifest)
-    known_ids.add(run_info.run_id)
-
-    return CreatedRunResult(run_info=run_info, warnings=warnings)
+    known_ids.add(final_run_info.run_id)
+    return CreatedRunResult(run_info=final_run_info, warnings=warnings)
 
 
 @dataclass(frozen=True)

@@ -39,6 +39,7 @@ def generate_job_script(
     setup_commands: list[str] | None = None,
     version_commands: list[str] | None = None,
     post_commands: list[str] | None = None,
+    script_run_dir: Path | None = None,
     resource_style: str = "standard",
     stdout_format: str | None = None,
     stderr_format: str | None = None,
@@ -71,6 +72,9 @@ def generate_job_script(
         version_commands: Shell commands that capture simulator/runtime
             version information before execution.
         post_commands: Shell commands after execution.
+        script_run_dir: Run directory path embedded in the generated script.
+            Defaults to *run_dir*. Used when writing into a staging directory
+            before atomically moving the completed run into place.
         resource_style: (Legacy) ``"standard"`` or ``"rsc"``.
         stdout_format: (Legacy) Custom stdout format.
         stderr_format: (Legacy) Custom stderr format.
@@ -122,7 +126,7 @@ def generate_job_script(
     content = _render_script(
         job_config=job_config,
         exec_line=exec_line,
-        run_dir=run_dir,
+        run_dir=script_run_dir or run_dir,
         run_id=run_id,
         extra_sbatch=effective_extra_sbatch,
         extra_env=effective_env,

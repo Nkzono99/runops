@@ -11,15 +11,22 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.case import ClassificationData, JobData
+import pytest
+
+from runops.adapters.generic import GenericAdapter
+from runops.core import run_creation as run_creation_module
+from runops.core.case import CaseData, ClassificationData, JobData
+from runops.core.project import ProjectConfig
 from runops.core.run_creation import (
     _build_job_config,
     _build_manifest_job,
     _merge_classification,
     _merge_job,
+    create_prepared_run,
 )
 from runops.core.site import SiteProfile
 from runops.jobgen.generator import generate_job_script
+from runops.launchers.srun import SrunLauncher
 
 
 def _rsc_site() -> SiteProfile:
@@ -28,6 +35,49 @@ def _rsc_site() -> SiteProfile:
 
 def _standard_site() -> SiteProfile:
     return SiteProfile(name="standard-site", resource_style="standard")
+
+
+def _transactional_project(root: Path) -> ProjectConfig:
+    return ProjectConfig(
+        name="test-project",
+        description="",
+        root_dir=root,
+        simulators={
+            "generic": {
+                "adapter": "generic",
+                "executable": "echo",
+                "resolver_mode": "local_executable",
+            }
+        },
+        launchers={},
+    )
+
+
+def _transactional_case(case_dir: Path) -> CaseData:
+    case_dir.mkdir(parents=True, exist_ok=True)
+    return CaseData(
+        name="base_case",
+        simulator="generic",
+        launcher="srun",
+        job=JobData(partition="debug", nodes=1, ntasks=1, walltime="00:10:00"),
+        params={"nx": 64},
+        case_dir=case_dir,
+        raw={
+            "case": {
+                "name": "base_case",
+                "simulator": "generic",
+                "launcher": "srun",
+            }
+        },
+    )
+
+
+def _transactional_launcher() -> SrunLauncher:
+    return SrunLauncher("srun", "srun", use_slurm_ntasks=True)
+
+
+def _assert_no_run_or_staging_dirs(parent_dir: Path) -> None:
+    assert sorted(path.name for path in parent_dir.iterdir()) == []
 
 
 class TestBuildJobConfigRsc:
@@ -240,6 +290,127 @@ class TestSurveyOverrides:
             == classification
         )
         assert _merge_job(job, JobData(partition="ignored"), {}) == job
+
+
+class RenderFailAdapter(GenericAdapter):
+    """Adapter that fails after writing a partial input file."""
+
+    def render_inputs(self, case_data: dict[str, object], run_dir: Path) -> list[str]:
+        (run_dir / "input" / "partial.txt").write_text("partial")
+        raise RuntimeError("render failed")
+
+
+class ResolveFailAdapter(GenericAdapter):
+    """Adapter that fails after successful input rendering."""
+
+    def resolve_runtime(
+        self,
+        simulator_config: dict[str, object],
+        resolver_mode: str,
+    ) -> dict[str, object]:
+        raise RuntimeError("resolve failed")
+
+
+class TestTransactionalRunCreation:
+    """``create_prepared_run`` commits only fully prepared runs."""
+
+    def test_success_commits_final_run_dir_and_rewrites_script_paths(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+
+        result = create_prepared_run(
+            parent_dir=parent_dir,
+            case_data=case_data,
+            project=project,
+            adapter=GenericAdapter(),
+            launcher=_transactional_launcher(),
+            site=_standard_site(),
+            existing_ids=set(),
+        )
+
+        run_dir = result.run_info.run_dir
+        assert run_dir.is_dir()
+        assert run_dir.name.startswith("R")
+        assert not any(path.name.startswith(".tmp-") for path in parent_dir.iterdir())
+        job_sh = (run_dir / "submit" / "job.sh").read_text()
+        assert f"cd {run_dir}" in job_sh
+        assert str(run_dir / "input" / "params.json") in job_sh
+        assert ".tmp-" not in job_sh
+
+    def test_copy_failure_cleans_staging_and_final_dir(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+
+        def fail_copy(case_dir: Path, input_dir: Path) -> None:
+            input_dir.mkdir(parents=True, exist_ok=True)
+            (input_dir / "partial.txt").write_text("partial")
+            raise RuntimeError("copy failed")
+
+        monkeypatch.setattr(run_creation_module, "_copy_case_files", fail_copy)
+
+        with pytest.raises(RuntimeError, match="copy failed"):
+            create_prepared_run(
+                parent_dir=parent_dir,
+                case_data=case_data,
+                project=project,
+                adapter=GenericAdapter(),
+                launcher=_transactional_launcher(),
+                site=_standard_site(),
+                existing_ids=set(),
+            )
+
+        _assert_no_run_or_staging_dirs(parent_dir)
+
+    def test_render_failure_cleans_staging_and_final_dir(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+
+        with pytest.raises(RuntimeError, match="render failed"):
+            create_prepared_run(
+                parent_dir=parent_dir,
+                case_data=case_data,
+                project=project,
+                adapter=RenderFailAdapter(),
+                launcher=_transactional_launcher(),
+                site=_standard_site(),
+                existing_ids=set(),
+            )
+
+        _assert_no_run_or_staging_dirs(parent_dir)
+
+    def test_resolve_failure_cleans_staging_and_final_dir(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+
+        with pytest.raises(RuntimeError, match="resolve failed"):
+            create_prepared_run(
+                parent_dir=parent_dir,
+                case_data=case_data,
+                project=project,
+                adapter=ResolveFailAdapter(),
+                launcher=_transactional_launcher(),
+                site=_standard_site(),
+                existing_ids=set(),
+            )
+
+        _assert_no_run_or_staging_dirs(parent_dir)
 
 
 class TestEndToEndRsc:
