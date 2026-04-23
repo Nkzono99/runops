@@ -13,10 +13,11 @@ from typing import Annotated, Any, Optional
 
 import typer
 
+from runops.cli.init_bootstrap import _bootstrap_environment
 from runops.core.discovery import validate_uniqueness
 from runops.core.exceptions import DuplicateRunIdError, ProjectConfigError
 from runops.core.project import load_project
-from runops.harness.builder import _collect_doc_repos, _collect_pip_packages
+from runops.harness.builder import _collect_doc_repos
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -786,159 +787,6 @@ def _build_campaign_toml(project_name: str, simulator_names: list[str]) -> str:
         project_name=project_name,
         simulator=simulator_names[0] if simulator_names else "",
     )
-
-
-def _venv_pip_executable(venv_dir: Path) -> Path:
-    """Return the pip executable path inside a virtual environment."""
-    if sys.platform == "win32":
-        return venv_dir / "Scripts" / "pip.exe"
-    return venv_dir / "bin" / "pip"
-
-
-def _find_uv() -> str:
-    """Find the uv executable, falling back to 'uv'."""
-    uv_path = shutil.which("uv")
-    return uv_path if uv_path else "uv"
-
-
-def _bootstrap_environment(
-    project_dir: Path,
-    sim_names: list[str],
-    runops_repo: str,
-    created: list[str],
-    skipped: list[str],
-) -> None:
-    """Bootstrap .venv, clone runops into tools/, and editable-install.
-
-    Args:
-        project_dir: Project root directory.
-        sim_names: List of simulator names for pip packages.
-        runops_repo: Git URL for runops repository.
-        created: Mutable list to append created items.
-        skipped: Mutable list to append skipped items.
-    """
-    uv = _find_uv()
-    venv_dir = project_dir / ".venv"
-    tools_dir = project_dir / "tools"
-    runops_dir = tools_dir / "runops"
-
-    # 1. Create .venv via uv
-    if venv_dir.exists():
-        skipped.append(".venv")
-    else:
-        typer.echo("  Creating .venv ...")
-        venv_result = subprocess.run(
-            [uv, "venv", str(venv_dir)],
-            cwd=str(project_dir),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if venv_result.returncode == 0:
-            created.append(".venv")
-        else:
-            typer.echo(
-                f"  Warning: uv venv failed: {(venv_result.stderr or '').strip()}"
-            )
-            return
-
-    # 2. Clone runops into tools/
-    if runops_dir.exists():
-        skipped.append("tools/runops")
-    else:
-        typer.echo("  Cloning runops into tools/ ...")
-        tools_dir.mkdir(exist_ok=True)
-        clone_result = subprocess.run(
-            ["git", "clone", runops_repo, str(runops_dir)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if clone_result.returncode == 0:
-            created.append("tools/runops")
-        else:
-            typer.echo(
-                f"  Warning: git clone failed: "
-                f"{(clone_result.stderr or '').strip()[:300]}"
-            )
-            return
-
-    # 3. Editable install runops into .venv
-    typer.echo("  Installing runops (editable) ...")
-    install_result = subprocess.run(
-        [
-            uv,
-            "pip",
-            "install",
-            "-e",
-            str(runops_dir),
-            "--python",
-            str(
-                venv_dir
-                / ("Scripts/python.exe" if sys.platform == "win32" else "bin/python")
-            ),
-        ],
-        cwd=str(project_dir),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if install_result.returncode == 0:
-        created.append("uv pip install -e tools/runops")
-    else:
-        typer.echo(
-            f"  Warning: editable install failed:\n"
-            f"    {(install_result.stderr or '').strip()[:300]}"
-        )
-
-    # 4. Install simulator-specific packages
-    pip_pkgs = _collect_pip_packages(sim_names) if sim_names else []
-    if pip_pkgs:
-        typer.echo(f"  Installing: {', '.join(pip_pkgs)} ...")
-        pkg_result = subprocess.run(
-            [
-                uv,
-                "pip",
-                "install",
-                *pip_pkgs,
-                "--python",
-                str(
-                    venv_dir
-                    / (
-                        "Scripts/python.exe"
-                        if sys.platform == "win32"
-                        else "bin/python"
-                    )
-                ),
-            ],
-            cwd=str(project_dir),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if pkg_result.returncode == 0:
-            created.append(f"pip install ({len(pip_pkgs)} packages)")
-        else:
-            _safe_echo(
-                f"  Warning: pip install failed:\n"
-                f"    {(pkg_result.stderr or '').strip()[:300]}",
-            )
-
-    # 5. Activation hint
-    if sys.platform == "win32":
-        activate_cmd = r".venv\Scripts\activate"
-    else:
-        activate_cmd = "source .venv/bin/activate"
-    typer.echo(f"\n  Next: {activate_cmd}")
-    typer.echo("  Then: runo doctor")
 
 
 def init(

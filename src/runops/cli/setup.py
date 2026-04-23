@@ -84,7 +84,7 @@ def setup(
     skipped: list[str] = []
 
     # 3. Bootstrap .venv + tools/ + editable install
-    from runops.cli.init import _bootstrap_environment
+    from runops.cli.init_bootstrap import _bootstrap_environment
 
     _bootstrap_environment(project_dir, sim_names, runops_repo, created, skipped)
 

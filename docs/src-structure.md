@@ -20,8 +20,8 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 
 | Directory | 役割 | 現在の規模 |
 |---|---|---|
-| `cli/` | Typer ベースの CLI エントリポイントと対話 UX | 24 個の Python module |
-| `core/` | ドメインモデル、実行オーケストレーション、manifest、state、knowledge | 21 個の Python module |
+| `cli/` | Typer ベースの CLI エントリポイントと対話 UX | 25 個の Python module |
+| `core/` | ドメインモデル、実行オーケストレーション、manifest、state、knowledge | 22 個の Python module |
 | `adapters/` | シミュレータ固有処理と adapter registry | 9 個の Python module |
 | `launchers/` | MPI 起動ラッパーと launcher factory | 5 個の Python module |
 | `jobgen/` | job、launcher、site から job.sh を組み立てる層 | 2 個の Python module |
@@ -63,12 +63,13 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 ## 次に読むと理解しやすい file
 
 - `src/runops/cli/main.py`: 最上位のコマンド登録。
-- `src/runops/core/actions.py`: CLI と agent が使う薄い action facade。
+- `src/runops/core/actions.py`: CLI と agent が使う action 実行 facade。
+- `src/runops/core/action_specs.py`: agent-facing action metadata と registry。
 - `src/runops/core/run_creation.py`: case -> adapter -> launcher -> site -> job.sh をつなぐ実行時の中心。
 - `src/runops/core/site.py`: runtime の site 解決。site.toml、legacy launcher fallback、STANDARD_SITE を扱う。
 - `src/runops/adapters/registry.py`: simulator adapter の registry と import-by-name 解決。
 - `src/runops/launchers/base.py`: Launcher.from_config() による launcher factory と profile 読み込み。
 - `src/runops/jobgen/generator.py`: site 固有の module / directive を含む最終的な Slurm job script 生成。
 - `src/runops/slurm/query.py`: Slurm state の問い合わせと runops RunState への写像。
-- `src/runops/cli/init.py`: init 時に src/runops/sites/*.toml を読み、project 側の site.toml を書く。
-
+- `src/runops/cli/init.py`: init 時の対話 UX、project scaffold、site preset 書き出し。
+- `src/runops/cli/init_bootstrap.py`: init 後の `.venv`、`tools/runops`、editable install bootstrap。
