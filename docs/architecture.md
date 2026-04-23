@@ -65,7 +65,7 @@ launchers/
  +--> launchers/base  (抽象基底 + ファクトリ)
 ```
 
-重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions.py` と `core/run_creation.py` が orchestration 層として `adapters/`、`launchers/`、`core/site.py`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
+重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions/` と `core/run_creation.py` が orchestration 層として `adapters/`、`launchers/`、`core/site.py`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
 
 ---
 

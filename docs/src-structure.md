@@ -63,8 +63,8 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 ## 次に読むと理解しやすい file
 
 - `src/runops/cli/main.py`: 最上位のコマンド登録。
-- `src/runops/core/actions.py`: CLI と agent が使う action 実行 facade。
-- `src/runops/core/action_specs.py`: agent-facing action metadata と registry。
+- `src/runops/core/actions/`: CLI と agent が使う action 実行 facade と責務別実装。
+- `src/runops/core/actions/specs.py`: agent-facing action metadata と registry。
 - `src/runops/core/run_creation.py`: case -> adapter -> launcher -> site -> job.sh をつなぐ実行時の中心。
 - `src/runops/core/site.py`: runtime の site 解決。site.toml、legacy launcher fallback、STANDARD_SITE を扱う。
 - `src/runops/adapters/registry.py`: simulator adapter の registry と import-by-name 解決。

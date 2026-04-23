@@ -5,13 +5,13 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from runops.core.action_helpers import (
+from runops.core.actions.helpers import (
     _dir_size,
     _error,
     _precondition_fail,
     _require_state,
 )
-from runops.core.action_result import ActionResult, ActionStatus
+from runops.core.actions.result import ActionResult, ActionStatus
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState
 
