@@ -3,14 +3,20 @@
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.registry import load_from_config
-from runops.core.case import CaseData, JobData, load_case, resolve_case
+from runops.core.case import (
+    CaseData,
+    ClassificationData,
+    JobData,
+    load_case,
+    resolve_case,
+)
 from runops.core.discovery import collect_existing_run_ids
 from runops.core.exceptions import ParameterValidationError, ProjectConfigError
 from runops.core.manifest import ManifestData, write_manifest
@@ -163,6 +169,88 @@ def _build_manifest_job(
         result["nodes"] = job.nodes
         result["ntasks"] = job.ntasks
     return result
+
+
+_CLASSIFICATION_OVERRIDE_FIELDS = frozenset({"model", "submodel", "tags"})
+_JOB_OVERRIDE_FIELDS = frozenset(
+    {
+        "partition",
+        "nodes",
+        "ntasks",
+        "walltime",
+        "processes",
+        "threads",
+        "cores",
+        "memory",
+        "gpus",
+        "qos",
+        "modules",
+        "pre_commands",
+        "post_commands",
+    }
+)
+_JOB_LIST_OVERRIDE_FIELDS = frozenset({"modules", "pre_commands", "post_commands"})
+
+
+def _is_empty_scalar_override(value: Any) -> bool:
+    return isinstance(value, str) and value == ""
+
+
+def _present_override_fields(
+    raw_section: object,
+    allowed_fields: frozenset[str],
+) -> set[str]:
+    if not isinstance(raw_section, dict):
+        return set()
+    return {
+        str(key)
+        for key in raw_section
+        if isinstance(key, str) and key in allowed_fields
+    }
+
+
+def _merge_classification(
+    base: ClassificationData,
+    override: ClassificationData,
+    raw_override: object,
+) -> ClassificationData:
+    """Apply survey classification keys as a partial overlay."""
+    fields = _present_override_fields(raw_override, _CLASSIFICATION_OVERRIDE_FIELDS)
+    updates: dict[str, Any] = {}
+    if "model" in fields and not _is_empty_scalar_override(override.model):
+        updates["model"] = override.model
+    if "submodel" in fields and not _is_empty_scalar_override(override.submodel):
+        updates["submodel"] = override.submodel
+    if "tags" in fields:
+        updates["tags"] = list(override.tags)
+    if not updates:
+        return base
+    return replace(base, **updates)
+
+
+def _merge_job(
+    base: JobData,
+    override: JobData,
+    raw_override: object,
+) -> JobData:
+    """Apply survey job keys as a partial overlay.
+
+    ``load_survey`` fills omitted job keys with defaults, so raw TOML keys are
+    the only reliable way to distinguish absent values from explicit empty or
+    zero values. List fields replace the base list when the key is present.
+    """
+    fields = _present_override_fields(raw_override, _JOB_OVERRIDE_FIELDS)
+    updates: dict[str, Any] = {}
+    for field in fields:
+        value = getattr(override, field)
+        if field in _JOB_LIST_OVERRIDE_FIELDS and isinstance(value, list):
+            value = list(value)
+        elif _is_empty_scalar_override(value):
+            continue
+        updates[field] = value
+    if not updates:
+        return base
+    return replace(base, **updates)
 
 
 def _build_manifest(
@@ -556,12 +644,16 @@ def create_survey_runs(
         simulator=simulator_name,
         launcher=launcher_name,
         description=case_data.description,
-        classification=(
-            survey_data.classification
-            if survey_data.classification.model
-            else case_data.classification
+        classification=_merge_classification(
+            case_data.classification,
+            survey_data.classification,
+            survey_data.raw.get("classification", {}),
         ),
-        job=survey_data.job if survey_data.job.partition else case_data.job,
+        job=_merge_job(
+            case_data.job,
+            survey_data.job,
+            survey_data.raw.get("job", {}),
+        ),
         params=case_data.params,
         case_dir=case_data.case_dir,
         raw=case_data.raw,

@@ -47,6 +47,11 @@ def _make_case(project_dir: Path, case_name: str) -> Path:
         f'launcher = "slurm_srun"\n'
         f'description = "A test case"\n'
         f"\n"
+        f"[classification]\n"
+        f'model = "base_model"\n'
+        f'submodel = "base_submodel"\n'
+        f'tags = ["baseline"]\n'
+        f"\n"
         f"[job]\n"
         f'partition = "debug"\n'
         f"nodes = 1\n"
@@ -294,6 +299,60 @@ class TestSweep:
 
         assert manifest["origin"]["survey"] == "S20260327-test"
         assert set(manifest["variation"]["changed_keys"]) == {"nx", "ny"}
+
+    def test_sweep_applies_partial_survey_overrides(self, tmp_path: Path) -> None:
+        """Survey [classification]/[job] fields overlay the base case by key."""
+        try:
+            import tomllib
+        except ModuleNotFoundError:  # pragma: no cover - Python < 3.11
+            import tomli as tomllib
+
+        project_dir = _make_project(tmp_path)
+        _make_case(project_dir, "base_case")
+        survey_dir = project_dir / "runs" / "my_survey"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text(
+            "[survey]\n"
+            'id = "S20260327-partial"\n'
+            'name = "Partial override survey"\n'
+            'base_case = "base_case"\n'
+            'simulator = "test_sim"\n'
+            'launcher = "slurm_srun"\n'
+            "\n"
+            "[classification]\n"
+            'tags = ["scan"]\n'
+            "\n"
+            "[axes]\n"
+            "nx = [32]\n"
+            "\n"
+            "[job]\n"
+            'walltime = "02:30:00"\n'
+            'modules = ["custom/module"]\n'
+        )
+
+        result = runner.invoke(app, ["runs", "sweep", str(survey_dir)])
+        assert result.exit_code == 0, result.output
+
+        run_dirs = [
+            d
+            for d in survey_dir.iterdir()
+            if d.is_dir() and (d / "manifest.toml").exists()
+        ]
+        assert len(run_dirs) == 1
+        with open(run_dirs[0] / "manifest.toml", "rb") as f:
+            manifest = tomllib.load(f)
+        job_sh = (run_dirs[0] / "submit" / "job.sh").read_text()
+
+        assert manifest["classification"] == {
+            "model": "base_model",
+            "submodel": "base_submodel",
+            "tags": ["scan"],
+        }
+        assert manifest["job"]["partition"] == "debug"
+        assert manifest["job"]["nodes"] == 1
+        assert manifest["job"]["ntasks"] == 4
+        assert manifest["job"]["walltime"] == "02:30:00"
+        assert "module load custom/module" in job_sh
 
     def test_sweep_dry_run_does_not_create_runs(self, tmp_path: Path) -> None:
         """--dry-run prints planned runs and resource estimate without writing."""

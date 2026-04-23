@@ -462,6 +462,29 @@ steps = [100, 1000]
 
 Same as `case.toml [job]`. Shared across all generated runs.
 
+### Survey-level overrides
+
+`[classification]` and `[job]` in `survey.toml` are partial overlays on the
+`base_case`. Only fields written in `survey.toml` are considered; omitted fields
+are inherited from `case.toml`.
+
+Scalar fields replace the case value when the survey value is non-empty.
+List fields replace the case list when present, including an explicit empty
+list. Supported list fields are `classification.tags`, `job.modules`,
+`job.pre_commands`, and `job.post_commands`.
+
+For example, this keeps the base case model, partition, nodes, and task count,
+while changing only tags, walltime, and modules:
+
+```toml
+[classification]
+tags = ["scan"]
+
+[job]
+walltime = "02:30:00"
+modules = ["custom/module"]
+```
+
 ---
 
 ## manifest.toml

@@ -11,8 +11,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.case import JobData
-from runops.core.run_creation import _build_job_config, _build_manifest_job
+from runops.core.case import ClassificationData, JobData
+from runops.core.run_creation import (
+    _build_job_config,
+    _build_manifest_job,
+    _merge_classification,
+    _merge_job,
+)
 from runops.core.site import SiteProfile
 from runops.jobgen.generator import generate_job_script
 
@@ -122,6 +127,119 @@ class TestBuildManifestJob:
         assert result["nodes"] == 2
         assert result["ntasks"] == 8
         assert "processes" not in result
+
+
+class TestSurveyOverrides:
+    """Survey metadata overrides are partial overlays on the base case."""
+
+    def test_classification_tags_only_preserves_model_fields(self) -> None:
+        base = ClassificationData(
+            model="plasma",
+            submodel="beam",
+            tags=["baseline"],
+        )
+        override = ClassificationData(tags=["scan"])
+        result = _merge_classification(base, override, {"tags": ["scan"]})
+        assert result == ClassificationData(
+            model="plasma",
+            submodel="beam",
+            tags=["scan"],
+        )
+
+    def test_classification_explicit_empty_tags_clears_tags(self) -> None:
+        base = ClassificationData(model="plasma", tags=["baseline"])
+        override = ClassificationData(tags=[])
+        result = _merge_classification(base, override, {"tags": []})
+        assert result.tags == []
+        assert result.model == "plasma"
+
+    def test_job_walltime_only_preserves_partition_and_size(self) -> None:
+        base = JobData(
+            partition="compute",
+            nodes=2,
+            ntasks=16,
+            walltime="01:00:00",
+        )
+        override = JobData(walltime="02:30:00")
+        result = _merge_job(base, override, {"walltime": "02:30:00"})
+        assert result.partition == "compute"
+        assert result.nodes == 2
+        assert result.ntasks == 16
+        assert result.walltime == "02:30:00"
+
+    def test_job_qos_only_preserves_partition(self) -> None:
+        base = JobData(partition="compute", walltime="01:00:00")
+        override = JobData(qos="debug")
+        result = _merge_job(base, override, {"qos": "debug"})
+        assert result.partition == "compute"
+        assert result.walltime == "01:00:00"
+        assert result.qos == "debug"
+
+    def test_job_list_fields_replace_when_present(self) -> None:
+        base = JobData(
+            partition="compute",
+            qos="normal",
+            modules=["base"],
+            pre_commands=["echo before"],
+        )
+        override = JobData(
+            modules=["extra"],
+            pre_commands=[],
+        )
+        result = _merge_job(
+            base,
+            override,
+            {"modules": ["extra"], "pre_commands": []},
+        )
+        assert result.partition == "compute"
+        assert result.qos == "normal"
+        assert result.modules == ["extra"]
+        assert result.pre_commands == []
+
+    def test_empty_scalar_values_keep_case_values(self) -> None:
+        classification = ClassificationData(
+            model="plasma",
+            submodel="beam",
+            tags=["baseline"],
+        )
+        job = JobData(
+            partition="compute",
+            walltime="03:00:00",
+            qos="normal",
+        )
+        assert (
+            _merge_classification(
+                classification,
+                ClassificationData(model="", submodel=""),
+                {"model": "", "submodel": ""},
+            )
+            == classification
+        )
+        assert (
+            _merge_job(
+                job,
+                JobData(partition="", walltime="", qos=""),
+                {"partition": "", "walltime": "", "qos": ""},
+            )
+            == job
+        )
+
+    def test_empty_raw_sections_keep_case_values(self) -> None:
+        classification = ClassificationData(
+            model="plasma",
+            submodel="beam",
+            tags=["baseline"],
+        )
+        job = JobData(partition="compute", walltime="03:00:00")
+        assert (
+            _merge_classification(
+                classification,
+                ClassificationData(model="ignored"),
+                {},
+            )
+            == classification
+        )
+        assert _merge_job(job, JobData(partition="ignored"), {}) == job
 
 
 class TestEndToEndRsc:

@@ -542,6 +542,12 @@ ntasks = 32
 walltime = "12:00:00"
 ```
 
+`survey.toml` の `[classification]` と `[job]` は、`base_case` の
+`case.toml` に対する field-wise override として扱う。書かれていない
+field は case 側から継承する。scalar field は survey 側の値が空でない
+場合に上書きし、list field は survey 側に field が存在する場合にリスト
+全体を置換する（空リストも明示的な置換として扱う）。
+
 ## 11.2.1 連動パラメータ (`[[linked]]`)
 
 `[axes]` は各パラメータを独立に直積展開するが、`[[linked]]` を使うと複数パラメータを連動（zip）して変化させられる。
