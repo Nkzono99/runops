@@ -11,6 +11,7 @@ from runops.core.exceptions import InvalidStateTransitionError
 from runops.core.manifest import ManifestData, write_manifest
 from runops.core.state import (
     RunState,
+    reset_state_for_retry,
     transition_state,
     update_state,
     validate_transition,
@@ -134,3 +135,80 @@ class TestUpdateState:
 
         update_state(tmp_path, RunState.SUBMITTED)
         assert (tmp_path / "status" / "state.json").exists()
+
+
+class TestResetStateForRetry:
+    """Tests for reset_state_for_retry()."""
+
+    def test_resets_failed_run_and_writes_state_json(self, tmp_path: Path) -> None:
+        data = ManifestData(
+            run={
+                "id": "R20260327-0001",
+                "status": "failed",
+                "failure_reason": "timeout",
+                "last_slurm_state": "TIMEOUT",
+            },
+            job={
+                "job_id": "12345",
+                "submitted_at": "2026-04-01T00:00:00Z",
+            },
+        )
+        write_manifest(tmp_path, data)
+
+        previous = reset_state_for_retry(
+            tmp_path,
+            job_updates={"attempt": 1, "retry_adjustments": {"walltime": "2x"}},
+        )
+
+        assert previous is RunState.FAILED
+
+        from runops.core.manifest import read_manifest
+
+        manifest = read_manifest(tmp_path)
+        assert manifest.run["status"] == "created"
+        assert manifest.run["failure_reason"] == ""
+        assert manifest.run["last_slurm_state"] == ""
+        assert manifest.job["job_id"] == ""
+        assert manifest.job["submitted_at"] == ""
+        assert manifest.job["attempt"] == 1
+        assert manifest.job["retry_adjustments"] == {"walltime": "2x"}
+
+        state_data = json.loads((tmp_path / "status" / "state.json").read_text())
+        assert state_data["state"] == "created"
+        assert state_data["previous_state"] == "failed"
+        assert state_data["reason"] == "retry"
+        assert "slurm_state" not in state_data
+
+    def test_resets_cancelled_run(self, tmp_path: Path) -> None:
+        data = ManifestData(
+            run={
+                "id": "R20260327-0002",
+                "status": "cancelled",
+                "last_slurm_state": "CANCELLED",
+            },
+            job={"job_id": "12345"},
+        )
+        write_manifest(tmp_path, data)
+
+        previous = reset_state_for_retry(tmp_path)
+
+        assert previous is RunState.CANCELLED
+
+        from runops.core.manifest import read_manifest
+
+        manifest = read_manifest(tmp_path)
+        assert manifest.run["status"] == "created"
+        assert manifest.run["last_slurm_state"] == ""
+        assert manifest.job["job_id"] == ""
+
+    def test_rejects_non_terminal_retry_reset(self, tmp_path: Path) -> None:
+        data = ManifestData(
+            run={"id": "R20260327-0003", "status": "created"},
+        )
+        write_manifest(tmp_path, data)
+
+        with pytest.raises(InvalidStateTransitionError) as exc_info:
+            reset_state_for_retry(tmp_path)
+
+        assert exc_info.value.current == "created"
+        assert exc_info.value.target == "created"

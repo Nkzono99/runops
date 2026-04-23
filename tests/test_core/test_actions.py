@@ -302,7 +302,11 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
                 "failure_reason": "",
                 "last_slurm_state": "CANCELLED",
             },
-            "job": {"attempt": 1},
+            "job": {
+                "attempt": 1,
+                "job_id": "12345",
+                "submitted_at": "2026-04-18T00:00:00Z",
+            },
         },
     )
 
@@ -315,7 +319,19 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
     from runops.core.manifest import read_manifest
 
     updated = read_manifest(run_dir)
+    assert updated.run["status"] == "created"
+    assert updated.run["failure_reason"] == ""
     assert updated.run["last_slurm_state"] == ""
+    assert updated.job["job_id"] == ""
+    assert updated.job["submitted_at"] == ""
+
+    state_file = run_dir / "status" / "state.json"
+    assert state_file.exists()
+    with open(state_file, encoding="utf-8") as f:
+        state_data = json.load(f)
+    assert state_data["state"] == "created"
+    assert state_data["previous_state"] == "cancelled"
+    assert state_data["reason"] == "retry"
 
 
 def test_retry_run_respects_max_attempts(tmp_path: Path) -> None:

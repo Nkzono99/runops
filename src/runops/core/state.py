@@ -179,12 +179,107 @@ def update_state(
 
     update_manifest(run_dir, {"run": run_updates})
 
-    # Write status/state.json
+    _write_state_json(
+        run_dir,
+        new_state=new_state,
+        previous_state=current,
+        timestamp=timestamp,
+        reason=reason,
+        slurm_state=slurm_state,
+    )
+
+
+def reset_state_for_retry(
+    run_dir: Path,
+    *,
+    timestamp: datetime | None = None,
+    run_updates: dict[str, Any] | None = None,
+    job_updates: dict[str, Any] | None = None,
+) -> RunState:
+    """Reset a failed or cancelled run to created for a retry attempt.
+
+    This is a deliberate lifecycle reset, not a normal state-machine
+    transition. It updates both ``manifest.toml`` and ``status/state.json``
+    so agent-facing status views remain consistent with the manifest.
+
+    Args:
+        run_dir: Path to the run directory.
+        timestamp: Optional timestamp for the reset. Defaults to current UTC
+            time.
+        run_updates: Additional ``[run]`` manifest fields to write after the
+            default retry reset fields.
+        job_updates: Additional ``[job]`` manifest fields to write after the
+            default retry reset fields.
+
+    Returns:
+        The previous terminal state.
+
+    Raises:
+        InvalidStateTransitionError: If the current state is not failed or
+            cancelled.
+        ManifestNotFoundError: If manifest.toml does not exist.
+    """
+    from runops.core.manifest import read_manifest, update_manifest
+
+    if timestamp is None:
+        timestamp = datetime.now(tz=timezone.utc)
+
+    manifest = read_manifest(run_dir)
+    current_str = manifest.run.get("status", "")
+    try:
+        current = RunState(current_str)
+    except ValueError:
+        raise InvalidStateTransitionError(current_str, RunState.CREATED.value) from None
+
+    if current not in {RunState.FAILED, RunState.CANCELLED}:
+        raise InvalidStateTransitionError(current.value, RunState.CREATED.value)
+
+    merged_run_updates: dict[str, Any] = {
+        "status": RunState.CREATED.value,
+        "failure_reason": "",
+        "last_slurm_state": "",
+    }
+    if run_updates:
+        merged_run_updates.update(run_updates)
+    merged_job_updates: dict[str, Any] = {
+        "job_id": "",
+        "submitted_at": "",
+    }
+    if job_updates:
+        merged_job_updates.update(job_updates)
+
+    update_manifest(
+        run_dir,
+        {
+            "run": merged_run_updates,
+            "job": merged_job_updates,
+        },
+    )
+    _write_state_json(
+        run_dir,
+        new_state=RunState.CREATED,
+        previous_state=current,
+        timestamp=timestamp,
+        reason="retry",
+    )
+    return current
+
+
+def _write_state_json(
+    run_dir: Path,
+    *,
+    new_state: RunState,
+    previous_state: RunState,
+    timestamp: datetime,
+    reason: str = "",
+    slurm_state: str = "",
+) -> None:
+    """Write the status/state.json mirror for a state change."""
     status_dir = run_dir / "status"
     status_dir.mkdir(parents=True, exist_ok=True)
     state_json: dict[str, Any] = {
         "state": new_state.value,
-        "previous_state": current.value,
+        "previous_state": previous_state.value,
         "changed_at": timestamp.isoformat(),
     }
     if reason:

@@ -227,11 +227,11 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     ),
     "retry_run": ActionSpec(
         name="retry_run",
-        description="Prepare a failed run for resubmission.",
+        description="Prepare a failed or cancelled run for resubmission.",
         required_params=("run_dir",),
         optional_params=("adjustments", "reviewed_log"),
-        preconditions=("run state == failed",),
-        state_change="failed -> created",
+        preconditions=("run state == failed or cancelled",),
+        state_change="failed/cancelled -> created",
         risk_level="medium",
         cost_class="medium",
         confirmation_conditions=(
@@ -852,8 +852,9 @@ def retry_run(
     reviewed_log: bool = False,
 ) -> ActionResult:
     """Resubmit a failed or cancelled run as a new attempt."""
-    from runops.core.manifest import read_manifest, update_manifest
+    from runops.core.manifest import read_manifest
     from runops.core.retry import get_attempt_count
+    from runops.core.state import reset_state_for_retry
 
     state_str, err = _require_state(run_dir, RunState.FAILED, RunState.CANCELLED)
     if err:
@@ -874,21 +875,11 @@ def retry_run(
             "failure_reason 'exit_error' requires log review before retrying",
         )
 
-    # Reset state to created for resubmission
-    update_manifest(
+    reset_state_for_retry(
         run_dir,
-        {
-            "run": {
-                "status": RunState.CREATED.value,
-                "failure_reason": "",
-                "last_slurm_state": "",
-            },
-            "job": {
-                "job_id": "",
-                "submitted_at": "",
-                "attempt": attempt,
-                "retry_adjustments": adjustments or {},
-            },
+        job_updates={
+            "attempt": attempt,
+            "retry_adjustments": adjustments or {},
         },
     )
 
