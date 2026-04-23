@@ -97,7 +97,7 @@ def setup(
         skipped.extend(refs_skipped)
 
     # 5. Ensure .runops/ skeleton exists
-    from runops.cli.init import _create_runops_skeleton
+    from runops.cli.init_scaffold import _create_runops_skeleton
 
     _create_runops_skeleton(project_dir, created)
 
