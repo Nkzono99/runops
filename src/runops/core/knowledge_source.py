@@ -913,199 +913,22 @@ def import_external_facts(
     return synced_sources, total_facts
 
 
-# ---------- Validation ----------
-
-
-def _validate_import_paths(
-    source_path: Path,
-    import_paths: list[str],
-    *,
-    context: str,
-) -> list[str]:
-    issues: list[str] = []
-    for rel_path in import_paths:
-        try:
-            target = _resolve_import_target(source_path, rel_path)
-        except KnowledgeSourceError as exc:
-            issues.append(f"{context}: {exc}")
-            continue
-        if not target.exists():
-            issues.append(f"{context}: missing import target: {rel_path}")
-        elif not target.is_file():
-            issues.append(f"{context}: import target is not a file: {rel_path}")
-    return issues
-
-
-def _validate_analysis_file(
-    path: Path,
-    *,
-    source_path: Path,
-    kind: str,
-) -> list[str]:
-    issues: list[str] = []
-    try:
-        with open(path, "rb") as f:
-            raw = tomllib.load(f)
-    except tomllib.TOMLDecodeError as exc:
-        issues.append(
-            f"{kind} schema parse failed: "
-            f"{path.relative_to(source_path).as_posix()} ({exc})"
-        )
-        return issues
-    except OSError as exc:
-        issues.append(
-            f"{kind} schema not readable: "
-            f"{path.relative_to(source_path).as_posix()} ({exc})"
-        )
-        return issues
-
-    rel = path.relative_to(source_path).as_posix()
-    if kind == "observables":
-        observable = raw.get("observable")
-        observables = raw.get("observables")
-        if isinstance(observable, dict):
-            if not any(key in observable for key in ("source", "path", "metric")):
-                issues.append(f"observables schema missing source/path/metric in {rel}")
-            return issues
-        if isinstance(observables, dict) and observables:
-            for name, entry in observables.items():
-                if not isinstance(entry, dict):
-                    issues.append(f"observables.{name} must be a table in {rel}")
-                    continue
-                if not any(key in entry for key in ("source", "path", "metric")):
-                    issues.append(
-                        f"observables.{name} missing source/path/metric in {rel}"
-                    )
-            return issues
-        issues.append(
-            f"observables schema must define [observable] or [observables] in {rel}"
-        )
-        return issues
-
-    recipe = raw.get("recipe")
-    recipes = raw.get("recipes")
-    required_recipe_keys = ("plot", "steps", "imports", "kind", "x", "y")
-    if isinstance(recipe, dict):
-        if not any(key in recipe for key in required_recipe_keys):
-            issues.append(f"recipe schema missing recipe definition keys in {rel}")
-        return issues
-    if isinstance(recipes, dict) and recipes:
-        for name, entry in recipes.items():
-            if not isinstance(entry, dict):
-                issues.append(f"recipes.{name} must be a table in {rel}")
-                continue
-            if not any(key in entry for key in required_recipe_keys):
-                issues.append(f"recipes.{name} missing recipe definition keys in {rel}")
-        return issues
-    issues.append(f"recipe schema must define [recipe] or [recipes] in {rel}")
-    return issues
-
-
 def validate_source_structure(source_path: Path) -> list[str]:
-    """Validate that a knowledge source has the expected structure.
+    """Validate that a knowledge source has the expected structure."""
+    from runops.core.knowledge_source_validation import (
+        validate_source_structure as _validate_source_structure,
+    )
 
-    Returns:
-        List of issue descriptions (empty = valid).
-    """
-    issues: list[str] = []
-
-    if not source_path.is_dir():
-        issues.append(f"Source directory not found: {source_path}")
-        return issues
-
-    if not (source_path / "profiles").is_dir():
-        issues.append("Missing required directory: profiles/")
-
-    if not (source_path / "README.md").is_file():
-        issues.append("Missing required file: README.md")
-
-    profile_paths = sorted((source_path / "profiles").glob("*.md"))
-    if (source_path / "profiles").is_dir() and not profile_paths:
-        issues.append("Missing required profile markdown files under profiles/*.md")
-
-    for profile_path in profile_paths:
-        try:
-            content = profile_path.read_text(encoding="utf-8")
-        except OSError as exc:
-            issues.append(f"Profile not readable: {profile_path} ({exc})")
-            continue
-        if not content.strip():
-            issues.append(
-                f"Profile is empty: {profile_path.relative_to(source_path).as_posix()}"
-            )
-            continue
-        issues.extend(
-            _validate_import_paths(
-                source_path,
-                _parse_import_directives(content),
-                context=profile_path.relative_to(source_path).as_posix(),
-            )
-        )
-
-    try:
-        manifest = load_entrypoints(source_path)
-    except KnowledgeSourceError as exc:
-        issues.append(str(exc))
-    else:
-        if manifest is not None:
-            issues.extend(
-                _validate_import_paths(
-                    source_path,
-                    list(manifest.imports),
-                    context=_ENTRYPOINTS_FILE,
-                )
-            )
-            for profile_name, imports in manifest.profile_imports.items():
-                if not _profile_markdown_path(source_path, profile_name).is_file():
-                    issues.append(
-                        f"{_ENTRYPOINTS_FILE}: profile '{profile_name}' has no "
-                        "matching profiles/<name>.md"
-                    )
-                issues.extend(
-                    _validate_import_paths(
-                        source_path,
-                        list(imports),
-                        context=f"{_ENTRYPOINTS_FILE}: profiles.{profile_name}",
-                    )
-                )
-
-    for agent_doc in sorted(source_path.rglob("agent-*.md")):
-        try:
-            content = agent_doc.read_text(encoding="utf-8")
-        except OSError as exc:
-            issues.append(f"Agent doc not readable: {agent_doc} ({exc})")
-            continue
-        if not content.strip():
-            issues.append(
-                f"Agent doc is empty: {agent_doc.relative_to(source_path).as_posix()}"
-            )
-
-    analysis_dir = source_path / "analysis"
-    for kind in ("observables", "recipes"):
-        kind_dir = analysis_dir / kind
-        if not kind_dir.is_dir():
-            continue
-        for file_path in sorted(kind_dir.rglob("*.toml")):
-            issues.extend(
-                _validate_analysis_file(
-                    file_path,
-                    source_path=source_path,
-                    kind=kind,
-                )
-            )
-
-    return issues
+    return _validate_source_structure(source_path)
 
 
 def discover_profiles(source_path: Path) -> list[str]:
-    """List available profile names from a knowledge source.
+    """List available profile names from a knowledge source."""
+    from runops.core.knowledge_source_validation import (
+        discover_profiles as _discover_profiles,
+    )
 
-    Scans ``profiles/*.md`` and returns stems.
-    """
-    profiles_dir = source_path / "profiles"
-    if not profiles_dir.is_dir():
-        return []
-    return sorted(p.stem for p in profiles_dir.glob("*.md"))
+    return _discover_profiles(source_path)
 
 
 # ---------- Rendering ----------
@@ -1117,88 +940,13 @@ def render_imports(
     *,
     extra_imports: list[str] | None = None,
 ) -> Path:
-    """Generate imports.md from enabled profiles.
+    """Generate imports.md from enabled profiles."""
+    from runops.core.knowledge_source_render import (
+        render_imports as _render_imports,
+    )
 
-    Reads each enabled profile file and generates a single
-    ``imports.md`` that uses ``@import`` directives to reference
-    source content.
-
-    Args:
-        project_root: Project root directory.
-        config: Knowledge configuration.
-        extra_imports: Additional relative paths to include as
-            ``@import`` directives (e.g. agent docs from refs/).
-
-    Returns:
-        Path to the generated imports.md file.
-    """
-    enabled_dir = project_root / config.derived_dir / "enabled"
-    enabled_dir.mkdir(parents=True, exist_ok=True)
-    imports_path = enabled_dir / "imports.md"
-
-    lines: list[str] = [
-        "<!-- Auto-generated by runops knowledge source render. Do not edit. -->",
-        "",
-    ]
-
-    rendered_paths: set[str] = set()
-    for source in config.sources:
-        if source.kind != "profiles":
-            continue
-
-        mount_path = _mount_path(project_root, source)
-        if mount_path is None:
-            lines.append(f"<!-- source {source.name}: mount not configured -->")
-            continue
-        if not mount_path.is_dir():
-            lines.append(f"<!-- source {source.name}: not mounted -->")
-            continue
-
-        try:
-            source_imports = _resolve_profile_imports(mount_path, source)
-        except KnowledgeSourceError as exc:
-            lines.append(f"<!-- source {source.name}: invalid entrypoints ({exc}) -->")
-            continue
-
-        if not source_imports:
-            lines.append(f"<!-- source {source.name}: no entrypoints enabled -->")
-            continue
-
-        for rel_path in source_imports:
-            try:
-                resolved = _resolve_import_target(mount_path, rel_path)
-            except KnowledgeSourceError as exc:
-                lines.append(f"<!-- source {source.name}: {exc} -->")
-                continue
-            if not resolved.is_file():
-                profile_match = rel_path.startswith("profiles/") and rel_path.endswith(
-                    ".md"
-                )
-                if profile_match:
-                    profile_name = Path(rel_path).stem
-                    lines.append(
-                        f"<!-- profile {profile_name} not found in {source.name} -->"
-                    )
-                else:
-                    lines.append(
-                        f"<!-- source {source.name}: missing import target "
-                        f"{rel_path} -->"
-                    )
-                continue
-            rendered = f"{source.mount}/{rel_path}".replace("\\", "/")
-            if rendered not in rendered_paths:
-                rendered_paths.add(rendered)
-                lines.append(f"@{rendered}")
-
-    if extra_imports:
-        lines.append("")
-        for path in extra_imports:
-            normalized = path.replace("\\", "/")
-            if normalized in rendered_paths:
-                continue
-            rendered_paths.add(normalized)
-            lines.append(f"@{normalized}")
-
-    lines.append("")  # trailing newline
-    imports_path.write_text("\n".join(lines), encoding="utf-8")
-    return imports_path
+    return _render_imports(
+        project_root,
+        config,
+        extra_imports=extra_imports,
+    )
