@@ -41,6 +41,9 @@ dev = [
 target-version = "py310"
 line-length = 88
 src = ["src", "tests"]
+extend-exclude = [
+    "src/runops/templates/scaffold/vscode_settings.json",
+]
 
 [tool.ruff.lint]
 select = [

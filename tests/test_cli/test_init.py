@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from unittest.mock import patch
 
@@ -130,6 +131,45 @@ class TestInit:
         assert "runs/**/analysis/scratch/" in content
         assert "AGENTS.override.md" in content
 
+    def test_init_vscode_settings_hide_generated_artifacts(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """VS Code hides generated/internal files while keeping sources visible."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        settings = json.loads(
+            (tmp_path / ".vscode" / "settings.json").read_text(encoding="utf-8")
+        )
+
+        files_exclude = settings["files.exclude"]
+        assert files_exclude[".venv"] is True
+        assert files_exclude["tools"] is True
+        assert files_exclude["refs"] is True
+        assert files_exclude[".runops/knowledge"] is True
+        assert files_exclude[".runops/environment.toml"] is True
+        assert files_exclude["runs/**/work"] is True
+        assert files_exclude["runs/**/status"] is True
+        assert files_exclude["runs/**/submit"] is True
+        assert files_exclude["runs/**/manifest.toml"] is True
+        assert "cases" not in files_exclude
+        assert "notes" not in files_exclude
+        assert "materials" not in files_exclude
+        assert "runs/**/survey.toml" not in files_exclude
+
+        search_exclude = settings["search.exclude"]
+        assert search_exclude["materials/**/*.pdf"] is True
+        assert "materials" not in search_exclude
+
+        watcher_exclude = settings["files.watcherExclude"]
+        assert watcher_exclude[".venv/**"] is True
+        assert watcher_exclude["runs/**/work/**"] is True
+        assert watcher_exclude["runs/**/status/**"] is True
+
+        analysis_exclude = settings["python.analysis.exclude"]
+        assert ".venv" in analysis_exclude
+        assert "refs" in analysis_exclude
+        assert "runs/**/work" in analysis_exclude
+
     def test_init_skips_existing_files(self, tmp_path: Path) -> None:
         """Init does not overwrite existing files."""
         (tmp_path / "runops.toml").write_text('[project]\nname = "original"\n')
@@ -254,7 +294,6 @@ class TestInit:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         settings_path = tmp_path / ".claude" / "settings.json"
         assert settings_path.exists()
-        import json
 
         data = json.loads(settings_path.read_text(encoding="utf-8"))
         assert "permissions" in data

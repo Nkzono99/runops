@@ -47,3 +47,12 @@
 - 毎回いきなり大量投入せず、Agent に `context` と `plan` を見せてもらってから初回 bulk submit に進む。
 - 解析が終わったら `knowledge save` や `add-fact` まで含めて 1 セットで閉じると、次の実験設計が速くなります。
 
+## Git ignore と VS Code 表示
+
+`runo init` は `.gitignore` と `.vscode/settings.json` の両方を生成します。
+この 2 つは役割が違います。
+
+- `.gitignore` は Git に載せないものを決めます。`.venv/`、`tools/`、`refs/`、`runs/**/work/`、`.runops/knowledge/` などの再生成可能または大きい成果物を対象にします。
+- VS Code の `files.exclude` は Explorer のノイズを減らします。生成済み run artifact や内部状態は隠しますが、`campaign.toml`、`cases/**`、`runs/**/survey.toml`、`notes/**`、`materials/**` は見えるままにします。
+- VS Code の `search.exclude` は検索ノイズを減らします。PDF などの人間が置いた資料は Explorer からは隠さず、検索対象からだけ外すのが基本です。
+- `files.watcherExclude` と `python.analysis.exclude` は editor の負荷を下げるための設定で、runops の保護ルールや Git 管理とは別物です。
