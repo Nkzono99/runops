@@ -15,10 +15,11 @@ def test_help_shows_primary_commands() -> None:
         ["--help"],
         env={"COLUMNS": "160", "TERM": "dumb", "NO_COLOR": "1"},
     )
+    normalized_output = " ".join(result.output.split())
     assert result.exit_code == 0
     assert app.info.name == "runo"
-    assert "Preferred command: runo" in result.output
-    assert "Stable alias: runops" in result.output
+    assert "Preferred command: runo" in normalized_output
+    assert "Stable alias: runops" in normalized_output
     for cmd in [
         "init",
         "setup",
