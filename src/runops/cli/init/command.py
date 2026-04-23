@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-import logging
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
 import typer
 
+from runops.cli.init.knowledge import _clone_doc_repos, _prepare_knowledge_imports
+from runops.cli.init.prompting import _BundledSiteProfile
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
     _create_notes_skeleton,
@@ -19,10 +19,15 @@ from runops.cli.init.scaffold import (
     _mkdir_if_missing,
     _write_if_missing,
 )
+from runops.cli.init.serialization import (
+    _build_campaign_toml,
+    _build_launchers_toml,
+    _build_simulators_toml,
+    _build_simulators_toml_from_configs,
+)
 from runops.core.discovery import validate_uniqueness
 from runops.core.exceptions import DuplicateRunIdError, ProjectConfigError
 from runops.core.project import load_project
-from runops.harness.builder import _collect_doc_repos
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -33,8 +38,6 @@ try:
     import tomli_w
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
-
-logger = logging.getLogger(__name__)
 
 _SIMPROJECT_FILE = "runops.toml"
 _SIMULATORS_FILE = "simulators.toml"
@@ -62,598 +65,6 @@ def _safe_echo(message: str, *, err: bool = False) -> None:
             errors="replace",
         )
         typer.echo(safe_message, err=err)
-
-
-def _build_simulators_toml(simulator_names: list[str]) -> str:
-    """Build simulators.toml content from adapter default configs.
-
-    Args:
-        simulator_names: List of simulator adapter names (e.g. ["emses", "beach"]).
-
-    Returns:
-        TOML string for simulators.toml.
-
-    Raises:
-        typer.BadParameter: If a simulator name is not recognized.
-    """
-    # Ensure built-in adapters are registered
-    import runops.adapters  # noqa: F401
-    from runops.adapters.registry import get_global_registry
-
-    registry = get_global_registry()
-    available = registry.list_adapters()
-
-    config: dict[str, Any] = {"simulators": {}}
-    for sim_name in simulator_names:
-        if sim_name not in available:
-            msg = f"Unknown simulator: '{sim_name}'. Available: {', '.join(available)}"
-            raise typer.BadParameter(msg)
-        adapter_cls = registry.get(sim_name)
-        config["simulators"][sim_name] = adapter_cls.default_config()
-
-    if tomli_w is None:
-        # Fallback to manual TOML generation
-        lines = ["[simulators]", ""]
-        for sim_name, sim_cfg in config["simulators"].items():
-            lines.append(f"[simulators.{sim_name}]")
-            for key, value in sim_cfg.items():
-                if isinstance(value, list):
-                    items = ", ".join(f'"{v}"' for v in value)
-                    lines.append(f"{key} = [{items}]")
-                elif isinstance(value, str):
-                    lines.append(f'{key} = "{value}"')
-                else:
-                    lines.append(f"{key} = {value}")
-            lines.append("")
-        return "\n".join(lines) + "\n"
-
-    import io
-
-    buf = io.BytesIO()
-    tomli_w.dump(config, buf)
-    return buf.getvalue().decode("utf-8")
-
-
-def _clone_doc_repos(
-    project_dir: Path, simulator_names: list[str]
-) -> tuple[list[str], list[str]]:
-    """Clone documentation repos into project_dir/refs/.
-
-    Returns:
-        Tuple of (created_list, skipped_list).
-    """
-    repos = _collect_doc_repos(simulator_names)
-    if not repos:
-        return [], []
-
-    created: list[str] = []
-    skipped: list[str] = []
-    refs_dir = project_dir / "refs"
-    refs_dir.mkdir(exist_ok=True)
-
-    for url, dest in repos:
-        dest_path = refs_dir / dest
-        rel = f"refs/{dest}"
-        if dest_path.exists():
-            skipped.append(rel)
-            continue
-        result = subprocess.run(
-            ["git", "clone", "--depth", "1", url, str(dest_path)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if result.returncode == 0:
-            created.append(rel)
-        else:
-            logger.warning(
-                "git clone %s failed: %s", url, (result.stderr or "").strip()
-            )
-
-    return created, skipped
-
-
-def _discover_agent_docs(
-    project_dir: Path, doc_repos: list[tuple[str, str]]
-) -> list[str]:
-    """Discover manifest-declared agent doc imports from cloned repos.
-
-    Returns:
-        List of relative import paths rooted at the project directory.
-    """
-    from runops.core.knowledge_source import discover_repo_imports
-
-    refs_dir = project_dir / "refs"
-    paths: list[str] = []
-    for _url, dest in doc_repos:
-        repo_root = refs_dir / dest
-        if not repo_root.is_dir():
-            continue
-        for rel_path in discover_repo_imports(repo_root):
-            paths.append(f"refs/{dest}/{rel_path}".replace("\\", "/"))
-
-    runops_root = project_dir / "tools" / "runops"
-    if runops_root.is_dir():
-        for rel_path in discover_repo_imports(runops_root):
-            paths.append(f"tools/runops/{rel_path}".replace("\\", "/"))
-    return paths
-
-
-def _prepare_knowledge_imports(
-    project_dir: Path,
-    simulator_names: list[str],
-    *,
-    sync_sources: bool = False,
-    validate_sources: bool = False,
-) -> str:
-    """Sync knowledge sources and render the unified imports.md bundle."""
-    from runops.core.knowledge_source import (
-        KnowledgeConfig,
-        load_knowledge_config,
-        render_imports,
-        sync_all_sources,
-        validate_source_structure,
-    )
-
-    knowledge_imports_path = ""
-    config = load_knowledge_config(project_dir)
-
-    if sync_sources and config is not None and config.sources:
-        typer.echo("Syncing knowledge sources...")
-        for name, status in sync_all_sources(project_dir, config):
-            typer.echo(f"  {name}: {status}")
-
-        if validate_sources:
-            for source in config.sources:
-                if not source.mount:
-                    continue
-                source_path = project_dir / source.mount
-                if not source_path.is_dir():
-                    continue
-                issues = validate_source_structure(source_path)
-                for issue in issues:
-                    typer.echo(f"  Warning ({source.name}): {issue}")
-
-    doc_repos = _collect_doc_repos(simulator_names) if simulator_names else []
-    agent_doc_imports = _discover_agent_docs(project_dir, doc_repos)
-
-    render_config = config if config is not None else KnowledgeConfig()
-    should_render = bool(agent_doc_imports or (config is not None and config.sources))
-    if should_render:
-        render_imports(
-            project_dir,
-            render_config,
-            extra_imports=agent_doc_imports or None,
-        )
-        typer.echo("  Rendered knowledge imports")
-
-    if render_config.generate_claude_imports:
-        imports_file = (
-            project_dir / render_config.derived_dir / "enabled" / "imports.md"
-        )
-        if imports_file.is_file():
-            knowledge_imports_path = f"{render_config.derived_dir}/enabled/imports.md"
-
-    return knowledge_imports_path
-
-
-def _search_knowledge_repos() -> list[tuple[str, str]]:
-    """Search GitHub for shared knowledge repos using ``gh``.
-
-    Looks for repos matching ``*shared_knowledge*`` in the
-    authenticated user's repositories.
-
-    Returns:
-        List of (full_name, clone_url) tuples.
-    """
-    try:
-        result = subprocess.run(
-            [
-                "gh",
-                "repo",
-                "list",
-                "--limit",
-                "50",
-                "--json",
-                "nameWithOwner,sshUrl,description",
-            ],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-    except FileNotFoundError:
-        return []
-    if result.returncode != 0:
-        return []
-
-    import json
-
-    try:
-        repos = json.loads(result.stdout)
-    except (json.JSONDecodeError, TypeError):
-        return []
-
-    candidates: list[tuple[str, str]] = []
-    for repo in repos:
-        name = repo.get("nameWithOwner", "")
-        # Match *shared_knowledge* or *shared-knowledge* (case-insensitive)
-        repo_name = name.rsplit("/", 1)[-1] if "/" in name else name
-        lower = repo_name.lower()
-        if "shared_knowledge" in lower or "shared-knowledge" in lower:
-            ssh_url = repo.get("sshUrl", "")
-            if ssh_url:
-                candidates.append((name, ssh_url))
-
-    return candidates
-
-
-def _prompt_knowledge_sources(
-    project_dir: Path,
-) -> list[Any]:
-    """Interactively prompt the user to attach knowledge sources.
-
-    Searches GitHub for repos matching ``*shared_knowledge*`` or
-    ``*shared-knowledge*`` first, then presents them as candidates.
-    Also allows manual URL entry.
-
-    Returns:
-        List of KnowledgeSource to attach.
-    """
-    from runops.core.knowledge_source import KnowledgeSource
-
-    # Search first, then ask
-    typer.echo("\n  Searching GitHub for shared knowledge repos...")
-    candidates = _search_knowledge_repos()
-
-    selected_sources: list[KnowledgeSource] = []
-
-    if candidates:
-        typer.echo("\n  Found knowledge repositories:")
-        for i, (full_name, _url) in enumerate(candidates, 1):
-            typer.echo(f"    {i}. {full_name}")
-
-        selection = typer.prompt(
-            "\n  Select repos to attach (comma-separated numbers, Enter to skip)",
-            default="",
-        )
-
-        for token in selection.split(","):
-            token = token.strip()
-            if not token:
-                continue
-            if token.isdigit():
-                idx = int(token) - 1
-                if 0 <= idx < len(candidates):
-                    full_name, url = candidates[idx]
-                    repo_name = full_name.rsplit("/", 1)[-1]
-                    selected_sources.append(
-                        KnowledgeSource(
-                            name=repo_name,
-                            source_type="git",
-                            url=url,
-                            ref="main",
-                            mount=f"refs/knowledge/{repo_name}",
-                        )
-                    )
-                else:
-                    typer.echo(f"    Warning: ignoring invalid number '{token}'")
-    else:
-        typer.echo("  No shared knowledge repos found on GitHub.")
-
-    # Allow manual entry
-    while True:
-        manual = typer.prompt(
-            "\n  Add a knowledge source manually? "
-            "(git URL, local path, or Enter to finish)",
-            default="",
-        )
-        if not manual.strip():
-            break
-
-        manual = manual.strip()
-        # Detect type
-        is_git = (
-            manual.startswith("https://")
-            or manual.startswith("http://")
-            or manual.startswith("git@")
-        )
-        if is_git:
-            # Extract name from URL
-            stem = manual.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
-            if stem.endswith(".git"):
-                stem = stem[:-4]
-            source_name = typer.prompt("    Source name", default=stem)
-            selected_sources.append(
-                KnowledgeSource(
-                    name=source_name,
-                    source_type="git",
-                    url=manual,
-                    ref="main",
-                    mount=f"refs/knowledge/{source_name}",
-                )
-            )
-        else:
-            # Local path
-            p = Path(manual).expanduser()
-            source_name = typer.prompt("    Source name", default=p.name)
-            selected_sources.append(
-                KnowledgeSource(
-                    name=source_name,
-                    source_type="path",
-                    url=manual,
-                    mount=f"refs/knowledge/{source_name}",
-                )
-            )
-        typer.echo(f"    Added: {source_name}")
-
-    if selected_sources:
-        typer.echo(f"\n  {len(selected_sources)} knowledge source(s) selected.")
-    return selected_sources
-
-
-def _prompt_simulators() -> tuple[list[str], dict[str, dict[str, Any]]]:
-    """Interactively prompt the user to select and configure simulators.
-
-    Returns:
-        Tuple of (simulator_names, {name: config_dict}).
-    """
-    import runops.adapters  # noqa: F401
-    from runops.adapters.registry import get_global_registry
-
-    registry = get_global_registry()
-    available = registry.list_adapters()
-
-    typer.echo("\nAvailable simulators:")
-    for i, name in enumerate(available, 1):
-        typer.echo(f"  {i}. {name}")
-
-    selection = typer.prompt(
-        "\nSelect simulators (comma-separated numbers or names, Enter to skip)",
-        default="",
-    )
-
-    if not selection.strip():
-        return [], {}
-
-    # Parse selection — accept both numbers and names
-    selected: list[str] = []
-    for token in selection.split(","):
-        token = token.strip()
-        if not token:
-            continue
-        if token.isdigit():
-            idx = int(token) - 1
-            if 0 <= idx < len(available):
-                selected.append(available[idx])
-            else:
-                typer.echo(f"  Warning: ignoring invalid number '{token}'")
-        elif token in available:
-            selected.append(token)
-        else:
-            typer.echo(f"  Warning: unknown simulator '{token}', skipping")
-
-    if not selected:
-        return [], {}
-
-    # Interactive config for each selected simulator
-    use_interactive = typer.confirm("\nCustomize simulator settings?", default=False)
-
-    configs: dict[str, dict[str, Any]] = {}
-    for sim_name in selected:
-        adapter_cls = registry.get(sim_name)
-        if use_interactive:
-            configs[sim_name] = adapter_cls.interactive_config()
-        else:
-            configs[sim_name] = adapter_cls.default_config()
-
-    return selected, configs
-
-
-@dataclass
-class _BundledSiteProfile:
-    """A bundled site profile loaded from sites/*.toml.
-
-    Used during ``runo init`` to offer preconfigured site choices.
-    The file uses the same ``[site]`` format as project-level ``site.toml``,
-    plus an optional ``[launcher]`` section for launcher defaults.
-
-    Attributes:
-        name: Site name (file stem, e.g. "camphor").
-        launcher: Launcher-only configuration dict for launchers.toml.
-        source_path: Path to the bundled .toml file (copied as site.toml).
-        docs_path: Path to companion .md documentation (may not exist).
-    """
-
-    name: str
-    launcher: dict[str, Any]
-    source_path: Path
-    docs_path: Path | None = None
-
-
-# Legacy alias for backward compatibility with code that references the old name.
-SiteProfile = _BundledSiteProfile
-
-
-def _load_site_profiles() -> dict[str, _BundledSiteProfile]:
-    """Load site profiles from bundled TOML files in runops/sites/.
-
-    Each file uses the unified format:
-    - ``[site]`` section → copied as-is to project ``site.toml``
-    - ``[launcher]`` section → used for ``launchers.toml`` defaults
-    """
-    sites_dir = Path(__file__).resolve().parent.parent / "sites"
-    profiles: dict[str, _BundledSiteProfile] = {}
-    if not sites_dir.is_dir():
-        return profiles
-    for toml_file in sorted(sites_dir.glob("*.toml")):
-        with open(toml_file, "rb") as f:
-            data = tomllib.load(f)
-        # Require at least a [site] or [launcher] section
-        if "site" not in data and "launcher" not in data:
-            continue
-        launcher_data = dict(data.get("launcher", {}))
-        docs_file = toml_file.with_suffix(".md")
-        profiles[toml_file.stem] = _BundledSiteProfile(
-            name=toml_file.stem,
-            launcher=launcher_data,
-            source_path=toml_file,
-            docs_path=docs_file if docs_file.is_file() else None,
-        )
-    return profiles
-
-
-def _prompt_launchers() -> tuple[dict[str, dict[str, Any]], _BundledSiteProfile | None]:
-    """Interactively prompt for launcher configuration.
-
-    Returns:
-        Tuple of (launcher config dict, selected _BundledSiteProfile or None).
-    """
-    site_profiles = _load_site_profiles()
-
-    typer.echo("\nLauncher configuration:")
-    typer.echo("  Site profiles (preconfigured):")
-    site_names = list(site_profiles.keys())
-    for i, sname in enumerate(site_names, start=1):
-        typer.echo(f"    {i}. {sname}")
-    offset = len(site_names)
-    typer.echo("  Launcher types:")
-    typer.echo(f"    {offset + 1}. srun (Slurm)")
-    typer.echo(f"    {offset + 2}. mpirun (OpenMPI)")
-    typer.echo(f"    {offset + 3}. mpiexec (MPICH)")
-
-    selection = typer.prompt(
-        "\nSelect site profile or launcher type (number or name, Enter to skip)",
-        default="",
-    )
-
-    sel = selection.strip()
-    if not sel:
-        return {}, None
-
-    # Check site profiles first
-    site_map = {str(i): name for i, name in enumerate(site_names, start=1)}
-    if sel in site_map:
-        profile_name = site_map[sel]
-        profile = site_profiles[profile_name]
-        return {profile_name: dict(profile.launcher)}, profile
-    if sel in site_profiles:
-        profile = site_profiles[sel]
-        return {sel: dict(profile.launcher)}, profile
-
-    # Launcher types
-    launcher_map = {
-        str(offset + 1): "srun",
-        str(offset + 2): "mpirun",
-        str(offset + 3): "mpiexec",
-    }
-    launcher_type = launcher_map.get(sel, sel)
-
-    if launcher_type not in ("srun", "mpirun", "mpiexec"):
-        typer.echo(f"  Unknown selection '{sel}', skipping")
-        return {}, None
-
-    launcher_name = typer.prompt("  Launcher profile name", default=launcher_type)
-
-    config: dict[str, Any] = {"type": launcher_type}
-
-    if launcher_type == "srun":
-        use_slurm = typer.confirm(
-            "  Use SLURM_NTASKS (rely on #SBATCH --ntasks)?", default=True
-        )
-        config["use_slurm_ntasks"] = use_slurm
-        config["args"] = typer.prompt(
-            "  Extra srun arguments (e.g. --mpi=pmix)", default=""
-        )
-    elif launcher_type in ("mpirun", "mpiexec"):
-        config["args"] = typer.prompt(f"  Extra {launcher_type} arguments", default="")
-
-    # Module loading
-    modules_str = typer.prompt(
-        "  Modules to load (space-separated, Enter to skip)", default=""
-    )
-    if modules_str.strip():
-        config["modules"] = modules_str.strip().split()
-
-    # Clean empty args
-    if not config.get("args"):
-        config.pop("args", None)
-
-    return {launcher_name: config}, None
-
-
-def _build_simulators_toml_from_configs(
-    configs: dict[str, dict[str, Any]],
-) -> str:
-    """Serialize simulator configs to TOML string."""
-    full_config: dict[str, Any] = {"simulators": configs}
-
-    if tomli_w is None:
-        lines = ["[simulators]", ""]
-        for sim_name, sim_cfg in configs.items():
-            lines.append(f"[simulators.{sim_name}]")
-            for key, value in sim_cfg.items():
-                if isinstance(value, list):
-                    items = ", ".join(f'"{v}"' for v in value)
-                    lines.append(f"{key} = [{items}]")
-                elif isinstance(value, str):
-                    lines.append(f'{key} = "{value}"')
-                else:
-                    lines.append(f"{key} = {value}")
-            lines.append("")
-        return "\n".join(lines) + "\n"
-
-    import io
-
-    buf = io.BytesIO()
-    tomli_w.dump(full_config, buf)
-    return buf.getvalue().decode("utf-8")
-
-
-def _build_launchers_toml(launchers: dict[str, dict[str, Any]]) -> str:
-    """Serialize launcher configs to TOML string."""
-    if not launchers:
-        return "[launchers]\n"
-
-    full_config: dict[str, Any] = {"launchers": launchers}
-
-    if tomli_w is None:
-        lines = ["[launchers]", ""]
-        for name, cfg in launchers.items():
-            lines.append(f"[launchers.{name}]")
-            for key, value in cfg.items():
-                if isinstance(value, list):
-                    items = ", ".join(f'"{v}"' for v in value)
-                    lines.append(f"{key} = [{items}]")
-                elif isinstance(value, str):
-                    lines.append(f'{key} = "{value}"')
-                elif isinstance(value, bool):
-                    lines.append(f"{key} = {str(value).lower()}")
-                else:
-                    lines.append(f"{key} = {value}")
-            lines.append("")
-        return "\n".join(lines) + "\n"
-
-    import io
-
-    buf = io.BytesIO()
-    tomli_w.dump(full_config, buf)
-    return buf.getvalue().decode("utf-8")
-
-
-def _build_campaign_toml(project_name: str, simulator_names: list[str]) -> str:
-    """Build a minimal campaign.toml skeleton."""
-    from runops.templates import render
-
-    return render(
-        "scaffold/campaign.toml.j2",
-        schema_base_url=_SCHEMA_BASE_URL,
-        project_name=project_name,
-        simulator=simulator_names[0] if simulator_names else "",
-    )
 
 
 def init(
@@ -826,7 +237,11 @@ def init(
             created.append("SITE.md")
 
     # campaign.toml
-    campaign_content = _build_campaign_toml(project_name, sim_names)
+    campaign_content = _build_campaign_toml(
+        project_name,
+        sim_names,
+        schema_base_url=_SCHEMA_BASE_URL,
+    )
     if _write_if_missing(project_dir / _CAMPAIGN_FILE, campaign_content):
         created.append(_CAMPAIGN_FILE)
     else:
@@ -864,11 +279,9 @@ def init(
         skipped.extend(refs_skipped)
 
     # .gitignore
-    from runops.templates import load_static
+    from runops.harness.builder import build_gitignore_file
 
-    if _write_if_missing(
-        project_dir / ".gitignore", load_static("scaffold/gitignore.txt")
-    ):
+    if _write_if_missing(project_dir / ".gitignore", build_gitignore_file()):
         created.append(".gitignore")
     else:
         skipped.append(".gitignore")
@@ -905,7 +318,13 @@ def init(
     # Build all harness-managed files (CLAUDE.md, AGENTS.md, skills, rules,
     # settings.json, editor settings, subdirectory CLAUDE.md) via the shared
     # builder so that `runo update-harness` can re-render the same set later.
-    from runops.harness.builder import build_harness_bundle, save_harness_lock
+    from runops.harness.builder import (
+        GITIGNORE_PATH,
+        build_harness_bundle,
+        build_managed_gitignore_block,
+        hash_text,
+        save_harness_lock,
+    )
 
     harness = build_harness_bundle(
         project_name,
@@ -922,7 +341,9 @@ def init(
             skipped.append(rel_path)
 
     # Persist template hashes so update-harness can detect user edits.
-    save_harness_lock(project_dir, harness.hashes())
+    lock_hashes = harness.hashes()
+    lock_hashes[GITIGNORE_PATH] = hash_text(build_managed_gitignore_block())
+    save_harness_lock(project_dir, lock_hashes)
 
     # git init
     fresh_git = False
