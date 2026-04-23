@@ -33,6 +33,15 @@ runops update-harness
 runops update
 ```
 
+`runops update` は adapter が宣言する package spec に合わせて simulator
+package を更新する。`refs/<simulator>/` を editable install して simulator
+本体を開発している場合は、更新前に warning と確認が出る。
+
+- git-pinned / package install が通常運用。再現性と provenance を優先する
+- editable install は simulator 本体を修正・debug するときだけの opt-in
+- editable を package spec に戻してよい場合だけ `runops update --yes` または
+  `runops update --force` を使う
+
 ## 一括実行
 
 ```bash

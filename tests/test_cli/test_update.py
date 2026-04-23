@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 from types import SimpleNamespace
@@ -13,8 +14,11 @@ from runops.cli.main import app
 from runops.cli.update import (
     _build_install_cmd,
     _collect_packages,
+    _distribution_name_from_package_spec,
+    _find_editable_installs,
     _find_venv_python,
     _get_project_simulators,
+    _normalize_package_name,
 )
 from runops.core.exceptions import SimctlError
 
@@ -123,6 +127,49 @@ def test_build_install_cmd_falls_back_to_python_m_pip(tmp_path: Path) -> None:
     assert cmd[-1] == "emout"
 
 
+def test_distribution_name_from_package_spec() -> None:
+    assert (
+        _distribution_name_from_package_spec(
+            "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git"
+        )
+        == "MPIEMSES3D"
+    )
+    assert _distribution_name_from_package_spec("beach-bem>=1.0") == "beach-bem"
+    assert _distribution_name_from_package_spec("git+https://x/y.git#egg=foo") == "foo"
+    assert _distribution_name_from_package_spec("") is None
+
+
+def test_normalize_package_name() -> None:
+    assert _normalize_package_name("MPIEMSES3D") == "mpiemses3d"
+    assert _normalize_package_name("beach_bem.plugin") == "beach-bem-plugin"
+
+
+def test_find_editable_installs_reads_direct_url_metadata(tmp_path: Path) -> None:
+    venv_py = tmp_path / ".venv" / "bin" / "python"
+    payload = [
+        {
+            "name": "MPIEMSES3D",
+            "url": "file:///project/refs/MPIEMSES3D",
+        }
+    ]
+    completed = SimpleNamespace(returncode=0, stdout=json.dumps(payload))
+
+    with patch("runops.cli.update.subprocess.run", return_value=completed) as mock_run:
+        editables = _find_editable_installs(
+            venv_py,
+            [
+                "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git",
+                "numpy",
+            ],
+        )
+
+    assert editables[0].name == "MPIEMSES3D"
+    assert editables[0].url == "file:///project/refs/MPIEMSES3D"
+    cmd = mock_run.call_args.args[0]
+    assert cmd[0] == str(venv_py)
+    assert json.loads(cmd[-1]) == ["mpiemses3d", "numpy"]
+
+
 def test_collect_packages_deduplicates_and_skips_unknown_adapters() -> None:
     fake_registry = SimpleNamespace(
         get=lambda name: {
@@ -203,6 +250,57 @@ def test_update_requires_virtualenv_for_real_upgrade() -> None:
 
     assert result.exit_code == 1
     assert "No .venv found" in result.output
+
+
+def test_update_aborts_before_replacing_editable_install(tmp_path: Path) -> None:
+    venv_py = tmp_path / ".venv" / "bin" / "python"
+
+    with (
+        patch("runops.cli.update._collect_packages", return_value=["MPIEMSES3D"]),
+        patch("runops.cli.update._find_venv_python", return_value=venv_py),
+        patch(
+            "runops.cli.update._find_editable_installs",
+            return_value=[
+                SimpleNamespace(
+                    name="MPIEMSES3D",
+                    url="file:///project/refs/MPIEMSES3D",
+                )
+            ],
+        ),
+        patch("runops.cli.update.subprocess.run") as mock_run,
+    ):
+        result = runner.invoke(app, ["update", "emses"], input="n\n")
+
+    assert result.exit_code == 1
+    assert "editable-installed" in result.output
+    assert "Aborted." in result.output
+    mock_run.assert_not_called()
+
+
+def test_update_yes_replaces_editable_install(tmp_path: Path) -> None:
+    completed = SimpleNamespace(returncode=0)
+    venv_py = tmp_path / ".venv" / "bin" / "python"
+
+    with (
+        patch("runops.cli.update._collect_packages", return_value=["MPIEMSES3D"]),
+        patch("runops.cli.update._find_venv_python", return_value=venv_py),
+        patch(
+            "runops.cli.update._find_editable_installs",
+            return_value=[
+                SimpleNamespace(
+                    name="MPIEMSES3D",
+                    url="file:///project/refs/MPIEMSES3D",
+                )
+            ],
+        ),
+        patch("runops.cli.update._find_uv", return_value="/usr/local/bin/uv"),
+        patch("runops.cli.update.subprocess.run", return_value=completed) as mock_run,
+    ):
+        result = runner.invoke(app, ["update", "emses", "--yes"])
+
+    assert result.exit_code == 0, result.output
+    assert "editable-installed" in result.output
+    assert mock_run.call_args.args[0][-1] == "MPIEMSES3D"
 
 
 def test_update_runs_uv_pip_install_for_selected_simulators(tmp_path: Path) -> None:

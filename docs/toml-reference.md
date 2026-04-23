@@ -111,9 +111,16 @@ executable = "beach"
 
 ### resolver_mode
 
-- **`package`** (recommended): Executable is pip-installed into `.venv`. `runops init` installs it automatically.
+- **`package`** (recommended): Executable is pip-installed into `.venv` from the adapter's package spec. For simulator packages backed by Git repositories, this means a git-pinned/package install rather than an editable checkout. This is the default for reproducible runs because provenance can record the resolved source and `runops update` can follow upstream package specs.
 - **`local_executable`**: Executable is on PATH or specified as an absolute path.
 - **`local_source`**: Build from source. `source_repo` and `build_command` must be set.
+
+Editable installs, such as `uv pip install -e refs/MPIEMSES3D`, are an opt-in
+development workflow for hacking on the simulator itself. They are not the
+default project runtime. `runops update` upgrades the package specs declared by
+the active adapters; if a target package is currently editable-installed, it
+warns before replacing that editable install. Use `runops update --yes` or
+`runops update --force` only when that replacement is intentional.
 
 ---
 

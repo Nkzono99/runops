@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -13,6 +16,43 @@ import typer
 
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
+
+
+@dataclass(frozen=True)
+class EditableInstall:
+    """Editable package currently installed in the target virtualenv."""
+
+    name: str
+    url: str
+
+
+_PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*")
+
+
+def _normalize_package_name(name: str) -> str:
+    """Return the PEP 503 normalized distribution name."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+def _distribution_name_from_package_spec(package_spec: str) -> str | None:
+    """Extract a distribution name from a pip requirement-like package spec."""
+    spec = package_spec.strip()
+    if not spec:
+        return None
+
+    if " @ " in spec:
+        name = spec.split(" @ ", 1)[0].strip()
+        return name or None
+
+    egg_match = re.search(r"[#&]egg=([^&]+)", spec)
+    if egg_match:
+        return egg_match.group(1).strip() or None
+
+    name_match = _PACKAGE_NAME_RE.match(spec)
+    if name_match:
+        return name_match.group(0)
+
+    return None
 
 
 def _venv_python_from_dir(venv_dir: Path) -> Path | None:
@@ -105,6 +145,82 @@ def _build_install_cmd(
     return cmd, "python -m pip"
 
 
+def _find_editable_installs(
+    venv_python: Path,
+    packages: list[str],
+) -> list[EditableInstall]:
+    """Return target packages that are editable-installed in the venv.
+
+    Editable installs are detected from PEP 610 ``direct_url.json`` metadata in
+    the target interpreter, so this works for pip and uv-managed environments.
+    """
+    package_names = {
+        _normalize_package_name(name)
+        for pkg in packages
+        if (name := _distribution_name_from_package_spec(pkg)) is not None
+    }
+    if not package_names:
+        return []
+
+    probe = r"""
+import json
+import sys
+from importlib import metadata
+
+targets = set(json.loads(sys.argv[1]))
+
+def normalize(name):
+    import re
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+matches = []
+for dist in metadata.distributions():
+    name = dist.metadata.get("Name", "")
+    if normalize(name) not in targets:
+        continue
+    direct_url = dist.read_text("direct_url.json")
+    if not direct_url:
+        continue
+    try:
+        data = json.loads(direct_url)
+    except json.JSONDecodeError:
+        continue
+    if data.get("dir_info", {}).get("editable"):
+        matches.append({"name": name, "url": data.get("url", "")})
+
+print(json.dumps(matches))
+"""
+
+    result = subprocess.run(
+        [str(venv_python), "-c", probe, json.dumps(sorted(package_names))],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return []
+
+    raw = getattr(result, "stdout", "")
+    try:
+        payload = json.loads(raw or "[]")
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(payload, list):
+        return []
+
+    editable_installs: list[EditableInstall] = []
+    for item in payload:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        url = item.get("url", "")
+        if isinstance(name, str):
+            editable_installs.append(
+                EditableInstall(name=name, url=url if isinstance(url, str) else "")
+            )
+    return editable_installs
+
+
 def _collect_packages(simulator_names: list[str]) -> list[str]:
     """Collect pip packages for the given simulators."""
     import runops.adapters  # noqa: F401
@@ -145,6 +261,14 @@ def update(
         bool,
         typer.Option("--dry-run", help="Show what would be upgraded."),
     ] = False,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip editable-install confirmation."),
+    ] = False,
+    force: Annotated[
+        bool,
+        typer.Option("--force", help="Skip editable-install confirmation."),
+    ] = False,
 ) -> None:
     """Upgrade simulator packages in the project .venv.
 
@@ -152,6 +276,7 @@ def update(
       runops update emses        # upgrade EMSES and its dependencies
       runops update              # upgrade all simulators in project
       runops update --dry-run    # show what would be upgraded
+      runops update --yes        # upgrade without confirmation prompts
     """
     # Determine which simulators to update
     if not simulators:
@@ -179,6 +304,25 @@ def update(
             err=True,
         )
         raise typer.Exit(code=1)
+
+    editable_installs = _find_editable_installs(venv_python, packages)
+    if editable_installs:
+        typer.echo(
+            "Warning: the following package(s) are currently editable-installed "
+            "in the target venv:",
+            err=True,
+        )
+        for editable in editable_installs:
+            source = f" from {editable.url}" if editable.url else ""
+            typer.echo(f"  {editable.name}{source}", err=True)
+        typer.echo(
+            "Continuing will replace them with the package specs used by "
+            "runops update.",
+            err=True,
+        )
+        if not (yes or force) and not typer.confirm("Proceed?", default=False):
+            typer.echo("Aborted.", err=True)
+            raise typer.Exit(code=1)
 
     cmd, approach = _build_install_cmd(venv_python, packages, upgrade=True)
     typer.echo(
