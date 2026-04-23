@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import os
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -67,19 +69,18 @@ class EnvironmentInfo:
     raw: dict[str, Any] = field(default_factory=dict)
 
 
-def load_environment(project_root: Path) -> EnvironmentInfo | None:
-    """Load .runops/environment.toml if it exists."""
-    env_file = project_root / _SIMCTL_DIR / _ENV_FILE
-    if not env_file.is_file():
-        return None
-
-    with open(env_file, "rb") as f:
-        raw = tomllib.load(f)
-
+def _parse_environment_data(raw: dict[str, Any]) -> EnvironmentInfo:
+    """Build :class:`EnvironmentInfo` from TOML-compatible raw data."""
     cluster = raw.get("cluster", {})
+    if not isinstance(cluster, dict):
+        cluster = {}
+
     partitions: list[PartitionInfo] = []
-    for name, pdata in cluster.get("partitions", {}).items():
-        if isinstance(pdata, dict):
+    partition_map = cluster.get("partitions", {})
+    if isinstance(partition_map, dict):
+        for name, pdata in partition_map.items():
+            if not isinstance(pdata, dict):
+                continue
             partitions.append(
                 PartitionInfo(
                     name=name,
@@ -91,9 +92,15 @@ def load_environment(project_root: Path) -> EnvironmentInfo | None:
             )
 
     modules: dict[str, list[str]] = {}
-    for name, mlist in raw.get("modules", {}).items():
-        if isinstance(mlist, list):
-            modules[name] = mlist
+    module_sets = raw.get("modules", {})
+    if isinstance(module_sets, dict):
+        for name, mlist in module_sets.items():
+            if isinstance(mlist, list):
+                modules[name] = [str(item) for item in mlist]
+
+    constraints = cluster.get("constraints", {})
+    if not isinstance(constraints, dict):
+        constraints = {}
 
     return EnvironmentInfo(
         cluster_name=cluster.get("name", ""),
@@ -101,9 +108,38 @@ def load_environment(project_root: Path) -> EnvironmentInfo | None:
         partitions=partitions,
         modules=modules,
         scratch_path=cluster.get("scratch_path", ""),
-        constraints=cluster.get("constraints", {}),
+        constraints=constraints,
         raw=raw,
     )
+
+
+def load_environment(project_root: Path) -> EnvironmentInfo | None:
+    """Load .runops/environment.toml if it exists."""
+    env_file = project_root / _SIMCTL_DIR / _ENV_FILE
+    if not env_file.is_file():
+        return None
+
+    with open(env_file, "rb") as f:
+        raw = tomllib.load(f)
+
+    return _parse_environment_data(raw)
+
+
+def _detect_cluster_name() -> str:
+    """Detect cluster name from environment variables or hostname."""
+    cluster_name = os.environ.get("SLURM_CLUSTER_NAME", "")
+    if cluster_name:
+        return cluster_name
+
+    result = subprocess.run(
+        ["hostname", "-s"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return result.stdout.strip()
+    return ""
 
 
 def detect_environment() -> EnvironmentInfo:
@@ -119,21 +155,7 @@ def detect_environment() -> EnvironmentInfo:
         info.scheduler = "slurm"
         info.partitions = _detect_slurm_partitions()
 
-    # Detect cluster name from hostname or SLURM_CLUSTER_NAME
-    import os
-
-    info.cluster_name = os.environ.get("SLURM_CLUSTER_NAME", "")
-    if not info.cluster_name:
-        result = subprocess.run(
-            ["hostname", "-s"],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode == 0:
-            info.cluster_name = result.stdout.strip()
-
-    # Detect available modules
+    info.cluster_name = _detect_cluster_name()
     info.modules = _detect_modules()
 
     return info
@@ -188,12 +210,34 @@ def save_environment(project_root: Path, info: EnvironmentInfo) -> Path:
 
 def _command_exists(cmd: str) -> bool:
     """Check if a command is available in PATH."""
-    result = subprocess.run(
-        ["which", cmd],
-        capture_output=True,
-        check=False,
-    )
-    return result.returncode == 0
+    return shutil.which(cmd) is not None
+
+
+def _parse_sinfo_output(output: str) -> list[PartitionInfo]:
+    """Parse ``sinfo --format=%P %D %l`` output into partition records."""
+    partitions: list[PartitionInfo] = []
+    for line in output.strip().splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        name = parts[0]
+        is_default = name.endswith("*")
+        if is_default:
+            name = name[:-1]
+        try:
+            max_nodes = int(parts[1])
+        except ValueError:
+            max_nodes = 0
+        max_walltime = parts[2] if parts[2] != "infinite" else ""
+        partitions.append(
+            PartitionInfo(
+                name=name,
+                max_nodes=max_nodes,
+                max_walltime=max_walltime,
+                default=is_default,
+            )
+        )
+    return partitions
 
 
 def _detect_slurm_partitions() -> list[PartitionInfo]:
@@ -210,32 +254,28 @@ def _detect_slurm_partitions() -> list[PartitionInfo]:
     )
     if result.returncode != 0:
         return []
+    return _parse_sinfo_output(result.stdout)
 
-    partitions: list[PartitionInfo] = []
-    for line in result.stdout.strip().split("\n"):
-        parts = line.split()
-        if len(parts) < 3:
+
+def _parse_module_list_output(output: str) -> dict[str, list[str]]:
+    """Parse ``module list`` output into the current module set."""
+    modules: list[str] = []
+    for line in output.splitlines():
+        normalized = line.strip()
+        if (
+            not normalized
+            or normalized.startswith("Currently")
+            or normalized.startswith("No")
+        ):
             continue
-        name = parts[0]
-        is_default = name.endswith("*")
-        if is_default:
-            name = name[:-1]
-        try:
-            max_nodes = int(parts[1])
-        except ValueError:
-            max_nodes = 0
-        max_walltime = parts[2] if parts[2] != "infinite" else ""
+        for part in normalized.split():
+            candidate = part.strip().rstrip(")")
+            if "/" in candidate and not candidate.startswith("-"):
+                modules.append(candidate)
 
-        partitions.append(
-            PartitionInfo(
-                name=name,
-                max_nodes=max_nodes,
-                max_walltime=max_walltime,
-                default=is_default,
-            )
-        )
-
-    return partitions
+    if modules:
+        return {"current": modules}
+    return {}
 
 
 def _detect_modules() -> dict[str, list[str]]:
@@ -248,19 +288,4 @@ def _detect_modules() -> dict[str, list[str]]:
     )
     if result.returncode != 0:
         return {}
-
-    # Parse "module list" output
-    modules: list[str] = []
-    for line in result.stdout.split("\n"):
-        line = line.strip()
-        if not line or line.startswith("Currently") or line.startswith("No"):
-            continue
-        # Module list formats vary; try to extract module names
-        for part in line.split():
-            part = part.strip().rstrip(")")
-            if "/" in part and not part.startswith("-"):
-                modules.append(part)
-
-    if modules:
-        return {"current": modules}
-    return {}
+    return _parse_module_list_output(result.stdout)
