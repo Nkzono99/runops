@@ -118,7 +118,7 @@ def _get_data_path() -> Path:
     if (pkg_data / "README.md").is_file():
         return pkg_data
     # Dev mode fallback: walk up from this file to the repo root
-    repo_root = Path(__file__).resolve().parent.parent.parent.parent
+    repo_root = Path(__file__).resolve().parents[4]
     if (repo_root / "README.md").is_file() and (repo_root / "docs").is_dir():
         return repo_root
     return pkg_data
