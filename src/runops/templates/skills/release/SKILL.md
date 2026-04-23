@@ -9,6 +9,12 @@ description: "Tag a project milestone, archive completed runs, and record a rele
 git tag として記録するスキル。論文投稿・報告書提出・キャンペーン
 区切りなどのタイミングで使う。
 
+## リリースノート方針
+
+- リリースノートは**必ず日本語**で書く
+- コマンド、識別子、ファイル名は英語のままでよい
+- annotated tag や lab notebook に残す要約も日本語で統一する
+
 ## 使い方
 
 ```
@@ -52,6 +58,9 @@ git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~30)..HEAD --on
 - **主要な知見**: `.runops/insights/` や `notes/` から
 - **データの場所**: 重要な出力ファイルのパス
 - **次のステップ**: 残タスクや次のキャンペーン
+
+上の項目は日本語で記述し、tag message や notebook 記録へ再利用できる形で
+整理しておく。
 
 ### 3. 完了 run をアーカイブする (任意)
 
