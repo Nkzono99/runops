@@ -404,17 +404,15 @@ def _materialize_export_files(
     mode: str,
 ) -> tuple[PublicationExportFile, ...]:
     exported_files: list[PublicationExportFile] = []
-    seen_sources: set[Path] = set()
+    materialized_paths: set[Path] = set()
 
     for artifact in artifacts:
         resolved_source = artifact.source_path.resolve()
-        if resolved_source in seen_sources:
-            continue
-        seen_sources.add(resolved_source)
-
         rel_source = resolved_source.relative_to(project_root)
         dest_path = files_dir / rel_source
-        _link_or_copy(resolved_source, dest_path, mode=mode)
+        if dest_path not in materialized_paths:
+            _link_or_copy(resolved_source, dest_path, mode=mode)
+            materialized_paths.add(dest_path)
 
         media_type = mimetypes.guess_type(str(resolved_source))[0] or ""
         exported_files.append(

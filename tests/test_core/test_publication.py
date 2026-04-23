@@ -9,7 +9,11 @@ from typing import Any
 import pytest
 import tomli_w
 
-from runops.core.publication import export_publication_bundle
+from runops.core.publication import (
+    PublicationSourceArtifact,
+    _materialize_export_files,
+    export_publication_bundle,
+)
 
 
 def _write_manifest(run_dir: Path, data: dict[str, Any]) -> None:
@@ -133,3 +137,40 @@ def test_force_export_preserves_existing_bundle_on_failure(
     assert sentinel.read_text(encoding="utf-8") == "keep me"
     assert export_dir.exists()
     assert not list(export_dir.parent.glob(".baseline.tmp-*"))
+
+
+def test_materialize_export_files_preserves_duplicate_metadata_entries(
+    tmp_path: Path,
+) -> None:
+    _create_project(tmp_path)
+    source = tmp_path / "runs" / "R20260424-0001" / "analysis" / "figures" / "phi.png"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text("fake image", encoding="utf-8")
+    files_dir = tmp_path / "exports" / "files"
+
+    exported = _materialize_export_files(
+        [
+            PublicationSourceArtifact(
+                role="run_figure",
+                source_path=source,
+                run_id="R20260424-0001",
+                caption="Run figure",
+            ),
+            PublicationSourceArtifact(
+                role="survey_plot",
+                source_path=source,
+                caption="Survey plot reference",
+            ),
+        ],
+        project_root=tmp_path,
+        files_dir=files_dir,
+        mode="copy",
+    )
+
+    assert len(exported) == 2
+    assert exported[0].export_path == exported[1].export_path
+    assert exported[0].caption == "Run figure"
+    assert exported[1].caption == "Survey plot reference"
+    assert exported[0].role == "run_figure"
+    assert exported[1].role == "survey_plot"
+    assert exported[0].export_path.is_file()
