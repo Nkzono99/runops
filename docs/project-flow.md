@@ -18,7 +18,10 @@
 | `runs/**/survey.toml` | サーベイ設計 | どの軸をどう振るか、命名や job override をどうするかを定義する。 |
 | `runs/**/Rxxxx/manifest.toml` | run の正本 | 各実行の state、origin、provenance、job 情報を記録する。 |
 | `refs/` | 外部知識と simulator docs | Agent が simulator 固有知識や cookbook を参照する入口。 |
-| `.runops/insights/` と `facts.toml` | 学習結果の蓄積 | 解析後に得られた知見を次の設計へ戻すための project memory。 |
+| `materials/` | 人間提供の source material | 論文、manual、図、snippet を Agent と人間が見える場所に置く。 |
+| `notes/**` | 作業ログとレポート | 日次 notebook と refined report を残す human/agent shared workspace。 |
+| `.runops/knowledge/` | 生成済み Agent context | `imports.md` や candidate fact transport などの派生物。正本として手編集しない。 |
+| `.runops/insights/` と `facts.toml` | advanced structured memory | 機械的に再利用したい整理済み知見だけを保存する互換/上級者向け層。 |
 
 ## `runo init` 後の project と Agent の見る世界
 
@@ -37,7 +40,7 @@
 - `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。
 - `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。
 - `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。
-- 解析後の結果は `insight` や `fact` として `.runops/` に戻すことで、次の設計に再利用できます。
+- 解析後の観察はまず `notes/` や `notes/reports/` に残し、機械的に再利用したいものだけ `insight` や `fact` として `.runops/` に戻します。
 - つまり日常運用は `設計 -> 実行 -> 観測 -> 解析 -> 学習 -> 設計` のループです。
 
 ## 実務上のおすすめ

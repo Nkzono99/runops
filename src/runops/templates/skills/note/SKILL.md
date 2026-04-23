@@ -7,14 +7,16 @@ description: Append a timestamped entry to today's lab notebook in notes/YYYY-MM
 
 `{{ skill_prefix }}note` は today's `notes/YYYY-MM-DD.md` に **timestamped な短いエントリを
 追記** する skill。**準備フェーズから解析フェーズまで**、研究プロセスの
-全期間で使うことを想定している。curated knowledge (`{{ skill_prefix }}learn`,
-`runo knowledge save/add-fact`) とは目的が違う:
+全期間で使うことを想定している。source material (`materials/`) や advanced
+structured knowledge (`{{ skill_prefix }}learn`, `runo knowledge save/add-fact`)
+とは目的が違う:
 
 | 用途 | スキル | 書き先 | 性質 |
 |---|---|---|---|
 | 試したこと、見たこと、仮説、TODO の **時系列ログ** | `{{ skill_prefix }}note` | `notes/YYYY-MM-DD.md` | append-only, chronological, scratch OK |
-| 整理済の **名前付き知見** | `{{ skill_prefix }}learn` | `.runops/insights/<name>.md` | curated, durable, 上書き可 |
-| 機械可読な **atomic claim** | `{{ skill_prefix }}learn` | `.runops/facts.toml` | curated, atomic |
+| 論文・manual・図・snippet の **source material** | (直接編集) | `materials/` | visible, inspectable |
+| 整理済の **名前付き知見** | `{{ skill_prefix }}learn` | `.runops/insights/<name>.md` | advanced, durable, 上書き可 |
+| 機械可読な **atomic claim** | `{{ skill_prefix }}learn` | `.runops/facts.toml` | advanced, atomic |
 
 ## 使い方
 
@@ -88,8 +90,9 @@ EOF
 
 ## 何を書かないか
 
-- 整理済の永続知見 → `{{ skill_prefix }}learn` で `.runops/insights/`
-- 1 つの atomic claim → `{{ skill_prefix }}learn` で `.runops/facts.toml`
+- 論文 PDF / manual / figure / snippet → `materials/`
+- 整理済の永続知見 → 必要な場合だけ `{{ skill_prefix }}learn` で `.runops/insights/`
+- 1 つの atomic claim → 必要な場合だけ `{{ skill_prefix }}learn` で `.runops/facts.toml`
 - 個別 run の curated 解析出力 → `runs/<run>/analysis/`
 
 ## 昇格ルール
@@ -98,7 +101,7 @@ lab notebook entry が積み上がって 1 つのストーリーになり、誰�
 出てきたら、
 
 1. `notes/reports/<topic>.md` に refined version を書き起こす (改稿 OK)
-2. さらに永続知見にしたい部分は `{{ skill_prefix }}learn` で `.runops/insights/` / `facts.toml` に昇格
+2. 機械的に再利用したい部分だけ `{{ skill_prefix }}learn` で `.runops/insights/` / `facts.toml` に昇格
 
 `{{ skill_prefix }}learn` は **`notes/` を素材として読む** ことを前提にしている (`{{ skill_prefix }}learn`
 SKILL を参照)。つまり `{{ skill_prefix }}note` を高頻度で書いておくほど、後の `{{ skill_prefix }}learn` が

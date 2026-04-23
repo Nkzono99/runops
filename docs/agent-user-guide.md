@@ -58,20 +58,23 @@ runops プロジェクトにおける Agent の作業ガイド。
 - `runs/**/survey.toml` — パラメータサーベイ定義
 - `runs/**/Rxxxx/manifest.toml` — run メタデータ (自動生成、手動編集禁止)
 
-## Lab notebook と curated knowledge の二層
+## notes / materials / generated context
 
-実験で残す情報は **2 層** で管理する。Agent 自身の memory には保存しない。
+実験で残す情報は、見える作業場 (`notes/`, `materials/`) を中心に管理する。
+Agent 自身の memory には保存しない。
 
 | 種類 | 性質 | 書き先 | コマンド |
 |---|---|---|---|
-| 整理済の名前付き知見 | curated, durable, 上書き可 | `.runops/insights/<name>.md` | `runo knowledge save` |
-| 機械可読 atomic claim | curated, atomic | `.runops/facts.toml` | `runo knowledge add-fact` |
 | 時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runo notes append` |
 | 長文 refined レポート | refined, 改稿可 | `notes/reports/<topic>.md` | (直接編集) |
+| 論文・manual・図・snippet | visible source material | `materials/` | (直接編集) |
+| 整理済の名前付き知見 | advanced, durable, 上書き可 | `.runops/insights/<name>.md` | `runo knowledge save` |
+| 機械可読 atomic claim | advanced, atomic | `.runops/facts.toml` | `runo knowledge add-fact` |
 
-- 「結果をまとめて」「知見を記録して」等の整理済情報 → `runo knowledge save` / `add-fact` で curated 層に
+- 「結果をまとめて」「知見を記録して」等の整理済情報 → まず `notes/reports/` に
 - 「今やってる作業のメモ」「途中経過」「議論の流れ」「準備フェーズの意思決定」 → `runo notes append` で lab notebook に
-- 価値が出てきたら `notes/` → `notes/reports/` → `.runops/insights/` / `facts.toml` の順に昇格
+- 参照 PDF / manual / snippet → `materials/` に
+- 機械的に再利用したい atomic な知見だけ `.runops/insights/` / `facts.toml` に昇格
 
 `/note` skill は **準備フェーズから使う**。campaign 設計, case 設計,
 survey 設計, run 生成, 投入の各タイミングで意思決定の理由・トレードオフ・
@@ -129,8 +132,10 @@ completed → archived → purged
 | 情報 | 場所 | 読むタイミング |
 |------|------|---------------|
 | 研究意図・仮説 | `campaign.toml` | 作業開始時 |
-| 構造化 fact (制約・依存性) | `.runops/facts.toml` | パラメータ設計・検証時 |
-| 実験知見 (Markdown) | `.runops/insights/` | 作業開始時・解析後 |
+| 作業ログ・レポート | `notes/` | 作業開始時・解析後 |
+| source material | `materials/` | 設計・読解・解析時 |
+| 構造化 fact (制約・依存性) | `.runops/facts.toml` | 必要な場合のパラメータ設計・検証時 |
+| 実験知見 (Markdown) | `.runops/insights/` | 必要な場合の作業開始時・解析後 |
 | シミュレータドキュメント | `.runops/knowledge/`, `refs/` | パラメータ設計時 |
 | 実行環境 | `.runops/environment.toml` | job 設定・launcher 選択時 |
 | 外部共有知識 | `refs/knowledge/` | 必要に応じて |

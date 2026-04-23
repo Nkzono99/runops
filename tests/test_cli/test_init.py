@@ -50,6 +50,14 @@ class TestInit:
         assert (tmp_path / "notes").is_dir()
         assert (tmp_path / "notes" / "reports").is_dir()
         assert (tmp_path / "notes" / "README.md").is_file()
+        # Source material scaffolding
+        assert (tmp_path / "materials").is_dir()
+        assert (tmp_path / "materials" / "papers").is_dir()
+        assert (tmp_path / "materials" / "manuals").is_dir()
+        assert (tmp_path / "materials" / "figures").is_dir()
+        assert (tmp_path / "materials" / "snippets").is_dir()
+        assert (tmp_path / "materials" / "README.md").is_file()
+        assert (tmp_path / "materials" / "index.toml").is_file()
 
     def test_init_notes_readme_content(self, tmp_path: Path) -> None:
         """notes/README.md describes the lab-notebook convention."""
@@ -58,6 +66,17 @@ class TestInit:
         assert "lab notebook" in readme
         assert "runo notes append" in readme
         assert "notes/YYYY-MM-DD.md" in readme
+
+    def test_init_materials_readme_content(self, tmp_path: Path) -> None:
+        """materials/README.md describes visible source material storage."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        readme = (tmp_path / "materials" / "README.md").read_text(encoding="utf-8")
+        index = (tmp_path / "materials" / "index.toml").read_text(encoding="utf-8")
+        assert "source material" in readme
+        assert "human/agent shared workspace" in readme
+        assert ".runops/knowledge/" in readme
+        assert "materials/**/*.pdf" in readme
+        assert "materials = []" in index
 
     def test_init_creates_note_skill(self, tmp_path: Path) -> None:
         """The note skill is scaffolded next to the other skills."""

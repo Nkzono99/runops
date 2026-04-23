@@ -1,19 +1,24 @@
 ---
 name: learn
-description: Save knowledge insights and structured facts from experiment results. Use after analyzing runs to capture findings. Reads notes/ first to gather raw material before crystallizing.
+description: Save advanced knowledge insights and structured facts from experiment results. Use only after notes/ or reports/ contain stable findings worth machine reuse.
 ---
 
 # 実験結果から知見を記録する
 
-`{{ skill_prefix }}learn` は curated knowledge (`.runops/insights/`, `.runops/facts.toml`)
-への永続化スキル。これに対して `{{ skill_prefix }}note` は raw な lab notebook (`notes/`) への
-時系列追記。`{{ skill_prefix }}learn` は **`{{ skill_prefix }}note` の中身を素材として利用** する関係になる。
+`{{ skill_prefix }}learn` は advanced / structured knowledge
+(`.runops/insights/`, `.runops/facts.toml`) への永続化スキル。これに対して
+`{{ skill_prefix }}note` は raw な lab notebook (`notes/`) への時系列追記で、
+論文・manual・図・snippet などの source material は `materials/` に置く。
+
+日常の知識共有はまず `notes/` と `materials/` に寄せる。`{{ skill_prefix }}learn`
+は **機械的に再利用したい、安定した知見だけを抽出する** ときに使う。
 
 ## 手順
 
-1. **`notes/` を素材として集める** (curated knowledge を作る前段)
+1. **`notes/` と `materials/` を素材として集める** (structured knowledge を作る前段)
    - `runo notes list` で最近の lab notebook 日付を確認
    - 関連するテーマの `runo notes show <YYYY-MM-DD>` で読む
+   - `materials/index.toml` や `materials/README.md` で関連資料を確認
    - 散らばった観察・仮説・反例・却下案を集める
 2. 完了した run の結果 (`runo analyze summarize`, ログ, 出力) を読む
 3. 新たに分かったこと・期待と異なる結果を特定する

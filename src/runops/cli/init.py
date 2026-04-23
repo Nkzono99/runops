@@ -93,7 +93,7 @@ def _mkdir_if_missing(path: Path) -> bool:
 
 
 def _create_runops_skeleton(project_dir: Path, created: list[str]) -> None:
-    """Create .runops/ skeleton (insights/, facts.toml, knowledge/).
+    """Create .runops/ skeleton for internal/generated state.
 
     Args:
         project_dir: Project root directory.
@@ -122,8 +122,8 @@ def _create_runops_skeleton(project_dir: Path, created: list[str]) -> None:
 def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
     """Create the lab-notebook skeleton (``notes/`` + README + ``reports/``).
 
-    The lab notebook lives next to ``.runops/insights/`` but serves a
-    different purpose: chronological, append-only entries, edited via
+    The lab notebook is a visible human/agent workspace for chronological
+    append-only entries, edited via
     ``runo notes append`` or the ``/note`` skill.
 
     Args:
@@ -141,6 +141,25 @@ def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
     readme_path = notes_dir / "README.md"
     if _write_if_missing(readme_path, load_static("scaffold/notes/README.md")):
         created.append("notes/README.md")
+
+
+def _create_materials_skeleton(project_dir: Path, created: list[str]) -> None:
+    """Create the human-facing source-material skeleton."""
+    materials_dir = project_dir / "materials"
+    if _mkdir_if_missing(materials_dir):
+        created.append("materials/")
+    for dirname in ("papers", "manuals", "figures", "snippets"):
+        if _mkdir_if_missing(materials_dir / dirname):
+            created.append(f"materials/{dirname}/")
+
+    from runops.templates import load_static
+
+    readme_path = materials_dir / "README.md"
+    if _write_if_missing(readme_path, load_static("scaffold/materials/README.md")):
+        created.append("materials/README.md")
+    index_path = materials_dir / "index.toml"
+    if _write_if_missing(index_path, load_static("scaffold/materials/index.toml")):
+        created.append("materials/index.toml")
 
 
 def _build_simulators_toml(simulator_names: list[str]) -> str:
@@ -982,6 +1001,9 @@ def init(
 
     # notes/ skeleton (chronological lab notebook + reports)
     _create_notes_skeleton(project_dir, created)
+
+    # materials/ skeleton (human-provided source material for agents)
+    _create_materials_skeleton(project_dir, created)
 
     # refs/ — clone simulator doc repos
     if sim_names:

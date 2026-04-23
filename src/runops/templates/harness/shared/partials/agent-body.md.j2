@@ -93,11 +93,14 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 | 種類 | 性質 | 書き先 | スキル |
 |---|---|---|---|
-| 整理済の名前付き知見 | curated, durable | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |
 | 時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `{{ skill_prefix }}note` |
+| 論文・manual・図・snippet | visible source material | `materials/` | 直接編集 |
+| 機械的に再利用する知見 | advanced, structured | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |
 
-- 「結果をまとめて」「知見を記録して」等の整理済情報は **`{{ skill_prefix }}learn` で knowledge レイヤに**
+- 「結果をまとめて」「知見を記録して」等の整理済情報はまず **`notes/reports/` に**
+- 機械的に再利用したい atomic な知見だけ **`{{ skill_prefix }}learn` で advanced knowledge レイヤに**
 - 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`{{ skill_prefix }}note` で lab notebook に**
+- 参照 PDF / manual / snippet は **`materials/` に**
 - どちらも Agent 自身の memory に保存してはいけない (会話を跨いで失われる)
 - 共有 source 由来の candidate fact を採用するときは
   `runo knowledge promote-fact` で local fact に昇格する
@@ -120,14 +123,16 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 ### `{{ skill_prefix }}learn` は `{{ skill_prefix }}note` を素材として使う
 
-`{{ skill_prefix }}note` は raw な原料、`{{ skill_prefix }}learn` (curated knowledge) は整理済みの最終産物。
-つまり **`{{ skill_prefix }}learn` を呼ぶときは、まず `notes/` を読んで素材を集める**:
+`{{ skill_prefix }}note` と `materials/` は raw な原料、`{{ skill_prefix }}learn`
+は advanced / structured な最終産物。つまり **`{{ skill_prefix }}learn` を呼ぶときは、
+まず `notes/` と `materials/` を読んで素材を集める**:
 
 1. `runo notes list` で最近の lab notebook の日付を確認
 2. 当該テーマに関連する `notes/YYYY-MM-DD.md` を `runo notes show` で読む
-3. 散らばっている観察・仮説・反例を一つの insight にまとめる
-4. `runo knowledge save` / `add-fact` で永続化する
-5. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
+3. 関連する `materials/index.toml` / `materials/` の資料を確認する
+4. 散らばっている観察・仮説・反例を一つの insight にまとめる
+5. 必要な場合だけ `runo knowledge save` / `add-fact` で永続化する
+6. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
 
 lab notebook の entry が積み上がってストーリーになったら、
 `notes/reports/<topic>.md` に refined version を書き起こし、必要なら

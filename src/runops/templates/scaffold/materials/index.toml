@@ -1,0 +1,12 @@
+# Optional index for human-provided source material.
+#
+# Example:
+# [[materials]]
+# id = "paper-2026-example"
+# path = "papers/example.pdf"
+# title = "Example paper"
+# kind = "paper"
+# tags = ["background"]
+# notes = "Summarized in notes/readings/example.md"
+
+materials = []

@@ -12,16 +12,19 @@ runops の知識層は 4 つのドメインで構成される:
 | **外部共有知識** | ラボ共通の解析手法・知識、シミュレータ汎用知識 | `refs/knowledge/` | `runo knowledge source sync` |
 | **実行環境知識** | クラスタ構成、パーティション、モジュール | `.runops/environment.toml` | `runo doctor` |
 | **研究意図** | 仮説、実験設計、変数定義、観測量 | `campaign.toml` | ユーザーが記述 |
+| **人間提供資料** | 論文 PDF、manual、図、snippet、source index | `materials/` | ユーザー / Agent が整理 |
 
-加えて、実験から得られた情報は **二層** で蓄積・共有される:
+加えて、実験から得られた情報は **見える作業場を中心** に蓄積・共有される:
 
-- **curated knowledge**: 整理済の永続知見 — `.runops/insights/<name>.md` (Markdown), `.runops/facts.toml` (atomic claims)
 - **lab notebook**: append-only な時系列ログ — `notes/YYYY-MM-DD.md` (日次ノート), `notes/reports/<topic>.md` (refined long-form)
+- **materials**: 人間が持ち込む source material — `materials/papers/`, `materials/manuals/`, `materials/figures/`, `materials/snippets/`
+- **advanced structured knowledge**: 機械的に再利用したい知見 — `.runops/insights/<name>.md`, `.runops/facts.toml`
 
-curated knowledge は名前付き・上書き可・durable で、最終的な findings を
-入れる場所。lab notebook は raw chronological で、準備フェーズの意思決定・
-観察・仮説・TODO をその場で残す場所。価値が出てきたら lab notebook →
-reports → insights / facts.toml の順に昇格する。
+日常運用では `notes/` と `materials/` を人間/Agent の共有ワークスペースとする。
+`.runops/knowledge/` は `imports.md` などの生成済み Agent context であり、
+source of truth ではない。`.runops/insights/` と `.runops/facts.toml` は
+互換性を保つ advanced / structured store として残し、機械的に再利用したい
+atomic な知見だけを昇格する。
 
 ## ディレクトリ構成
 
@@ -29,6 +32,13 @@ reports → insights / facts.toml の順に昇格する。
 project/
   runops.toml                # プロジェクト設定 ([knowledge] セクション含む)
   campaign.toml                  # 研究意図
+  materials/                     # 人間が持ち込む source material
+    README.md
+    index.toml                   # optional hand-written/generated index
+    papers/
+    manuals/
+    figures/
+    snippets/
   refs/                          # シミュレータリファレンスリポジトリ
     MPIEMSES3D/
       cookbook/                   # simulator cookbook (入力例・設定カタログ)
@@ -44,25 +54,25 @@ project/
         simulators/
         analysis/
   .runops/
-    knowledge/                   # 自動生成ナレッジ (gitignore 対象)
+    knowledge/                   # 自動生成 Agent context (gitignore 対象)
       emses.md                   # refs/ 内のドキュメント一覧 + 変更ログ
       beach.md
       enabled/                   # 有効 profile の展開結果
         imports.md               # CLAUDE.md から @import される
       candidates/                # 外部 source 由来の候補 knowledge
         facts/                   # candidate fact transport
-    insights/                    # 実験から得た curated 知見 (Markdown)
+    insights/                    # advanced: curated 知見 (Markdown)
       emses_cfl_limit.md         # 安定性の知見
       mag_scan_results.md        # 実験結果サマリー
       heating_mechanism.md       # 物理的考察
     environment.toml             # 実行環境記述
-    facts.toml                   # 構造化された curated 知識 (AI 向け)
+    facts.toml                   # advanced: structured claims
   notes/                         # Lab notebook (chronological, append-only)
     2026-04-08.md                # 日次の作業ノート (`runo notes append`)
     2026-04-09.md
     reports/                     # 長文 refined レポート
       cs_vs_vti_scaling.md
-    README.md                    # 二層運用規約
+    README.md                    # notes / materials / .runops の役割
 ```
 
 ## シミュレータ知識
@@ -83,10 +93,12 @@ runo update-refs --dry-run
 2. 変更を検出 (コミットハッシュ比較)
 3. `.runops/knowledge/{simulator}.md` にインデックスを再生成
 
-### knowledge/ — ナレッジインデックス
+### knowledge/ — 生成済み Agent context
 
 各シミュレータについて、`refs/` 内のドキュメントの所在一覧と変更ログを自動生成する。
 AI エージェントはまずこのインデックスを読み、必要に応じて `refs/` の実ファイルを直接参照する。
+`.runops/knowledge/enabled/imports.md` も同じく、外部 source profile を
+Agent が読みやすい形へレンダリングした派生物であり、手で編集する正本ではない。
 
 ```markdown
 # Knowledge Index: emses
@@ -347,10 +359,11 @@ lab notebook はこの隙間を埋める:
 
 | 用途 | 場所 | 性質 | コマンド |
 |---|---|---|---|
-| 整理済の名前付き知見 | `.runops/insights/<name>.md` | curated, durable, 上書き可 | `runo knowledge save` |
-| 機械可読 atomic claim | `.runops/facts.toml` | curated, atomic | `runo knowledge add-fact` |
 | 日次の lab notebook | `notes/YYYY-MM-DD.md` | append-only, chronological | `runo notes append` |
 | 長文 refined レポート | `notes/reports/<topic>.md` | refined, 改稿可 | (直接編集) |
+| source material | `materials/` | visible, inspectable | (直接編集) |
+| 整理済の名前付き知見 | `.runops/insights/<name>.md` | advanced, durable, 上書き可 | `runo knowledge save` |
+| 機械可読 atomic claim | `.runops/facts.toml` | advanced, atomic | `runo knowledge add-fact` |
 
 ### ファイル形式
 

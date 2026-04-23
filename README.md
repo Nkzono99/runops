@@ -17,9 +17,9 @@ run ディレクトリを日常運用の主単位とし、パラメータサー�
 - **Provenance 記録**: git commit、executable hash、パラメータ snapshot を manifest.toml に自動記録
 - **多重ネスト対応**: `runs/` 以下を自由に階層化して分類・整理できる
 - **Agent/AI 対応**: TOML/JSON ベースの構造化データで AI エージェントとの連携が容易
-- **知識層**: シミュレータ知識・実行環境・研究意図の 3 層で AI エージェントにコンテキストを提供
+- **知識層**: `notes/` と `materials/` を人間/Agent の共有作業場にし、`.runops/knowledge/` で生成済みコンテキストを提供
 - **外部知識ソース**: 共有知識リポジトリを project に接続し、profile ベースで必要な知識だけを投影
-- **Lab notebook**: `notes/YYYY-MM-DD.md` に append-only な時系列ノートを残し、curated knowledge (`.runops/insights/`, `facts.toml`) と二層で管理
+- **Lab notebook**: `notes/YYYY-MM-DD.md` に append-only な時系列ノートを残し、`notes/reports/` で整理済みレポートに育てる
 - **パラメータバリデーション**: 物理的制約 (CFL 条件, Debye 長等) を run 生成前にチェック
 - **Research Campaign**: campaign.toml で研究仮説・変数・観測量を構造化し、実験設計を明示
 
@@ -93,24 +93,31 @@ my-simulation-project/
   tools/
     runops/        # runops 本体 (editable install, Git 管理外)
   .venv/               # Python 仮想環境 (Git 管理外)
-  .runops/             # 知識層 (ナレッジ・環境・知見)
+  .runops/             # runops 内部状態 / 生成済み Agent context
     knowledge/         # 自動生成ナレッジ (gitignore 対象)
       enabled/         # 有効な profile の imports.md
       candidates/      # 外部 source 由来の candidate fact transport
-    insights/          # 実験知見 (人間向け curated Markdown)
-    facts.toml         # 構造化された知識 (AI 向け machine-readable claims)
+    insights/          # advanced: curated Markdown insight
+    facts.toml         # advanced: machine-readable structured claims
     environment.toml   # 実行環境記述 (自動検出)
-  notes/               # Lab notebook (append-only, 時系列)
+  notes/               # Human/Agent shared workspace: lab notebook
     YYYY-MM-DD.md      # 日次の作業ログ (`runo notes append` で追記)
     reports/           # 長文レポート (改稿可)
-    README.md          # 二層 (curated vs lab notebook) の運用規約
+    README.md          # notes / materials / .runops の役割
+  materials/           # Human-provided source material for Agent
+    papers/            # PDF, BibTeX, paper notes
+    manuals/           # Site / simulator / tool manuals
+    figures/           # Reference figures
+    snippets/          # Copied examples and source excerpts
+    index.toml         # Optional material index
 ```
 
 `runo init` が生成する Claude ハーネスは、`.claude/settings.json` と
 `.claude/hooks/` により次のようなガードを入れます。
 
 - `manifest.toml`、`runs/**/input/**`、`submit/job.sh`、`work/**`、`SITE.md` などの生成物は直接編集しない
-- `.runops/facts.toml` や `.runops/insights/` は `runo knowledge save` / `add-fact` 経由で更新する
+- `.runops/knowledge/` は生成済み Agent context なので手で整形しない
+- `.runops/facts.toml` や `.runops/insights/` を使う場合は `runo knowledge save` / `add-fact` 経由で更新する
 - `runo runs submit` は `--dry-run` を除き実行前に確認を挟む
 
 runops 自体の開発では、Claude ハーネスの定義は
@@ -313,10 +320,16 @@ runo runs list runs/cavity/scan
 | `runo notes list [-n N]` | 最近の lab notebook 日付一覧 (新しい順) |
 | `runo notes show [DATE\|today\|latest]` | 指定日 (省略時は today) の lab notebook を表示 |
 
-`notes/` は curated knowledge (`.runops/insights/`, `facts.toml`) と
-**二層構造** で運用する append-only な実験ノートです。準備フェーズの意思決定、観察、
-仮説、TODO をその場で残し、価値が出てきたら `notes/reports/` の long-form
-レポートを経て `runo knowledge save` / `add-fact` で curated 層に昇格させます。
+`notes/` は append-only な実験ノートと、改稿可能な `notes/reports/` を置く
+人間/Agent 共有の知識層です。準備フェーズの意思決定、観察、仮説、TODO を
+その場で残し、価値が出てきたら `notes/reports/` の long-form レポートに
+整理します。`materials/` には論文 PDF、manual、図、snippet などの source
+material を置きます。
+
+`.runops/knowledge/enabled/imports.md` は source knowledge から生成される
+Agent context です。`.runops/insights/` と `.runops/facts.toml` は互換性のため
+残る advanced/structured knowledge store として扱い、日常のメモやレポートは
+まず `notes/` と `materials/` に置くことを推奨します。
 
 ### 知識管理
 
@@ -339,10 +352,13 @@ runo runs list runs/cavity/scan
 
 知識管理は三層構造:
 - **source knowledge** — 外部共有知識リポジトリ (`refs/knowledge/` にマウント)
-- **local knowledge** — プロジェクト固有の知見 (insights, facts)
-- **derived knowledge** — source と local から生成される派生物 (imports.md, candidate fact transport 等)
+- **visible project knowledge** — 人間と Agent が直接読む `notes/` と `materials/`
+- **derived / structured knowledge** — source と local から生成される `imports.md`、candidate fact transport、advanced な insights/facts
 
-profile source は repo ルートの `entrypoints.toml` で import 対象を明示できる。`imports.md` はこの manifest を優先し、未指定 profile は `profiles/<name>.md` にフォールバックする。
+profile source は repo ルートの `entrypoints.toml` で import 対象を明示できる。
+`imports.md` はこの manifest を優先し、未指定 profile は `profiles/<name>.md` に
+フォールバックする。`imports.md` は source of truth ではなく、Agent が読みやすい
+形にレンダリングされた派生コンテキストです。
 
 全コマンドは引数省略時にカレントディレクトリをデフォルトとする。
 

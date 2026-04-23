@@ -1,17 +1,24 @@
 # notes/ — lab notebook & reports
 
-`.runops/insights/` と `.runops/facts.toml` は **curated knowledge** (整理済の
-名前付き知見) を入れる場所。本ディレクトリ `notes/` は **逐次的な実験ノート
-と長文レポート** を入れる場所で、両者は明確に役割を分ける。
+`notes/` は **逐次的な実験ノートと長文レポート** を入れる、人間/Agent 共有の
+作業場です。論文 PDF、manual、図、snippet などの source material は隣の
+`materials/` に置きます。
+
+`.runops/knowledge/` は `runo update-refs` や `runo knowledge source render` が
+生成する Agent context です。`.runops/insights/` と `.runops/facts.toml` は
+互換性のため残る advanced/structured knowledge store と考え、日常のメモや
+レポートはまず `notes/` と `materials/` に置くのを推奨します。
 
 ## どこに何を書くか
 
 | 場所                          | 用途                                     | 性質                |
 | ---                           | ---                                      | ---                 |
-| `.runops/facts.toml`          | 機械可読 atomic claim                    | curated, atomic     |
-| `.runops/insights/<name>.md`  | 名前付き整理済知見 (`/learn` で書く)     | curated, durable    |
 | **`notes/YYYY-MM-DD.md`**     | **日次の lab notebook (append-only)**    | **chronological**   |
 | **`notes/reports/<topic>.md`**| **長文レポート / 解析記事**              | **refined, 改稿可** |
+| **`materials/`**              | **論文・manual・図・snippet**            | **source material** |
+| `.runops/knowledge/`          | 生成済み Agent context                   | generated, internal |
+| `.runops/facts.toml`          | 機械可読 atomic claim                    | advanced, structured |
+| `.runops/insights/<name>.md`  | 名前付き整理済知見 (`/learn` で書く)     | advanced, durable   |
 | `runs/<run>/analysis/`        | 個別 run の curated 出力                 | run 単位            |
 
 ## 規約
@@ -53,18 +60,20 @@ Series B 完走で確かめる。
 ## なぜ `runo knowledge save` ではダメか
 
 - `knowledge save` は **同名で書くと上書き** で chronology と相性が悪い
-- knowledge は「最終的な findings」を整理する場所であって、「今日試したこと
-  のメモ」は意味的にも違う
-- 個別 fact / insight に昇格する価値が出てきたら、そのときに `/learn` で
-  knowledge layer に移送すればよい
+- knowledge commands は structured / advanced な用途に向いていて、「今日試したこと
+  のメモ」や「読みかけ論文の要約」とは shape が違う
+- 個別 fact / insight として機械的に再利用する価値が出てきたら、そのときに
+  `/learn` で `.runops/insights/` や `facts.toml` に移送すればよい
 
 ## 昇格パス
 
 ```
-notes/YYYY-MM-DD.md          ← 日次の chain of thought
+materials/                  ← source material (papers, manuals, snippets)
+        ↓ (読んだこと・観察したことを記録)
+notes/YYYY-MM-DD.md          ← 日次の observation / work log
         ↓ (ストーリーが固まる)
 notes/reports/<topic>.md     ← 整理済 long form report
-        ↓ (atomic な知見を抽出)
-.runops/insights/<name>.md   ← 名前付き curated insight
-.runops/facts.toml           ← 機械可読 atomic claim
+        ↓ (機械的に再利用したい atomic な知見だけ抽出)
+.runops/insights/<name>.md   ← advanced: named insight
+.runops/facts.toml           ← advanced: machine-readable claim
 ```
