@@ -97,6 +97,45 @@ class TestCaseNewMinimal:
         plasma_path = project_root / "cases" / "emses" / "test_case" / "plasma.toml"
         assert "rich-marker" not in plasma_path.read_text(encoding="utf-8")
 
+    def test_invalid_project_config_warns_and_uses_default_launcher(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Broken launcher config falls back to the default launcher with warning."""
+        project_root = _make_emses_project(tmp_path)
+        (project_root / "launchers.toml").write_text("[launchers\n", encoding="utf-8")
+
+        monkeypatch.chdir(project_root)
+        result = runner.invoke(
+            app, ["case", "new", "test_case", "-s", "emses", "--minimal"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Warning: failed to read project config" in result.output
+        case_toml = (
+            project_root / "cases" / "emses" / "test_case" / "case.toml"
+        ).read_text(encoding="utf-8")
+        assert 'launcher = "srun"' in case_toml
+
+    def test_invalid_site_profile_warns_and_uses_standard_resource_style(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Broken site.toml falls back to the standard resource style."""
+        project_root = _make_emses_project(tmp_path)
+        (project_root / "site.toml").write_text("[site\n", encoding="utf-8")
+
+        monkeypatch.chdir(project_root)
+        result = runner.invoke(
+            app, ["case", "new", "test_case", "-s", "emses", "--minimal"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Warning: failed to read site profile" in result.output
+        case_toml = (
+            project_root / "cases" / "emses" / "test_case" / "case.toml"
+        ).read_text(encoding="utf-8")
+        assert "ntasks = 1" in case_toml
+        assert "processes = 1" not in case_toml
+
 
 class TestCaseNewEmuAutoRun:
     """Tests for the auto-call to `emu generate -u` after EMSES case creation."""

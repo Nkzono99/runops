@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+
+if TYPE_CHECKING:
+    import pytest
 
 runner = CliRunner()
 
@@ -24,7 +28,7 @@ def _make_existing_project(project_dir: Path) -> None:
 
 def test_setup_renders_imports_for_bootstrapped_tool_docs(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir = tmp_path / "setup-project"
     _make_existing_project(project_dir)
@@ -59,7 +63,7 @@ def test_setup_renders_imports_for_bootstrapped_tool_docs(
 
 def test_setup_smoke_with_knowledge_attach_render_and_doctor(
     tmp_path: Path,
-    monkeypatch,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     project_dir = tmp_path / "smoke-project"
 
@@ -125,3 +129,40 @@ def test_setup_smoke_with_knowledge_attach_render_and_doctor(
     ).read_text(encoding="utf-8")
     assert "@tools/runops/docs/agent-user-guide.md" in imports
     assert "@refs/knowledge/shared-kb/profiles/common.md" in imports
+
+
+def test_setup_warns_on_invalid_project_config_and_continues(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    project_dir = tmp_path / "broken-project"
+    project_dir.mkdir()
+    (project_dir / "runops.toml").write_text("[project]\nname = [\n", encoding="utf-8")
+
+    captured_sim_names: list[list[str]] = []
+
+    def _fake_bootstrap(
+        _root: Path,
+        sim_names: list[str],
+        _runops_repo: str,
+        created: list[str],
+        _skipped: list[str],
+    ) -> None:
+        captured_sim_names.append(sim_names)
+        created.append(".venv")
+
+    monkeypatch.setattr("runops.cli.init._bootstrap_environment", _fake_bootstrap)
+    monkeypatch.setattr(
+        "runops.cli.init._prepare_knowledge_imports",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "runops.cli.init.scaffold._create_runops_skeleton",
+        lambda _root, created: created.append(".runops"),
+    )
+
+    result = runner.invoke(app, ["setup", "--path", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "Warning: failed to read project config" in result.output
+    assert captured_sim_names == [[]]

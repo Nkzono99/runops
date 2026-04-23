@@ -9,9 +9,24 @@ from typing import Annotated, Optional
 
 import typer
 
-from runops.core.knowledge_source import _repo_name_from_url
+from runops.core.exceptions import ProjectConfigError
+from runops.core.project import ProjectConfig, load_project
+from runops.core.repository import repo_name_from_url
 
 _DEFAULT_SIMCTL_REPO = "https://github.com/Nkzono99/runops.git"
+
+
+def _load_project_for_setup(project_dir: Path) -> ProjectConfig | None:
+    """Load a project config for setup, warning on invalid config."""
+    try:
+        return load_project(project_dir)
+    except ProjectConfigError as exc:
+        typer.echo(
+            "Warning: failed to read project config "
+            f"({exc}). Continuing without simulator-specific setup.",
+            err=True,
+        )
+        return None
 
 
 def setup(
@@ -71,14 +86,9 @@ def setup(
 
     # 2. Read simulator names from project config
     sim_names: list[str] = []
-    project = None
-    try:
-        from runops.core.project import load_project
-
-        project = load_project(project_dir)
+    project = _load_project_for_setup(project_dir)
+    if project is not None:
         sim_names = list(project.simulators.keys())
-    except Exception:
-        pass  # Continue without simulator-specific setup
 
     created: list[str] = []
     skipped: list[str] = []
@@ -147,7 +157,7 @@ def _clone_project(url: str, dest: Path | None) -> Path:
         Resolved path to the cloned directory.
     """
     if dest is None:
-        dest = Path.cwd() / _repo_name_from_url(url)
+        dest = Path.cwd() / repo_name_from_url(url)
 
     dest = dest.resolve()
     if dest.exists():

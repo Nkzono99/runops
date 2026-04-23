@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
-import contextlib
+import sys
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
-from runops.core.project import find_project_root
+from runops.adapters.base import SimulatorAdapter
+from runops.core.exceptions import ProjectConfigError, ProjectNotFoundError
+from runops.core.project import find_project_root, load_project
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 def _detect_simulator(cwd: Path) -> str | None:
@@ -21,6 +28,77 @@ def _detect_simulator(cwd: Path) -> str | None:
         if part == "cases" and i + 1 < len(parts):
             return parts[i + 1]
     return None
+
+
+def _warn_fallback(message: str) -> None:
+    """Emit a warning when falling back to safe defaults."""
+    typer.echo(f"  Warning: {message}", err=True)
+
+
+def _try_find_project_root(start: Path) -> Path | None:
+    """Return the project root when inside a project, else ``None``."""
+    try:
+        return find_project_root(start)
+    except ProjectNotFoundError:
+        return None
+
+
+def _load_case_defaults(project_root: Path) -> tuple[str, str]:
+    """Load launcher and site defaults, warning when config is invalid."""
+    default_launcher = "srun"
+    site_resource_style = "standard"
+
+    from runops.core.site import load_site_profile
+
+    try:
+        project = load_project(project_root)
+    except ProjectConfigError as exc:
+        _warn_fallback(
+            "failed to read project config "
+            f"({exc}); using launcher '{default_launcher}'"
+        )
+    else:
+        launcher_names = list(project.launchers.keys())
+        if launcher_names:
+            default_launcher = launcher_names[0]
+
+    try:
+        site = load_site_profile(project_root)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        _warn_fallback(
+            f"failed to read site profile ({exc}); using '{site_resource_style}' "
+            "resource style"
+        )
+    else:
+        site_resource_style = site.resource_style
+
+    return default_launcher, site_resource_style
+
+
+def _discover_ref_templates(
+    project_root: Path,
+    adapter_cls: type[SimulatorAdapter],
+) -> dict[str, str]:
+    """Load rich ref templates when available."""
+    refs_dir = project_root / "refs"
+    templates: dict[str, str] = {}
+
+    for _url, repo_name in adapter_cls.doc_repos():
+        repo_dir = refs_dir / repo_name
+        if not repo_dir.is_dir():
+            continue
+        for candidate_name in ("plasma.toml", "beach.toml"):
+            candidate = repo_dir / candidate_name
+            if not candidate.is_file():
+                continue
+            try:
+                templates[candidate_name] = candidate.read_text(encoding="utf-8")
+            except OSError as exc:
+                _warn_fallback(
+                    f"failed to read ref template {candidate}: {exc}; "
+                    "using bundled template"
+                )
+    return templates
 
 
 def new(
@@ -95,9 +173,7 @@ def new(
     if dest is not None:
         target_dir = dest.resolve()
     elif sim_name is not None:
-        project_root_candidate: Path | None = None
-        with contextlib.suppress(Exception):
-            project_root_candidate = find_project_root(cwd)
+        project_root_candidate = _try_find_project_root(cwd)
         if project_root_candidate is not None:
             target_dir = (project_root_candidate / "cases" / sim_name).resolve()
         else:
@@ -145,45 +221,16 @@ def new(
     # Resolve project root (used for launcher, site profile, and ref templates)
     default_launcher = "srun"
     site_resource_style = "standard"
-    project_root: Path | None = None
-    with contextlib.suppress(Exception):
-        project_root = find_project_root(target_dir)
-
-    if project_root:
-        try:
-            from runops.core.project import load_project
-
-            project = load_project(project_root)
-            launcher_names = list(project.launchers.keys())
-            if launcher_names:
-                default_launcher = launcher_names[0]
-
-            from runops.core.site import load_site_profile
-
-            site = load_site_profile(project_root)
-            site_resource_style = site.resource_style
-        except Exception:
-            pass  # Fall back to defaults
+    project_root = _try_find_project_root(target_dir)
+    if project_root is not None:
+        default_launcher, site_resource_style = _load_case_defaults(project_root)
 
     # Look for rich template files in refs/<repo>/.  Skipped under
     # ``--minimal`` so the user always gets the small bundled adapter
     # template, even if a refs/ override exists.
-    ref_templates: dict[str, Path] = {}
-    if not minimal:
-        try:
-            if project_root and hasattr(adapter_cls, "doc_repos"):
-                refs_dir = project_root / "refs"
-                for _url, repo_name in adapter_cls.doc_repos():
-                    repo_dir = refs_dir / repo_name
-                    if not repo_dir.is_dir():
-                        continue
-                    # Look for template input files at repo root
-                    for candidate_name in ("plasma.toml", "beach.toml"):
-                        candidate = repo_dir / candidate_name
-                        if candidate.is_file():
-                            ref_templates[candidate_name] = candidate
-        except Exception:
-            pass
+    ref_templates: dict[str, str] = {}
+    if not minimal and project_root is not None:
+        ref_templates = _discover_ref_templates(project_root, adapter_cls)
 
     # Write template files
     templates = adapter_cls.case_template()
@@ -206,7 +253,7 @@ def new(
                 )
         # Override with rich template from refs/ if available
         if filename in ref_templates:
-            content = ref_templates[filename].read_text(encoding="utf-8")
+            content = ref_templates[filename]
         filepath.write_text(content, encoding="utf-8")
         created.append(filename)
 
