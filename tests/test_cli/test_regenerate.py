@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 runner = CliRunner()
 
@@ -121,7 +127,6 @@ def test_regenerate_rejects_unsafe_state(tmp_path: Path) -> None:
 
     # Bump manifest state to 'running'
     manifest_path = run_dir / "manifest.toml"
-    import tomllib
 
     with open(manifest_path, "rb") as f:
         manifest = tomllib.load(f)

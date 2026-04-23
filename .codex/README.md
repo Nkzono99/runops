@@ -53,14 +53,20 @@ policy です。runops は `submit`, `delete`, `purge-work`, `rm -rf`,
 `.codex/rules/*.md` に置きます。
 
 `runops runs submit --dry-run` は HPC 資源を使わない確認コマンドなので allow
-しています。ただし Codex execpolicy は prefix-based なので、`--dry-run` は
-`submit` の直後に置いてください:
+しています。ただし Codex execpolicy は prefix-based で、`prompt` は `allow`
+より安全側に倒れるため、`--dry-run` は必ず `submit` の直後に置いてください:
 
 ```bash
 runops runs submit --dry-run --all runs/survey -qn gr10451a
 ```
 
 実投入は必ず会話上でユーザー確認を得てから実行します。
+default の project rule は `--all`, `-qn`, `--queue-name`, `--qos`,
+`--afterok` など、HPC 資源を使う submit option prefix を `prompt` にします。
+一方で `pattern = ["runops", "runs", "submit"]` という広い rule は置きません。
+これを置くと dry-run も同時に match し、`approval_policy = "never"` 環境で
+安全確認の dry-run まで hard block されるためです。
+
 `approval_policy = "never"` / `AskForApproval = Never` の環境では `prompt`
 rule が hard block になるため、実投入まで Codex に任せる project では
 個人用の `AGENTS.override.md` と user-local execpolicy で明示 opt-in してください。
@@ -69,7 +75,13 @@ rule が hard block になるため、実投入まで Codex に任せる project
 ```starlark
 # ~/.codex/rules/runops-submit-approved.rules など user-local に置く
 prefix_rule(
-    pattern = ["runops", "runs", "submit", "--all"],
+    pattern = ["runops", "runs", "submit"],
+    decision = "allow",
+    justification = "Only use after explicit chat confirmation in this project.",
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit"],
     decision = "allow",
     justification = "Only use after explicit chat confirmation in this project.",
 )
@@ -81,10 +93,15 @@ prefix_rule(
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   runops runs submit --dry-run --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
+  runops runs submit --all runs/survey --dry-run
+codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   runops runs submit --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   rm -rf runs/R20260419-0001
 ```
+
+2 つ目のように `--dry-run` を後ろに置いた submit が `prompt` になる場合は、
+1 つ目の順序に直してください。
 
 ## Hooks
 

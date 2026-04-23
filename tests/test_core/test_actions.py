@@ -300,6 +300,7 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
                 "id": "R20260418-0002",
                 "status": "cancelled",
                 "failure_reason": "",
+                "last_slurm_state": "CANCELLED",
             },
             "job": {"attempt": 1},
         },
@@ -310,6 +311,11 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
     assert result.status is ActionStatus.SUCCESS
     assert result.state_before == "cancelled"
     assert result.state_after == "created"
+
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["last_slurm_state"] == ""
 
 
 def test_retry_run_respects_max_attempts(tmp_path: Path) -> None:
@@ -431,6 +437,7 @@ def test_submit_run_updates_manifest_and_state_file(tmp_path: Path) -> None:
             "run": {
                 "id": "R20260330-0001",
                 "status": "created",
+                "last_slurm_state": "COMPLETED",
             },
             "job": {
                 "partition": "debug",
@@ -451,6 +458,11 @@ def test_submit_run_updates_manifest_and_state_file(tmp_path: Path) -> None:
     assert result.status is ActionStatus.SUCCESS
     assert result.data["job_id"] == "12345"
     assert (run_dir / "status" / "state.json").exists()
+
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["last_slurm_state"] == ""
 
 
 def test_submit_run_rejects_empty_input_dir(tmp_path: Path) -> None:
@@ -563,6 +575,42 @@ def test_execute_action_sync_run_updates_manifest_and_state_file(
     assert updated.run["status"] == "running"
     assert updated.run["last_slurm_state"] == "RUNNING"
     assert (run_dir / "status" / "state.json").exists()
+
+
+def test_execute_action_sync_run_refreshes_slurm_state_when_state_unchanged(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260330-0001",
+                "status": "submitted",
+                "last_slurm_state": "COMPLETED",
+            },
+            "job": {
+                "job_id": "67890",
+            },
+        },
+    )
+
+    with patch(
+        "runops.slurm.query.query_job_status",
+        return_value=JobStatus(run_state=RunState.SUBMITTED, slurm_state="PENDING"),
+    ):
+        result = execute_action("sync_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_before == "submitted"
+    assert result.state_after == "submitted"
+    assert result.data["slurm_state"] == "PENDING"
+
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["status"] == "submitted"
+    assert updated.run["last_slurm_state"] == "PENDING"
 
 
 def test_execute_action_cancel_run_scancels_and_syncs_manifest(tmp_path: Path) -> None:

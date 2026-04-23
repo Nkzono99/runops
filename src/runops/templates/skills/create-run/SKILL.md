@@ -113,7 +113,7 @@ runops runs submit --all -qn <partition>
 - manifest.toml を手動編集しない
 - input/ や submit/job.sh を直接作らない
 - survey の run 数が多い場合は投入前に plan を出して承認を取る
-- `runops runs submit --all --dry-run` で投入前に確認できる
+- `runops runs submit --dry-run --all` で投入前に確認できる
 
 ## `{{ skill_prefix }}note` で残すべきこと
 

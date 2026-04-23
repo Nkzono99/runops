@@ -24,7 +24,7 @@ runops runs submit --all -qn <queue>
 
 - `run --all` は高コスト操作。事前に plan を出す
 - 初回の大規模 survey は承認を取る
-- dry-run で確認: `runops runs submit --all --dry-run`
+- dry-run で確認: `runops runs submit --dry-run --all`
 
 ## `{{ skill_prefix }}note` で残すべきこと
 

@@ -3,6 +3,12 @@
 # These rules apply when Codex asks to run a command outside the sandbox.
 # Keep behavioral workflow guidance in AGENTS.md; this file only captures
 # high-risk command prefixes that should not be silently escalated.
+#
+# Codex execpolicy is prefix-based and prompt decisions win over allow when a
+# command matches both.  Do not add a broad ["runops", "runs", "submit"] prompt
+# here: it would also match dry-runs and make the safe confirmation workflow
+# unusable.  Instead, keep dry-run as the canonical safe prefix and enumerate
+# resource-spending submit forms below.
 
 prefix_rule(
     pattern = ["runops", "runs", "submit", "--dry-run"],

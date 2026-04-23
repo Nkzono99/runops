@@ -581,6 +581,9 @@ def submit_run(
     update_manifest(
         run_dir,
         {
+            "run": {
+                "last_slurm_state": "",
+            },
             "job": {
                 "job_id": job_id,
                 "submitted_at": now,
@@ -612,7 +615,7 @@ def submit_run(
 
 def sync_run(run_dir: Path) -> ActionResult:
     """Synchronize run state with Slurm."""
-    from runops.core.manifest import read_manifest
+    from runops.core.manifest import read_manifest, update_manifest
     from runops.core.state import update_state
     from runops.slurm.query import SlurmQueryError, query_job_status
 
@@ -633,6 +636,14 @@ def sync_run(run_dir: Path) -> ActionResult:
 
     new_state = job_status.run_state
     if new_state.value == state_str:
+        try:
+            update_manifest(
+                run_dir,
+                {"run": {"last_slurm_state": job_status.slurm_state}},
+            )
+        except SimctlError as e:
+            return _error("sync_run", f"State update failed: {e}")
+
         return ActionResult(
             action="sync_run",
             status=ActionStatus.SUCCESS,
@@ -870,6 +881,7 @@ def retry_run(
             "run": {
                 "status": RunState.CREATED.value,
                 "failure_reason": "",
+                "last_slurm_state": "",
             },
             "job": {
                 "job_id": "",

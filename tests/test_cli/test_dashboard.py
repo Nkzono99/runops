@@ -122,6 +122,26 @@ class TestDashboard:
         assert "%" in result.output
         assert "SLURM" in result.output
 
+    def test_dashboard_hides_terminal_slurm_state_for_active_run(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project_dir = _make_project(tmp_path)
+        survey = project_dir / "runs" / "series_x"
+        _create_run(
+            survey,
+            "R20260327-0001",
+            status="submitted",
+            job_id="33333",
+            last_slurm_state="COMPLETED",
+        )
+
+        result = runner.invoke(app, ["runs", "dashboard", str(survey)])
+
+        assert result.exit_code == 0
+        assert "R20260327-0001" in result.output
+        assert "COMPLETED" not in result.output
+
 
 class TestDashboardWatch:
     """Tests for the --watch refresh loop."""

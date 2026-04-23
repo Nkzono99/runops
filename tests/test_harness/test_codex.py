@@ -31,7 +31,15 @@ def test_build_codex_config_documents_trust_requirement() -> None:
 def test_build_codex_rules_prompts_high_risk_runops_commands() -> None:
     """Rules prompt for HPC/deletion commands and forbid destructive Git/shell."""
     content = build_codex_rules()
-    assert 'pattern = ["runops", "runs", "submit"]' in content
+    assert 'pattern = ["runops", "runs", "submit", "--dry-run"]' in content
+    assert 'pattern = ["runops", "runs", "submit", "--all"]' in content
+    assert 'pattern = ["runops", "runs", "submit", "-qn"]' in content
+    assert 'pattern = ["runops", "runs", "submit", "--queue-name"]' in content
+    assert 'pattern = ["runops", "runs", "submit", "--qos"]' in content
+    assert 'pattern = ["runops", "runs", "submit", "--afterok"]' in content
+    assert 'pattern = ["runops", "runs", "submit"]' not in content
+    assert "prompt decisions win over allow" in content
+    assert 'decision = "allow"' in content
     assert 'pattern = ["runops", "runs", "purge-work"]' in content
     assert 'pattern = ["runops", "runs", "delete"]' in content
     assert 'decision = "prompt"' in content
@@ -53,6 +61,16 @@ def test_build_codex_readme_explains_auto_loaded_paths() -> None:
     assert ".codex/hooks.json" in content
     # Clarifies the non-auto-loaded pieces.
     assert "~/.codex/prompts/" in content
+
+
+def test_build_codex_readme_explains_submit_policy_opt_in() -> None:
+    """README explains the safe dry-run prefix and approval-never opt-in."""
+    content = build_codex_readme("demo")
+    assert "runops runs submit --dry-run --all" in content
+    assert 'pattern = ["runops", "runs", "submit"]' in content
+    assert 'approval_policy = "never"' in content
+    assert "user-local execpolicy" in content
+    assert "prompt" in content
 
 
 def test_bundle_emits_codex_config_and_agents_skills() -> None:
@@ -80,6 +98,9 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "`$learn`" in codex_note
     assert "`/note`" not in codex_note
     assert "{{ skill_prefix }}" not in codex_note
+    codex_run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
+    assert "runops runs submit --dry-run --all" in codex_run_all
+    assert "runops runs submit --all --dry-run" not in codex_run_all
 
 
 def test_bundle_does_not_emit_project_local_codex_prompts() -> None:
