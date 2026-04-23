@@ -25,6 +25,14 @@ runs/**/analysis/cache/
 runs/**/analysis/scratch/
 runs/**/analysis/.ipynb_checkpoints/
 
+# materials/: keep text indexes tracked, treat bulky binaries as local by default
+materials/**/*.pdf
+materials/**/*.pptx
+materials/**/*.docx
+materials/**/*.zip
+!materials/README.md
+!materials/index.toml
+
 # Personal agent overrides (not shared)
 CLAUDE.local.md
 AGENTS.override.md

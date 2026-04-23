@@ -428,6 +428,126 @@ class TestUpdateHarnessReexec:
         )
         assert "editable install refreshed" in result.output
 
+    def test_reinstall_editable_when_metadata_is_stale(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Refresh editable install even when ``git pull`` says no update."""
+        _init_project(tmp_path)
+
+        tools_runops = tmp_path / "tools" / "runops"
+        tools_runops.mkdir(parents=True)
+        (tools_runops / "pyproject.toml").write_text(
+            "[project]\nname='runops'\nversion='0.5.1'\n",
+            encoding="utf-8",
+        )
+
+        venv_bin = tmp_path / ".venv" / "bin"
+        venv_bin.mkdir(parents=True)
+        (venv_bin / "python").write_text("", encoding="utf-8")
+
+        captured_calls: list[list[str]] = []
+
+        def fake_run(argv, *_, **__):  # type: ignore[no-untyped-def]
+            captured_calls.append(list(argv))
+
+            class _Result:
+                def __init__(self, stdout: str = "") -> None:
+                    self.returncode = 0
+                    self.stdout = stdout
+                    self.stderr = ""
+
+            if len(argv) >= 3 and argv[1] == "-c":
+                return _Result(
+                    json.dumps(
+                        {
+                            "installed": True,
+                            "editable": True,
+                            "version": "0.4.0",
+                            "url": tools_runops.resolve().as_uri(),
+                        }
+                    )
+                )
+            return _Result()
+
+        monkeypatch.setattr(
+            "runops.cli.update_harness._pull_tools_repo",
+            lambda *_args, **_kwargs: "already up to date",
+        )
+        monkeypatch.setattr("runops.cli.update_harness.subprocess.run", fake_run)
+        monkeypatch.setattr(
+            "runops.cli.update_harness._restart_with_skip_pull",
+            lambda: (_ for _ in ()).throw(typer.Exit(code=0)),
+        )
+        monkeypatch.delenv(update_harness_module._REEXEC_ENV_VAR, raising=False)
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "tools/runops: already up to date" in result.output
+        assert "editable install refreshed" in result.output
+        assert any(len(call) >= 3 and call[1] == "-c" for call in captured_calls)
+        assert any(
+            "pip" in call and "install" in call and "-e" in call
+            for call in captured_calls
+        )
+
+    def test_skips_reinstall_when_editable_metadata_matches(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Do not reinstall when the editable metadata already matches."""
+        _init_project(tmp_path)
+
+        tools_runops = tmp_path / "tools" / "runops"
+        tools_runops.mkdir(parents=True)
+        (tools_runops / "pyproject.toml").write_text(
+            "[project]\nname='runops'\nversion='0.5.1'\n",
+            encoding="utf-8",
+        )
+
+        venv_bin = tmp_path / ".venv" / "bin"
+        venv_bin.mkdir(parents=True)
+        (venv_bin / "python").write_text("", encoding="utf-8")
+
+        captured_calls: list[list[str]] = []
+        restarted: list[bool] = []
+
+        def fake_run(argv, *_, **__):  # type: ignore[no-untyped-def]
+            captured_calls.append(list(argv))
+
+            class _Result:
+                returncode = 0
+                stdout = json.dumps(
+                    {
+                        "installed": True,
+                        "editable": True,
+                        "version": "0.5.1",
+                        "url": tools_runops.resolve().as_uri(),
+                    }
+                )
+                stderr = ""
+
+            return _Result()
+
+        monkeypatch.setattr(
+            "runops.cli.update_harness._pull_tools_repo",
+            lambda *_args, **_kwargs: "already up to date",
+        )
+        monkeypatch.setattr("runops.cli.update_harness.subprocess.run", fake_run)
+        monkeypatch.setattr(
+            "runops.cli.update_harness._restart_with_skip_pull",
+            lambda: restarted.append(True),
+        )
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "editable install refreshed" not in result.output
+        assert restarted == []
+        assert not any(
+            "pip" in call and "install" in call and "-e" in call
+            for call in captured_calls
+        )
+
     def test_reinstall_editable_skipped_without_venv(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:

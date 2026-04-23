@@ -14,14 +14,21 @@ the user can merge manually.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 from typing import Annotated, Optional
+from urllib.parse import unquote, urlparse
 
 import typer
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
@@ -51,6 +58,119 @@ def _venv_python(project_dir: Path) -> Path | None:
     python_rel = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
     python_path = venv_dir / python_rel
     return python_path if python_path.exists() else None
+
+
+def _read_runops_version(pyproject_path: Path) -> str | None:
+    """Return the version declared in ``pyproject.toml`` if available."""
+    try:
+        with open(pyproject_path, "rb") as f:
+            data = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+    project = data.get("project")
+    if not isinstance(project, dict):
+        return None
+
+    version = project.get("version")
+    if isinstance(version, str) and version:
+        return version
+    return None
+
+
+def _direct_url_to_path(url: str) -> Path | None:
+    """Convert a PEP 610 file URL to a local path when possible."""
+    parsed = urlparse(url)
+    if parsed.scheme != "file":
+        return None
+
+    raw_path = unquote(parsed.path)
+    if parsed.netloc and parsed.netloc != "localhost":
+        raw_path = f"//{parsed.netloc}{raw_path}"
+
+    try:
+        return Path(raw_path).resolve()
+    except OSError:
+        return Path(raw_path)
+
+
+def _editable_install_needs_refresh(project_dir: Path) -> bool:
+    """Return whether the venv's ``runops`` install should be refreshed.
+
+    This catches the case where ``tools/runops`` was updated manually before
+    ``runo update-harness`` runs: ``git pull`` reports "already up to date",
+    but the virtualenv metadata still points to an older editable install.
+    """
+    runops_dir = project_dir / "tools" / "runops"
+    pyproject_path = runops_dir / "pyproject.toml"
+    if not pyproject_path.is_file():
+        return False
+
+    python_path = _venv_python(project_dir)
+    if python_path is None:
+        return False
+
+    expected_version = _read_runops_version(pyproject_path)
+    expected_path = runops_dir.resolve()
+    probe = r"""
+import json
+from importlib import metadata
+
+payload = {"installed": False}
+try:
+    dist = metadata.distribution("runops")
+except metadata.PackageNotFoundError:
+    print(json.dumps(payload))
+    raise SystemExit(0)
+
+payload["installed"] = True
+payload["version"] = dist.version
+direct_url = dist.read_text("direct_url.json")
+if direct_url:
+    try:
+        data = json.loads(direct_url)
+    except json.JSONDecodeError:
+        data = {}
+    payload["editable"] = bool(data.get("dir_info", {}).get("editable"))
+    payload["url"] = data.get("url", "")
+else:
+    payload["editable"] = False
+    payload["url"] = ""
+
+print(json.dumps(payload))
+"""
+    result = subprocess.run(
+        [str(python_path), "-c", probe],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+    if result.returncode != 0:
+        return True
+
+    try:
+        payload = json.loads(result.stdout or "{}")
+    except json.JSONDecodeError:
+        return True
+    if not isinstance(payload, dict):
+        return True
+
+    if payload.get("installed") is not True:
+        return True
+    if payload.get("editable") is not True:
+        return True
+
+    installed_url = payload.get("url")
+    if not isinstance(installed_url, str):
+        return True
+    installed_path = _direct_url_to_path(installed_url)
+    if installed_path != expected_path:
+        return True
+
+    installed_version = payload.get("version")
+    return expected_version is not None and installed_version != expected_version
 
 
 def _reinstall_editable(project_dir: Path) -> str | None:
@@ -252,7 +372,10 @@ def update_harness(
         pull_status = _pull_tools_repo(project_dir)
         if pull_status is not None:
             typer.echo(f"tools/runops: {pull_status}")
-            if pull_status == "updated" and os.environ.get(_REEXEC_ENV_VAR) != "1":
+            needs_refresh = pull_status == "updated"
+            if pull_status == "already up to date":
+                needs_refresh = _editable_install_needs_refresh(project_dir)
+            if needs_refresh and os.environ.get(_REEXEC_ENV_VAR) != "1":
                 install_status = _reinstall_editable(project_dir)
                 if install_status is not None:
                     typer.echo(f"tools/runops: {install_status}")

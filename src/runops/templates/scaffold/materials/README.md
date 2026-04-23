@@ -20,9 +20,12 @@ This directory is different from generated runops state:
 | `snippets/` | Copied examples, short configs, and source excerpts |
 | `index.toml` | Optional hand-written or generated material index |
 
-Large PDFs remain visible in VS Code Explorer, but the scaffolded VS Code
+Large PDFs remain visible in VS Code Explorer, and the scaffolded VS Code
 settings exclude `materials/**/*.pdf` from text search to keep search results
-usable.
+usable. The scaffolded `.gitignore` also treats bulky binaries such as
+`materials/**/*.pdf`, `materials/**/*.pptx`, `materials/**/*.docx`, and
+`materials/**/*.zip` as local by default while keeping `materials/README.md`
+and `materials/index.toml` tracked.
 
 ## Notes
 

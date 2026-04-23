@@ -76,6 +76,7 @@ class TestInit:
         assert "human/agent shared workspace" in readme
         assert ".runops/knowledge/" in readme
         assert "materials/**/*.pdf" in readme
+        assert "local by default" in readme
         assert "materials = []" in index
 
     def test_init_creates_note_skill(self, tmp_path: Path) -> None:
@@ -148,6 +149,12 @@ class TestInit:
         assert "runs/**/status/" in content
         assert "runs/**/input/plasma.inp" in content
         assert "runs/**/analysis/scratch/" in content
+        assert "materials/**/*.pdf" in content
+        assert "materials/**/*.pptx" in content
+        assert "materials/**/*.docx" in content
+        assert "materials/**/*.zip" in content
+        assert "!materials/README.md" in content
+        assert "!materials/index.toml" in content
         assert "AGENTS.override.md" in content
 
     def test_init_vscode_settings_hide_generated_artifacts(
