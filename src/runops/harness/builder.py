@@ -1,10 +1,10 @@
 """Harness file generation shared by ``runops init`` and ``runops update-harness``.
 
-The builder renders every harness file (``CLAUDE.md``, ``AGENTS.md``,
+The builder renders every harness-managed file (``CLAUDE.md``, ``AGENTS.md``,
 ``.claude/skills/*``, ``.claude/rules/*``, ``.claude/settings.json``,
-``.codex/*``, ``.agents/skills/*``, ``cases/CLAUDE.md``,
-``cases/AGENTS.md``, ``runs/CLAUDE.md``, ``runs/AGENTS.md``) into an
-in-memory mapping of
+``.vscode/settings.json``, ``.codex/*``, ``.agents/skills/*``,
+``cases/CLAUDE.md``, ``cases/AGENTS.md``, ``runs/CLAUDE.md``,
+``runs/AGENTS.md``) into an in-memory mapping of
 ``relative_path -> rendered_content``.
 
 ``runops init`` iterates the mapping and writes each file (``_write_if_missing``),
@@ -33,6 +33,7 @@ HARNESS_LOCK_PATH = ".runops/harness.lock"
 CLAUDE_MD = "CLAUDE.md"
 AGENTS_MD = "AGENTS.md"
 CLAUDE_SETTINGS = ".claude/settings.json"
+VSCODE_SETTINGS = ".vscode/settings.json"
 CASES_CLAUDE_MD = "cases/CLAUDE.md"
 RUNS_CLAUDE_MD = "runs/CLAUDE.md"
 CASES_AGENTS_MD = "cases/AGENTS.md"
@@ -56,6 +57,7 @@ _RULE_WORKFLOW_TEMPLATE = "harness/claude/rules/runops-workflow.md"
 _RULE_PLAN_BEFORE_ACT_TEMPLATE = "harness/claude/rules/plan-before-act.md"
 _RULE_COOKBOOK_TEMPLATE = "harness/claude/rules/cookbook.md.j2"
 _RULE_UPSTREAM_FEEDBACK_TEMPLATE = "harness/claude/rules/upstream-feedback.md.j2"
+_VSCODE_SETTINGS_TEMPLATE = "scaffold/vscode_settings.json"
 
 # Files that update-harness is allowed to touch.  Any other file under the
 # project root (campaign.toml, cases/**, runs/**, etc.) is user-owned and
@@ -64,6 +66,7 @@ _ALL_HARNESS_PREFIXES: tuple[str, ...] = (
     CLAUDE_MD,
     AGENTS_MD,
     CLAUDE_SETTINGS,
+    VSCODE_SETTINGS,
     CASES_CLAUDE_MD,
     RUNS_CLAUDE_MD,
     CASES_AGENTS_MD,
@@ -306,6 +309,7 @@ def build_harness_bundle(
     )
 
     files[CLAUDE_SETTINGS] = build_claude_settings()
+    files[VSCODE_SETTINGS] = load_static(_VSCODE_SETTINGS_TEMPLATE)
 
     rendered_claude_skills = _render_skill_files(
         project_name,

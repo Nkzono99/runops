@@ -45,8 +45,6 @@ _AGENTS_MD = "AGENTS.md"
 _SKILLS_DIR = ".claude/skills"
 _RULES_DIR = ".claude/rules"
 _CLAUDE_SETTINGS = ".claude/settings.json"
-_VSCODE_DIR = ".vscode"
-_VSCODE_SETTINGS = "settings.json"
 
 _SCHEMA_BASE_URL = "https://raw.githubusercontent.com/Nkzono99/runops/main/schemas"
 _DEFAULT_SIMCTL_REPO = "https://github.com/Nkzono99/runops.git"
@@ -904,9 +902,9 @@ def init(
         sync_sources=True,
     )
 
-    # Build all harness files (CLAUDE.md, AGENTS.md, skills, rules,
-    # settings.json, subdirectory CLAUDE.md) via the shared builder so that
-    # `runo update-harness` can re-render the same set later.
+    # Build all harness-managed files (CLAUDE.md, AGENTS.md, skills, rules,
+    # settings.json, editor settings, subdirectory CLAUDE.md) via the shared
+    # builder so that `runo update-harness` can re-render the same set later.
     from runops.harness.builder import build_harness_bundle, save_harness_lock
 
     harness = build_harness_bundle(
@@ -925,18 +923,6 @@ def init(
 
     # Persist template hashes so update-harness can detect user edits.
     save_harness_lock(project_dir, harness.hashes())
-
-    # .vscode/settings.json
-    vscode_dir = project_dir / _VSCODE_DIR
-    vscode_settings = vscode_dir / _VSCODE_SETTINGS
-    if vscode_settings.exists():
-        skipped.append(f"{_VSCODE_DIR}/{_VSCODE_SETTINGS}")
-    else:
-        vscode_dir.mkdir(exist_ok=True)
-        vscode_settings.write_text(
-            load_static("scaffold/vscode_settings.json"), encoding="utf-8"
-        )
-        created.append(f"{_VSCODE_DIR}/{_VSCODE_SETTINGS}")
 
     # git init
     fresh_git = False

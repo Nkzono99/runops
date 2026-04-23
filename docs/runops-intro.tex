@@ -269,6 +269,7 @@ CLAUDE.md & プロジェクト運用ルール・スキル一覧・役割分担 \
 .claude/skills/ & 定型作業のスキル定義 (15+ 種類) \\
 .claude/rules/ & Agent が守るべき制約 (ファイル保護、承認フロー等) \\
 .claude/settings.json & 権限設定 (許可/確認/拒否するツール) \\
+.vscode/settings.json & 生成物を隠す editor 設定 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -395,7 +396,8 @@ AI: tools/runops を pull して update-harness を実行します...
 実行内容:
 \begin{itemize}[nosep]
   \item \textbf{tools/runops/} リポジトリを \texttt{git pull} で最新化
-  \item \textbf{runo update-harness} でハーネスファイル (CLAUDE.md, skills, rules 等) を再生成
+  \item \textbf{runo update-harness} でハーネスファイル (CLAUDE.md, skills, rules, editor settings 等) を再生成
+  \item \textbf{不足している visible workspace} として \texttt{notes/}, \texttt{materials/} を補完
   \item \textbf{runo update} でシミュレータパッケージを更新
   \item 編集済みファイルとの競合は \texttt{.new} ファイルとして出力され、diff 確認後にマージ
 \end{itemize}

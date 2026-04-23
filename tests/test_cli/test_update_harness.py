@@ -54,6 +54,7 @@ class TestUpdateHarnessBasic:
         assert "CLAUDE.md" in lock
         assert "AGENTS.md" in lock
         assert ".claude/settings.json" in lock
+        assert ".vscode/settings.json" in lock
         assert ".claude/rules/runops-workflow.md" in lock
         assert ".claude/rules/upstream-feedback.md" in lock
         assert ".codex/config.toml" in lock
@@ -108,6 +109,58 @@ class TestUpdateHarnessBasic:
         assert "Updated" in result.output
         # File should no longer be the user edit
         assert claude_md.read_text(encoding="utf-8") != "# Edited\n"
+
+    def test_vscode_settings_are_harness_managed(self, tmp_path: Path) -> None:
+        """User edits to .vscode/settings.json are preserved via .new."""
+        _init_project(tmp_path)
+        settings_path = tmp_path / ".vscode" / "settings.json"
+        settings_path.write_text('{"files.exclude":{}}\n', encoding="utf-8")
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert ".vscode/settings.json.new" in result.output
+        assert settings_path.read_text(encoding="utf-8") == '{"files.exclude":{}}\n'
+        assert (tmp_path / ".vscode" / "settings.json.new").exists()
+
+    def test_backfills_visible_workspace_when_missing(self, tmp_path: Path) -> None:
+        """update-harness recreates missing notes/materials scaffold."""
+        _init_project(tmp_path)
+        (tmp_path / "notes" / "README.md").unlink()
+        (tmp_path / "materials" / "README.md").unlink()
+        (tmp_path / "materials" / "papers").rmdir()
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert "Backfilled" in result.output
+        assert (tmp_path / "notes" / "README.md").is_file()
+        assert (tmp_path / "materials" / "README.md").is_file()
+        assert (tmp_path / "materials" / "papers").is_dir()
+        lock = load_harness_lock(tmp_path)
+        assert "notes/README.md" not in lock
+        assert "materials/README.md" not in lock
+
+    def test_only_can_limit_workspace_backfill(self, tmp_path: Path) -> None:
+        """--only respects notes/materials workspace backfill targets."""
+        _init_project(tmp_path)
+        (tmp_path / "notes" / "README.md").unlink()
+        (tmp_path / "materials" / "README.md").unlink()
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--only",
+                "materials",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert not (tmp_path / "notes" / "README.md").exists()
+        assert (tmp_path / "materials" / "README.md").is_file()
 
     def test_dry_run_no_writes(self, tmp_path: Path) -> None:
         """--dry-run reports but does not actually write files."""

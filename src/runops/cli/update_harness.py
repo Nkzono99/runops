@@ -1,8 +1,10 @@
 """CLI command for updating harness files in an existing project.
 
-``runo update-harness`` re-renders all agent-harness templates (CLAUDE.md,
-AGENTS.md, .claude/skills/, .claude/rules/, .claude/settings.json, etc.)
-from the current version of runops and writes them into the project.
+``runo update-harness`` re-renders all harness-managed templates (CLAUDE.md,
+AGENTS.md, .claude/skills/, .claude/rules/, .claude/settings.json,
+.vscode/settings.json, etc.) from the current version of runops and writes
+them into the project. It also backfills the visible ``notes/`` and
+``materials/`` workspace scaffold when those paths are missing.
 
 Collision detection:  If the on-disk file matches the hash recorded in
 ``.runops/harness.lock``, it is assumed to be unedited and is silently
@@ -21,6 +23,10 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops.cli.init.scaffold import (
+    _create_materials_skeleton,
+    _create_notes_skeleton,
+)
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
 from runops.harness.builder import (
@@ -130,6 +136,56 @@ def _get_knowledge_imports_path(project_dir: Path) -> str:
     return ""
 
 
+def _workspace_target_requested(
+    only_prefixes: list[str] | None,
+    target: str,
+) -> bool:
+    """Return whether ``target`` should be considered for workspace backfill."""
+    if only_prefixes is None:
+        return True
+    normalized = f"{target}/"
+    return any(
+        prefix == target or prefix.startswith(normalized) for prefix in only_prefixes
+    )
+
+
+def _missing_workspace_scaffold(
+    project_dir: Path,
+    *,
+    include_notes: bool,
+    include_materials: bool,
+) -> list[str]:
+    """Return missing visible workspace scaffold paths."""
+    expected: list[str] = []
+    if include_notes:
+        expected.extend(
+            [
+                "notes/",
+                "notes/reports/",
+                "notes/README.md",
+            ]
+        )
+    if include_materials:
+        expected.extend(
+            [
+                "materials/",
+                "materials/papers/",
+                "materials/manuals/",
+                "materials/figures/",
+                "materials/snippets/",
+                "materials/README.md",
+                "materials/index.toml",
+            ]
+        )
+
+    missing: list[str] = []
+    for rel_path in expected:
+        full_path = project_dir / rel_path.rstrip("/")
+        if not full_path.exists():
+            missing.append(rel_path)
+    return missing
+
+
 def update_harness(
     path: Annotated[
         Optional[Path],
@@ -160,7 +216,7 @@ def update_harness(
             "--only",
             help=(
                 "Comma-separated list of files to update"
-                " (e.g. 'CLAUDE.md,.claude/rules')."
+                " (e.g. 'CLAUDE.md,.claude/rules,.vscode,notes,materials')."
             ),
         ),
     ] = None,
@@ -231,6 +287,7 @@ def update_harness(
     written_new: list[str] = []
     unchanged: list[str] = []
     adopted: list[str] = []
+    backfilled_workspace: list[str] = []
     updated_lock = dict(lock)
 
     for rel_path in sorted(harness.files):
@@ -292,6 +349,22 @@ def update_harness(
                 updated_lock[rel_path] = template_hash
             written_new.append(rel_path)
 
+    include_notes = _workspace_target_requested(only_prefixes, "notes")
+    include_materials = _workspace_target_requested(only_prefixes, "materials")
+    if dry_run:
+        backfilled_workspace.extend(
+            _missing_workspace_scaffold(
+                project_dir,
+                include_notes=include_notes,
+                include_materials=include_materials,
+            )
+        )
+    else:
+        if include_notes:
+            _create_notes_skeleton(project_dir, backfilled_workspace)
+        if include_materials:
+            _create_materials_skeleton(project_dir, backfilled_workspace)
+
     if not dry_run:
         save_harness_lock(project_dir, updated_lock)
 
@@ -331,5 +404,9 @@ def update_harness(
         )
     if unchanged:
         typer.echo(f"{prefix}{len(unchanged)} file(s) already up to date.")
-    if not overwritten and not written_new and not adopted:
+    if backfilled_workspace:
+        typer.echo(f"{prefix}Backfilled {len(backfilled_workspace)} workspace item(s):")
+        for p in backfilled_workspace:
+            typer.echo(f"  {p}")
+    if not overwritten and not written_new and not adopted and not backfilled_workspace:
         typer.echo(f"{prefix}All harness files are up to date.")

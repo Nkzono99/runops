@@ -53,6 +53,8 @@
 ## Git ignore と VS Code 表示
 
 `runo init` は `.gitignore` と `.vscode/settings.json` の両方を生成します。
+既存プロジェクトでは `runo update-harness` が `.vscode/settings.json` を再同期し、
+`notes/` と `materials/` の不足分を補完します。
 この 2 つは役割が違います。
 
 - `.gitignore` は Git に載せないものを決めます。`.venv/`、`tools/`、`refs/`、`runs/**/work/`、`.runops/knowledge/` などの再生成可能または大きい成果物を対象にします。
