@@ -7,7 +7,8 @@ import json
 import mimetypes
 import os
 import shutil
-from dataclasses import dataclass
+import uuid
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -136,7 +137,7 @@ def _default_export_name(
     return f"{target_kind}-{base}-{_utc_timestamp().lower()}"
 
 
-def _ensure_export_dir(path: Path, *, force: bool) -> None:
+def _ensure_export_dir_available(path: Path, *, force: bool) -> None:
     if not path.exists():
         return
     if not force:
@@ -144,7 +145,29 @@ def _ensure_export_dir(path: Path, *, force: bool) -> None:
             f"Export already exists: {path}. Use --name to choose another slot "
             "or --force to replace it."
         )
-    shutil.rmtree(path)
+
+
+def _create_staging_export_dir(path: Path) -> Path:
+    """Return a sibling staging directory for atomic-ish export assembly."""
+    return path.parent / f".{path.name}.tmp-{uuid.uuid4().hex}"
+
+
+def _cleanup_staging_export_dir(path: Path) -> None:
+    """Best-effort cleanup for an incomplete staging export."""
+    if path.exists():
+        shutil.rmtree(path)
+
+
+def _finalize_export_dir(staging_dir: Path, export_dir: Path, *, force: bool) -> None:
+    """Move a fully-rendered staging export into its final location."""
+    if export_dir.exists():
+        if not force:
+            raise SimctlError(
+                f"Export already exists: {export_dir}. "
+                "Use --name to choose another slot or --force to replace it."
+            )
+        shutil.rmtree(export_dir)
+    staging_dir.replace(export_dir)
 
 
 def _link_or_copy(source_path: Path, dest_path: Path, *, mode: str) -> None:
@@ -410,6 +433,22 @@ def _materialize_export_files(
     return tuple(exported_files)
 
 
+def _rebase_exported_files(
+    files: tuple[PublicationExportFile, ...],
+    *,
+    from_root: Path,
+    to_root: Path,
+) -> tuple[PublicationExportFile, ...]:
+    """Rebase export paths after moving a staged bundle into place."""
+    return tuple(
+        replace(
+            item,
+            export_path=to_root / item.export_path.relative_to(from_root),
+        )
+        for item in files
+    )
+
+
 def _artifact_role_counts(files: tuple[PublicationExportFile, ...]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for item in files:
@@ -574,130 +613,144 @@ def export_publication_bundle(
     export_id = f"{paper_dir_token}/{export_name}"
     paper_root = project_root / "exports" / "papers" / paper_dir_token
     export_dir = paper_root / export_name
-    _ensure_export_dir(export_dir, force=force)
-    files_dir = export_dir / "files"
+    _ensure_export_dir_available(export_dir, force=force)
+    staging_dir = _create_staging_export_dir(export_dir)
+    files_dir = staging_dir / "files"
 
     source_run_ids: tuple[str, ...]
     source_metadata: dict[str, Any]
     warnings: tuple[str, ...]
 
-    if target_kind == "run":
-        source_artifacts, warning_list = _collect_run_export_sources(
-            target_path,
-            include_figures=include_figures,
-        )
-        exported_files = _materialize_export_files(
-            source_artifacts,
-            project_root=project_root,
-            files_dir=files_dir,
-            mode=normalized_mode,
-        )
-        run_record = _build_run_record(project_root, target_path)
-        source_run_ids = (str(run_record["run_id"]),)
-        source_metadata = _build_run_source_metadata(
-            project_root=project_root,
-            target_path=target_path,
-            run_record=run_record,
-            files=exported_files,
-        )
-        warnings = tuple(warning_list)
-    else:
-        collection, source_artifacts, warning_list = _collect_survey_export_sources(
-            target_path,
-            include_figures=include_figures,
-            include_plots=include_plots,
-        )
-        exported_files = _materialize_export_files(
-            source_artifacts,
-            project_root=project_root,
-            files_dir=files_dir,
-            mode=normalized_mode,
-        )
-        run_records = [
-            _build_run_record(project_root, run_dir)
-            for run_dir in discover_runs(target_path)
-        ]
-        source_run_ids = tuple(record["run_id"] for record in run_records)
-        source_metadata = _build_survey_source_metadata(
-            project_root=project_root,
-            target_path=target_path,
-            collection=collection,
-            run_records=run_records,
-            files=exported_files,
-        )
-        warnings = tuple(warning_list)
+    try:
+        if target_kind == "run":
+            source_artifacts, warning_list = _collect_run_export_sources(
+                target_path,
+                include_figures=include_figures,
+            )
+            exported_files = _materialize_export_files(
+                source_artifacts,
+                project_root=project_root,
+                files_dir=files_dir,
+                mode=normalized_mode,
+            )
+            run_record = _build_run_record(project_root, target_path)
+            source_run_ids = (str(run_record["run_id"]),)
+            source_metadata = _build_run_source_metadata(
+                project_root=project_root,
+                target_path=target_path,
+                run_record=run_record,
+                files=exported_files,
+            )
+            warnings = tuple(warning_list)
+        else:
+            collection, source_artifacts, warning_list = _collect_survey_export_sources(
+                target_path,
+                include_figures=include_figures,
+                include_plots=include_plots,
+            )
+            exported_files = _materialize_export_files(
+                source_artifacts,
+                project_root=project_root,
+                files_dir=files_dir,
+                mode=normalized_mode,
+            )
+            run_records = [
+                _build_run_record(project_root, run_dir)
+                for run_dir in discover_runs(target_path)
+            ]
+            source_run_ids = tuple(record["run_id"] for record in run_records)
+            source_metadata = _build_survey_source_metadata(
+                project_root=project_root,
+                target_path=target_path,
+                collection=collection,
+                run_records=run_records,
+                files=exported_files,
+            )
+            warnings = tuple(warning_list)
 
-    manifest_path = export_dir / "manifest.json"
-    readme_path = export_dir / "README.md"
-    target_relpath = _relative_to_project(project_root, target_path)
+        manifest_path = staging_dir / "manifest.json"
+        readme_path = staging_dir / "README.md"
+        target_relpath = _relative_to_project(project_root, target_path)
 
-    manifest_payload: dict[str, Any] = {
-        "schema_version": 2,
-        "paper_id": paper_id,
-        "paper_dir": paper_dir_token,
-        "export_name": export_name,
-        "target_kind": target_kind,
-        "target_path": target_relpath,
-        "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "mode": normalized_mode,
-        "source_run_ids": list(source_run_ids),
-        "paper": {
-            "id": paper_id,
-            "slug": paper_dir_token,
-        },
-        "export": {
-            "id": export_id,
-            "name": export_name,
-            "dir": _relative_to_project(project_root, export_dir),
+        manifest_payload: dict[str, Any] = {
+            "schema_version": 2,
+            "paper_id": paper_id,
+            "paper_dir": paper_dir_token,
+            "export_name": export_name,
+            "target_kind": target_kind,
+            "target_path": target_relpath,
             "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "mode": normalized_mode,
-            "tool": {
-                "name": "runops",
-                "version": __version__,
+            "source_run_ids": list(source_run_ids),
+            "paper": {
+                "id": paper_id,
+                "slug": paper_dir_token,
             },
-        },
-        "project": {
-            "name": project.name,
-            "root": str(project_root),
-            "runops_version": __version__,
-            **_collect_project_git_info(project_root),
-        },
-        "source": source_metadata,
-        "files": [
-            {
-                "role": item.role,
-                "source_path": _relative_to_project(project_root, item.source_path),
-                "export_path": str(item.export_path.relative_to(export_dir)).replace(
-                    "\\",
-                    "/",
-                ),
-                "run_id": item.run_id,
-                "caption": item.caption,
-                "size_bytes": item.size_bytes,
-                "sha256": item.sha256,
-                "media_type": item.media_type,
-            }
-            for item in exported_files
-        ],
-        "warnings": list(warnings),
-    }
-    export_dir.mkdir(parents=True, exist_ok=True)
-    with open(manifest_path, "w", encoding="utf-8") as f:
-        json.dump(manifest_payload, f, indent=2)
-        f.write("\n")
+            "export": {
+                "id": export_id,
+                "name": export_name,
+                "dir": _relative_to_project(project_root, export_dir),
+                "created_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                "mode": normalized_mode,
+                "tool": {
+                    "name": "runops",
+                    "version": __version__,
+                },
+            },
+            "project": {
+                "name": project.name,
+                "root": str(project_root),
+                "runops_version": __version__,
+                **_collect_project_git_info(project_root),
+            },
+            "source": source_metadata,
+            "files": [
+                {
+                    "role": item.role,
+                    "source_path": _relative_to_project(project_root, item.source_path),
+                    "export_path": str(
+                        item.export_path.relative_to(staging_dir)
+                    ).replace(
+                        "\\",
+                        "/",
+                    ),
+                    "run_id": item.run_id,
+                    "caption": item.caption,
+                    "size_bytes": item.size_bytes,
+                    "sha256": item.sha256,
+                    "media_type": item.media_type,
+                }
+                for item in exported_files
+            ],
+            "warnings": list(warnings),
+        }
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        with open(manifest_path, "w", encoding="utf-8") as f:
+            json.dump(manifest_payload, f, indent=2)
+            f.write("\n")
 
-    _write_export_readme(
-        readme_path,
-        export_id=export_id,
-        paper_id=paper_id,
-        export_name=export_name,
-        target_kind=target_kind,
-        target_relpath=target_relpath,
-        mode=normalized_mode,
-        run_ids=source_run_ids,
-        files=exported_files,
-        warnings=warnings,
-    )
+        _write_export_readme(
+            readme_path,
+            export_id=export_id,
+            paper_id=paper_id,
+            export_name=export_name,
+            target_kind=target_kind,
+            target_relpath=target_relpath,
+            mode=normalized_mode,
+            run_ids=source_run_ids,
+            files=exported_files,
+            warnings=warnings,
+        )
+
+        _finalize_export_dir(staging_dir, export_dir, force=force)
+        rebased_files = _rebase_exported_files(
+            exported_files,
+            from_root=staging_dir,
+            to_root=export_dir,
+        )
+    except Exception:
+        _cleanup_staging_export_dir(staging_dir)
+        raise
 
     return PublicationExportResult(
         paper_id=paper_id,
@@ -705,10 +758,10 @@ def export_publication_bundle(
         target_kind=target_kind,
         target_path=target_path,
         export_dir=export_dir,
-        manifest_path=manifest_path,
-        readme_path=readme_path,
+        manifest_path=export_dir / "manifest.json",
+        readme_path=export_dir / "README.md",
         mode=normalized_mode,
         source_run_ids=source_run_ids,
-        files=exported_files,
+        files=rebased_files,
         warnings=warnings,
     )
