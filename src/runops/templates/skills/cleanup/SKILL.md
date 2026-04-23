@@ -7,7 +7,7 @@ description: Archive completed runs, purge unnecessary work files, cancel runnin
 
 ```bash
 # 状態を確認
-runops runs list $ARGUMENTS
+runo runs list $ARGUMENTS
 ```
 
 ## completed run の整理 (通常フロー)
@@ -15,24 +15,24 @@ runops runs list $ARGUMENTS
 ```bash
 # completed run をアーカイブ
 cd <run_dir>
-runops runs archive
+runo runs archive
 
 # work/ の不要ファイルを削除 (archived のみ)
-runops runs purge-work
+runo runs purge-work
 ```
 
 ## 実行中 job の停止
 
 ```bash
 # scancel + sync を一回で。submitted/running の run を cancelled に遷移
-runops runs cancel
+runo runs cancel
 ```
 
 ## created / cancelled / failed の run を捨てる
 
 ```bash
 # 失敗 run などをディレクトリごと削除 (completed/archived には使えない)
-runops runs delete
+runo runs delete
 ```
 
 ## 注意

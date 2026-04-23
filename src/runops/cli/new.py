@@ -75,17 +75,17 @@ def new(
     ``refs/<simulator>/`` is skipped.  Use this when you want a small,
     easy-to-edit starting point.
 
-    For EMSES cases, ``runops case new`` also tries to populate
+    For EMSES cases, ``runo case new`` also tries to populate
     ``[meta.physical]`` in the generated ``plasma.toml`` by running
     ``emu generate -u`` (best-effort: silently skipped if the ``emu``
     CLI is not on PATH).
 
     Examples:
-      runops case new flat_surface -s emses
-      runops case new flat_surface -s emses --minimal
-      runops case new periodic -s beach --survey
-      cd cases/emses && runops case new flat_surface
-      runops case new mycase -d /path/to/dest -s emses
+      runo case new flat_surface -s emses
+      runo case new flat_surface -s emses --minimal
+      runo case new periodic -s beach --survey
+      cd cases/emses && runo case new flat_surface
+      runo case new mycase -d /path/to/dest -s emses
     """
     # Detect simulator early: from --simulator, or from dest/cwd path
     cwd = Path.cwd().resolve()
@@ -338,6 +338,4 @@ def _generate_survey_stub(
     survey_file.write_text(content, encoding="utf-8")
     typer.echo("\nCreated survey stub:")
     typer.echo(f"  Path: {survey_dir / 'survey.toml'}")
-    typer.echo(
-        f"  Edit axes and naming, then run: cd {survey_dir} && runops runs sweep"
-    )
+    typer.echo(f"  Edit axes and naming, then run: cd {survey_dir} && runo runs sweep")

@@ -19,7 +19,8 @@ dependencies = [
 ]
 
 [project.scripts]
-runops = "runops.cli.main:app"
+runo = "runops.cli.main:app"
+runops = "runops.cli.main:runops_app"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/runops"]

@@ -33,4 +33,4 @@ templates/
 ```
 
 Move existing templates gradually when they are already being edited so
-`runops update-harness` diffs remain understandable for existing projects.
+`runo update-harness` diffs remain understandable for existing projects.

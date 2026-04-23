@@ -55,7 +55,7 @@ class TestInit:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         readme = (tmp_path / "notes" / "README.md").read_text(encoding="utf-8")
         assert "lab notebook" in readme
-        assert "runops notes append" in readme
+        assert "runo notes append" in readme
         assert "notes/YYYY-MM-DD.md" in readme
 
     def test_init_creates_note_skill(self, tmp_path: Path) -> None:
@@ -68,9 +68,9 @@ class TestInit:
         content = skill_md.read_text(encoding="utf-8")
         codex_content = codex_skill_md.read_text(encoding="utf-8")
         assert "name: note" in content
-        assert "runops notes append" in content
+        assert "runo notes append" in content
         assert "name: note" in codex_content
-        assert "runops notes append" in codex_content
+        assert "runo notes append" in codex_content
         assert "`/note`" in content
         assert "`$note`" in codex_content
         assert "`/note`" not in codex_content
@@ -182,7 +182,7 @@ class TestInit:
         # Simulator details are via imports.md, not inline
         assert "シミュレータ固有知識" not in content
         assert "Agent ガイド" not in content
-        assert "runops context" in content
+        assert "runo context" in content
         assert "campaign.toml" in content
         # Ref repos should be listed
         assert "リファレンスリポジトリ" in content
@@ -209,7 +209,7 @@ class TestInit:
         assert not agents_path.is_symlink()
         content = agents_path.read_text(encoding="utf-8")
         assert "runops" in content
-        assert "runops context" in content
+        assert "runo context" in content
         assert "役割分担" in content
         assert "$new-case" in content
         assert "/new-case" not in content
@@ -261,9 +261,11 @@ class TestInit:
         assert "allow" in data["permissions"]
         assert "ask" in data["permissions"]
         assert "deny" in data["permissions"]
+        assert any("runo" in r for r in data["permissions"]["allow"])
         assert any("runops" in r for r in data["permissions"]["allow"])
         assert "Edit(/campaign.toml)" in data["permissions"]["allow"]
         assert "Edit(/tools/runops/**)" in data["permissions"]["allow"]
+        assert "Bash(runo runs submit*)" in data["permissions"]["ask"]
         assert "Bash(runops runs submit*)" in data["permissions"]["ask"]
         assert "Write(/runops.toml)" in data["permissions"]["ask"]
         assert "Write(/SITE.md)" in data["permissions"]["deny"]
@@ -287,8 +289,10 @@ class TestInit:
         rules = (tmp_path / ".codex" / "rules" / "runops.rules").read_text(
             encoding="utf-8"
         )
+        assert 'pattern = ["runo", "runs", "submit", "--dry-run"]' in rules
         assert 'pattern = ["runops", "runs", "submit", "--dry-run"]' in rules
         assert 'decision = "allow"' in rules
+        assert 'pattern = ["runo", "runs", "submit", "--all"]' in rules
         assert 'pattern = ["runops", "runs", "submit", "--all"]' in rules
         assert 'decision = "prompt"' in rules
         assert 'pattern = ["rm", "-rf"]' in rules
@@ -315,7 +319,7 @@ class TestInit:
         assert "promote-fact" in workflow
         # Behavioural rules that used to live in PreToolUse hooks must now be
         # documented in this rule file.
-        assert "runops runs submit" in workflow
+        assert "runo runs submit" in workflow
         assert "tools/runops" in workflow
 
     def test_init_subdirectory_claude_md(self, tmp_path: Path) -> None:

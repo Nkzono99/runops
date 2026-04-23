@@ -1,6 +1,6 @@
 ---
 name: new-case
-description: Create a new simulation case and customize its input files. Use when setting up a new case from scratch with runops case new.
+description: Create a new simulation case and customize its input files. Use when setting up a new case from scratch with runo case new.
 ---
 
 # ケースを作成・編集する
@@ -8,7 +8,7 @@ description: Create a new simulation case and customize its input files. Use whe
 ## 手順
 
 1. campaign.toml を確認して研究目的・対象シミュレータを把握する
-2. `runops case new` でケースの雛形を生成する
+2. `runo case new` でケースの雛形を生成する
 3. case.toml のパラメータを研究目的に合わせて編集する
 4. 入力テンプレートをカスタマイズする
 5. (必要なら) survey.toml も同時に生成する
@@ -17,16 +17,16 @@ description: Create a new simulation case and customize its input files. Use whe
 
 ```bash
 # simulator を指定するだけで cases/<sim>/ 以下に自動生成
-runops case new my_case -s emses
+runo case new my_case -s emses
 
 # survey.toml も同時に生成
-runops case new my_case -s emses --survey
+runo case new my_case -s emses --survey
 
 # cases/<sim>/ 以下にいれば -s 不要 (自動検出)
-cd cases/emses && runops case new my_case
+cd cases/emses && runo case new my_case
 
 # 明示的に生成先を指定
-runops case new my_case -s emses -d /path/to/dest
+runo case new my_case -s emses -d /path/to/dest
 ```
 
 生成されるファイル:
@@ -69,7 +69,7 @@ cat CLAUDE.md
 cat refs/<repo>/cookbook/index.toml
 
 # 既知の制約を確認
-runops knowledge facts
+runo knowledge facts
 ```
 
 ## 入力テンプレートの編集
@@ -82,11 +82,11 @@ case.toml の `[params]` で dot 記法で指定したパラメータは、入�
 
 ## 注意
 
-- ケースは必ず `runops case new` で作る (手書きしない)
+- ケースは必ず `runo case new` で作る (手書きしない)
 - cookbook の `[edit_policy].immutable` パラメータは変更しない
 - `[edit_policy].sensitive` パラメータを変更する場合は理由を記録する
 - description には実験の意図を書く (後から振り返れるように)
-- ケース作成後は `runops runs create` で run を生成する
+- ケース作成後は `runo runs create` で run を生成する
 
 ## `{{ skill_prefix }}note` で残すべきこと
 
@@ -98,7 +98,7 @@ case を作る時の意思決定は `notes/YYYY-MM-DD.md` に残す:
 - 一度試して没にしたパラメータ値とその理由
 
 ```bash
-runops notes append "case 'flat_plate' を作成" - <<'EOF'
+runo notes append "case 'flat_plate' を作成" - <<'EOF'
 EMSES emses-mini fragment ベース。違い:
 - nx=4000, nz=800 に拡張 (depletion 観察に必要な x 範囲)
 - vti は survey で振るので case 側はプレースホルダ 5 eV

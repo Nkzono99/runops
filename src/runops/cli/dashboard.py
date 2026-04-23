@@ -60,13 +60,13 @@ def dashboard(
 
     Aggregates per-run progress (state, step, %, last diagnostic) into a
     single table.  Useful while a survey of dozens of runs is in flight:
-    instead of opening ``runops runs log`` for each run individually,
-    one ``runops runs dashboard`` call shows the whole survey.
+    instead of opening ``runo runs log`` for each run individually,
+    one ``runo runs dashboard`` call shows the whole survey.
 
     Examples:
-      runops runs dashboard runs/series_A          # one survey
-      runops runs dashboard -w 30 runs/series_A    # auto-refresh every 30 s
-      runops runs dashboard --all runs/            # whole project, including
+      runo runs dashboard runs/series_A          # one survey
+      runo runs dashboard -w 30 runs/series_A    # auto-refresh every 30 s
+      runo runs dashboard --all runs/            # whole project, including
                                                     # completed/failed runs
     """
     cwd = Path.cwd().resolve()
@@ -200,9 +200,7 @@ def _watch_loop(
         while True:
             typer.echo("\x1b[2J\x1b[H", nl=False)
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            typer.echo(
-                f"runops runs dashboard (watch every {interval:g}s) — {timestamp}"
-            )
+            typer.echo(f"runo runs dashboard (watch every {interval:g}s) — {timestamp}")
             typer.echo("")
             _print_dashboard(run_dirs, all_states=all_states)
             time.sleep(interval)

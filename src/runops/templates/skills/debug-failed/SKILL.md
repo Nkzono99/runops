@@ -7,10 +7,10 @@ description: Diagnose failed runs and propose fixes. Use when a run has failed a
 
 ```bash
 cd $ARGUMENTS
-runops runs sync
-runops runs status
-runops runs log -e
-runops runs log
+runo runs sync
+runo runs status
+runo runs log -e
+runo runs log
 ```
 
 必要なら `work/` 以下も確認:

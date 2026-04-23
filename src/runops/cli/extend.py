@@ -42,9 +42,9 @@ def extend(
     The adapter handles simulator-specific continuation setup.
 
     Examples:
-      runops runs extend                      # continue cwd run
-      runops runs extend R0001 --nstep 200000 # continue with more steps
-      runops runs extend --run                # continue and submit
+      runo runs extend                      # continue cwd run
+      runo runs extend R0001 --nstep 200000 # continue with more steps
+      runo runs extend --run                # continue and submit
     """
     source_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
 

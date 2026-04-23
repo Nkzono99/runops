@@ -77,25 +77,36 @@ notes_app.command("append")(notes_append)
 notes_app.command("list")(notes_list)
 notes_app.command("show")(notes_show)
 
-app = typer.Typer(
-    name="runops",
-    help="HPC simulation run management CLI tool.",
-    no_args_is_help=True,
-)
 
-app.command("init")(init)
-app.command("setup")(setup)
-app.command("doctor")(doctor)
-app.add_typer(config_app, name="config")
-app.add_typer(knowledge_app, name="knowledge")
-app.command("context")(context)
-app.add_typer(case_app, name="case")
-app.add_typer(runs_app, name="runs")
-app.add_typer(analyze_app, name="analyze")
-app.add_typer(notes_app, name="notes")
-app.command("update")(update)
-app.command("update-harness")(update_harness)
-app.command("update-refs")(update_refs)
+def _build_app(name: str) -> typer.Typer:
+    """Build a top-level CLI app with the given executable name."""
+    cli_app = typer.Typer(
+        name=name,
+        help=(
+            "RunOps HPC simulation run management CLI. "
+            "Preferred command: runo. Stable alias: runops."
+        ),
+        no_args_is_help=True,
+    )
+
+    cli_app.command("init")(init)
+    cli_app.command("setup")(setup)
+    cli_app.command("doctor")(doctor)
+    cli_app.add_typer(config_app, name="config")
+    cli_app.add_typer(knowledge_app, name="knowledge")
+    cli_app.command("context")(context)
+    cli_app.add_typer(case_app, name="case")
+    cli_app.add_typer(runs_app, name="runs")
+    cli_app.add_typer(analyze_app, name="analyze")
+    cli_app.add_typer(notes_app, name="notes")
+    cli_app.command("update")(update)
+    cli_app.command("update-harness")(update_harness)
+    cli_app.command("update-refs")(update_refs)
+    return cli_app
+
+
+app = _build_app("runo")
+runops_app = _build_app("runops")
 
 if __name__ == "__main__":
     app()

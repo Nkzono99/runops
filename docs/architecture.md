@@ -390,7 +390,7 @@ class RunState(str, Enum):
 ### create (単一 run 生成)
 
 ```
-CLI: runops runs create CASE --dest DIR
+CLI: runo runs create CASE --dest DIR
   |
   +--> find_project_root() --> load_project()
   |      ProjectConfig を取得
@@ -435,7 +435,7 @@ CLI: runops runs create CASE --dest DIR
 ### sweep (パラメータサーベイ展開)
 
 ```
-CLI: runops runs sweep DIR
+CLI: runo runs sweep DIR
   |
   +--> load_project() + load_survey() + load_case()
   |
@@ -454,7 +454,7 @@ CLI: runops runs sweep DIR
 ### submit (job 投入)
 
 ```
-CLI: runops runs submit RUN
+CLI: runo runs submit RUN
   |
   +--> resolve_run()
   |      run_id またはパスから run ディレクトリを特定
@@ -476,7 +476,7 @@ CLI: runops runs submit RUN
 ### sync (Slurm 状態同期)
 
 ```
-CLI: runops runs sync RUN
+CLI: runo runs sync RUN
   |
   +--> resolve_run() --> read_manifest()
   |      job_id を取得
@@ -599,14 +599,14 @@ AI エージェントがシミュレーションを自律的に実行するた�
 
 ```
 refs/{repo}/docs/          ← シミュレータ開発者が管理
-    ↓ runops update-refs
+    ↓ runo update-refs
 .runops/knowledge/{sim}.md ← インデックス (自動生成)
     ↓ AI が参照
 adapter.parameter_schema() ← 構造化メタデータ
 adapter.validate_params()  ← 物理的バリデーション
 ```
 
-- `refs/`: `runops init` 時に `doc_repos()` からクローン
+- `refs/`: `runo init` 時に `doc_repos()` からクローン
 - `knowledge_sources()`: インデックス対象のファイルパターン
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
 - `validate_params()`: CFL 条件、Debye 長解像度など
@@ -615,7 +615,7 @@ adapter.validate_params()  ← 物理的バリデーション
 
 ```
 sinfo / module list        ← HPC 環境
-    ↓ runops doctor
+    ↓ runo doctor
 .runops/environment.toml   ← 自動検出・保存
 ```
 
@@ -632,9 +632,9 @@ campaign.toml              ← ユーザーが記述
 
 ```
 .runops/insights/*.md      ← /learn で保存
-.runops/facts.toml         ← runops knowledge add-fact
+.runops/facts.toml         ← runo knowledge add-fact
 runops.toml:[knowledge.sources] ← 外部 knowledge source 定義
-    ↓ runops knowledge source sync
+    ↓ runo knowledge source sync
 insights のインポート       ← プロジェクト横断の知識共有
 ```
 
@@ -644,7 +644,7 @@ insights のインポート       ← プロジェクト横断の知識共有
 ### Lab notebook (chronological)
 
 ```
-notes/YYYY-MM-DD.md        ← runops notes append (append-only)
+notes/YYYY-MM-DD.md        ← runo notes append (append-only)
 notes/reports/<topic>.md   ← refined long-form (改稿可)
     ↓ /learn で素材として読む
 .runops/insights/, facts.toml ← curated 化
@@ -654,7 +654,7 @@ curated knowledge と lab notebook は **二層構造**:
 
 - 整理済の永続知見 (上書き可・名前付き) は `.runops/insights/` / `facts.toml`
 - 時系列の chain of thought (準備フェーズの意思決定・観察・仮説・TODO) は `notes/YYYY-MM-DD.md`
-- `runops notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
+- `runo notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
 - 価値が出てきたら notes → reports → insights / facts.toml の順に昇格
 
 詳細は [docs/knowledge-layer.md](knowledge-layer.md) を参照。

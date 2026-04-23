@@ -92,9 +92,9 @@ def log(
     """Show latest job output log with progress.
 
     Examples:
-      runops runs log              # stdout of cwd run
-      runops runs log -e           # stderr
-      runops runs log -n 50        # last 50 lines
+      runo runs log              # stdout of cwd run
+      runo runs log -e           # stderr
+      runo runs log -n 50        # last 50 lines
     """
     run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
     work_dir = run_dir / "work"

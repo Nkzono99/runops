@@ -45,10 +45,10 @@ def setup(
     existing configuration files (TOML, CLAUDE.md, etc.).
 
     Bootstrap usage (no prior install needed):
-      uvx --from runops runops setup https://github.com/user/my-project.git
+      uvx --from runops runo setup https://github.com/user/my-project.git
 
     Set up an already-cloned directory:
-      cd my-project && runops setup
+      cd my-project && runo setup
     """
     # 1. Clone if URL is given
     project_dir = _clone_project(url, path) if url else (path or Path.cwd()).resolve()
@@ -133,7 +133,7 @@ def setup(
     else:
         activate_cmd = "source .venv/bin/activate"
     typer.echo(f"\n  Next: cd {project_dir.name} && {activate_cmd}")
-    typer.echo("  Then: runops doctor")
+    typer.echo("  Then: runo doctor")
 
 
 def _clone_project(url: str, dest: Path | None) -> Path:

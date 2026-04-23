@@ -29,7 +29,7 @@ cat refs/<repo>/cookbook/examples/<category>/<name>/meta.toml
 cat refs/<repo>/cookbook/examples/<category>/<name>/input.toml
 
 # 既知の制約を確認
-runops knowledge facts
+runo knowledge facts
 ```
 
 ## survey の作成
@@ -37,8 +37,8 @@ runops knowledge facts
 ```bash
 mkdir -p runs/<category>/<survey_name>
 # survey.toml を作成 (フォーマットは tools/runops/docs/toml-reference.md 参照)
-runops runs sweep runs/<category>/<survey_name>
-runops runs list runs/<category>/<survey_name>
+runo runs sweep runs/<category>/<survey_name>
+runo runs list runs/<category>/<survey_name>
 ```
 
 ## 注意
@@ -59,7 +59,7 @@ survey 設計の意思決定は `notes/YYYY-MM-DD.md` に残す:
 - 一度試して没にした設計 (e.g. 解像度を上げて 1 軸にした, 2 軸を諦めた)
 
 ```bash
-runops notes append "Series A vti scan 設計" - <<'EOF'
+runo notes append "Series A vti scan 設計" - <<'EOF'
 独立軸: vti = 1, 3, 5, ..., 19 eV (10 点, 線形).
 理由: 4σ CFL で 19 eV が上限, 1 eV が drift 主導側の下限.
 固定: vflow=400 km/s, vte=10 eV, plate -34 V.

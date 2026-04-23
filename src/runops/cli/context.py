@@ -1,4 +1,4 @@
-"""CLI command: runops context — project context bundle for agents."""
+"""CLI command: runo context — project context bundle for agents."""
 
 from __future__ import annotations
 

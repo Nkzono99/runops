@@ -53,7 +53,7 @@ def status(
 
     Displays the run state from manifest.toml. If a Slurm job_id is
     recorded, also queries Slurm for the live job state. Does NOT
-    update the manifest (use ``runops runs sync`` for that).
+    update the manifest (use ``runo runs sync`` for that).
 
     Multi-target form: pass a survey directory (e.g. ``runs/series_A``)
     or several run_ids; status is printed for each.
@@ -209,7 +209,7 @@ def sync(
     Queries Slurm for the current job state of each target and updates
     both manifest.toml and status/state.json if the state has changed.
 
-    When passed a survey directory (e.g. ``runops runs sync runs/series_A``)
+    When passed a survey directory (e.g. ``runo runs sync runs/series_A``)
     every run found underneath is sync'd.  In bulk / multi-target mode the
     following runs are skipped silently so the command remains useful on
     mixed-state surveys:

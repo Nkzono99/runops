@@ -146,7 +146,7 @@ def cancel(
 ) -> None:
     """Cancel active Slurm jobs (scancel) and sync run states.
 
-    Combines ``scancel <job_id>`` and ``runops runs sync`` so each manifest is
+    Combines ``scancel <job_id>`` and ``runo runs sync`` so each manifest is
     updated automatically.  Use this instead of bare ``scancel`` so run states
     end up consistent.
 
@@ -265,7 +265,7 @@ def delete(
         typer.echo(
             "Error: can only delete created/cancelled/failed runs, "
             f"but run is '{current_status}'. "
-            "Use `runops runs archive` (then purge-work) for completed runs.",
+            "Use `runo runs archive` (then purge-work) for completed runs.",
             err=True,
         )
         raise typer.Exit(code=1)

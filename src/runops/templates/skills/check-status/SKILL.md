@@ -7,23 +7,23 @@ description: Check and sync run or survey status. Use when monitoring job progre
 
 ```bash
 # プロジェクト全体の active jobs
-runops runs jobs
+runo runs jobs
 
 # 特定ディレクトリの run 一覧
-runops runs list $ARGUMENTS
+runo runs list $ARGUMENTS
 
 # 個別 run の同期と確認
 cd <run_dir>
-runops runs sync
-runops runs status
+runo runs sync
+runo runs status
 ```
 
 ## survey 全体のステータスを確認する場合
 
 ```bash
-runops runs sync $ARGUMENTS
-runops runs list $ARGUMENTS
-runops runs jobs
+runo runs sync $ARGUMENTS
+runo runs list $ARGUMENTS
+runo runs jobs
 ```
 
 状態をサマリーとして報告する: completed / running / failed / submitted の数。

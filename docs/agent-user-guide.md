@@ -8,45 +8,45 @@ runops プロジェクトにおける Agent の作業ガイド。
 - **run ディレクトリが主単位**: すべての操作は run_id または run ディレクトリを基点
 - **manifest.toml が正本**: run の状態・由来・provenance はすべて manifest.toml に記録
 - **cwd ベース**: 全コマンドはカレントディレクトリをデフォルトターゲット
-- **case は `runops case new` で生成**: case.toml を手書きしない
-- **run は `runops runs create` / `runops runs sweep` で生成**: run ディレクトリを手で作らない
+- **case は `runo case new` で生成**: case.toml を手書きしない
+- **run は `runo runs create` / `runo runs sweep` で生成**: run ディレクトリを手で作らない
 
 ## コマンドクイックリファレンス
 
 | 操作 | コマンド |
 |------|---------|
-| プロジェクト状況把握 | `runops context --json` |
-| case テンプレート生成 | `runops case new <name>` |
-| 最小 case テンプレート生成 | `runops case new <name> --minimal` |
-| survey 付き case 生成 | `runops case new <name> --survey` |
-| run 生成 | `runops runs create <case>` |
-| survey 全 run 生成 | `runops runs sweep <survey>` |
-| sweep 内容を確認だけ | `runops runs sweep <survey> --dry-run` |
-| job 投入 | `runops runs submit` |
-| 全 run 一括投入 | `runops runs submit --all` |
-| キュー上書き / QOS / 依存ジョブ | `runops runs submit -qn <queue>` / `--qos <qos>` / `--afterok <job_id>` |
-| 状態確認 (単一/複数/survey 一括) | `runops runs status [RUNS...]` |
-| Slurm 同期 (単一/複数/survey 一括) | `runops runs sync [RUNS...]` (bulk: created + terminal state は silent skip) |
-| ログ確認 | `runops runs log` |
-| エラーログ | `runops runs log -e` |
-| 実行中ジョブ一覧 / 自動更新 | `runops runs jobs` / `runops runs jobs -w 30` |
-| 複数 run の進捗ダッシュボード | `runops runs dashboard runs/<survey>` (`-w 30`, `--all` 対応) |
-| run 一覧 (複数 PATH 可) | `runops runs list [PATHS...]` |
-| run 停止 (scancel + sync) | `runops runs cancel` |
-| run のハード削除 (created/failed/cancelled) | `runops runs delete` |
-| 解析 | `runops analyze summarize` |
-| 集計 | `runops analyze collect` |
-| 論文向け export | `runops analyze export <run-or-survey> --paper <paper-id>` |
-| lab notebook に追記 | `runops notes append "<title>" "<body>"` |
-| lab notebook 日付一覧 | `runops notes list` |
-| lab notebook 内容表示 | `runops notes show [DATE\|today\|latest]` |
-| 知見保存 (curated) | `runops knowledge save` |
-| 知見一覧 | `runops knowledge list` |
-| 知見表示 | `runops knowledge show <name>` |
-| 構造化 fact 一覧 | `runops knowledge facts` |
-| fact 追加 | `runops knowledge add-fact` |
-| 外部知識ソース一覧 | `runops knowledge source list` |
-| 外部知識ソース同期 | `runops knowledge source sync` |
+| プロジェクト状況把握 | `runo context --json` |
+| case テンプレート生成 | `runo case new <name>` |
+| 最小 case テンプレート生成 | `runo case new <name> --minimal` |
+| survey 付き case 生成 | `runo case new <name> --survey` |
+| run 生成 | `runo runs create <case>` |
+| survey 全 run 生成 | `runo runs sweep <survey>` |
+| sweep 内容を確認だけ | `runo runs sweep <survey> --dry-run` |
+| job 投入 | `runo runs submit` |
+| 全 run 一括投入 | `runo runs submit --all` |
+| キュー上書き / QOS / 依存ジョブ | `runo runs submit -qn <queue>` / `--qos <qos>` / `--afterok <job_id>` |
+| 状態確認 (単一/複数/survey 一括) | `runo runs status [RUNS...]` |
+| Slurm 同期 (単一/複数/survey 一括) | `runo runs sync [RUNS...]` (bulk: created + terminal state は silent skip) |
+| ログ確認 | `runo runs log` |
+| エラーログ | `runo runs log -e` |
+| 実行中ジョブ一覧 / 自動更新 | `runo runs jobs` / `runo runs jobs -w 30` |
+| 複数 run の進捗ダッシュボード | `runo runs dashboard runs/<survey>` (`-w 30`, `--all` 対応) |
+| run 一覧 (複数 PATH 可) | `runo runs list [PATHS...]` |
+| run 停止 (scancel + sync) | `runo runs cancel` |
+| run のハード削除 (created/failed/cancelled) | `runo runs delete` |
+| 解析 | `runo analyze summarize` |
+| 集計 | `runo analyze collect` |
+| 論文向け export | `runo analyze export <run-or-survey> --paper <paper-id>` |
+| lab notebook に追記 | `runo notes append "<title>" "<body>"` |
+| lab notebook 日付一覧 | `runo notes list` |
+| lab notebook 内容表示 | `runo notes show [DATE\|today\|latest]` |
+| 知見保存 (curated) | `runo knowledge save` |
+| 知見一覧 | `runo knowledge list` |
+| 知見表示 | `runo knowledge show <name>` |
+| 構造化 fact 一覧 | `runo knowledge facts` |
+| fact 追加 | `runo knowledge add-fact` |
+| 外部知識ソース一覧 | `runo knowledge source list` |
+| 外部知識ソース同期 | `runo knowledge source sync` |
 
 ## TOML ファイル体系
 
@@ -64,13 +64,13 @@ runops プロジェクトにおける Agent の作業ガイド。
 
 | 種類 | 性質 | 書き先 | コマンド |
 |---|---|---|---|
-| 整理済の名前付き知見 | curated, durable, 上書き可 | `.runops/insights/<name>.md` | `runops knowledge save` |
-| 機械可読 atomic claim | curated, atomic | `.runops/facts.toml` | `runops knowledge add-fact` |
-| 時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runops notes append` |
+| 整理済の名前付き知見 | curated, durable, 上書き可 | `.runops/insights/<name>.md` | `runo knowledge save` |
+| 機械可読 atomic claim | curated, atomic | `.runops/facts.toml` | `runo knowledge add-fact` |
+| 時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runo notes append` |
 | 長文 refined レポート | refined, 改稿可 | `notes/reports/<topic>.md` | (直接編集) |
 
-- 「結果をまとめて」「知見を記録して」等の整理済情報 → `runops knowledge save` / `add-fact` で curated 層に
-- 「今やってる作業のメモ」「途中経過」「議論の流れ」「準備フェーズの意思決定」 → `runops notes append` で lab notebook に
+- 「結果をまとめて」「知見を記録して」等の整理済情報 → `runo knowledge save` / `add-fact` で curated 層に
+- 「今やってる作業のメモ」「途中経過」「議論の流れ」「準備フェーズの意思決定」 → `runo notes append` で lab notebook に
 - 価値が出てきたら `notes/` → `notes/reports/` → `.runops/insights/` / `facts.toml` の順に昇格
 
 `/note` skill は **準備フェーズから使う**。campaign 設計, case 設計,
@@ -80,32 +80,32 @@ survey 設計, run 生成, 投入の各タイミングで意思決定の理由�
 
 ```bash
 # 準備フェーズで意思決定を残す
-runops notes append "Series A 設計" - <<'EOF'
+runo notes append "Series A 設計" - <<'EOF'
 独立軸: vti = 1..19 eV (10 点). 4σ CFL で 19 eV が上限.
 固定: vflow=400 km/s. 没案: vflow も振る → 資源不足.
 EOF
 
 # 後で日付一覧 → 内容を確認
-runops notes list
-runops notes show 2026-04-08
-runops notes show today    # 今日
-runops notes show latest   # 一番新しい日
+runo notes list
+runo notes show 2026-04-08
+runo notes show today    # 今日
+runo notes show latest   # 一番新しい日
 
 # /learn 時に notes を素材として読み込む
-runops notes show latest | head -100
+runo notes show latest | head -100
 ```
 
 ## ハーネスのガード
 
-`runops init` は `.claude/settings.json` と `.claude/hooks/` も生成し、
+`runo init` は `.claude/settings.json` と `.claude/hooks/` も生成し、
 Claude Code 向けに project 内の保護ルールを設定する。
 
 - 直接編集してよいのは主に `campaign.toml`、`cases/**`、`runs/**/survey.toml`、通常の docs
 - 直接編集してはいけないのは `runs/**/manifest.toml`、`input/**`、`submit/**`、`work/**`、`SITE.md`
-- `.runops/insights/` と `.runops/facts.toml` は `runops knowledge save` / `add-fact` を使う
-- `notes/YYYY-MM-DD.md` は `runops notes append` 経由で append-only に追記する (既存 entry を書き換えない)
-- `runops runs submit` は `--dry-run` を除いて実行前に確認を挟む
-- `runops runs cancel` は harness 上 allow 扱いだが、実行前に対象 run と理由は報告する
+- `.runops/insights/` と `.runops/facts.toml` は `runo knowledge save` / `add-fact` を使う
+- `notes/YYYY-MM-DD.md` は `runo notes append` 経由で append-only に追記する (既存 entry を書き換えない)
+- `runo runs submit` は `--dry-run` を除いて実行前に確認を挟む
+- `runo runs cancel` は harness 上 allow 扱いだが、実行前に対象 run と理由は報告する
 
 ## 状態遷移
 
@@ -116,9 +116,9 @@ submitted/running → cancelled
 completed → archived → purged
 ```
 
-`runops runs cancel` は `submitted` / `running` の run に対して `scancel` と
-`runops runs sync` をまとめて実行し、`cancelled` 状態に遷移させる安全な経路。
-`runops runs delete` はライフサイクル外の操作で、`created` / `cancelled` / `failed`
+`runo runs cancel` は `submitted` / `running` の run に対して `scancel` と
+`runo runs sync` をまとめて実行し、`cancelled` 状態に遷移させる安全な経路。
+`runo runs delete` はライフサイクル外の操作で、`created` / `cancelled` / `failed`
 の run ディレクトリを直接削除する (`completed` / `archived` の run には使えないので
 `archive` → `purge-work` を使うこと)。
 
@@ -138,11 +138,11 @@ completed → archived → purged
 ### 読む
 
 ```bash
-runops knowledge list                     # 知見の一覧
-runops knowledge list -s emses -t constraint  # フィルタ付き
-runops knowledge show <name>              # 知見の全文表示
-runops knowledge facts                    # 構造化 fact の一覧
-runops knowledge facts --scope emses -c high  # フィルタ付き
+runo knowledge list                     # 知見の一覧
+runo knowledge list -s emses -t constraint  # フィルタ付き
+runo knowledge show <name>              # 知見の全文表示
+runo knowledge facts                    # 構造化 fact の一覧
+runo knowledge facts --scope emses -c high  # フィルタ付き
 ```
 
 ### 書く
@@ -150,8 +150,8 @@ runops knowledge facts --scope emses -c high  # フィルタ付き
 知見の保存は `/learn` スキル経由で行う。Agent 自身の memory には保存しない。
 
 ```bash
-runops knowledge save <name> -t <type> -s <simulator> -m "<内容>"
-runops knowledge add-fact "<claim>" -t <type> -s <simulator> -c <confidence>
+runo knowledge save <name> -t <type> -s <simulator> -m "<内容>"
+runo knowledge add-fact "<claim>" -t <type> -s <simulator> -c <confidence>
 ```
 
 詳細な仕様は [knowledge-layer.md](knowledge-layer.md) を参照。

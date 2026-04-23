@@ -12,10 +12,10 @@ description: Save knowledge insights and structured facts from experiment result
 ## 手順
 
 1. **`notes/` を素材として集める** (curated knowledge を作る前段)
-   - `runops notes list` で最近の lab notebook 日付を確認
-   - 関連するテーマの `runops notes show <YYYY-MM-DD>` で読む
+   - `runo notes list` で最近の lab notebook 日付を確認
+   - 関連するテーマの `runo notes show <YYYY-MM-DD>` で読む
    - 散らばった観察・仮説・反例・却下案を集める
-2. 完了した run の結果 (`runops analyze summarize`, ログ, 出力) を読む
+2. 完了した run の結果 (`runo analyze summarize`, ログ, 出力) を読む
 3. 新たに分かったこと・期待と異なる結果を特定する
 4. 知見の種類を判断する (constraint / result / analysis / dependency)
 5. 出処になった `notes/<date>.md` の日付を insight 本文に書き残す
@@ -24,7 +24,7 @@ description: Save knowledge insights and structured facts from experiment result
 ## 人向け知見の保存
 
 ```bash
-runops knowledge save <name> -t <type> -s <simulator> -m "<内容>"
+runo knowledge save <name> -t <type> -s <simulator> -m "<内容>"
 ```
 
 タイプ: `constraint`, `result`, `analysis`, `dependency`
@@ -32,14 +32,14 @@ runops knowledge save <name> -t <type> -s <simulator> -m "<内容>"
 例:
 
 ```bash
-runops knowledge save mag_scan_summary -t result -s emses \
+runo knowledge save mag_scan_summary -t result -s emses \
   -m "磁場角度 0-90 度のサーベイ。45度で最もイオン加速が効率的。"
 ```
 
 ## 機械可読な fact の追加
 
 ```bash
-runops knowledge add-fact "<claim>" \
+runo knowledge add-fact "<claim>" \
   -t <type> -s <simulator> \
   --param-name <param> --scope-text "<scope>" \
   --evidence-kind <kind> --evidence-ref <ref> \
@@ -50,5 +50,5 @@ runops knowledge add-fact "<claim>" \
 
 - `high` confidence は複数 run の再現か deterministic 確認がある場合だけ使う
 - 既存 fact を修正するときは `--supersedes fNNN` を使う
-- 外部 source から同期された candidate fact は `runops knowledge facts` で確認できる
-- 採用する candidate fact は `runops knowledge promote-fact <source>:<fact_id>` で local fact に昇格する
+- 外部 source から同期された candidate fact は `runo knowledge facts` で確認できる
+- 採用する candidate fact は `runo knowledge promote-fact <source>:<fact_id>` で local fact に昇格する

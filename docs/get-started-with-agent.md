@@ -10,7 +10,7 @@ TOML ファイルを最初から手で書く必要はありません。研究内
 1. **研究の方向性** — テーマ、仮説、探索したい変数、注目する観測量
 2. **ベース入力の方針** — 既存の入力テンプレートを使うか、simulator repo の `cookbook/` を起点に組み立てるか
 
-`runops init` では通常、simulator や launcher の設定を対話的に選ぶため、最初の依頼でそれらを毎回書き直す必要はありません。
+`runo init` では通常、simulator や launcher の設定を対話的に選ぶため、最初の依頼でそれらを毎回書き直す必要はありません。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
 一方で、まだベースを決めていない場合でも、Agent は `refs/` 以下の simulator docs や `cookbook/` を探索して、入力例や推奨パラメータをもとに case の叩き台を作れます。
@@ -22,21 +22,21 @@ TOML ファイルを最初から手で書く必要はありません。研究内
 新規作成の場合:
 
 ```bash
-uvx --from runops runops init
+uvx --from runops runo init
 source .venv/bin/activate
-runops doctor
+runo doctor
 ```
 
 既存プロジェクトをセットアップする場合:
 
 ```bash
-uvx --from runops runops setup https://github.com/user/my-project.git
+uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 source .venv/bin/activate
-runops doctor
+runo doctor
 ```
 
-`runops init` がディレクトリ構造と初期ファイルを作ります（詳細は [README.md](../README.md) を参照）。
+`runo init` がディレクトリ構造と初期ファイルを作ります（詳細は [README.md](../README.md) を参照）。
 初期セットアップを細かく確認するより、すぐにエージェントへ研究内容を渡して構成を整えてもらう方が早いです。
 あわせて Claude Code 向けのガードも生成され、`manifest.toml`、`input/`、`submit/job.sh`、
 `SITE.md` などの生成物は直接編集しない前提になります。
@@ -124,7 +124,7 @@ issue 候補を整理して。起票する前にタイトルと本文を見せ�
 ```
 
 ```text
-runops runs submit の挙動がわかりにくかったので、改善要望として issue を作って。
+runo runs submit の挙動がわかりにくかったので、改善要望として issue を作って。
 再現手順、期待する挙動、今回の workaround も本文に入れて。
 ```
 
@@ -141,6 +141,6 @@ issue のタイトルと本文案を作ります。
 ## 次に読む
 
 - [README.md](../README.md) — 生成される構造と全体像
-- [project-flow.md](project-flow.md) — `runops init` 後の project を Agent とどう運用するかの概念図
+- [project-flow.md](project-flow.md) — `runo init` 後の project を Agent とどう運用するかの概念図
 - [agent-user-guide.md](agent-user-guide.md) — Agent が守る基本ルール
 - [toml-reference.md](toml-reference.md) — TOML フィールドを手で確認したいとき

@@ -6,7 +6,7 @@
 {
   "goal": "what you want to achieve",
   "edits": ["file1.toml", "file2.toml"],
-  "commands": ["runops runs sweep ...", "runops runs submit --all ..."],
+  "commands": ["runo runs sweep ...", "runo runs submit --all ..."],
   "checkpoints": ["Confirm survey size before bulk submit"]
 }
 ```

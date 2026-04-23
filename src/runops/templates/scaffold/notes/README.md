@@ -39,18 +39,18 @@ Series B 完走で確かめる。
 - 1 トピック = 1 ファイル
 - 何度書き直してもよい (lab notebook と違って refined)
 - 図は `notes/reports/figures/` に置くか、`runs/_compare_*/` への相対 link
-- 完成度が高くなってから `runops analyze export --paper <paper-id>` で
+- 完成度が高くなってから `runo analyze export --paper <paper-id>` で
   `exports/papers/<paper-id>/` に束ね、paper repo に移送する
 
 ## 補助コマンド
 
-- **`runops notes append "<title>" "<body>"`** — 今日の `notes/YYYY-MM-DD.md`
+- **`runo notes append "<title>" "<body>"`** — 今日の `notes/YYYY-MM-DD.md`
   に新しい entry を append する。`-` または引数省略で stdin から本文を読む
-- **`runops notes list`** — 最近の lab notebook 日付一覧
-- **`runops notes show [DATE|today|latest]`** — 指定日 (省略時は today) の内容を表示
-- **`/note` skill** — agent から呼んで note を append (内部で `runops notes append` を呼ぶ)
+- **`runo notes list`** — 最近の lab notebook 日付一覧
+- **`runo notes show [DATE|today|latest]`** — 指定日 (省略時は today) の内容を表示
+- **`/note` skill** — agent から呼んで note を append (内部で `runo notes append` を呼ぶ)
 
-## なぜ `runops knowledge save` ではダメか
+## なぜ `runo knowledge save` ではダメか
 
 - `knowledge save` は **同名で書くと上書き** で chronology と相性が悪い
 - knowledge は「最終的な findings」を整理する場所であって、「今日試したこと

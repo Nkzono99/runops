@@ -52,18 +52,19 @@ policy です。runops は `submit`, `delete`, `purge-work`, `rm -rf`,
 書きます。通常の開発ワークフローや設計方針は `AGENTS.md` と
 `.codex/rules/*.md` に置きます。
 
-`runops runs submit --dry-run` は HPC 資源を使わない確認コマンドなので allow
+`runo runs submit --dry-run` は HPC 資源を使わない確認コマンドなので allow
 しています。ただし Codex execpolicy は prefix-based で、`prompt` は `allow`
 より安全側に倒れるため、`--dry-run` は必ず `submit` の直後に置いてください:
 
 ```bash
-runops runs submit --dry-run --all runs/survey -qn gr10451a
+runo runs submit --dry-run --all runs/survey -qn gr10451a
 ```
 
 実投入は必ず会話上でユーザー確認を得てから実行します。
-default の project rule は `--all`, `-qn`, `--queue-name`, `--qos`,
-`--afterok` など、HPC 資源を使う submit option prefix を `prompt` にします。
-一方で `pattern = ["runops", "runs", "submit"]` という広い rule は置きません。
+default の project rule は `runo` と `runops` の両方について、`--all`, `-qn`,
+`--queue-name`, `--qos`, `--afterok` など、HPC 資源を使う submit option prefix
+を `prompt` にします。一方で `pattern = ["runo", "runs", "submit"]` や
+`pattern = ["runops", "runs", "submit"]` という広い rule は置きません。
 これを置くと dry-run も同時に match し、`approval_policy = "never"` 環境で
 安全確認の dry-run まで hard block されるためです。
 
@@ -75,13 +76,13 @@ rule が hard block になるため、実投入まで Codex に任せる project
 ```starlark
 # ~/.codex/rules/runops-submit-approved.rules など user-local に置く
 prefix_rule(
-    pattern = ["runops", "runs", "submit"],
+    pattern = ["runo", "runs", "submit"],
     decision = "allow",
     justification = "Only use after explicit chat confirmation in this project.",
 )
 
 prefix_rule(
-    pattern = ["uv", "run", "runops", "runs", "submit"],
+    pattern = ["uv", "run", "runo", "runs", "submit"],
     decision = "allow",
     justification = "Only use after explicit chat confirmation in this project.",
 )
@@ -91,11 +92,11 @@ prefix_rule(
 
 ```bash
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runops runs submit --dry-run --all runs/survey
+  runo runs submit --dry-run --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runops runs submit --all runs/survey --dry-run
+  runo runs submit --all runs/survey --dry-run
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runops runs submit --all runs/survey
+  runo runs submit --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   rm -rf runs/R20260419-0001
 ```

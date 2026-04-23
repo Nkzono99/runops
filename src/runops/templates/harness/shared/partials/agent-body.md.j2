@@ -1,4 +1,6 @@
 このプロジェクトは runops で管理されています。
+CLI は `runo` を標準コマンドとして使う。`runops` も互換 alias として同じ
+CLI を実行できる。
 人が研究目的・ベース入力・計算資源上限を決め、Agent はその範囲で
 campaign 設計、case / survey 編集、run 生成、投入、監視、解析、知見整理を進めます。
 
@@ -10,12 +12,12 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 ## まずやること
 
 0. **venv を activate する** — `source .venv/bin/activate` (Linux/Mac) / `.venv\Scripts\activate` (Windows)
-   runops や関連パッケージは `.venv/` にインストール済み。activate しないと runops コマンドが使えない。
-1. `runops context --json` で project の現在地を把握する
+   runops や関連パッケージは `.venv/` にインストール済み。activate しないと `runo` コマンドが使えない。
+1. `runo context --json` で project の現在地を把握する
 2. `campaign.toml` を読む
 3. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
 4. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
-5. 必要なら最近の failed run の `runops runs status` / `runops runs log -e` を見る
+5. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
 6. **定型作業は `{{ skill_prefix }}skill-name` で呼び出す** (下記「スキル」参照)
 
 ## スキル
@@ -52,12 +54,12 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 - `tools/runops/` のソース修正 (editable install されているので即試せる)
 
 ### 確認が必要なもの
-- 初回の大規模 survey / `runops runs submit --all` / 資源増加を伴う retry
-- `runops runs purge-work` / `runops runs delete` (実ファイル削除)
+- 初回の大規模 survey / `runo runs submit --all` / 資源増加を伴う retry
+- `runo runs purge-work` / `runo runs delete` (実ファイル削除)
 - 実行バイナリ、モジュール、launcher の変更
 
 ### 報告してから進めるもの
-- `runops runs cancel` (実行中の job を停止するが、追加確認プロンプトは不要)
+- `runo runs cancel` (実行中の job を停止するが、追加確認プロンプトは不要)
 
 ## 進捗のコミット (義務)
 
@@ -67,10 +69,10 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 ### コミットするタイミング (最低限)
 
 - campaign.toml / case / survey を新規作成・大幅変更したとき
-- `runops runs sweep` で新しい run を生成したとき (run 設定が確定したとき)
+- `runo runs sweep` で新しい run を生成したとき (run 設定が確定したとき)
 - 解析結果・知見を `.runops/insights/` や `.runops/facts.toml` に保存したとき
 - `tools/runops/` を修正してテストが通ったとき
-- `runops runs submit` の前 (投入前のスナップショットとして)
+- `runo runs submit` の前 (投入前のスナップショットとして)
 - 1 つの作業フェーズが完了したとき (例: 新しい survey の設計が固まった、全 run の解析が終わった)
 
 ### コミット粒度
@@ -98,7 +100,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 - 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`{{ skill_prefix }}note` で lab notebook に**
 - どちらも Agent 自身の memory に保存してはいけない (会話を跨いで失われる)
 - 共有 source 由来の candidate fact を採用するときは
-  `runops knowledge promote-fact` で local fact に昇格する
+  `runo knowledge promote-fact` で local fact に昇格する
 
 ### `{{ skill_prefix }}note` は準備フェーズから使う
 
@@ -121,10 +123,10 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 `{{ skill_prefix }}note` は raw な原料、`{{ skill_prefix }}learn` (curated knowledge) は整理済みの最終産物。
 つまり **`{{ skill_prefix }}learn` を呼ぶときは、まず `notes/` を読んで素材を集める**:
 
-1. `runops notes list` で最近の lab notebook の日付を確認
-2. 当該テーマに関連する `notes/YYYY-MM-DD.md` を `runops notes show` で読む
+1. `runo notes list` で最近の lab notebook の日付を確認
+2. 当該テーマに関連する `notes/YYYY-MM-DD.md` を `runo notes show` で読む
 3. 散らばっている観察・仮説・反例を一つの insight にまとめる
-4. `runops knowledge save` / `add-fact` で永続化する
+4. `runo knowledge save` / `add-fact` で永続化する
 5. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
 
 lab notebook の entry が積み上がってストーリーになったら、
@@ -142,7 +144,7 @@ lab notebook の entry が積み上がってストーリーになったら、
 ## 情報源の優先順位
 
 1. `{{ skills_dir }}` → simulator docs / enabled knowledge → `tools/runops/docs/`
-2. `runops --help` / `runops <command> --help`
+2. `runo --help` / `runo <command> --help` (`runops` でも同じ)
 3. `tools/runops/src/` は最後の手段
 {% if doc_repos %}
 

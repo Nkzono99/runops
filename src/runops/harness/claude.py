@@ -5,6 +5,18 @@ from __future__ import annotations
 import json
 from typing import Final
 
+_CLI_COMMANDS: Final[tuple[str, ...]] = ("runo", "runops")
+
+
+def _cli_bash_patterns(*patterns: str) -> tuple[str, ...]:
+    """Expand runops CLI command suffixes for preferred and legacy names."""
+    return tuple(
+        f"Bash({command} {pattern})"
+        for command in _CLI_COMMANDS
+        for pattern in patterns
+    )
+
+
 # Bash commands the agent can run without confirmation.
 #
 # We deliberately keep ASK_BASH small (see _ASK_BASH below): the only Bash
@@ -13,55 +25,69 @@ from typing import Final
 # updates, and local git commits, lives here.
 _ALLOW_BASH: Final[tuple[str, ...]] = (
     # Read-only inspection
-    "Bash(runops --help*)",
-    "Bash(runops --version*)",
-    "Bash(runops context*)",
-    "Bash(runops runs list*)",
-    "Bash(runops runs status*)",
-    "Bash(runops runs sync*)",
-    "Bash(runops runs jobs*)",
-    "Bash(runops runs dashboard*)",
-    "Bash(runops runs history*)",
-    "Bash(runops runs log*)",
-    "Bash(runops doctor*)",
-    "Bash(runops config show*)",
+    *_cli_bash_patterns(
+        "--help*",
+        "--version*",
+        "context*",
+        "runs list*",
+        "runs status*",
+        "runs sync*",
+        "runs jobs*",
+        "runs dashboard*",
+        "runs history*",
+        "runs log*",
+        "doctor*",
+        "config show*",
+    ),
     # Generation (cheap, reversible by deleting the new files)
-    "Bash(runops case new *)",
-    "Bash(runops runs create *)",
-    "Bash(runops runs sweep *)",
-    "Bash(runops runs clone *)",
-    "Bash(runops runs extend *)",
+    *_cli_bash_patterns(
+        "case new *",
+        "runs create *",
+        "runs sweep *",
+        "runs clone *",
+        "runs extend *",
+    ),
     # Analysis (read + write into analysis/)
-    "Bash(runops analyze summarize*)",
-    "Bash(runops analyze collect*)",
-    "Bash(runops analyze plot*)",
-    "Bash(runops analyze export*)",
+    *_cli_bash_patterns(
+        "analyze summarize*",
+        "analyze collect*",
+        "analyze plot*",
+        "analyze export*",
+    ),
     # Knowledge management (mutates .runops/knowledge/ via runops, reversible)
-    "Bash(runops knowledge list*)",
-    "Bash(runops knowledge show*)",
-    "Bash(runops knowledge facts*)",
-    "Bash(runops knowledge save*)",
-    "Bash(runops knowledge add-fact*)",
-    "Bash(runops knowledge promote-fact*)",
-    "Bash(runops knowledge source list*)",
-    "Bash(runops knowledge source status*)",
-    "Bash(runops knowledge source attach*)",
-    "Bash(runops knowledge source detach*)",
-    "Bash(runops knowledge source sync*)",
-    "Bash(runops knowledge source render*)",
+    *_cli_bash_patterns(
+        "knowledge list*",
+        "knowledge show*",
+        "knowledge facts*",
+        "knowledge save*",
+        "knowledge add-fact*",
+        "knowledge promote-fact*",
+        "knowledge source list*",
+        "knowledge source status*",
+        "knowledge source attach*",
+        "knowledge source detach*",
+        "knowledge source sync*",
+        "knowledge source render*",
+    ),
     # Notes (lab notebook, append-only by design)
-    "Bash(runops notes append*)",
-    "Bash(runops notes list*)",
-    "Bash(runops notes show*)",
+    *_cli_bash_patterns(
+        "notes append*",
+        "notes list*",
+        "notes show*",
+    ),
     # Refs / config additions (mutates the corresponding TOML, which is
     # itself ask-listed below — the resulting prompt happens once, not twice)
-    "Bash(runops update-harness*)",
-    "Bash(runops update-refs*)",
-    "Bash(runops config add-simulator*)",
-    "Bash(runops config add-launcher*)",
+    *_cli_bash_patterns(
+        "update-harness*",
+        "update-refs*",
+        "config add-simulator*",
+        "config add-launcher*",
+    ),
     # Lifecycle move that does not delete data
-    "Bash(runops runs archive*)",
-    "Bash(runops runs cancel*)",
+    *_cli_bash_patterns(
+        "runs archive*",
+        "runs cancel*",
+    ),
     # Dev tooling
     "Bash(uv run pytest*)",
     "Bash(uv run ruff*)",
@@ -79,9 +105,11 @@ _ALLOW_BASH: Final[tuple[str, ...]] = (
 # Bash commands that must always prompt the user.  Keep this list as short
 # as possible — every entry here trains the user to dismiss prompts.
 _ASK_BASH: Final[tuple[str, ...]] = (
-    "Bash(runops runs submit*)",  # spends HPC resources
-    "Bash(runops runs purge-work*)",  # deletes work/ files irreversibly
-    "Bash(runops runs delete*)",  # removes run directory irreversibly
+    *_cli_bash_patterns(
+        "runs submit*",  # spends HPC resources
+        "runs purge-work*",  # deletes work/ files irreversibly
+        "runs delete*",  # removes run directory irreversibly
+    ),
 )
 _DENY_BASH: Final[tuple[str, ...]] = (
     "Bash(rm -rf *)",

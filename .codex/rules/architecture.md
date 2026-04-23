@@ -31,7 +31,7 @@ run の状態・由来・provenance はすべて `manifest.toml` に記録され
 runops は **2 種類のハーネス** を持つ:
 
 1. **このリポジトリ自身の `.claude/`, `.codex/`, `.agents/skills/`** — runops 開発者向け
-2. **`src/runops/templates/` → `runops init` が生成するプロジェクト側ハーネス** — runops ユーザーのプロジェクト向け
+2. **`src/runops/templates/` → `runo init` が生成するプロジェクト側ハーネス** — runops ユーザーのプロジェクト向け
 
 `harness/builder.py` がプロジェクト側のハーネス生成を担う。
 `update-harness` が既存プロジェクトへの反映を担う。

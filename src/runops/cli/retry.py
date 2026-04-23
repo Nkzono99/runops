@@ -66,7 +66,7 @@ def retry(
 
     ``retry_run`` clears the recorded job_id / submitted_at, bumps the attempt
     counter, and returns the run to ``created`` state.  Pass ``--and-submit``
-    to immediately invoke ``runops runs submit`` after the reset.
+    to immediately invoke ``runo runs submit`` after the reset.
     """
     run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
 

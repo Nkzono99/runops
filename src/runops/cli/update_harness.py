@@ -1,6 +1,6 @@
 """CLI command for updating harness files in an existing project.
 
-``runops update-harness`` re-renders all agent-harness templates (CLAUDE.md,
+``runo update-harness`` re-renders all agent-harness templates (CLAUDE.md,
 AGENTS.md, .claude/skills/, .claude/rules/, .claude/settings.json, etc.)
 from the current version of runops and writes them into the project.
 
@@ -176,11 +176,11 @@ def update_harness(
     (useful for first-time migration of an existing project).
 
     Examples:
-      runops update-harness                   # update all harness files
-      runops update-harness --dry-run         # preview changes
-      runops update-harness --force           # force-overwrite everything
-      runops update-harness --adopt           # lock current state
-      runops update-harness --only CLAUDE.md  # update a single file
+      runo update-harness                   # update all harness files
+      runo update-harness --dry-run         # preview changes
+      runo update-harness --force           # force-overwrite everything
+      runo update-harness --adopt           # lock current state
+      runo update-harness --only CLAUDE.md  # update a single file
     """
     project_dir = (path or Path.cwd()).resolve()
 
@@ -316,7 +316,7 @@ def update_harness(
             typer.echo(f"  {p}.new", err=True)
         typer.echo("", err=True)
         typer.echo(
-            "To accept new versions:  runops update-harness --force",
+            "To accept new versions:  runo update-harness --force",
             err=True,
         )
         first_new = written_new[0]

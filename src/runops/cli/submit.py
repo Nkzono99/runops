@@ -115,11 +115,11 @@ def run_cmd(
     """Submit a run or all runs via sbatch.
 
     Examples:
-      cd runs/experiment/R0001 && runops runs submit
-      cd runs/mag_scan && runops runs submit --all
-      runops runs submit -qn gr10451a
-      runops runs submit -qn gr10451a --qos gr10451a
-      runops runs submit --afterok 12345
+      cd runs/experiment/R0001 && runo runs submit
+      cd runs/mag_scan && runo runs submit --all
+      runo runs submit -qn gr10451a
+      runo runs submit -qn gr10451a --qos gr10451a
+      runo runs submit --afterok 12345
     """
     if all_runs:
         target = Path(run) if run else None
@@ -167,7 +167,7 @@ def _submit_single_cwd(
         elif len(run_dirs) > 1:
             typer.echo(
                 f"Multiple runs found in {cwd}. "
-                "Use 'runops runs submit --all' or specify a run."
+                "Use 'runo runs submit --all' or specify a run."
             )
             raise typer.Exit(code=1)
         else:

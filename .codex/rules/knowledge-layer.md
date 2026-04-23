@@ -7,13 +7,13 @@ AI エージェントがシミュレーションを自律的に行うための�
 
 | 種類 | 保存先 | 更新方法 |
 |------|--------|----------|
-| シミュレータ知識 | `refs/` + `.runops/knowledge/` | `runops update-refs` |
+| シミュレータ知識 | `refs/` + `.runops/knowledge/` | `runo update-refs` |
 | 外部共有知識 | `runops.toml` の `[knowledge]` | `knowledge source attach/sync` |
-| 実行環境 | `.runops/environment.toml` | `runops doctor` |
+| 実行環境 | `.runops/environment.toml` | `runo doctor` |
 | 研究意図 | `campaign.toml` | ユーザーが記述 |
 | 実験知見 (curated) | `.runops/insights/` | `knowledge save` / `knowledge source sync` |
 | 構造化知識 (curated) | `.runops/facts.toml` | `knowledge add-fact` / `knowledge facts` |
-| lab notebook | `notes/YYYY-MM-DD.md` | `runops notes append` |
+| lab notebook | `notes/YYYY-MM-DD.md` | `runo notes append` |
 | 長文レポート | `notes/reports/<topic>.md` | 直接編集 (改稿可) |
 
 ## 二層構造
@@ -27,11 +27,11 @@ AI エージェントがシミュレーションを自律的に行うための�
 複数プロジェクト間で共有する知識を外部リポジトリとして管理し、project に接続できる。
 
 ```bash
-runops knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
-runops knowledge source attach path local-kb ../hpc-knowledge
-runops knowledge source sync
-runops knowledge source render
+runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
+runo knowledge source attach path local-kb ../hpc-knowledge
+runo knowledge source sync
+runo knowledge source render
 ```
 
-- `runops init` 時に GitHub の `*shared_knowledge*` リポジトリを自動検索し接続
-- `runops setup` 時は `runops.toml` に設定された知識ソースを自動同期
+- `runo init` 時に GitHub の `*shared_knowledge*` リポジトリを自動検索し接続
+- `runo setup` 時は `runops.toml` に設定された知識ソースを自動同期

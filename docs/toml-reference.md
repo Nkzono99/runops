@@ -30,7 +30,7 @@ External shared knowledge source integration. If absent, only local knowledge (i
 enabled = true                       # Enable knowledge integration
 mount_dir = "refs/knowledge"         # Base mount directory
 derived_dir = ".runops/knowledge"    # Generated files directory
-auto_sync_on_setup = true            # Sync sources during `runops setup`
+auto_sync_on_setup = true            # Sync sources during `runo setup`
 generate_claude_imports = true       # Generate CLAUDE.md @import stubs
 
 [[knowledge.sources]]
@@ -53,7 +53,7 @@ mount = "refs/knowledge/personal-knowledge"
 | `knowledge.enabled` | bool | No | `true` | Enable knowledge integration |
 | `knowledge.mount_dir` | string | No | `"refs/knowledge"` | Base directory for source mounts |
 | `knowledge.derived_dir` | string | No | `".runops/knowledge"` | Directory for generated files |
-| `knowledge.auto_sync_on_setup` | bool | No | `true` | Auto-sync on `runops setup` |
+| `knowledge.auto_sync_on_setup` | bool | No | `true` | Auto-sync on `runo setup` |
 | `knowledge.generate_claude_imports` | bool | No | `true` | Generate `imports.md` for CLAUDE.md |
 | `knowledge.sources[].name` | string | Yes | — | Source identifier |
 | `knowledge.sources[].type` | string | Yes | — | `"git"` or `"path"` |
@@ -66,8 +66,8 @@ mount = "refs/knowledge/personal-knowledge"
 Profiles can be toggled later with:
 
 ```bash
-runops knowledge profile enable shared-lab-knowledge common-analysis
-runops knowledge profile disable shared-lab-knowledge emses-basic
+runo knowledge profile enable shared-lab-knowledge common-analysis
+runo knowledge profile disable shared-lab-knowledge emses-basic
 ```
 
 For `kind = "profiles"` repositories, an optional repo-root `entrypoints.toml` can declare the exact files imported into `.runops/knowledge/enabled/imports.md`:
@@ -111,16 +111,16 @@ executable = "beach"
 
 ### resolver_mode
 
-- **`package`** (recommended): Executable is pip-installed into `.venv` from the adapter's package spec. For simulator packages backed by Git repositories, this means a git-pinned/package install rather than an editable checkout. This is the default for reproducible runs because provenance can record the resolved source and `runops update` can follow upstream package specs.
+- **`package`** (recommended): Executable is pip-installed into `.venv` from the adapter's package spec. For simulator packages backed by Git repositories, this means a git-pinned/package install rather than an editable checkout. This is the default for reproducible runs because provenance can record the resolved source and `runo update` can follow upstream package specs.
 - **`local_executable`**: Executable is on PATH or specified as an absolute path.
 - **`local_source`**: Build from source. `source_repo` and `build_command` must be set.
 
 Editable installs, such as `uv pip install -e refs/MPIEMSES3D`, are an opt-in
 development workflow for hacking on the simulator itself. They are not the
-default project runtime. `runops update` upgrades the package specs declared by
+default project runtime. `runo update` upgrades the package specs declared by
 the active adapters; if a target package is currently editable-installed, it
-warns before replacing that editable install. Use `runops update --yes` or
-`runops update --force` only when that replacement is intentional.
+warns before replacing that editable install. Use `runo update --yes` or
+`runo update --force` only when that replacement is intentional.
 
 ---
 
@@ -188,7 +188,7 @@ modules = ["openmpi/4.1"]
 
 ## site.toml
 
-HPC サイト固有の環境設定。`runops init` でサイトプロファイル選択時に自動生成される。
+HPC サイト固有の環境設定。`runo init` でサイトプロファイル選択時に自動生成される。
 Launcher (MPI 起動方式) とは独立に、ジョブスクリプト生成に影響する環境設定を管理する。
 
 ```toml
@@ -235,10 +235,10 @@ modules = ["hdf5/1.12.2_intel-2023.2-impi", "fftw/3.3.10_intel-2022.3-impi"]
 Case template definition. Recommended location: `cases/<simulator>/<case_name>/case.toml`.
 Legacy `cases/<case_name>/case.toml` is still readable for backward compatibility.
 
-`runops case new` は simulator ごとのベース入力テンプレート
+`runo case new` は simulator ごとのベース入力テンプレート
 (`plasma.toml`, `beach.toml` など) を case ルートに生成する。
 追加の入力ファイルは `cases/<simulator>/<case_name>/input/` に置ける。
-`runops runs create` / `runops runs sweep` 実行時、`input/` 以下は
+`runo runs create` / `runo runs sweep` 実行時、`input/` 以下は
 ディレクトリ構造ごと run の `input/` に自動コピーされ、その後 adapter が
 ベーステンプレートに `[params]` を適用した入力で上書きする。
 
@@ -307,15 +307,15 @@ Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `partition` | string | No | Partition/queue name. Can be overridden at submit time with `runops runs submit -qn <name>` |
-| `qos` | string | No | Slurm QOS name. Emits `#SBATCH --qos=<value>`. Can be overridden with `runops runs submit --qos <name>`. Note: camphor では使用不可 (partition 経由で暗黙決定) |
+| `partition` | string | No | Partition/queue name. Can be overridden at submit time with `runo runs submit -qn <name>` |
+| `qos` | string | No | Slurm QOS name. Emits `#SBATCH --qos=<value>`. Can be overridden with `runo runs submit --qos <name>`. Note: camphor では使用不可 (partition 経由で暗黙決定) |
 | `nodes` | integer | No | Number of nodes |
 | `ntasks` | integer | No | Number of MPI tasks |
 | `walltime` | string | Yes | Wall time limit (HH:MM:SS) |
 
 #### RSC mode (`resource_style = "rsc"`, camphor 等)
 
-`site.toml` で `resource_style = "rsc"` の場合、`runops case new` は以下のフィールドを生成する:
+`site.toml` で `resource_style = "rsc"` の場合、`runo case new` は以下のフィールドを生成する:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -557,7 +557,7 @@ R20260329-0001/
     outputs/           # Simulator output files
     restart/           # Restart/checkpoint files
   analysis/            # Post-processing results
-    summary.json       # Key metrics (generated by runops analyze summarize)
+    summary.json       # Key metrics (generated by runo analyze summarize)
     figures/            # Plots and visualizations
 ```
 
@@ -565,8 +565,8 @@ R20260329-0001/
 
 ## analysis/summary.json
 
-`runops analyze summarize` が生成する run の要約ファイル。Adapter が基本メトリクスを出力し、プロジェクトスクリプトで拡張できる。
-`runops analyze collect` 実行時も、completed run に `analysis/summary.json` が無い場合はこの生成処理が自動で走る。
+`runo analyze summarize` が生成する run の要約ファイル。Adapter が基本メトリクスを出力し、プロジェクトスクリプトで拡張できる。
+`runo analyze collect` 実行時も、completed run に `analysis/summary.json` が無い場合はこの生成処理が自動で走る。
 
 ### 基本構造
 
@@ -598,7 +598,7 @@ R20260329-0001/
 
 ### プロジェクトスクリプトによる拡張
 
-`runops analyze summarize` は Adapter の `summarize()` 実行後、以下の順でプロジェクトスクリプトを探索し、見つかれば実行する:
+`runo analyze summarize` は Adapter の `summarize()` 実行後、以下の順でプロジェクトスクリプトを探索し、見つかれば実行する:
 
 1. `cases/<case>/summarize.py` — legacy レイアウトのケース解析
 2. `cases/<simulator>/<case>/summarize.py` — 現行の multi-simulator layout のケース解析
@@ -650,8 +650,8 @@ def summarize(run_dir: Path, base_summary: dict) -> dict:
 
 ## survey summary outputs
 
-`runops analyze collect <survey_dir>` は survey 配下の run を走査し、`<survey_dir>/summary/` に集計成果物を生成する。
-`runops analyze plot <survey_dir> --x <column> --y <column>` はこの集計結果を使って図を生成する。
+`runo analyze collect <survey_dir>` は survey 配下の run を走査し、`<survey_dir>/summary/` に集計成果物を生成する。
+`runo analyze plot <survey_dir> --x <column> --y <column>` はこの集計結果を使って図を生成する。
 adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも既定の診断図を呼び出せる。
 
 ### 生成されるファイル
@@ -662,7 +662,7 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
 | `summary/survey_summary.json` | run ごとの summary 原本、状態数、数値統計、warning を含む集計 JSON |
 | `summary/figures_index.json` | `analysis/figures/` と `summary.figures[]` を run ごとに引いた索引 |
 | `summary/survey_summary.md` | すぐ読める Markdown レポート |
-| `summary/plots/*.png` | `runops analyze plot` が生成する survey 可視化 |
+| `summary/plots/*.png` | `runo analyze plot` が生成する survey 可視化 |
 
 ### 収集ルール
 
@@ -706,15 +706,15 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
 
 ### plot command
 
-`runops analyze plot` は `survey_summary.json` の各 run から `flat_metadata` と `flat_summary` を統合した表を読み、指定列で可視化する。
+`runo analyze plot` は `survey_summary.json` の各 run から `flat_metadata` と `flat_summary` を統合した表を読み、指定列で可視化する。
 
 ```bash
-runops analyze plot runs/sheath/angle_scan --list-columns
-runops analyze plot runs/sheath/angle_scan --list-recipes
-runops analyze plot runs/sheath/angle_scan --recipe completion-vs-dt
-runops analyze plot runs/sheath/angle_scan --x param.tmgrid_dt --y floating_potential_final
-runops analyze plot runs/sheath/angle_scan --x origin.case --y energy_total_ratio --kind bar
-runops analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group param.seed
+runo analyze plot runs/sheath/angle_scan --list-columns
+runo analyze plot runs/sheath/angle_scan --list-recipes
+runo analyze plot runs/sheath/angle_scan --recipe completion-vs-dt
+runo analyze plot runs/sheath/angle_scan --x param.tmgrid_dt --y floating_potential_final
+runo analyze plot runs/sheath/angle_scan --x origin.case --y energy_total_ratio --kind bar
+runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group param.seed
 ```
 
 | Option | Description |
@@ -734,7 +734,7 @@ runops analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group 
 
 ## publication export outputs
 
-`runops analyze export <run-or-survey> --paper <paper-id>` は、paper repo に渡しやすい
+`runo analyze export <run-or-survey> --paper <paper-id>` は、paper repo に渡しやすい
 project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成する。
 
 ### 生成されるファイル
@@ -762,9 +762,9 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成す
 ### 例
 
 ```bash
-runops analyze export runs/sheath/angle_scan --paper draft-a
-runops analyze export R20260412-0003 --paper draft-a --name fig2-baseline
-runops analyze export runs/sheath/angle_scan --paper draft-a --mode symlink
+runo analyze export runs/sheath/angle_scan --paper draft-a
+runo analyze export R20260412-0003 --paper draft-a --name fig2-baseline
+runo analyze export runs/sheath/angle_scan --paper draft-a --mode symlink
 ```
 
 ---
@@ -839,7 +839,7 @@ ion_flux = { source = "work/influx", column = 1, description = "イオンフラ�
 
 ## .runops/environment.toml
 
-`runops doctor` で自動生成される実行環境記述ファイル。
+`runo doctor` で自動生成される実行環境記述ファイル。
 
 ### [cluster]
 

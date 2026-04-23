@@ -123,7 +123,7 @@ def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
 
     The lab notebook lives next to ``.runops/insights/`` but serves a
     different purpose: chronological, append-only entries, edited via
-    ``runops notes append`` or the ``/note`` skill.
+    ``runo notes append`` or the ``/note`` skill.
 
     Args:
         project_dir: Project root directory.
@@ -589,7 +589,7 @@ def _prompt_simulators() -> tuple[list[str], dict[str, dict[str, Any]]]:
 class _BundledSiteProfile:
     """A bundled site profile loaded from sites/*.toml.
 
-    Used during ``runops init`` to offer preconfigured site choices.
+    Used during ``runo init`` to offer preconfigured site choices.
     The file uses the same ``[site]`` format as project-level ``site.toml``,
     plus an optional ``[launcher]`` section for launcher defaults.
 
@@ -938,7 +938,7 @@ def _bootstrap_environment(
     else:
         activate_cmd = "source .venv/bin/activate"
     typer.echo(f"\n  Next: {activate_cmd}")
-    typer.echo("  Then: runops doctor")
+    typer.echo("  Then: runo doctor")
 
 
 def init(
@@ -979,10 +979,10 @@ def init(
     Use --yes / -y to skip prompts and use defaults.
 
     Simulator names can also be passed directly:
-      runops init emses beach
+      runo init emses beach
 
     Bootstrap usage (no prior install needed):
-      uvx --from runops runops init
+      uvx --from runops runo init
     """
     interactive = not yes
     project_dir = (path or Path.cwd()).resolve()
@@ -1172,7 +1172,7 @@ def init(
 
     # Build all harness files (CLAUDE.md, AGENTS.md, skills, rules,
     # settings.json, subdirectory CLAUDE.md) via the shared builder so that
-    # `runops update-harness` can re-render the same set later.
+    # `runo update-harness` can re-render the same set later.
     from runops.harness.builder import build_harness_bundle, save_harness_lock
 
     harness = build_harness_bundle(

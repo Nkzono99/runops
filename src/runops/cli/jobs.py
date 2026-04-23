@@ -41,9 +41,9 @@ def jobs(
     Shows job_id, status, run_id, and path for runs with Slurm jobs.
 
     Examples:
-      runops runs jobs             # active jobs under cwd
-      runops runs jobs --all       # all runs with job info
-      runops runs jobs -w 30       # auto-refresh every 30 seconds
+      runo runs jobs             # active jobs under cwd
+      runo runs jobs --all       # all runs with job info
+      runo runs jobs -w 30       # auto-refresh every 30 seconds
     """
     search_dir = (path or Path.cwd()).resolve()
 
@@ -136,7 +136,7 @@ def _watch_loop(search_dir: Path, *, all_states: bool, interval: float) -> None:
             # ANSI: clear screen + move cursor home.
             typer.echo("\x1b[2J\x1b[H", nl=False)
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            typer.echo(f"runops runs jobs (watch every {interval:g}s) — {timestamp}")
+            typer.echo(f"runo runs jobs (watch every {interval:g}s) — {timestamp}")
             typer.echo("")
             _print_jobs_once(search_dir, all_states=all_states)
             time.sleep(interval)

@@ -27,8 +27,8 @@ GitHub issue として起票するスキル。現在の作業を止めずにサ�
 ```
 ## フィードバック候補
 
-1. [bug] `runops runs sync` — <具体的な問題>
-2. [feature] `runops runs submit` — <欲しい機能>
+1. [bug] `runo runs sync` — <具体的な問題>
+2. [feature] `runo runs submit` — <欲しい機能>
 3. [improvement] `update-harness` — <改善提案>
 
 → 起票するものがあれば `/feedback-runops <番号 or 内容>` で issue 化できます
@@ -60,7 +60,7 @@ gh issue list --repo Nkzono99/runops --search "<キーワード>" --state all --
 ### 3. 環境情報を自動収集する
 
 ```bash
-runops --version 2>/dev/null || echo "unknown"
+runo --version 2>/dev/null || echo "unknown"
 python3 --version
 uname -srm
 ```
@@ -103,7 +103,7 @@ EOF
 作成した issue の URL を lab notebook に追記する:
 
 ```bash
-runops notes append "upstream feedback" "Filed <issue-url>: <タイトル>"
+runo notes append "upstream feedback" "Filed <issue-url>: <タイトル>"
 ```
 
 ## 注意事項

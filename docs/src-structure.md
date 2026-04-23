@@ -13,7 +13,7 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 いまの実装で特に混乱しやすいのは `site` まわりです。
 
 - `src/runops/sites/` は project の runtime site 設定そのものではありません。
-- ここは `runops init` が一度だけ読む bundled preset 集です。
+- ここは `runo init` が一度だけ読む bundled preset 集です。
 - 実行時に使われる site の本体は project root の `site.toml` で、解決ロジックは `src/runops/core/site.py` にあります。
 
 ## top-level directory 一覧
@@ -26,7 +26,7 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 | `launchers/` | MPI 起動ラッパーと launcher factory | 5 個の Python module |
 | `jobgen/` | job、launcher、site から job.sh を組み立てる層 | 2 個の Python module |
 | `slurm/` | sbatch / squeue / sacct の薄いラッパー | 3 個の Python module |
-| `sites/` | runops init だけが読む bundled site preset | 1 個の preset TOML、1 個の companion doc |
+| `sites/` | runo init だけが読む bundled site preset | 1 個の preset TOML、1 個の companion doc |
 | `templates/` | project / case / survey にコピーされる静的テンプレート | 37 個の template asset |
 
 ## 全体構造

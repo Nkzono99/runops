@@ -41,7 +41,7 @@ Adapter が返すリストは **累積** (重複排除) される。
 ## バージョン二重管理
 
 `pyproject.toml` の `version` と `src/runops/__init__.py` の `__version__` は
-**必ず同時に更新する**。片方だけ変えるとランタイム (`runops --version`) と
+**必ず同時に更新する**。片方だけ変えるとランタイム (`runo --version`) と
 PyPI パッケージのバージョンがずれる。`$release` スキルを使えば自動で両方更新される。
 
 ## read_text() の encoding

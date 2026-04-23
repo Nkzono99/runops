@@ -8,7 +8,7 @@ description: Append a timestamped entry to today's lab notebook in notes/YYYY-MM
 `{{ skill_prefix }}note` は today's `notes/YYYY-MM-DD.md` に **timestamped な短いエントリを
 追記** する skill。**準備フェーズから解析フェーズまで**、研究プロセスの
 全期間で使うことを想定している。curated knowledge (`{{ skill_prefix }}learn`,
-`runops knowledge save/add-fact`) とは目的が違う:
+`runo knowledge save/add-fact`) とは目的が違う:
 
 | 用途 | スキル | 書き先 | 性質 |
 |---|---|---|---|
@@ -21,20 +21,20 @@ description: Append a timestamped entry to today's lab notebook in notes/YYYY-MM
 短いエントリ (タイトル + 本文) を取り、そのまま append:
 
 ```bash
-runops notes append "<title>" "<body...>"
+runo notes append "<title>" "<body...>"
 ```
 
 タイトルだけ引数で渡して本文は stdin から流す形:
 
 ```bash
-runops notes append "<title>" -
+runo notes append "<title>" -
 # (stdin に本文を流す)
 ```
 
 または heredoc:
 
 ```bash
-runops notes append "<title>" - <<'EOF'
+runo notes append "<title>" - <<'EOF'
 今日の作業まとめ
 - A
 - B
@@ -50,8 +50,8 @@ EOF
 
 ## 関連コマンド
 
-- `runops notes list` — 最近の lab notebook 日付一覧
-- `runops notes show [DATE|today|latest]` — 指定日 (省略時は today) の内容を表示
+- `runo notes list` — 最近の lab notebook 日付一覧
+- `runo notes show [DATE|today|latest]` — 指定日 (省略時は today) の内容を表示
 
 ## いつ書くか — フェーズ別ガイド
 

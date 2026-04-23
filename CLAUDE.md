@@ -15,18 +15,21 @@ run ディレクトリを日常運用の主単位とし、パラメータサー�
 
 ## プロジェクトでの利用方法
 
+CLI は `runo` を標準コマンドとして使う。既存スクリプトとの互換性のため、
+`runops` も同じ CLI を指す stable alias として残す。
+
 ```bash
 # 新規プロジェクト作成
 mkdir my-project && cd my-project
-uvx --from runops runops init
-source .venv/bin/activate && runops doctor
+uvx --from runops runo init
+source .venv/bin/activate && runo doctor
 
 # 既存プロジェクトを clone + セットアップ
-uvx --from runops runops setup https://github.com/user/my-project.git
-source my-project/.venv/bin/activate && runops doctor
+uvx --from runops runo setup https://github.com/user/my-project.git
+source my-project/.venv/bin/activate && runo doctor
 ```
 
-`runops init` が `.venv/` と `tools/runops/` を自動構築し、editable install する。
+`runo init` が `.venv/` と `tools/runops/` を自動構築し、editable install する。
 
 ## 技術スタック
 
@@ -59,7 +62,7 @@ uv run pytest                              # テスト
 uv run ruff check src/ tests/              # Lint
 uv run ruff format --check src/ tests/     # Format check
 uv run mypy src/                           # 型チェック
-uv run runops --help                       # CLI 実行
+uv run runo --help                       # CLI 実行
 ```
 
 ## 設計原則
@@ -91,13 +94,13 @@ completed → archived → purged
 
 | コマンド | 説明 |
 |---------|------|
-| `runops init` / `setup` / `doctor` | プロジェクト管理 |
-| `runops case new` / `runs create` / `runs sweep` | case / run 生成 |
-| `runops runs submit [--all] [-qn] [--qos]` | ジョブ投入 |
-| `runops runs status` / `sync` / `log` / `dashboard` | モニタリング |
-| `runops analyze summarize` / `collect` | 解析 |
-| `runops notes append` / `knowledge save` | 知見管理 |
-| `runops runs archive` / `purge-work` / `cancel` / `delete` | ライフサイクル |
+| `runo init` / `setup` / `doctor` | プロジェクト管理 |
+| `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
+| `runo runs submit [--all] [-qn] [--qos]` | ジョブ投入 |
+| `runo runs status` / `sync` / `log` / `dashboard` | モニタリング |
+| `runo analyze summarize` / `collect` | 解析 |
+| `runo notes append` / `knowledge save` | 知見管理 |
+| `runo runs archive` / `purge-work` / `cancel` / `delete` | ライフサイクル |
 
 全コマンド一覧: `.claude/rules/commands.md`
 

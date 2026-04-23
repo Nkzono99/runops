@@ -14,9 +14,9 @@ cases/<simulator>/<case-name>/
 
 ## ルール
 
-- case は `runops case new <name> -s <simulator>` で生成する (cases/<sim>/ に自動生成)
+- case は `runo case new <name> -s <simulator>` で生成する (cases/<sim>/ に自動生成)
 - 生成された case.toml や入力テンプレートの編集は自由
-- survey 付きは `runops case new <name> --survey` を使う
+- survey 付きは `runo case new <name> --survey` を使う
   - survey stub は `runs/<case_name>/survey.toml` に生成される
 - case.toml の編集は自由だが、フォーマットは `runops-reference` スキルを参照
 - テンプレートのパラメータは case.toml の `[params]` から展開される

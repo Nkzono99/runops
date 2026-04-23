@@ -108,9 +108,9 @@ def append(
 
     Examples::
 
-        runops notes append "cs scaling preview" "tan(alpha) = 0.79 cs/v + 0.02"
-        echo "..." | runops notes append "today's TODO"
-        runops notes append --date 2026-04-10 "yesterday's continuation" "..."
+        runo notes append "cs scaling preview" "tan(alpha) = 0.79 cs/v + 0.02"
+        echo "..." | runo notes append "today's TODO"
+        runo notes append --date 2026-04-10 "yesterday's continuation" "..."
     """
     title = title.strip()
     if not title:

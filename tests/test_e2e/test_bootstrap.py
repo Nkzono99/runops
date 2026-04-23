@@ -205,6 +205,7 @@ def test_e2e_init_minimal(
     assert "permissions" in settings
     assert "Edit(/campaign.toml)" in settings["permissions"]["allow"]
     assert "Edit(/tools/runops/**)" in settings["permissions"]["allow"]
+    assert "Bash(runo runs submit*)" in settings["permissions"]["ask"]
     assert "Bash(runops runs submit*)" in settings["permissions"]["ask"]
     assert "Write(/runops.toml)" in settings["permissions"]["ask"]
     assert "Write(/SITE.md)" in settings["permissions"]["deny"]

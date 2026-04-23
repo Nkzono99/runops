@@ -35,25 +35,27 @@ Codex の project-local config は、この repo を trusted project として�
 ## プロジェクトでの利用方法
 
 runops はプロジェクトごとにブートストラップインストールする。事前のグローバルインストールは不要。
+CLI は `runo` を標準コマンドとして使う。既存スクリプトとの互換性のため、
+`runops` も同じ CLI を指す stable alias として残す。
 
 ```bash
 # 新規プロジェクト作成
 mkdir my-project && cd my-project
-uvx --from runops runops init
+uvx --from runops runo init
 
 # activate
 source .venv/bin/activate
-runops doctor
+runo doctor
 ```
 
-`runops init` が `.venv/` と `tools/runops/` を自動構築し、editable install する。
+`runo init` が `.venv/` と `tools/runops/` を自動構築し、editable install する。
 Agent は `tools/runops/docs/` や `tools/runops/SPEC.md` を直接参照できる。
 
 ```bash
 # 既存プロジェクトを clone + セットアップ
-uvx --from runops runops setup https://github.com/user/my-project.git
+uvx --from runops runo setup https://github.com/user/my-project.git
 source my-project/.venv/bin/activate
-runops doctor
+runo doctor
 ```
 
 ## 技術スタック
@@ -77,26 +79,26 @@ runops/
       cli/              # CLI エントリポイント (typer)
         __init__.py
         main.py
-        init.py         # runops init / doctor
-        setup.py        # runops setup (clone + bootstrap)
-        context.py      # runops context
-        new.py          # runops case new
-        create.py       # runops runs create / sweep
-        submit.py       # runops runs submit
-        status.py       # runops runs status / sync
-        log.py          # runops runs log
-        jobs.py         # runops runs jobs (--watch 対応)
-        history.py      # runops runs history
-        list.py         # runops runs list (複数 PATH 対応)
-        dashboard.py    # runops runs dashboard (multi-run 進捗ビュー)
-        clone.py        # runops runs clone
-        extend.py       # runops runs extend
-        analyze.py      # runops analyze summarize / collect / plot
-        manage.py       # runops runs archive / purge-work / cancel / delete
-        knowledge.py    # runops knowledge / knowledge source
-        config.py       # runops config
-        update.py       # runops update
-        update_refs.py  # runops update-refs
+        init.py         # runo init / doctor
+        setup.py        # runo setup (clone + bootstrap)
+        context.py      # runo context
+        new.py          # runo case new
+        create.py       # runo runs create / sweep
+        submit.py       # runo runs submit
+        status.py       # runo runs status / sync
+        log.py          # runo runs log
+        jobs.py         # runo runs jobs (--watch 対応)
+        history.py      # runo runs history
+        list.py         # runo runs list (複数 PATH 対応)
+        dashboard.py    # runo runs dashboard (multi-run 進捗ビュー)
+        clone.py        # runo runs clone
+        extend.py       # runo runs extend
+        analyze.py      # runo analyze summarize / collect / plot
+        manage.py       # runo runs archive / purge-work / cancel / delete
+        knowledge.py    # runo knowledge / knowledge source
+        config.py       # runo config
+        update.py       # runo update
+        update_refs.py  # runo update-refs
         run_lookup.py   # run path / id lookup helper
       core/             # ドメインロジック
         __init__.py
@@ -126,7 +128,7 @@ runops/
         __init__.py
         submit.py
         query.py
-      sites/            # bundled site preset (runops init で読込)
+      sites/            # bundled site preset (runo init で読込)
         __init__.py
         camphor.toml
         camphor.md
@@ -150,48 +152,48 @@ runops/
 
 | コマンド | 説明 |
 |---------|------|
-| `runops init [SIMS...] -y` | Project 初期化 (対話型がデフォルト) |
-| `runops setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
-| `runops doctor` | 環境検査 |
-| `runops context --json` | Agent 向け project context を JSON で取得 |
-| `runops case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレート、EMSES では `emu generate -u` を自動実行) |
-| `runops runs create CASE` | case から単一 run を生成 |
-| `runops runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 (`--dry-run` で件数・パラメータ・概算 core-hour を表示するだけ) |
-| `runops runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--afterok` 対応) |
-| `runops runs submit --all [DIR]` | created な run を一括投入 |
-| `runops runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
-| `runops runs status [RUNS...]` | run 状態確認 (run_id・run dir・survey dir を複数渡してまとめて表示可) |
-| `runops runs sync [RUNS...]` | Slurm 状態を manifest に反映 (bulk 対応: survey 配下の created run + terminal state な run は silent skip) |
-| `runops runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 (`--watch` で N 秒ごとに自動更新) |
-| `runops runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗 (state, step/N, %, last Slurm state) を 1 つの表で表示 |
-| `runops runs history [PATH]` | 投入履歴表示 |
-| `runops runs list [PATHS...]` | run 一覧表示 (複数 PATH 指定可) |
-| `runops runs clone` | run 複製・派生 |
-| `runops runs extend` | スナップショットから継続 run 生成 |
-| `runops analyze summarize [RUN]` | run 解析 summary 生成 |
-| `runops analyze collect [DIR]` | survey 集計 |
-| `runops notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
-| `runops notes list` | 最近の lab notebook 日付一覧 |
-| `runops notes show [DATE\|today\|latest]` | 指定日 (省略時 today) の lab notebook を表示 |
-| `runops runs archive [RUN]` | run アーカイブ (completed のみ) |
-| `runops runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
-| `runops runs cancel [RUN]` | scancel + sync を同時実行し、submitted/running な run を停止 |
-| `runops runs delete [RUN]` | created/cancelled/failed な run ディレクトリをハード削除 (completed/archived は archive→purge-work を使う) |
-| `runops config show` | 設定表示 |
-| `runops config add-simulator` | シミュレータ追加 (対話型) |
-| `runops config add-launcher` | ランチャー追加 (対話型) |
-| `runops update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
-| `runops knowledge save` | 知見を .runops/insights/ に保存 |
-| `runops knowledge add-fact` | 構造化 fact を .runops/facts.toml に追加 |
-| `runops knowledge list` | 知見一覧表示 |
-| `runops knowledge facts` | 構造化 fact 一覧表示 |
-| `runops knowledge show` | 知見の詳細表示 |
-| `runops knowledge source list` | 外部知識ソース一覧表示 |
-| `runops knowledge source attach` | 外部知識ソースを接続 (git / path) |
-| `runops knowledge source detach` | 外部知識ソースを切断 |
-| `runops knowledge source sync` | 知識ソース同期 + 外部知見取り込み |
-| `runops knowledge source render` | 有効な profile から imports.md を生成 |
-| `runops knowledge source status` | 知識統合の状態表示 |
+| `runo init [SIMS...] -y` | Project 初期化 (対話型がデフォルト) |
+| `runo setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
+| `runo doctor` | 環境検査 |
+| `runo context --json` | Agent 向け project context を JSON で取得 |
+| `runo case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレート、EMSES では `emu generate -u` を自動実行) |
+| `runo runs create CASE` | case から単一 run を生成 |
+| `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 (`--dry-run` で件数・パラメータ・概算 core-hour を表示するだけ) |
+| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--afterok` 対応) |
+| `runo runs submit --all [DIR]` | created な run を一括投入 |
+| `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
+| `runo runs status [RUNS...]` | run 状態確認 (run_id・run dir・survey dir を複数渡してまとめて表示可) |
+| `runo runs sync [RUNS...]` | Slurm 状態を manifest に反映 (bulk 対応: survey 配下の created run + terminal state な run は silent skip) |
+| `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 (`--watch` で N 秒ごとに自動更新) |
+| `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗 (state, step/N, %, last Slurm state) を 1 つの表で表示 |
+| `runo runs history [PATH]` | 投入履歴表示 |
+| `runo runs list [PATHS...]` | run 一覧表示 (複数 PATH 指定可) |
+| `runo runs clone` | run 複製・派生 |
+| `runo runs extend` | スナップショットから継続 run 生成 |
+| `runo analyze summarize [RUN]` | run 解析 summary 生成 |
+| `runo analyze collect [DIR]` | survey 集計 |
+| `runo notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
+| `runo notes list` | 最近の lab notebook 日付一覧 |
+| `runo notes show [DATE\|today\|latest]` | 指定日 (省略時 today) の lab notebook を表示 |
+| `runo runs archive [RUN]` | run アーカイブ (completed のみ) |
+| `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
+| `runo runs cancel [RUN]` | scancel + sync を同時実行し、submitted/running な run を停止 |
+| `runo runs delete [RUN]` | created/cancelled/failed な run ディレクトリをハード削除 (completed/archived は archive→purge-work を使う) |
+| `runo config show` | 設定表示 |
+| `runo config add-simulator` | シミュレータ追加 (対話型) |
+| `runo config add-launcher` | ランチャー追加 (対話型) |
+| `runo update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
+| `runo knowledge save` | 知見を .runops/insights/ に保存 |
+| `runo knowledge add-fact` | 構造化 fact を .runops/facts.toml に追加 |
+| `runo knowledge list` | 知見一覧表示 |
+| `runo knowledge facts` | 構造化 fact 一覧表示 |
+| `runo knowledge show` | 知見の詳細表示 |
+| `runo knowledge source list` | 外部知識ソース一覧表示 |
+| `runo knowledge source attach` | 外部知識ソースを接続 (git / path) |
+| `runo knowledge source detach` | 外部知識ソースを切断 |
+| `runo knowledge source sync` | 知識ソース同期 + 外部知見取り込み |
+| `runo knowledge source render` | 有効な profile から imports.md を生成 |
+| `runo knowledge source status` | 知識統合の状態表示 |
 
 全コマンドは引数省略時にカレントディレクトリをデフォルトとする。
 
@@ -252,7 +254,7 @@ uv run ruff format --check src/ tests/
 uv run mypy src/
 
 # CLI 実行 (開発中)
-uv run runops --help
+uv run runo --help
 ```
 
 ## 状態遷移
@@ -285,7 +287,7 @@ AI エージェントがシミュレーションを自律的に行うための�
 - **研究意図**: `campaign.toml` (ユーザーが記述)
 - **実験知見 (curated)**: `.runops/insights/` (knowledge save / knowledge source sync で管理)
 - **構造化知識 (curated)**: `.runops/facts.toml` (knowledge add-fact / knowledge facts で管理)
-- **lab notebook (chronological)**: `notes/YYYY-MM-DD.md` (`runops notes append` で時系列追記)
+- **lab notebook (chronological)**: `notes/YYYY-MM-DD.md` (`runo notes append` で時系列追記)
 - **長文レポート**: `notes/reports/<topic>.md` (改稿可)
 
 curated knowledge と lab notebook は **二層構造**:
@@ -301,24 +303,24 @@ curated knowledge と lab notebook は **二層構造**:
 
 ```bash
 # 外部知識ソースの接続
-runops knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
-runops knowledge source attach path local-kb ../hpc-knowledge
+runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
+runo knowledge source attach path local-kb ../hpc-knowledge
 
 # 同期・レンダリング
-runops knowledge source sync
-runops knowledge source render
+runo knowledge source sync
+runo knowledge source render
 
 # 状態確認
-runops knowledge source status
-runops knowledge source list
+runo knowledge source status
+runo knowledge source list
 ```
 
-`runops init` 時に GitHub の `*shared_knowledge*` リポジトリを自動検索し、対話的に接続できる。
-`runops setup` 時は `runops.toml` に設定された知識ソースを自動同期する。
+`runo init` 時に GitHub の `*shared_knowledge*` リポジトリを自動検索し、対話的に接続できる。
+`runo setup` 時は `runops.toml` に設定された知識ソースを自動同期する。
 
 主要コマンド:
-- `runops update-refs` — refs/ リポジトリ更新 + ナレッジインデックス再生成
-- `runops knowledge source attach/detach/sync/render/status` — 外部知識ソース管理
-- `runops knowledge save/list/show` — Markdown 知見の管理
-- `runops knowledge add-fact/facts` — 構造化知識の管理
-- `runops doctor` — 環境検出・保存
+- `runo update-refs` — refs/ リポジトリ更新 + ナレッジインデックス再生成
+- `runo knowledge source attach/detach/sync/render/status` — 外部知識ソース管理
+- `runo knowledge save/list/show` — Markdown 知見の管理
+- `runo knowledge add-fact/facts` — 構造化知識の管理
+- `runo doctor` — 環境検出・保存

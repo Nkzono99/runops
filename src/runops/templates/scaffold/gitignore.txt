@@ -1,10 +1,10 @@
 # Python venv
 .venv/
 
-# runops tool (cloned by runops init)
+# runops tool (cloned by runo init)
 tools/
 
-# Reference repos (cloned by runops init)
+# Reference repos (cloned by runo init)
 refs/
 
 # Auto-generated knowledge indexes (insights/ and facts.toml are tracked)

@@ -1,6 +1,6 @@
 # runs/ ディレクトリ
 
-ここには simulation run が格納される。すべて `runops runs create` / `runops runs sweep` で生成。
+ここには simulation run が格納される。すべて `runo runs create` / `runo runs sweep` で生成。
 
 ## 構造
 
@@ -18,7 +18,7 @@ runs/<path>/Rxxxx/
 - run ディレクトリ (`Rxxxx/`) を手で作らない
 - `manifest.toml` を手動編集しない
 - `input/*`, `submit/job.sh` を直接作らない
-- 状態確認は `runops runs status`、同期は `runops runs sync`
-- 解析は `runops analyze summarize` / `runops analyze collect`
+- 状態確認は `runo runs status`、同期は `runo runs sync`
+- 解析は `runo analyze summarize` / `runo analyze collect`
 - 試行中の図・メモ・一時解析物は `analysis/scratch/` に置く
 - 共有したい図や summary は `analysis/` の curated 出力に昇格する

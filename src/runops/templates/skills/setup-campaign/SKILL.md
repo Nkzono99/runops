@@ -1,6 +1,6 @@
 ---
 name: setup-campaign
-description: Set up campaign.toml from a research theme description. Use after runops init to define hypothesis, variables, and observables.
+description: Set up campaign.toml from a research theme description. Use after runo init to define hypothesis, variables, and observables.
 ---
 
 # campaign.toml をセットアップする
@@ -16,7 +16,7 @@ description: Set up campaign.toml from a research theme description. Use after r
 
 ```bash
 # プロジェクトの現状を把握
-runops context --no-json
+runo context --no-json
 
 # シミュレータ固有のガイド（パラメータ名・物理的意味）
 cat CLAUDE.md   # agent_guide セクションにシミュレータ知識がある
@@ -75,7 +75,7 @@ unit = "V (normalized)"
 2. 記入内容のサマリーを表示する
 3. **`{{ skill_prefix }}note` で経緯を残す** (下記参照)
 4. 次のステップを提案する:
-   - ケースが未作成なら `runops case new <case_name> -s <simulator>` を提案 (cases/<sim>/ に自動生成)
+   - ケースが未作成なら `runo case new <case_name> -s <simulator>` を提案 (cases/<sim>/ に自動生成)
    - ケースが既存なら survey 設計を提案
 
 ## `{{ skill_prefix }}note` で残すべきこと
@@ -92,7 +92,7 @@ campaign 設計の意思決定は raw な状態で `notes/YYYY-MM-DD.md` に残�
 例:
 
 ```bash
-runops notes append "campaign セットアップ" - <<'EOF'
+runo notes append "campaign セットアップ" - <<'EOF'
 Theme: thermal-motion-induced ion depletion (2D PIC).
 Hypothesis: vti が大きいほど plate 下流の枯渇角 alpha が広がる。
 

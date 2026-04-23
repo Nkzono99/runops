@@ -4,14 +4,21 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
-from runops.cli.main import app
+from runops.cli.main import app, runops_app
 
 runner = CliRunner()
 
 
 def test_help_shows_primary_commands() -> None:
-    result = runner.invoke(app, ["--help"])
+    result = runner.invoke(
+        app,
+        ["--help"],
+        env={"COLUMNS": "160", "TERM": "dumb", "NO_COLOR": "1"},
+    )
     assert result.exit_code == 0
+    assert app.info.name == "runo"
+    assert "Preferred command: runo" in result.output
+    assert "Stable alias: runops" in result.output
     for cmd in [
         "init",
         "setup",
@@ -26,6 +33,17 @@ def test_help_shows_primary_commands() -> None:
         "update-refs",
     ]:
         assert cmd in result.output
+
+
+def test_runops_compatibility_app_keeps_legacy_name() -> None:
+    result = runner.invoke(
+        runops_app,
+        ["--help"],
+        env={"COLUMNS": "120", "TERM": "dumb", "NO_COLOR": "1"},
+    )
+    assert result.exit_code == 0
+    assert runops_app.info.name == "runops"
+    assert "Usage: runops" in result.output
 
 
 def test_case_help_shows_grouped_case_commands() -> None:

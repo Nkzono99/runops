@@ -4,6 +4,9 @@ HPC 環境における Slurm ベースのシミュレーション実行管理 CL
 
 run ディレクトリを日常運用の主単位とし、パラメータサーベイ展開・job 投入・状態追跡・provenance 記録・解析補助を一貫して管理します。
 
+日常的な CLI コマンド名は `runo`（ルーノ）です。既存スクリプトとの互換性のため、
+`runops` コマンドも同じ CLI を指す stable alias として残しています。
+
 ## 特徴
 
 - **run 中心の管理**: すべての操作は run ディレクトリ (`runs/.../Rxxxx/`) を基点に行う
@@ -27,14 +30,14 @@ runops はプロジェクトごとにブートストラップインストール�
 
 ```bash
 # プロジェクトディレクトリを作成して初期化 (uv だけあれば OK)
-uvx --from runops runops init
+uvx --from runops runo init
 
 # activate して利用開始
 source .venv/bin/activate
-runops doctor
+runo doctor
 ```
 
-`runops init` が以下を自動的に行います:
+`runo init` が以下を自動的に行います:
 
 1. `.venv/` を作成 (`uv venv`)
 2. `tools/runops/` に runops リポジトリを clone
@@ -46,9 +49,9 @@ runops の更新は `cd tools/runops && git pull` で行えます。
 ### 既存プロジェクトのセットアップ
 
 ```bash
-uvx --from runops runops setup https://github.com/user/my-project.git
+uvx --from runops runo setup https://github.com/user/my-project.git
 source my-project/.venv/bin/activate
-runops doctor
+runo doctor
 ```
 
 ### 開発者向け (runops 自体の開発)
@@ -98,17 +101,17 @@ my-simulation-project/
     facts.toml         # 構造化された知識 (AI 向け machine-readable claims)
     environment.toml   # 実行環境記述 (自動検出)
   notes/               # Lab notebook (append-only, 時系列)
-    YYYY-MM-DD.md      # 日次の作業ログ (`runops notes append` で追記)
+    YYYY-MM-DD.md      # 日次の作業ログ (`runo notes append` で追記)
     reports/           # 長文レポート (改稿可)
     README.md          # 二層 (curated vs lab notebook) の運用規約
 ```
 
-`runops init` が生成する Claude ハーネスは、`.claude/settings.json` と
+`runo init` が生成する Claude ハーネスは、`.claude/settings.json` と
 `.claude/hooks/` により次のようなガードを入れます。
 
 - `manifest.toml`、`runs/**/input/**`、`submit/job.sh`、`work/**`、`SITE.md` などの生成物は直接編集しない
-- `.runops/facts.toml` や `.runops/insights/` は `runops knowledge save` / `add-fact` 経由で更新する
-- `runops runs submit` は `--dry-run` を除き実行前に確認を挟む
+- `.runops/facts.toml` や `.runops/insights/` は `runo knowledge save` / `add-fact` 経由で更新する
+- `runo runs submit` は `--dry-run` を除き実行前に確認を挟む
 
 runops 自体の開発では、Claude ハーネスの定義は
 `src/runops/harness/claude.py` にまとまっています。
@@ -156,10 +159,10 @@ use_slurm_ntasks = true
 
 ### 4. Case の定義
 
-`runops case new` で case を生成し、`cases/<simulator>/<case>/case.toml` を編集します:
+`runo case new` で case を生成し、`cases/<simulator>/<case>/case.toml` を編集します:
 
 ```bash
-runops case new my_case -s my_solver
+runo case new my_case -s my_solver
 ```
 
 生成された `cases/my_solver/my_case/case.toml` の例:
@@ -191,7 +194,7 @@ dt = 1.0e-8
 ### 5. 単一 run の作成
 
 ```bash
-runops runs create my_case --dest runs/cavity/test
+runo runs create my_case --dest runs/cavity/test
 ```
 
 ### 6. パラメータサーベイの実行
@@ -221,7 +224,7 @@ walltime = "12:00:00"
 ```
 
 ```bash
-runops runs sweep runs/cavity/scan
+runo runs sweep runs/cavity/scan
 ```
 
 ### 7. Job の投入
@@ -229,25 +232,25 @@ runops runs sweep runs/cavity/scan
 ```bash
 # cwd の run を投入
 cd runs/cavity/test/R20260327-0001
-runops runs submit
+runo runs submit
 
 # survey 内の全 run を一括投入
 cd runs/cavity/scan
-runops runs submit --all
+runo runs submit --all
 ```
 
 ### 8. 状態の確認
 
 ```bash
 # 単一 run の状態確認
-runops runs status R20260327-0001
+runo runs status R20260327-0001
 
 # Slurm 状態を manifest に同期
-runops runs sync R20260327-0001
+runo runs sync R20260327-0001
 
 # run の一覧表示
-runops runs list
-runops runs list runs/cavity/scan
+runo runs list
+runo runs list runs/cavity/scan
 ```
 
 ## コマンドリファレンス
@@ -256,83 +259,83 @@ runops runs list runs/cavity/scan
 
 | コマンド | 説明 |
 |---------|------|
-| `runops init [SIMS...] [-y]` | プロジェクトの初期化 (対話型がデフォルト) |
-| `runops setup [URL]` | 既存 runops project のセットアップ |
-| `runops doctor [PATH]` | 環境検査 (設定・sbatch・run_id 一意性・環境検出) |
-| `runops context [DIR]` | Agent 向け project context の要約を表示 |
-| `runops config show` | 設定表示 |
-| `runops config add-simulator` | シミュレータ追加 (対話型) |
-| `runops config add-launcher` | ランチャー追加 (対話型) |
-| `runops update` | シミュレータパッケージのアップグレード |
-| `runops update-refs [SIMS...]` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
+| `runo init [SIMS...] [-y]` | プロジェクトの初期化 (対話型がデフォルト) |
+| `runo setup [URL]` | 既存 runops project のセットアップ |
+| `runo doctor [PATH]` | 環境検査 (設定・sbatch・run_id 一意性・環境検出) |
+| `runo context [DIR]` | Agent 向け project context の要約を表示 |
+| `runo config show` | 設定表示 |
+| `runo config add-simulator` | シミュレータ追加 (対話型) |
+| `runo config add-launcher` | ランチャー追加 (対話型) |
+| `runo update` | シミュレータパッケージのアップグレード |
+| `runo update-refs [SIMS...]` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
 
 ### Run 作成・投入
 
 | コマンド | 説明 |
 |---------|------|
-| `runops case new CASE [--minimal] [--survey]` | 新規 case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレートを使用、EMSES では `emu generate -u` を best-effort で自動実行し `[meta.physical]` を埋める) |
-| `runops runs create CASE` | case から単一 run を生成 |
-| `runops runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 一括生成 (`--dry-run` で件数・パラメータ組合せ・概算 core-hour のみ表示) |
-| `runops runs submit [RUN]` | run を sbatch で投入 (`-qn` でキュー上書き、`--afterok` で依存ジョブ指定) |
-| `runops runs submit --all [DIR]` | created な run を一括投入 |
-| `runops runs clone` | run 複製・派生 |
-| `runops runs extend` | スナップショットから継続 run 生成 |
+| `runo case new CASE [--minimal] [--survey]` | 新規 case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレートを使用、EMSES では `emu generate -u` を best-effort で自動実行し `[meta.physical]` を埋める) |
+| `runo runs create CASE` | case から単一 run を生成 |
+| `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 一括生成 (`--dry-run` で件数・パラメータ組合せ・概算 core-hour のみ表示) |
+| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn` でキュー上書き、`--afterok` で依存ジョブ指定) |
+| `runo runs submit --all [DIR]` | created な run を一括投入 |
+| `runo runs clone` | run 複製・派生 |
+| `runo runs extend` | スナップショットから継続 run 生成 |
 
 ### 状態管理・モニタリング
 
 | コマンド | 説明 |
 |---------|------|
-| `runops runs status [RUNS...]` | run の状態確認 (run_id / run dir / survey dir を複数渡してまとめて表示可) |
-| `runops runs sync [RUNS...]` | Slurm 状態を manifest.toml に反映 (bulk 対応: survey 配下の created run + terminal state な run は silent skip) |
-| `runops runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
-| `runops runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 (`--watch` で自動更新) |
-| `runops runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗 (state, step/N, %, last Slurm state) を 1 つの表で表示 |
-| `runops runs history [PATH]` | 投入履歴表示 |
-| `runops runs list [PATHS...]` | run の一覧表示 (複数 PATH 指定可、状態・タグでフィルタ可能) |
+| `runo runs status [RUNS...]` | run の状態確認 (run_id / run dir / survey dir を複数渡してまとめて表示可) |
+| `runo runs sync [RUNS...]` | Slurm 状態を manifest.toml に反映 (bulk 対応: survey 配下の created run + terminal state な run は silent skip) |
+| `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
+| `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 (`--watch` で自動更新) |
+| `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗 (state, step/N, %, last Slurm state) を 1 つの表で表示 |
+| `runo runs history [PATH]` | 投入履歴表示 |
+| `runo runs list [PATHS...]` | run の一覧表示 (複数 PATH 指定可、状態・タグでフィルタ可能) |
 
 ### 解析・整理
 
 | コマンド | 説明 |
 |---------|------|
-| `runops analyze summarize [RUN]` | Adapter による run 解析 summary 生成 |
-| `runops analyze collect [DIR]` | survey 内の全 run から集計データ生成 |
-| `runops analyze plot [DIR]` | survey 集計結果の可視化 (`--recipe` / `--list-recipes` 対応) |
-| `runops runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で安全に停止 |
-| `runops runs archive [RUN]` | run のアーカイブ (completed のみ) |
-| `runops runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
-| `runops runs delete [RUN]` | created / cancelled / failed の run ディレクトリをハード削除 (completed/archived は archive → purge-work を使う) |
+| `runo analyze summarize [RUN]` | Adapter による run 解析 summary 生成 |
+| `runo analyze collect [DIR]` | survey 内の全 run から集計データ生成 |
+| `runo analyze plot [DIR]` | survey 集計結果の可視化 (`--recipe` / `--list-recipes` 対応) |
+| `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で安全に停止 |
+| `runo runs archive [RUN]` | run のアーカイブ (completed のみ) |
+| `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
+| `runo runs delete [RUN]` | created / cancelled / failed の run ディレクトリをハード削除 (completed/archived は archive → purge-work を使う) |
 
 ### Lab notebook (実験ノート)
 
 | コマンド | 説明 |
 |---------|------|
-| `runops notes append TITLE [BODY]` | 今日の `notes/YYYY-MM-DD.md` に timestamped エントリを追記 (`-` または省略で stdin から本文を読む) |
-| `runops notes list [-n N]` | 最近の lab notebook 日付一覧 (新しい順) |
-| `runops notes show [DATE\|today\|latest]` | 指定日 (省略時は today) の lab notebook を表示 |
+| `runo notes append TITLE [BODY]` | 今日の `notes/YYYY-MM-DD.md` に timestamped エントリを追記 (`-` または省略で stdin から本文を読む) |
+| `runo notes list [-n N]` | 最近の lab notebook 日付一覧 (新しい順) |
+| `runo notes show [DATE\|today\|latest]` | 指定日 (省略時は today) の lab notebook を表示 |
 
 `notes/` は curated knowledge (`.runops/insights/`, `facts.toml`) と
 **二層構造** で運用する append-only な実験ノートです。準備フェーズの意思決定、観察、
 仮説、TODO をその場で残し、価値が出てきたら `notes/reports/` の long-form
-レポートを経て `runops knowledge save` / `add-fact` で curated 層に昇格させます。
+レポートを経て `runo knowledge save` / `add-fact` で curated 層に昇格させます。
 
 ### 知識管理
 
 | コマンド | 説明 |
 |---------|------|
-| `runops knowledge save NAME` | 知見を .runops/insights/ に保存 |
-| `runops knowledge list` | 知見一覧表示 |
-| `runops knowledge show NAME` | 知見の詳細表示 |
-| `runops knowledge add-fact CLAIM` | 構造化された知識を facts.toml に追加 |
-| `runops knowledge facts` | local facts と imported candidate facts の一覧表示 |
-| `runops knowledge promote-fact FACT_ID` | candidate fact を local facts.toml に昇格 |
-| `runops knowledge source list` | 外部知識ソース一覧表示 |
-| `runops knowledge source attach TYPE NAME URL` | 外部知識ソースを接続 (git / path) |
-| `runops knowledge source detach NAME` | 外部知識ソースを切断 |
-| `runops knowledge source sync [NAME]` | 知識ソース同期 + insight / fact transport |
-| `runops knowledge source render` | 有効な profile から imports.md を生成 |
-| `runops knowledge source status` | 知識統合の状態表示 |
-| `runops knowledge profile enable SOURCE PROFILE...` | source の profile を有効化して imports.md を更新 |
-| `runops knowledge profile disable SOURCE PROFILE...` | source の profile を無効化して imports.md を更新 |
+| `runo knowledge save NAME` | 知見を .runops/insights/ に保存 |
+| `runo knowledge list` | 知見一覧表示 |
+| `runo knowledge show NAME` | 知見の詳細表示 |
+| `runo knowledge add-fact CLAIM` | 構造化された知識を facts.toml に追加 |
+| `runo knowledge facts` | local facts と imported candidate facts の一覧表示 |
+| `runo knowledge promote-fact FACT_ID` | candidate fact を local facts.toml に昇格 |
+| `runo knowledge source list` | 外部知識ソース一覧表示 |
+| `runo knowledge source attach TYPE NAME URL` | 外部知識ソースを接続 (git / path) |
+| `runo knowledge source detach NAME` | 外部知識ソースを切断 |
+| `runo knowledge source sync [NAME]` | 知識ソース同期 + insight / fact transport |
+| `runo knowledge source render` | 有効な profile から imports.md を生成 |
+| `runo knowledge source status` | 知識統合の状態表示 |
+| `runo knowledge profile enable SOURCE PROFILE...` | source の profile を有効化して imports.md を更新 |
+| `runo knowledge profile disable SOURCE PROFILE...` | source の profile を無効化して imports.md を更新 |
 
 知識管理は三層構造:
 - **source knowledge** — 外部共有知識リポジトリ (`refs/knowledge/` にマウント)
@@ -423,13 +426,13 @@ created --> submitted --> running --> completed
 completed --> archived --> purged
 ```
 
-`runops runs cancel` は `submitted` / `running` の run に対して `scancel` と `sync`
+`runo runs cancel` は `submitted` / `running` の run に対して `scancel` と `sync`
 を組み合わせて発行し、最終状態を `cancelled` に遷移させます。
-`runops runs delete` はライフサイクル外の操作で、`created` / `cancelled` / `failed`
+`runo runs delete` はライフサイクル外の操作で、`created` / `cancelled` / `failed`
 の run ディレクトリを直接削除します (`completed` / `archived` の run は
 `archive` → `purge-work` 経路を使ってください)。
 
-> **Note**: `runops runs sync` は Slurm の観測結果を manifest に反映するため、
+> **Note**: `runo runs sync` は Slurm の観測結果を manifest に反映するため、
 > ポーリング間隔によっては `submitted → completed` のように途中状態を飛び越す遷移が発生します。
 > 詳細は [SPEC.md](SPEC.md) を参照してください。
 
@@ -457,13 +460,13 @@ uv run ruff format --check src/ tests/
 uv run mypy src/
 
 # CLI 実行 (開発中)
-uv run runops --help
+uv run runo --help
 ```
 
 ## ドキュメント
 
-- [AI エージェントではじめる](docs/get-started-with-agent.md) -- `runops init` 済み project を Agent と進める最短導線
-- [AI Agent 運用概念図](docs/project-flow.md) -- `runops init` 後の project を Agent とどう回すかの全体像
+- [AI エージェントではじめる](docs/get-started-with-agent.md) -- `runo init` 済み project を Agent と進める最短導線
+- [AI Agent 運用概念図](docs/project-flow.md) -- `runo init` 後の project を Agent とどう回すかの全体像
 - [src 構成ガイド](docs/src-structure.md) -- `src/runops/` の層構造と adapter / launcher / site 解決の流れ
 - [アーキテクチャ](docs/architecture.md) -- システム設計とモジュール構成
 - [拡張ガイド](docs/extending.md) -- Adapter / Launcher の追加方法

@@ -24,7 +24,7 @@ git tag として記録するスキル。論文投稿・報告書提出・キャ
 
 ```bash
 # 全 run の状態を確認
-runops runs list . 2>/dev/null || echo "no runs found"
+runo runs list . 2>/dev/null || echo "no runs found"
 
 # 未コミットの変更
 git status --porcelain
@@ -57,7 +57,7 @@ git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~30)..HEAD --on
 
 ```bash
 # completed な run をアーカイブ
-runops runs archive --all .
+runo runs archive --all .
 ```
 
 ### 4. タグを作成する
@@ -71,7 +71,7 @@ git tag -a vX.Y -m "<リリースノート概要>"
 ### 5. lab notebook に記録する
 
 ```bash
-runops notes append "release vX.Y" "<リリースノート概要>"
+runo notes append "release vX.Y" "<リリースノート概要>"
 ```
 
 ### 6. push する (ユーザー確認後)

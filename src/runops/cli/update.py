@@ -273,10 +273,10 @@ def update(
     """Upgrade simulator packages in the project .venv.
 
     Examples:
-      runops update emses        # upgrade EMSES and its dependencies
-      runops update              # upgrade all simulators in project
-      runops update --dry-run    # show what would be upgraded
-      runops update --yes        # upgrade without confirmation prompts
+      runo update emses        # upgrade EMSES and its dependencies
+      runo update              # upgrade all simulators in project
+      runo update --dry-run    # show what would be upgraded
+      runo update --yes        # upgrade without confirmation prompts
     """
     # Determine which simulators to update
     if not simulators:
@@ -299,7 +299,7 @@ def update(
     venv_python = _find_venv_python()
     if venv_python is None:
         typer.echo(
-            "No .venv found. Run 'runops init' first, activate an existing "
+            "No .venv found. Run 'runo init' first, activate an existing "
             "venv, or create one with 'uv venv'.",
             err=True,
         )
@@ -316,8 +316,7 @@ def update(
             source = f" from {editable.url}" if editable.url else ""
             typer.echo(f"  {editable.name}{source}", err=True)
         typer.echo(
-            "Continuing will replace them with the package specs used by "
-            "runops update.",
+            "Continuing will replace them with the package specs used by runo update.",
             err=True,
         )
         if not (yes or force) and not typer.confirm("Proceed?", default=False):

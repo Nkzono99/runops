@@ -105,9 +105,9 @@ def save(
     """Save a knowledge insight to .runops/insights/.
 
     Examples:
-      runops knowledge save emses_cfl -t constraint -s emses \\
+      runo knowledge save emses_cfl -t constraint -s emses \\
         -m "dt > 1.5 causes instability with nx=64 grid"
-      echo "Survey results..." | runops knowledge save mag_results -t result
+      echo "Survey results..." | runo knowledge save mag_results -t result
     """
     if insight_type not in INSIGHT_TYPES:
         typer.echo(
@@ -164,8 +164,8 @@ def list_cmd(
     """List knowledge insights.
 
     Examples:
-      runops knowledge list
-      runops knowledge list -s emses -t constraint
+      runo knowledge list
+      runo knowledge list -s emses -t constraint
     """
     root = _find_root()
 
@@ -255,7 +255,7 @@ def show(
     """Show a specific insight.
 
     Examples:
-      runops knowledge show emses_cfl_limit
+      runo knowledge show emses_cfl_limit
     """
     root = _find_root()
     insights_dir = root / ".runops" / "insights"
@@ -289,9 +289,9 @@ def sync(
     imported from sources with ``kind = "project"`` or ``"insights"``.
 
     Examples:
-      runops knowledge source sync
-      runops knowledge source sync shared-lab-knowledge
-      runops knowledge source sync -s emses
+      runo knowledge source sync
+      runo knowledge source sync shared-lab-knowledge
+      runo knowledge source sync -s emses
     """
     root = _find_root()
     config = load_knowledge_config(root)
@@ -450,7 +450,7 @@ def add_fact(
     programmatic use by AI agents.
 
     Examples:
-      runops knowledge add-fact "CFL limit: dt must be < 1.0 for emses" \\
+      runo knowledge add-fact "CFL limit: dt must be < 1.0 for emses" \\
         --type constraint --simulator emses --param-name tmgrid.dt \\
         --scope-text "baseline scan" --confidence high \\
         --evidence-kind run_observation --evidence-ref run:R20260330-0001
@@ -551,8 +551,8 @@ def facts_cmd(
     """List structured facts from local and transported knowledge stores.
 
     Examples:
-      runops knowledge facts
-      runops knowledge facts --scope emses --confidence high
+      runo knowledge facts
+      runo knowledge facts --scope emses --confidence high
     """
     if confidence and confidence not in ("high", "medium", "low"):
         typer.echo(
@@ -706,9 +706,9 @@ def attach(
     """Attach an external knowledge source to this project.
 
     Examples:
-      runops knowledge source attach git shared-kb git@github.com:lab/kb.git
-      runops knowledge source attach path old-project ../old-project --kind project
-      runops knowledge source attach git lab-kb \\
+      runo knowledge source attach git shared-kb git@github.com:lab/kb.git
+      runo knowledge source attach path old-project ../old-project --kind project
+      runo knowledge source attach git lab-kb \\
         https://github.com/lab/kb.git --profiles common,emses
     """
     if source_type not in ("git", "path"):
@@ -796,8 +796,8 @@ def detach(
     """Detach a knowledge source from this project.
 
     Examples:
-      runops knowledge source detach shared-kb
-      runops knowledge source detach shared-kb --keep-files
+      runo knowledge source detach shared-kb
+      runo knowledge source detach shared-kb --keep-files
     """
     root = _find_root()
 
@@ -839,7 +839,7 @@ def render() -> None:
     @import directives for each enabled profile.
 
     Examples:
-      runops knowledge source render
+      runo knowledge source render
     """
     root = _find_root()
     config = load_knowledge_config(root)
@@ -863,7 +863,7 @@ def status_cmd() -> None:
     """Show knowledge integration status.
 
     Examples:
-      runops knowledge source status
+      runo knowledge source status
     """
     root = _find_root()
     config = load_knowledge_config(root)
@@ -873,7 +873,7 @@ def status_cmd() -> None:
         typer.echo("Knowledge integration: not configured")
         typer.echo(
             "  Add [knowledge] section to runops.toml"
-            " or use 'runops knowledge source attach'."
+            " or use 'runo knowledge source attach'."
         )
     else:
         status = "enabled" if config.enabled else "disabled"
@@ -896,9 +896,7 @@ def status_cmd() -> None:
     if imports_path.is_file():
         typer.echo(f"\n  imports.md: {imports_path.relative_to(root)} (exists)")
     else:
-        typer.echo(
-            "\n  imports.md: not generated (run 'runops knowledge source render')"
-        )
+        typer.echo("\n  imports.md: not generated (run 'runo knowledge source render')")
 
 
 def _validate_requested_profiles(

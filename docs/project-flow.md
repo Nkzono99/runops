@@ -3,7 +3,7 @@
 > このファイルは `python scripts/generate_agent_project_flow.py` で生成しています。
 > 標準の再生成手順は `python scripts/render_diagrams_in_docker.py` です。
 
-このガイドは、`runops init` で生成された project を人間と AI Agent がどう運用していくかを
+このガイドは、`runo init` で生成された project を人間と AI Agent がどう運用していくかを
 概念図としてまとめたものです。
 
 ポイントは、runops の project を単なる directory 群ではなく、
@@ -20,9 +20,9 @@
 | `refs/` | 外部知識と simulator docs | Agent が simulator 固有知識や cookbook を参照する入口。 |
 | `.runops/insights/` と `facts.toml` | 学習結果の蓄積 | 解析後に得られた知見を次の設計へ戻すための project memory。 |
 
-## `runops init` 後の project と Agent の見る世界
+## `runo init` 後の project と Agent の見る世界
 
-![runops init 後の project と Agent の見る世界](figures/agent-project-flow/init-world.png)
+![runo init 後の project と Agent の見る世界](figures/agent-project-flow/init-world.png)
 
 ## AI Agent 前提の運用ループ
 
@@ -34,7 +34,7 @@
 
 ## 読み方の要点
 
-- `runops init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。
+- `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。
 - `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。
 - `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。
 - 解析後の結果は `insight` や `fact` として `.runops/` に戻すことで、次の設計に再利用できます。

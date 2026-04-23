@@ -11,35 +11,35 @@ user-invocable: false
 ## 現在地を把握する
 
 ```bash
-runops context --json      # project / campaign / runs / failures の概要
-runops runs list           # run 一覧
-runops runs list runs/a runs/b  # 複数 PATH 指定
-runops runs jobs           # submitted/running のジョブ一覧
-runops runs jobs --all     # 全 run のジョブ情報
-runops runs jobs -w 30     # 30 秒ごとに自動更新
-runops runs dashboard runs/<survey>     # 複数 run の進捗 (state, step/N, %, slurm)
-runops runs dashboard runs/<survey> -w 30
-runops runs dashboard runs/<survey> --all  # completed/failed も表示
-runops runs history        # 投入履歴 (最新20件)
-runops runs history -n 0   # 全件
+runo context --json      # project / campaign / runs / failures の概要
+runo runs list           # run 一覧
+runo runs list runs/a runs/b  # 複数 PATH 指定
+runo runs jobs           # submitted/running のジョブ一覧
+runo runs jobs --all     # 全 run のジョブ情報
+runo runs jobs -w 30     # 30 秒ごとに自動更新
+runo runs dashboard runs/<survey>     # 複数 run の進捗 (state, step/N, %, slurm)
+runo runs dashboard runs/<survey> -w 30
+runo runs dashboard runs/<survey> --all  # completed/failed も表示
+runo runs history        # 投入履歴 (最新20件)
+runo runs history -n 0   # 全件
 ```
 
 ## Case を作る
 
 ```bash
 # simulator 指定で cases/<sim>/ 以下に自動生成
-runops case new my_case -s emses
+runo case new my_case -s emses
 # cases/<sim>/ 以下なら simulator を自動検出
-cd cases/emses && runops case new my_case
+cd cases/emses && runo case new my_case
 # 小さな bundled テンプレートで生成 (refs/ の rich テンプレートを使わない)
-runops case new my_case -s emses --minimal
+runo case new my_case -s emses --minimal
 # survey.toml stub も同時生成
-runops case new my_case -s emses --survey
+runo case new my_case -s emses --survey
 # 生成先を明示指定
-runops case new my_case -s emses -d /path/to/dest
+runo case new my_case -s emses -d /path/to/dest
 ```
 
-EMSES の場合、`runops case new` は best-effort で `emu generate -u` を呼んで
+EMSES の場合、`runo case new` は best-effort で `emu generate -u` を呼んで
 生成された `plasma.toml` の `[meta.physical]` を埋める (`emu` が PATH に
 入っていなければ silent skip)。
 
@@ -47,20 +47,20 @@ EMSES の場合、`runops case new` は best-effort で `emu generate -u` を呼
 
 ```bash
 # case から単一 run を生成 (cwd に生成)
-cd runs/test/basic && runops runs create my_case
+cd runs/test/basic && runo runs create my_case
 # 生成先を指定
-runops runs create my_case --dest runs/test/basic
+runo runs create my_case --dest runs/test/basic
 ```
 
 ## Survey を展開する
 
 ```bash
 # survey.toml から全 run を生成
-runops runs sweep runs/sheath/angle_scan
+runo runs sweep runs/sheath/angle_scan
 # cwd が survey ディレクトリなら引数省略可
-cd runs/sheath/angle_scan && runops runs sweep
+cd runs/sheath/angle_scan && runo runs sweep
 # 生成せずに件数・パラメータ組合せ・概算 core-hour だけ確認
-runops runs sweep runs/sheath/angle_scan --dry-run
+runo runs sweep runs/sheath/angle_scan --dry-run
 ```
 
 ## Run を投入する
@@ -68,107 +68,107 @@ runops runs sweep runs/sheath/angle_scan --dry-run
 ```bash
 # 個別 run
 cd runs/test/basic/R20260330-0001
-runops runs submit
-runops runs submit -qn compute       # queue 指定
-runops runs submit --dry-run          # 確認のみ
+runo runs submit
+runo runs submit -qn compute       # queue 指定
+runo runs submit --dry-run          # 確認のみ
 
 # survey 全体
 cd runs/sheath/angle_scan
-runops runs submit --all
-runops runs submit --all -qn compute
+runo runs submit --all
+runo runs submit --all -qn compute
 ```
 
 ## 状態確認と同期
 
 ```bash
-runops runs status                    # cwd の run の状態 (manifest 更新なし)
-runops runs status R20260330-0001 R20260330-0002  # 複数を一気に
-runops runs status runs/sheath/angle_scan         # survey 配下を一括で
-runops runs sync                      # Slurm 状態を manifest に反映
-runops runs sync runs/sheath/angle_scan           # survey 一括 sync
+runo runs status                    # cwd の run の状態 (manifest 更新なし)
+runo runs status R20260330-0001 R20260330-0002  # 複数を一気に
+runo runs status runs/sheath/angle_scan         # survey 配下を一括で
+runo runs sync                      # Slurm 状態を manifest に反映
+runo runs sync runs/sheath/angle_scan           # survey 一括 sync
                                                   # (created な run は silent skip)
 ```
 
 ## ログ
 
 ```bash
-runops runs log            # stdout (デフォルト20行)
-runops runs log -e         # stderr
-runops runs log -n 100     # 行数指定
-runops runs log -f         # follow (tail -f 相当)
+runo runs log            # stdout (デフォルト20行)
+runo runs log -e         # stderr
+runo runs log -n 100     # 行数指定
+runo runs log -f         # follow (tail -f 相当)
 ```
 
 ## Clone / Extend
 
 ```bash
 # clone
-runops runs clone --dest runs/test/variant
-runops runs clone --set dt=0.5e-8 --set nx=128
+runo runs clone --dest runs/test/variant
+runo runs clone --set dt=0.5e-8 --set nx=128
 
 # 完了 run から continuation
-runops runs extend
-runops runs extend --nstep 200000
-runops runs extend --run         # 生成して即投入
+runo runs extend
+runo runs extend --nstep 200000
+runo runs extend --run         # 生成して即投入
 ```
 
 ## 解析
 
 ```bash
-runops analyze summarize                          # run の要約
-runops analyze collect runs/sheath/angle_scan     # survey 集計 artifacts (CSV/JSON/report)
-runops analyze plot runs/sheath/angle_scan --list-columns
-runops analyze plot runs/sheath/angle_scan --list-recipes
-runops analyze plot runs/sheath/angle_scan --recipe completion-vs-dt
-runops analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux
-runops analyze export runs/sheath/angle_scan --paper draft-a
+runo analyze summarize                          # run の要約
+runo analyze collect runs/sheath/angle_scan     # survey 集計 artifacts (CSV/JSON/report)
+runo analyze plot runs/sheath/angle_scan --list-columns
+runo analyze plot runs/sheath/angle_scan --list-recipes
+runo analyze plot runs/sheath/angle_scan --recipe completion-vs-dt
+runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux
+runo analyze export runs/sheath/angle_scan --paper draft-a
 ```
 
 ## 知見管理
 
 ```bash
 # 人向け知見
-runops knowledge save name -t result -s emses -m "..."
-runops knowledge save name -t constraint -s emses --tags "stability,cfl" -m "..."
-runops knowledge list
-runops knowledge list -s emses -t constraint
+runo knowledge save name -t result -s emses -m "..."
+runo knowledge save name -t constraint -s emses --tags "stability,cfl" -m "..."
+runo knowledge list
+runo knowledge list -s emses -t constraint
 
 # 機械可読 fact
-runops knowledge add-fact "claim" -t constraint -s emses \
+runo knowledge add-fact "claim" -t constraint -s emses \
   --param-name tmgrid.dt --scope-text "baseline scan" \
   --evidence-kind run_observation --evidence-ref run:R20260330-0001 \
   -c high --tags "stability,cfl"
-runops knowledge facts
-runops knowledge facts --local-only
-runops knowledge facts --scope emses --tag stability -c medium
-runops knowledge promote-fact shared:f004
+runo knowledge facts
+runo knowledge facts --local-only
+runo knowledge facts --scope emses --tag stability -c medium
+runo knowledge promote-fact shared:f004
 
 # 外部 knowledge source
-runops knowledge source attach path other-project ../other-project --kind project
-runops knowledge source attach git shared-kb https://github.com/u/repo.git
-runops knowledge source attach path analysis-notes ../shared-notes --kind insights
-runops knowledge source detach other-project
-runops knowledge source list
-runops knowledge source sync                        # 接続先から知見をインポート
-runops knowledge source sync -s emses
+runo knowledge source attach path other-project ../other-project --kind project
+runo knowledge source attach git shared-kb https://github.com/u/repo.git
+runo knowledge source attach path analysis-notes ../shared-notes --kind insights
+runo knowledge source detach other-project
+runo knowledge source list
+runo knowledge source sync                        # 接続先から知見をインポート
+runo knowledge source sync -s emses
 ```
 
 ## 停止・整理・削除
 
 ```bash
 # 実行中の run を安全に停止 (scancel + sync を一回で)
-runops runs cancel             # submitted/running の run を停止
-runops runs cancel --yes       # 確認スキップ
+runo runs cancel             # submitted/running の run を停止
+runo runs cancel --yes       # 確認スキップ
 
 # completed → archived → purged の通常フロー
-runops runs archive            # completed run をアーカイブ
-runops runs archive --yes      # 確認スキップ
-runops runs purge-work         # work/ の不要ファイル削除 (archived のみ)
-runops runs purge-work --yes
+runo runs archive            # completed run をアーカイブ
+runo runs archive --yes      # 確認スキップ
+runo runs purge-work         # work/ の不要ファイル削除 (archived のみ)
+runo runs purge-work --yes
 
 # created/cancelled/failed の run ディレクトリをハード削除
 # (completed/archived には使えない — archive → purge-work を使うこと)
-runops runs delete             # 確認あり
-runops runs delete --yes       # 確認スキップ
+runo runs delete             # 確認あり
+runo runs delete --yes       # 確認スキップ
 ```
 
 ## Cookbook を参照する
@@ -198,7 +198,7 @@ fragment は `[merge]` と `[compatibility]` を確認してから使う。
 ## 環境
 
 ```bash
-runops doctor             # 環境検査
-runops update-refs        # refs/ 更新 + cookbook/ナレッジ再生成
-runops config show        # 設定表示
+runo doctor             # 環境検査
+runo update-refs        # refs/ 更新 + cookbook/ナレッジ再生成
+runo config show        # 設定表示
 ```

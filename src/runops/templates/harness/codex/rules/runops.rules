@@ -5,10 +5,20 @@
 # high-risk command prefixes that should not be silently escalated.
 #
 # Codex execpolicy is prefix-based and prompt decisions win over allow when a
-# command matches both.  Do not add a broad ["runops", "runs", "submit"] prompt
-# here: it would also match dry-runs and make the safe confirmation workflow
-# unusable.  Instead, keep dry-run as the canonical safe prefix and enumerate
-# resource-spending submit forms below.
+# command matches both.  Do not add a broad ["runo", "runs", "submit"] or
+# ["runops", "runs", "submit"] prompt here: it would also match dry-runs and
+# make the safe confirmation workflow unusable.  Instead, keep dry-run as the
+# canonical safe prefix and enumerate resource-spending submit forms below.
+
+prefix_rule(
+    pattern = ["runo", "runs", "submit", "--dry-run"],
+    decision = "allow",
+    justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
+    match = [
+        "runo runs submit --dry-run R20260419-0001",
+        "runo runs submit --dry-run --all runs/survey",
+    ],
+)
 
 prefix_rule(
     pattern = ["runops", "runs", "submit", "--dry-run"],
@@ -21,12 +31,35 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["uv", "run", "runo", "runs", "submit", "--dry-run"],
+    decision = "allow",
+    justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
+    match = [
+        "uv run runo runs submit --dry-run R20260419-0001",
+        "uv run runo runs submit --dry-run --all runs/survey",
+    ],
+)
+
+prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit", "--dry-run"],
     decision = "allow",
     justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
     match = [
         "uv run runops runs submit --dry-run R20260419-0001",
         "uv run runops runs submit --dry-run --all runs/survey",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runo", "runs", "submit", "--all"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runo runs submit --all runs/survey",
+    ],
+    not_match = [
+        "runo runs submit --dry-run --all runs/survey",
+        "runo runs status R20260419-0001",
     ],
 )
 
@@ -44,11 +77,29 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["uv", "run", "runo", "runs", "submit", "--all"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runo runs submit --all runs/survey",
+    ],
+)
+
+prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit", "--all"],
     decision = "prompt",
     justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
     match = [
         "uv run runops runs submit --all runs/survey",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runo", "runs", "submit", "-qn"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runo runs submit -qn gr10451a R20260419-0001",
     ],
 )
 
@@ -62,11 +113,29 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["uv", "run", "runo", "runs", "submit", "-qn"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runo runs submit -qn gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit", "-qn"],
     decision = "prompt",
     justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
     match = [
         "uv run runops runs submit -qn gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runo", "runs", "submit", "--queue-name"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runo runs submit --queue-name gr10451a R20260419-0001",
     ],
 )
 
@@ -80,11 +149,29 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["uv", "run", "runo", "runs", "submit", "--queue-name"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runo runs submit --queue-name gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit", "--queue-name"],
     decision = "prompt",
     justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
     match = [
         "uv run runops runs submit --queue-name gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runo", "runs", "submit", "--qos"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runo runs submit --qos gr10451a R20260419-0001",
     ],
 )
 
@@ -98,11 +185,29 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["uv", "run", "runo", "runs", "submit", "--qos"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runo runs submit --qos gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit", "--qos"],
     decision = "prompt",
     justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
     match = [
         "uv run runops runs submit --qos gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runo", "runs", "submit", "--afterok"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runo runs submit --afterok 12345 R20260419-0001",
     ],
 )
 
@@ -116,6 +221,15 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["uv", "run", "runo", "runs", "submit", "--afterok"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runo runs submit --afterok 12345 R20260419-0001",
+    ],
+)
+
+prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit", "--afterok"],
     decision = "prompt",
     justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
@@ -125,11 +239,29 @@ prefix_rule(
 )
 
 prefix_rule(
+    pattern = ["runo", "runs", "purge-work"],
+    decision = "prompt",
+    justification = "Purging work/ deletes generated run outputs.",
+    match = [
+        "runo runs purge-work R20260419-0001",
+    ],
+)
+
+prefix_rule(
     pattern = ["runops", "runs", "purge-work"],
     decision = "prompt",
     justification = "Purging work/ deletes generated run outputs.",
     match = [
         "runops runs purge-work R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runo", "runs", "delete"],
+    decision = "prompt",
+    justification = "Deleting a run removes its directory.",
+    match = [
+        "runo runs delete R20260419-0001",
     ],
 )
 

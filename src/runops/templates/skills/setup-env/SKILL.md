@@ -8,9 +8,9 @@ description: Set up or repair the project Python environment. Use when initializ
 ## 方法 1: ブートストラップ (新規プロジェクト)
 
 ```bash
-uvx --from runops runops init
+uvx --from runops runo init
 source .venv/bin/activate
-runops doctor
+runo doctor
 ```
 
 ## 方法 2: 手動セットアップ (既存プロジェクト)
@@ -21,7 +21,7 @@ mkdir -p tools && git clone https://github.com/Nkzono99/runops.git tools/runops
 uv pip install -e ./tools/runops
 {{ pip_install_line }}
 source .venv/bin/activate
-runops doctor
+runo doctor
 ```
 
 ## 注意

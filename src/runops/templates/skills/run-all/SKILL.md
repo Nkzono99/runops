@@ -7,24 +7,24 @@ description: Generate and submit all runs from a survey. Use when ready to launc
 
 ## 手順
 
-1. `runops runs sweep` で run 生成
-2. `runops runs list` で確認
+1. `runo runs sweep` で run 生成
+2. `runo runs list` で確認
 3. run 数と queue を報告して承認を取る
-4. `runops runs submit --all` で投入
+4. `runo runs submit --all` で投入
 
 ```bash
-runops runs sweep $ARGUMENTS
-runops runs list $ARGUMENTS
+runo runs sweep $ARGUMENTS
+runo runs list $ARGUMENTS
 # → run 数と queue を確認してから投入
 cd $ARGUMENTS
-runops runs submit --all -qn <queue>
+runo runs submit --all -qn <queue>
 ```
 
 ## 注意
 
 - `run --all` は高コスト操作。事前に plan を出す
 - 初回の大規模 survey は承認を取る
-- dry-run で確認: `runops runs submit --dry-run --all`
+- dry-run で確認: `runo runs submit --dry-run --all`
 
 ## `{{ skill_prefix }}note` で残すべきこと
 
@@ -37,7 +37,7 @@ runops runs submit --all -qn <queue>
 - 投入前のスナップショット commit hash
 
 ```bash
-runops notes append "Series A 全投入" - <<'EOF'
+runo notes append "Series A 全投入" - <<'EOF'
 runs/series_A_flat_plate/ から 10 run, gr20001a へ投入.
 job_id: 4567890..4567899. snapshot commit: 53a7e62.
 smoke は R20260330-0001/-0010/-0019 (両端と中央).

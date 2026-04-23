@@ -29,8 +29,8 @@ def history(
     Lists runs sorted by submission time (most recent first).
 
     Examples:
-      runops runs history           # last 20 submissions
-      runops runs history -n 0      # all submissions
+      runo runs history           # last 20 submissions
+      runo runs history -n 0      # all submissions
     """
     search_dir = (path or Path.cwd()).resolve()
 

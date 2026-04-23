@@ -8,7 +8,7 @@
 
 {{ rule_heading | default("#") }}# いつフィードバックするか
 
-- `runops <command>` がクラッシュした、または unhelpful なエラーで止まった
+- `runo <command>` がクラッシュした、または unhelpful なエラーで止まった
 - コマンド体系や help が実態と噛み合っていない
 - 「もう一段抽象化してあれば手作業が減る」ワークフローが繰り返し出てきた
 - `CLAUDE.md` / skill / rule の記述と実装が食い違っている
@@ -45,7 +45,7 @@
    <いま何が起きているか / エラーメッセージ>
 
    ## 環境
-   - runops version: $(runops --version 2>/dev/null || echo unknown)
+   - runops version: $(runo --version 2>/dev/null || echo unknown)
    - OS: $(uname -srm)
    - simulator: <該当 adapter 名 / バージョン>
    - 関連 run: <run_id があれば>
@@ -56,7 +56,7 @@
    )"
    ```
 
-3. 投げた issue の URL を `notes/YYYY-MM-DD.md` (`runops notes append`) に
+3. 投げた issue の URL を `notes/YYYY-MM-DD.md` (`runo notes append`) に
    記録しておく。後から「あのとき投げた issue」で辿れるようにする。
 
 {{ rule_heading | default("#") }}# 軽微な修正は直接 PR でもよい

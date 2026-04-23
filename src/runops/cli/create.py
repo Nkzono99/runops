@@ -36,14 +36,14 @@ def create(
     """Create a run in the current directory.
 
     Examples:
-      cd runs/experiment && runops runs create flat_surface
+      cd runs/experiment && runo runs create flat_surface
     """
     target_dir = (dest or Path.cwd()).resolve()
 
     if case_name == "survey" and (target_dir / "survey.toml").is_file():
         typer.echo(
-            "Error: 'runops runs create survey' has been removed. "
-            "Use 'runops runs sweep [DIR]' instead.",
+            "Error: 'runo runs create survey' has been removed. "
+            "Use 'runo runs sweep [DIR]' instead.",
             err=True,
         )
         raise typer.Exit(code=1)
