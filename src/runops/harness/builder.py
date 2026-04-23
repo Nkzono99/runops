@@ -5,7 +5,9 @@ The builder renders every harness-managed file (``CLAUDE.md``, ``AGENTS.md``,
 ``.vscode/settings.json``, ``.codex/*``, ``.agents/skills/*``,
 ``cases/CLAUDE.md``, ``cases/AGENTS.md``, ``runs/CLAUDE.md``,
 ``runs/AGENTS.md``) into an in-memory mapping of
-``relative_path -> rendered_content``.
+``relative_path -> rendered_content``. The scaffolded ``.gitignore`` is also
+harness-managed, but through a dedicated block-based workflow so user-owned
+ignore rules can live outside the managed section.
 
 ``runops init`` iterates the mapping and writes each file (``_write_if_missing``),
 then persists template hashes to ``.runops/harness.lock``.  ``runops update-harness``
@@ -42,12 +44,15 @@ RULE_WORKFLOW = ".claude/rules/runops-workflow.md"
 RULE_PLAN_BEFORE_ACT = ".claude/rules/plan-before-act.md"
 RULE_COOKBOOK = ".claude/rules/cookbook.md"
 RULE_UPSTREAM_FEEDBACK = ".claude/rules/upstream-feedback.md"
+GITIGNORE_PATH = ".gitignore"
 
 # Codex-side outputs (see runops.harness.codex for rationale).
 CODEX_CONFIG = ".codex/config.toml"
 CODEX_README = ".codex/README.md"
 CODEX_RULES = ".codex/rules/runops.rules"
 AGENTS_SKILLS_PREFIX = ".agents/skills/"
+GITIGNORE_MANAGED_START = "# >>> runops managed (auto-updated by runo update-harness)"
+GITIGNORE_MANAGED_END = "# <<< runops managed"
 
 _CLAUDE_MD_TEMPLATE = "harness/claude/CLAUDE.md.j2"
 _AGENTS_MD_TEMPLATE = "harness/codex/AGENTS.md.j2"
@@ -58,6 +63,7 @@ _RULE_PLAN_BEFORE_ACT_TEMPLATE = "harness/claude/rules/plan-before-act.md"
 _RULE_COOKBOOK_TEMPLATE = "harness/claude/rules/cookbook.md.j2"
 _RULE_UPSTREAM_FEEDBACK_TEMPLATE = "harness/claude/rules/upstream-feedback.md.j2"
 _VSCODE_SETTINGS_TEMPLATE = "scaffold/vscode_settings.json"
+_GITIGNORE_TEMPLATE = "scaffold/gitignore.txt"
 
 # Files that update-harness is allowed to touch.  Any other file under the
 # project root (campaign.toml, cases/**, runs/**, etc.) is user-owned and
@@ -67,6 +73,7 @@ _ALL_HARNESS_PREFIXES: tuple[str, ...] = (
     AGENTS_MD,
     CLAUDE_SETTINGS,
     VSCODE_SETTINGS,
+    GITIGNORE_PATH,
     CASES_CLAUDE_MD,
     RUNS_CLAUDE_MD,
     CASES_AGENTS_MD,
@@ -110,6 +117,87 @@ def hash_file(path: Path) -> str | None:
         return hash_text(path.read_text(encoding="utf-8"))
     except (FileNotFoundError, OSError, UnicodeDecodeError):
         return None
+
+
+def build_managed_gitignore_block() -> str:
+    """Return the runops-managed ``.gitignore`` block."""
+    from runops.templates import load_static
+
+    block = load_static(_GITIGNORE_TEMPLATE).rstrip("\n")
+    return f"{GITIGNORE_MANAGED_START}\n{block}\n{GITIGNORE_MANAGED_END}\n"
+
+
+def build_gitignore_file(existing_text: str = "") -> str:
+    """Return a ``.gitignore`` that appends the managed block to existing text."""
+    managed_block = build_managed_gitignore_block()
+    prefix = existing_text.rstrip("\n")
+    if not prefix:
+        return managed_block
+    return f"{prefix}\n\n{managed_block}"
+
+
+def extract_managed_gitignore_block(text: str) -> str | None:
+    """Return the managed ``.gitignore`` block when exactly one valid block exists."""
+    lines = text.splitlines(keepends=True)
+    start_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if line.rstrip("\n") == GITIGNORE_MANAGED_START
+    ]
+    end_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if line.rstrip("\n") == GITIGNORE_MANAGED_END
+    ]
+    if len(start_indexes) != 1 or len(end_indexes) != 1:
+        return None
+
+    start = start_indexes[0]
+    end = end_indexes[0]
+    if start >= end:
+        return None
+    return "".join(lines[start : end + 1])
+
+
+def hash_managed_gitignore_block(text: str) -> str | None:
+    """Return the managed-block hash from ``.gitignore``, if present."""
+    block = extract_managed_gitignore_block(text)
+    if block is None:
+        return None
+    return hash_text(block)
+
+
+def replace_managed_gitignore_block(text: str) -> str | None:
+    """Replace the existing managed ``.gitignore`` block in ``text``."""
+    lines = text.splitlines(keepends=True)
+    start_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if line.rstrip("\n") == GITIGNORE_MANAGED_START
+    ]
+    end_indexes = [
+        index
+        for index, line in enumerate(lines)
+        if line.rstrip("\n") == GITIGNORE_MANAGED_END
+    ]
+    if len(start_indexes) != 1 or len(end_indexes) != 1:
+        return None
+
+    start = start_indexes[0]
+    end = end_indexes[0]
+    if start >= end:
+        return None
+
+    updated = "".join(
+        [
+            *lines[:start],
+            build_managed_gitignore_block(),
+            *lines[end + 1 :],
+        ]
+    )
+    if updated and not updated.endswith("\n"):
+        updated += "\n"
+    return updated
 
 
 # ---------------------------------------------------------------------------

@@ -194,6 +194,7 @@ def test_harness_prefixes_include_agents_and_codex() -> None:
     assert is_harness_path(".codex/README.md")
     assert is_harness_path(".codex/rules/runops.rules")
     assert is_harness_path(".vscode/settings.json")
+    assert is_harness_path(".gitignore")
     assert is_harness_path(".agents/skills/new-case/SKILL.md")
     assert is_harness_path("cases/AGENTS.md")
     assert is_harness_path("runs/AGENTS.md")

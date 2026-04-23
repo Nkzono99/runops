@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -13,7 +14,9 @@ from typer.testing import CliRunner
 import runops.cli.update_harness as update_harness_module
 from runops.cli.main import app
 from runops.harness.builder import (
+    GITIGNORE_PATH,
     HARNESS_LOCK_PATH,
+    build_managed_gitignore_block,
     hash_text,
     load_harness_lock,
     save_harness_lock,
@@ -62,6 +65,7 @@ class TestUpdateHarnessBasic:
         assert ".agents/skills/new-case/SKILL.md" in lock
         assert "cases/AGENTS.md" in lock
         assert "runs/AGENTS.md" in lock
+        assert GITIGNORE_PATH in lock
 
     def test_overwrites_unedited_files(self, tmp_path: Path) -> None:
         """Files matching their lock hash are silently overwritten."""
@@ -198,6 +202,46 @@ class TestUpdateHarnessBasic:
         lock = load_harness_lock(tmp_path)
         assert lock["CLAUDE.md"] == hash_text("# Custom\n")
 
+    def test_gitignore_updates_managed_block_in_place(self, tmp_path: Path) -> None:
+        """update-harness refreshes only the managed gitignore block."""
+        _init_project(tmp_path)
+        gitignore_path = tmp_path / GITIGNORE_PATH
+        old_block = build_managed_gitignore_block().replace("runs/**/status/\n", "")
+        gitignore_path.write_text(
+            f"# custom-before/\n\n{old_block}\ncustom-after/\n",
+            encoding="utf-8",
+        )
+
+        lock = load_harness_lock(tmp_path)
+        lock[GITIGNORE_PATH] = hash_text(old_block)
+        save_harness_lock(tmp_path, lock)
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert ".gitignore" in result.output
+        updated = gitignore_path.read_text(encoding="utf-8")
+        assert "# custom-before/" in updated
+        assert "custom-after/" in updated
+        assert build_managed_gitignore_block() in updated
+        assert old_block not in updated
+        assert not (tmp_path / ".gitignore.new").exists()
+
+    def test_gitignore_without_managed_block_writes_new(self, tmp_path: Path) -> None:
+        """Existing gitignore without the managed block is preserved via .new."""
+        _init_project(tmp_path)
+        gitignore_path = tmp_path / GITIGNORE_PATH
+        gitignore_path.write_text("# custom-only\ncache/\n", encoding="utf-8")
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert ".gitignore.new" in result.output
+        assert gitignore_path.read_text(encoding="utf-8") == "# custom-only\ncache/\n"
+        new_content = (tmp_path / ".gitignore.new").read_text(encoding="utf-8")
+        assert new_content.startswith("# custom-only\ncache/\n")
+        assert build_managed_gitignore_block() in new_content
+
     def test_only_filters_paths(self, tmp_path: Path) -> None:
         """--only limits which files are processed."""
         _init_project(tmp_path)
@@ -330,8 +374,8 @@ class TestUpdateHarnessReexec:
         monkeypatch.setattr(
             sys, "argv", ["runops", "update-harness", "/tmp/p", "--force"]
         )
-        monkeypatch.setattr(update_harness_module.sys, "executable", "/usr/bin/python3")
-        monkeypatch.setattr(update_harness_module.os, "execvpe", fake_exec)
+        monkeypatch.setattr(sys, "executable", "/usr/bin/python3")
+        monkeypatch.setattr(os, "execvpe", fake_exec)
 
         with pytest.raises(RuntimeError, match="exec called"):
             update_harness_module._restart_with_skip_pull()

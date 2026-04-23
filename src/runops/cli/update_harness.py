@@ -2,9 +2,10 @@
 
 ``runo update-harness`` re-renders all harness-managed templates (CLAUDE.md,
 AGENTS.md, .claude/skills/, .claude/rules/, .claude/settings.json,
-.vscode/settings.json, etc.) from the current version of runops and writes
-them into the project. It also backfills the visible ``notes/`` and
-``materials/`` workspace scaffold when those paths are missing.
+.vscode/settings.json, the managed block inside ``.gitignore``, etc.) from
+the current version of runops and writes them into the project. It also
+backfills the visible ``notes/`` and ``materials/`` workspace scaffold when
+those paths are missing.
 
 Collision detection:  If the on-disk file matches the hash recorded in
 ``.runops/harness.lock``, it is assumed to be unedited and is silently
@@ -37,10 +38,16 @@ from runops.cli.init.scaffold import (
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
 from runops.harness.builder import (
+    GITIGNORE_PATH,
+    build_gitignore_file,
     build_harness_bundle,
+    build_managed_gitignore_block,
     hash_file,
+    hash_managed_gitignore_block,
+    hash_text,
     load_harness_lock,
     read_upstream_feedback_setting,
+    replace_managed_gitignore_block,
     save_harness_lock,
 )
 
@@ -269,6 +276,18 @@ def _workspace_target_requested(
     )
 
 
+def _harness_path_requested(
+    only_prefixes: list[str] | None,
+    rel_path: str,
+) -> bool:
+    """Return whether ``rel_path`` should be processed by update-harness."""
+    if only_prefixes is None:
+        return True
+    return any(
+        rel_path == prefix or rel_path.startswith(prefix) for prefix in only_prefixes
+    )
+
+
 def _missing_workspace_scaffold(
     project_dir: Path,
     *,
@@ -414,10 +433,7 @@ def update_harness(
     updated_lock = dict(lock)
 
     for rel_path in sorted(harness.files):
-        if only_prefixes and not any(
-            rel_path == prefix or rel_path.startswith(prefix)
-            for prefix in only_prefixes
-        ):
+        if not _harness_path_requested(only_prefixes, rel_path):
             continue
 
         full_path = project_dir / rel_path
@@ -471,6 +487,63 @@ def update_harness(
                 new_path.write_text(content, encoding="utf-8")
                 updated_lock[rel_path] = template_hash
             written_new.append(rel_path)
+
+    if _harness_path_requested(only_prefixes, GITIGNORE_PATH):
+        gitignore_path = project_dir / GITIGNORE_PATH
+        managed_block = build_managed_gitignore_block()
+        managed_hash = hash_text(managed_block)
+        locked_hash = lock.get(GITIGNORE_PATH)
+        new_path = gitignore_path.parent / (gitignore_path.name + ".new")
+
+        if adopt and not gitignore_path.exists():
+            if not dry_run:
+                gitignore_path.write_text(build_gitignore_file(), encoding="utf-8")
+                updated_lock[GITIGNORE_PATH] = managed_hash
+            overwritten.append(GITIGNORE_PATH)
+        elif gitignore_path.exists():
+            try:
+                disk_text = gitignore_path.read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                disk_text = ""
+
+            disk_hash = hash_managed_gitignore_block(disk_text)
+            if adopt and disk_hash is not None:
+                updated_lock[GITIGNORE_PATH] = disk_hash
+                adopted.append(GITIGNORE_PATH)
+            elif disk_hash is None:
+                if not dry_run:
+                    new_path.write_text(
+                        build_gitignore_file(disk_text),
+                        encoding="utf-8",
+                    )
+                written_new.append(GITIGNORE_PATH)
+            else:
+                updated_text = replace_managed_gitignore_block(disk_text)
+                if updated_text is None:
+                    if not dry_run:
+                        new_path.write_text(
+                            build_gitignore_file(disk_text),
+                            encoding="utf-8",
+                        )
+                    written_new.append(GITIGNORE_PATH)
+                elif disk_hash == managed_hash:
+                    updated_lock[GITIGNORE_PATH] = managed_hash
+                    unchanged.append(GITIGNORE_PATH)
+                elif force or (locked_hash is not None and disk_hash == locked_hash):
+                    if not dry_run:
+                        gitignore_path.write_text(updated_text, encoding="utf-8")
+                        updated_lock[GITIGNORE_PATH] = managed_hash
+                    overwritten.append(GITIGNORE_PATH)
+                else:
+                    if not dry_run:
+                        new_path.write_text(updated_text, encoding="utf-8")
+                        updated_lock[GITIGNORE_PATH] = managed_hash
+                    written_new.append(GITIGNORE_PATH)
+        else:
+            if not dry_run:
+                gitignore_path.write_text(build_gitignore_file(), encoding="utf-8")
+                updated_lock[GITIGNORE_PATH] = managed_hash
+            overwritten.append(GITIGNORE_PATH)
 
     include_notes = _workspace_target_requested(only_prefixes, "notes")
     include_materials = _workspace_target_requested(only_prefixes, "materials")

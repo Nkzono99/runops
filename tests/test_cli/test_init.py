@@ -10,6 +10,7 @@ import pytest
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 
 runner = CliRunner()
 
@@ -143,6 +144,8 @@ class TestInit:
         """.gitignore contains run output exclusion patterns."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         content = (tmp_path / ".gitignore").read_text(encoding="utf-8")
+        assert GITIGNORE_MANAGED_START in content
+        assert GITIGNORE_MANAGED_END in content
         # The whole work/ tree is regenerable from input/, so it is excluded
         # wholesale rather than enumerating per-simulator output filenames.
         assert "runs/**/work/" in content
@@ -501,7 +504,7 @@ class TestInit:
         assert "Camphor3" in site_md.read_text(encoding="utf-8")
 
     def test_init_renders_imports_after_bootstrap(
-        self, tmp_path: Path, monkeypatch
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Init discovers tool docs only after bootstrap and wires imports.md."""
 
