@@ -13,6 +13,17 @@ run ディレクトリを日常運用の主単位とし、パラメータサー�
 - commit message は英語 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)
 - Agent 向けドキュメント (rules, skills, agents) は日本語で書いてよい
 
+## 開発ハーネス対応
+
+runops の開発ハーネスは `.claude/` だけではなく、`.codex/` と
+`.agents/skills/` も含む。ハーネス改善時は次を意識すること:
+
+- Claude 固有設定は `.claude/`、Codex 固有設定は `.codex/` に置く
+- 共通ワークフローや運用知識は、tool 固有の文法差を除いて意図的な差分だけを残す
+- shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
+  `.claude/skills/improve-harness/SKILL.md`, `.agents/skills/improve-harness/SKILL.md`
+  の drift を点検する
+
 ## プロジェクトでの利用方法
 
 CLI は `runo` を標準コマンドとして使う。既存スクリプトとの互換性のため、
