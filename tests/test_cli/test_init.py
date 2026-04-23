@@ -169,6 +169,8 @@ class TestInit:
 
         files_exclude = settings["files.exclude"]
         assert files_exclude[".venv"] is True
+        assert files_exclude[".ruff_cache"] is True
+        assert files_exclude[".pytest_cache"] is True
         assert files_exclude["tools"] is True
         assert files_exclude["refs"] is True
         assert files_exclude[".runops/knowledge"] is True
@@ -183,16 +185,22 @@ class TestInit:
         assert "runs/**/survey.toml" not in files_exclude
 
         search_exclude = settings["search.exclude"]
+        assert search_exclude[".ruff_cache"] is True
+        assert search_exclude[".pytest_cache"] is True
         assert search_exclude["materials/**/*.pdf"] is True
         assert "materials" not in search_exclude
 
         watcher_exclude = settings["files.watcherExclude"]
         assert watcher_exclude[".venv/**"] is True
+        assert watcher_exclude[".ruff_cache/**"] is True
+        assert watcher_exclude[".pytest_cache/**"] is True
         assert watcher_exclude["runs/**/work/**"] is True
         assert watcher_exclude["runs/**/status/**"] is True
 
         analysis_exclude = settings["python.analysis.exclude"]
         assert ".venv" in analysis_exclude
+        assert ".ruff_cache" in analysis_exclude
+        assert ".pytest_cache" in analysis_exclude
         assert "refs" in analysis_exclude
         assert "runs/**/work" in analysis_exclude
 

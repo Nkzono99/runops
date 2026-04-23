@@ -8,6 +8,8 @@
     },
     "files.exclude": {
         ".venv": true,
+        ".ruff_cache": true,
+        ".pytest_cache": true,
         "tools": true,
         "refs": true,
         ".runops/knowledge": true,
@@ -20,6 +22,8 @@
     },
     "search.exclude": {
         ".venv": true,
+        ".ruff_cache": true,
+        ".pytest_cache": true,
         "tools": true,
         "refs": true,
         ".runops/knowledge": true,
@@ -32,6 +36,8 @@
     },
     "files.watcherExclude": {
         ".venv/**": true,
+        ".ruff_cache/**": true,
+        ".pytest_cache/**": true,
         "tools/**": true,
         "refs/**": true,
         ".runops/knowledge/**": true,
@@ -41,6 +47,8 @@
     },
     "python.analysis.exclude": [
         ".venv",
+        ".ruff_cache",
+        ".pytest_cache",
         "tools",
         "refs",
         ".runops/knowledge",
