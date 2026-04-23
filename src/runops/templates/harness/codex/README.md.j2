@@ -46,11 +46,36 @@ command policy です。runops は `submit`, `delete`, `purge-work`,
 `rm -rf`, `git reset --hard`, `git push --force`
 のような高リスク操作だけをここに書きます。
 
+`runops runs submit --dry-run` は HPC 資源を使わない確認コマンドなので allow
+しています。ただし Codex execpolicy は prefix-based なので、`--dry-run` は
+`submit` の直後に置いてください:
+
+```bash
+runops runs submit --dry-run --all runs/survey -qn gr10451a
+```
+
+実投入は必ず会話上でユーザー確認を得てから実行します。
+`approval_policy = "never"` / `AskForApproval = Never` の環境では `prompt`
+rule が hard block になるため、実投入まで Codex に任せる project では
+個人用の `AGENTS.override.md` と user-local execpolicy で明示 opt-in してください。
+例:
+
+```starlark
+# ~/.codex/rules/runops-submit-approved.rules など user-local に置く
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "--all"],
+    decision = "allow",
+    justification = "Only use after explicit chat confirmation in this project.",
+)
+```
+
 ルールを変更したら、最低限次を確認してください:
 
 ```bash
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runops runs submit R20260419-0001
+  runops runs submit --dry-run --all runs/survey
+codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
+  runops runs submit --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   rm -rf runs/R20260419-0001
 ```

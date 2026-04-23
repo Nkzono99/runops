@@ -287,7 +287,9 @@ class TestInit:
         rules = (tmp_path / ".codex" / "rules" / "runops.rules").read_text(
             encoding="utf-8"
         )
-        assert 'pattern = ["runops", "runs", "submit"]' in rules
+        assert 'pattern = ["runops", "runs", "submit", "--dry-run"]' in rules
+        assert 'decision = "allow"' in rules
+        assert 'pattern = ["runops", "runs", "submit", "--all"]' in rules
         assert 'decision = "prompt"' in rules
         assert 'pattern = ["rm", "-rf"]' in rules
         assert 'decision = "forbidden"' in rules
