@@ -1,4 +1,4 @@
-# CLAUDE.md — runops
+# AGENTS.md — runops
 
 ## プロジェクト概要
 
@@ -6,6 +6,31 @@ HPC 環境における Slurm ベースのシミュレーション実行管理 CL
 run ディレクトリを日常運用の主単位とし、パラメータサーベイ展開・job 投入・状態追跡・provenance 記録・解析補助を一貫して管理する。
 
 仕様書: `SPEC.md`
+
+## コミュニケーション
+
+- **日本語で応答する**。コード・コマンド・変数名・エラーメッセージは英語のまま
+- commit message は英語 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)
+- Agent 向けドキュメント (rules, skills, agents) は日本語で書いてよい
+
+## Codex ハーネス
+
+このリポジトリでは Claude Code 用の `.claude/` に加えて、Codex 用に以下を置く。
+
+| 目的 | Codex 側 | Claude 側 |
+|------|----------|-----------|
+| Project doc | `AGENTS.md` | `CLAUDE.md` |
+| 定型スキル | `.agents/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` |
+| 専門 agent 由来の知識 | `.agents/skills/<name>/SKILL.md` | `.claude/agents/<name>.md` |
+| 実行設定 | `.codex/config.toml` | `.claude/settings.json` |
+| 高リスク command policy | `.codex/rules/runops.rules` | `.claude/settings.json` permissions |
+| 設計・運用リファレンス | `.codex/rules/*.md` | `.claude/rules/*.md` |
+
+Codex ではスキルを `$check`, `$release`, `$implement-core` のように `$` 付きで呼ぶ。
+Claude Code の `/check` などとは表記が異なる。
+
+Codex の project-local config は、この repo を trusted project として登録したときに読む。
+詳細は `.codex/README.md` を参照する。
 
 ## プロジェクトでの利用方法
 
@@ -208,6 +233,7 @@ runops/
 - run の大容量出力 (work/outputs/, work/restart/, work/tmp/) は .gitignore で除外
 - テスト fixtures の TOML ファイルは Git 管理対象
 - `gh release create` などで release を切るときは、先に `pyproject.toml` の `[project].version` を更新し、Git tag / release 名と同じバージョンに揃えること
+- Codex の個人用メモや一時 override は `AGENTS.override.md` に置き、Git 管理しない
 
 ## ビルド・実行
 

@@ -210,6 +210,9 @@ __marimo__/
 .claude/settings.local.json
 .claude/agent-memory/
 
+# Codex
+**/AGENTS.override.md
+
 # HPC simulation heavy run outputs
 runs/**/work/outputs/
 runs/**/work/restart/

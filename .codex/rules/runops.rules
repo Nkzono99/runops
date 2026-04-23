@@ -1,0 +1,166 @@
+# Codex execpolicy rules for the runops development repository.
+#
+# These rules apply when Codex asks to run a command outside the sandbox.
+# Keep behavioral workflow guidance in AGENTS.md; this file only captures
+# high-risk command prefixes that should not be silently escalated.
+
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "--dry-run"],
+    decision = "allow",
+    justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
+    match = [
+        "runops runs submit --dry-run R20260419-0001",
+        "runops runs submit --dry-run --all runs/survey",
+    ],
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit", "--dry-run"],
+    decision = "allow",
+    justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
+    match = [
+        "uv run runops runs submit --dry-run R20260419-0001",
+        "uv run runops runs submit --dry-run --all runs/survey",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "--all"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runops runs submit --all runs/survey",
+    ],
+    not_match = [
+        "runops runs submit --dry-run --all runs/survey",
+        "runops runs status R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit", "--all"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runops runs submit --all runs/survey",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "-qn"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runops runs submit -qn gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit", "-qn"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runops runs submit -qn gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "--queue-name"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runops runs submit --queue-name gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit", "--queue-name"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runops runs submit --queue-name gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "--qos"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runops runs submit --qos gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit", "--qos"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runops runs submit --qos gr10451a R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "submit", "--afterok"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "runops runs submit --afterok 12345 R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["uv", "run", "runops", "runs", "submit", "--afterok"],
+    decision = "prompt",
+    justification = "Submitting Slurm jobs spends HPC resources; confirm first.",
+    match = [
+        "uv run runops runs submit --afterok 12345 R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "purge-work"],
+    decision = "prompt",
+    justification = "Purging work/ deletes generated run outputs.",
+    match = [
+        "runops runs purge-work R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["runops", "runs", "delete"],
+    decision = "prompt",
+    justification = "Deleting a run removes its directory.",
+    match = [
+        "runops runs delete R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["rm", "-rf"],
+    decision = "forbidden",
+    justification = "Avoid broad recursive deletion; use runops cleanup commands.",
+    match = [
+        "rm -rf runs/R20260419-0001",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "push", "--force"],
+    decision = "forbidden",
+    justification = "Force-pushing rewrites shared history.",
+    match = [
+        "git push --force",
+        "git push --force origin main",
+    ],
+)
+
+prefix_rule(
+    pattern = ["git", "reset", "--hard"],
+    decision = "forbidden",
+    justification = "Hard reset discards local work.",
+    match = [
+        "git reset --hard",
+        "git reset --hard HEAD~1",
+    ],
+)
