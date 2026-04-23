@@ -109,6 +109,35 @@ campaign 設計用の SKILL を使って campaign.toml を整理して。
 
 それ以外はエージェントに任せて大丈夫です。
 
+## runops へのフィードバックを issue にする
+
+プロジェクトを運用していて runops 本体への不満点・改善点・バグらしき挙動に
+気づいたら、その場でエージェントに issue 起票を頼んでください。runops が生成する
+プロジェクト側ハーネスには `feedback-runops` SKILL が含まれており、現在の研究タスクを
+止めずに upstream へフィードバックできます。
+
+例えば次のように依頼できます。
+
+```text
+今の作業で runops への不満点や改善点があれば、feedback-runops SKILL を使って
+issue 候補を整理して。起票する前にタイトルと本文を見せて確認して。
+```
+
+```text
+runops runs submit の挙動がわかりにくかったので、改善要望として issue を作って。
+再現手順、期待する挙動、今回の workaround も本文に入れて。
+```
+
+SKILL 名を直接指定する場合、Claude Code では `/feedback-runops`、Codex では
+`$feedback-runops` のように呼びます。引数なしなら、そのセッション中に見つかった
+候補を一覧します。具体的な内容を渡すと、重複 issue を確認し、環境情報を集め、
+issue のタイトルと本文案を作ります。
+
+この SKILL は安全のため、ユーザー確認なしに GitHub issue を作りません。
+起票前に必ず内容を表示させ、private なデータパス・クラスタ固有の秘密・未公開の
+研究情報が本文に入っていないことを確認してください。作成後は issue URL を
+`notes/YYYY-MM-DD.md` に記録しておくと、後で「あのときの改善要望」を辿りやすくなります。
+
 ## 次に読む
 
 - [README.md](../README.md) — 生成される構造と全体像
