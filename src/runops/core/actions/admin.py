@@ -12,10 +12,12 @@ from runops.core.actions.helpers import (
     _require_state,
 )
 from runops.core.actions.result import ActionResult, ActionStatus
+from runops.core.event_log import logged_action
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState
 
 
+@logged_action("archive_run")
 def archive_run(run_dir: Path) -> ActionResult:
     """Archive a completed run."""
     from runops.core.manifest import read_manifest
@@ -42,6 +44,7 @@ def archive_run(run_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("purge_work")
 def purge_work(run_dir: Path) -> ActionResult:
     """Delete purgeable work outputs from an archived run."""
     from runops.core.state import update_state
@@ -84,6 +87,7 @@ def purge_work(run_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("cancel_run")
 def cancel_run(run_dir: Path) -> ActionResult:
     """Cancel an active Slurm job (scancel) and sync the run state.
 
@@ -148,6 +152,7 @@ def cancel_run(run_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("delete_run")
 def delete_run(run_dir: Path) -> ActionResult:
     """Hard-delete a run directory.
 

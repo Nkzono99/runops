@@ -80,6 +80,14 @@ class KnowledgeSourceError(SimctlError):
     """
 
 
+class SessionImportError(SimctlError):
+    """Raised when a Codex session log cannot be imported."""
+
+
+class DemoReplayError(SimctlError):
+    """Raised when a demo replay UI cannot be built."""
+
+
 class ParameterValidationError(SimctlError):
     """Raised when parameter validation finds errors.
 

@@ -8,10 +8,12 @@ from typing import Any
 
 from runops.core.actions.helpers import _error, _precondition_fail, _require_state
 from runops.core.actions.result import ActionResult, ActionStatus
+from runops.core.event_log import logged_action
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState
 
 
+@logged_action("show_log")
 def show_log(run_dir: Path, *, lines: int = 50) -> ActionResult:
     """Read the latest job stdout log."""
     work_dir = run_dir / "work"
@@ -43,6 +45,7 @@ def show_log(run_dir: Path, *, lines: int = 50) -> ActionResult:
     )
 
 
+@logged_action("summarize_run")
 def summarize_run(run_dir: Path) -> ActionResult:
     """Generate an analysis summary for a completed run."""
     _state_str, err = _require_state(run_dir, RunState.COMPLETED)
@@ -70,6 +73,7 @@ def summarize_run(run_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("collect_survey")
 def collect_survey(survey_dir: Path) -> ActionResult:
     """Aggregate results across all runs in a survey directory."""
     from runops.core.discovery import discover_runs
@@ -128,6 +132,7 @@ def collect_survey(survey_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("export_publication")
 def export_publication(
     target_path: Path,
     paper_id: str,

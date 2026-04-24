@@ -20,6 +20,8 @@ try:
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
 
+from runops.core.event_log import emit_artifact_event
+
 logger = logging.getLogger(__name__)
 
 _SIMCTL_DIR = ".runops"
@@ -183,7 +185,14 @@ def write_insight(insights_dir: Path, insight: Insight) -> Path:
 
     text = "\n".join(frontmatter) + "\n\n" + insight.content + "\n"
     filepath = insights_dir / f"{insight.name}.md"
-    filepath.write_text(text)
+    existed_before = filepath.exists()
+    filepath.write_text(text, encoding="utf-8")
+    emit_artifact_event(
+        filepath,
+        operation="update" if existed_before else "create",
+        artifact_kind="insight",
+        summary=f"{'Update' if existed_before else 'Create'} insight {filepath.name}",
+    )
     return filepath
 
 
@@ -438,6 +447,7 @@ def save_fact(project_root: Path, fact: Fact) -> None:
     runops_dir = project_root / _SIMCTL_DIR
     runops_dir.mkdir(exist_ok=True)
     facts_file = runops_dir / _FACTS_FILE
+    existed_before = facts_file.exists()
 
     # Load existing
     existing: list[dict[str, Any]] = []
@@ -481,6 +491,12 @@ def save_fact(project_root: Path, fact: Fact) -> None:
 
     with open(facts_file, "wb") as f:
         tomli_w.dump({"facts": existing}, f)
+    emit_artifact_event(
+        facts_file,
+        operation="update" if existed_before else "create",
+        artifact_kind="facts",
+        summary="Update .runops/facts.toml",
+    )
 
 
 def next_fact_id(project_root: Path) -> str:

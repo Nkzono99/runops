@@ -8,10 +8,12 @@ from typing import Any
 
 from runops.core.actions.helpers import _error, _precondition_fail, _require_state
 from runops.core.actions.result import ActionResult, ActionStatus
+from runops.core.event_log import logged_action
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState
 
 
+@logged_action("create_run")
 def create_run(
     project_root: Path,
     case_name: str,
@@ -50,6 +52,7 @@ def create_run(
         return _error("create_run", str(e))
 
 
+@logged_action("create_survey")
 def create_survey(project_root: Path, survey_dir: Path) -> ActionResult:
     """Expand a survey.toml into created run directories."""
     from runops.core.project import load_project
@@ -107,6 +110,7 @@ def create_survey(project_root: Path, survey_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("submit_run")
 def submit_run(
     run_dir: Path,
     *,
@@ -222,6 +226,7 @@ def submit_run(
     )
 
 
+@logged_action("sync_run")
 def sync_run(run_dir: Path) -> ActionResult:
     """Synchronize run state with Slurm."""
     from runops.core.manifest import read_manifest, update_manifest
@@ -288,6 +293,7 @@ def sync_run(run_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("retry_run")
 def retry_run(
     run_dir: Path,
     *,

@@ -1,0 +1,1149 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ title }}</title>
+    <style>
+      :root {
+        --bg: #f6f1e8;
+        --paper: rgba(255, 250, 242, 0.86);
+        --paper-strong: #fffaf2;
+        --ink: #1f2d2e;
+        --muted: #5f6f6d;
+        --line: rgba(31, 45, 46, 0.12);
+        --accent: #0f7a77;
+        --accent-soft: rgba(15, 122, 119, 0.14);
+        --read: #2f78c4;
+        --create: #2b8f5d;
+        --update: #c47d15;
+        --delete: #b54b43;
+        --note: #7c56a4;
+        --shadow: 0 26px 56px rgba(43, 52, 53, 0.12);
+        --radius: 22px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--ink);
+        font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(15, 122, 119, 0.12), transparent 32%),
+          radial-gradient(circle at 85% 8%, rgba(196, 125, 21, 0.14), transparent 26%),
+          linear-gradient(180deg, #fbf7f0 0%, var(--bg) 100%);
+      }
+
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background-image:
+          linear-gradient(rgba(15, 122, 119, 0.04) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(15, 122, 119, 0.04) 1px, transparent 1px);
+        background-size: 28px 28px;
+        mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.45), transparent 85%);
+      }
+
+      .shell {
+        position: relative;
+        width: min(1500px, calc(100vw - 32px));
+        margin: 20px auto 32px;
+        display: grid;
+        gap: 18px;
+        animation: rise 520ms ease;
+      }
+
+      .hero,
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        background: var(--paper);
+        box-shadow: var(--shadow);
+        backdrop-filter: blur(20px);
+      }
+
+      .hero {
+        overflow: hidden;
+      }
+
+      .hero-top {
+        padding: 28px 30px 18px;
+        display: grid;
+        gap: 14px;
+        background:
+          linear-gradient(135deg, rgba(15, 122, 119, 0.1), transparent 60%),
+          linear-gradient(160deg, rgba(196, 125, 21, 0.12), transparent 55%);
+      }
+
+      .eyebrow {
+        font-size: 0.82rem;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      h1 {
+        margin: 0;
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        font-size: clamp(2rem, 3vw, 3.4rem);
+        line-height: 0.98;
+        letter-spacing: -0.03em;
+      }
+
+      .hero-subtitle {
+        margin: 0;
+        color: var(--muted);
+        max-width: 68ch;
+        font-size: 1rem;
+        line-height: 1.6;
+      }
+
+      .hero-stats {
+        padding: 0 30px 28px;
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .stat-card {
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.6);
+        border: 1px solid rgba(31, 45, 46, 0.08);
+      }
+
+      .stat-label {
+        display: block;
+        font-size: 0.78rem;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+        color: var(--muted);
+        margin-bottom: 8px;
+      }
+
+      .stat-value {
+        font-size: clamp(1.2rem, 2vw, 1.8rem);
+        font-weight: 700;
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 0.95fr 1.3fr 1fr;
+        gap: 18px;
+      }
+
+      .panel {
+        min-height: 0;
+      }
+
+      .panel-header {
+        padding: 20px 22px 14px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .panel-title {
+        margin: 0;
+        font-size: 0.95rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .panel-body {
+        padding: 18px 22px 22px;
+      }
+
+      .controls {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .button,
+      .speed-select {
+        border: 1px solid var(--line);
+        background: var(--paper-strong);
+        color: var(--ink);
+        border-radius: 999px;
+        padding: 10px 14px;
+        font: inherit;
+      }
+
+      .button {
+        cursor: pointer;
+        transition: transform 140ms ease, background 140ms ease;
+      }
+
+      .button:hover {
+        transform: translateY(-1px);
+        background: #ffffff;
+      }
+
+      .button.is-accent {
+        background: var(--accent);
+        color: white;
+        border-color: transparent;
+      }
+
+      .tree-list,
+      .feed-list,
+      .event-types {
+        display: grid;
+        gap: 10px;
+      }
+
+      .chapter-rail {
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(220px, 1fr);
+        gap: 12px;
+        overflow-x: auto;
+      }
+
+      .chapter-card {
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        background: rgba(255, 255, 255, 0.62);
+        border-radius: 18px;
+        padding: 14px 16px;
+        display: grid;
+        gap: 10px;
+        cursor: pointer;
+        transition: transform 140ms ease, border-color 140ms ease, background 140ms ease;
+      }
+
+      .chapter-card:hover {
+        transform: translateY(-1px);
+        background: rgba(255, 255, 255, 0.78);
+      }
+
+      .chapter-card.is-current {
+        border-color: rgba(15, 122, 119, 0.28);
+        background: rgba(15, 122, 119, 0.14);
+      }
+
+      .chapter-index {
+        font-size: 0.78rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .chapter-title {
+        margin: 0;
+        font-size: 1rem;
+        line-height: 1.4;
+      }
+
+      .chapter-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tree-group {
+        display: grid;
+        gap: 8px;
+      }
+
+      .tree-dir {
+        font-size: 0.8rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .tree-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.56);
+        border: 1px solid transparent;
+      }
+
+      .tree-item.is-current {
+        border-color: rgba(15, 122, 119, 0.28);
+        background: rgba(15, 122, 119, 0.12);
+      }
+
+      .swatch {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        flex: 0 0 auto;
+      }
+
+      .swatch.read {
+        background: var(--read);
+      }
+
+      .swatch.create {
+        background: var(--create);
+      }
+
+      .swatch.update,
+      .swatch.action_start,
+      .swatch.action_finish,
+      .swatch.command {
+        background: var(--update);
+      }
+
+      .swatch.delete,
+      .swatch.action_error {
+        background: var(--delete);
+      }
+
+      .swatch.note,
+      .swatch.user_request,
+      .swatch.tool_call,
+      .swatch.tool_result,
+      .swatch.web_search {
+        background: var(--note);
+      }
+
+      .file-meta,
+      .feed-meta,
+      .event-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      .focus-card {
+        display: grid;
+        gap: 18px;
+      }
+
+      .focus-head {
+        display: grid;
+        gap: 10px;
+      }
+
+      .focus-label {
+        font-size: 0.8rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .focus-summary {
+        margin: 0;
+        font-size: clamp(1.35rem, 2.2vw, 2rem);
+        line-height: 1.2;
+      }
+
+      .focus-path {
+        font-family: "SFMono-Regular", "Menlo", "Monaco", monospace;
+        font-size: 0.92rem;
+        color: var(--muted);
+        word-break: break-all;
+      }
+
+      .preview-card {
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        border-radius: 18px;
+        background: rgba(248, 243, 233, 0.8);
+        overflow: hidden;
+      }
+
+      .detail-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+      }
+
+      .detail-card.is-hidden {
+        display: none;
+      }
+
+      .detail-card.is-wide {
+        grid-column: 1 / -1;
+      }
+
+      .preview-header {
+        padding: 12px 16px;
+        border-bottom: 1px solid rgba(31, 45, 46, 0.08);
+        font-size: 0.84rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .preview-content,
+      .json-view {
+        margin: 0;
+        padding: 16px;
+        font-family: "SFMono-Regular", "Menlo", "Monaco", monospace;
+        font-size: 0.86rem;
+        line-height: 1.65;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .feed-item {
+        padding: 14px 14px 14px 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.62);
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        display: grid;
+        gap: 8px;
+      }
+
+      .feed-item.is-current {
+        border-color: rgba(15, 122, 119, 0.26);
+        background: rgba(15, 122, 119, 0.12);
+      }
+
+      .feed-summary {
+        margin: 0;
+        font-weight: 600;
+        line-height: 1.5;
+      }
+
+      .timeline-panel {
+        overflow: hidden;
+      }
+
+      .timeline-head {
+        padding: 18px 22px 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .timeline-progress {
+        height: 8px;
+        margin: 12px 22px 0;
+        border-radius: 999px;
+        background: rgba(31, 45, 46, 0.08);
+        overflow: hidden;
+      }
+
+      .timeline-progress-bar {
+        height: 100%;
+        width: 0%;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--accent), #d18f2b);
+        transition: width 160ms ease;
+      }
+
+      .timeline-rail {
+        padding: 18px 18px 22px;
+        display: grid;
+        grid-auto-flow: column;
+        grid-auto-columns: minmax(40px, 1fr);
+        gap: 8px;
+        overflow-x: auto;
+      }
+
+      .timeline-tick {
+        appearance: none;
+        border: 0;
+        background: none;
+        padding: 0;
+        cursor: pointer;
+        display: grid;
+        gap: 8px;
+      }
+
+      .timeline-dot {
+        width: 100%;
+        min-width: 40px;
+        height: 14px;
+        border-radius: 999px;
+        background: rgba(31, 45, 46, 0.12);
+        transition: transform 140ms ease, box-shadow 140ms ease, opacity 140ms ease;
+        opacity: 0.65;
+      }
+
+      .timeline-tick.is-current .timeline-dot {
+        transform: translateY(-2px);
+        opacity: 1;
+        box-shadow: 0 14px 22px rgba(15, 122, 119, 0.18);
+      }
+
+      .timeline-label {
+        font-size: 0.76rem;
+        line-height: 1.35;
+        color: var(--muted);
+        text-align: left;
+      }
+
+      .empty-state {
+        color: var(--muted);
+        line-height: 1.6;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      @media (max-width: 1180px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
+
+        .hero-stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .detail-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 720px) {
+        .shell {
+          width: min(100vw - 18px, 100%);
+          margin: 10px auto 20px;
+        }
+
+        .hero-top,
+        .hero-stats,
+        .panel-header,
+        .panel-body,
+        .timeline-head {
+          padding-left: 16px;
+          padding-right: 16px;
+        }
+
+        .hero-stats {
+          grid-template-columns: 1fr;
+          padding-bottom: 18px;
+        }
+
+        .timeline-progress {
+          margin-left: 16px;
+          margin-right: 16px;
+        }
+
+        .timeline-rail {
+          padding: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <script id="replay-data" type="application/json">{{ replay_data_json }}</script>
+    <div class="shell">
+      <header class="hero">
+        <div class="hero-top">
+          <div class="eyebrow">RunOps Demo Replay</div>
+          <div>
+            <h1 id="hero-title">{{ title }}</h1>
+            <p class="hero-subtitle" id="hero-subtitle">{{ subtitle }}</p>
+          </div>
+        </div>
+        <div class="hero-stats">
+          <article class="stat-card">
+            <span class="stat-label">Events</span>
+            <span class="stat-value" id="stat-events">0</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Files</span>
+            <span class="stat-value" id="stat-files">0</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Actors</span>
+            <span class="stat-value" id="stat-actors">0</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Chapters</span>
+            <span class="stat-value" id="stat-chapters">0</span>
+          </article>
+          <article class="stat-card">
+            <span class="stat-label">Current Step</span>
+            <span class="stat-value" id="stat-current">1</span>
+          </article>
+        </div>
+      </header>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Chapters</h2>
+          <div class="pill" id="chapter-count">0 chapters</div>
+        </div>
+        <div class="panel-body">
+          <div class="chapter-rail" id="chapter-rail"></div>
+        </div>
+      </section>
+
+      <div class="layout">
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">File Tree</h2>
+            <div class="pill" id="tree-count">0 touched</div>
+          </div>
+          <div class="panel-body">
+            <div class="tree-list" id="tree-list"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Current Event</h2>
+            <div class="controls">
+              <button class="button" id="prev-button" type="button">Prev</button>
+              <button class="button is-accent" id="play-button" type="button">Play</button>
+              <button class="button" id="next-button" type="button">Next</button>
+              <select class="speed-select" id="speed-select" aria-label="Playback speed">
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+                <option value="4">4x</option>
+              </select>
+            </div>
+          </div>
+          <div class="panel-body">
+            <article class="focus-card">
+              <div class="focus-head">
+                <div class="focus-label" id="focus-label">Step 1</div>
+                <h3 class="focus-summary" id="focus-summary"></h3>
+                <div class="event-meta" id="focus-meta"></div>
+                <div class="focus-path" id="focus-path"></div>
+              </div>
+
+              <div class="detail-grid">
+                <section class="preview-card detail-card is-hidden" id="command-card">
+                  <div class="preview-header">Command</div>
+                  <pre class="preview-content" id="command-content"></pre>
+                </section>
+
+                <section class="preview-card detail-card is-hidden" id="diff-card">
+                  <div class="preview-header">Diff</div>
+                  <pre class="preview-content" id="diff-content"></pre>
+                </section>
+
+                <section class="preview-card detail-card is-hidden" id="output-card">
+                  <div class="preview-header">Output</div>
+                  <pre class="preview-content" id="output-content"></pre>
+                </section>
+
+                <section class="preview-card detail-card is-hidden" id="context-card">
+                  <div class="preview-header">Context</div>
+                  <pre class="preview-content" id="preview-content"></pre>
+                </section>
+              </div>
+
+              <section class="preview-card detail-card is-wide">
+                <div class="preview-header">Structured Data</div>
+                <pre class="json-view" id="json-view"></pre>
+              </section>
+            </article>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <h2 class="panel-title">Activity Feed</h2>
+            <div class="pill" id="feed-range">Recent 8</div>
+          </div>
+          <div class="panel-body">
+            <div class="feed-list" id="feed-list"></div>
+          </div>
+        </section>
+      </div>
+
+      <section class="panel timeline-panel">
+        <div class="timeline-head">
+          <h2 class="panel-title">Timeline</h2>
+          <div class="event-types" id="event-types"></div>
+        </div>
+        <div class="timeline-progress">
+          <div class="timeline-progress-bar" id="timeline-progress-bar"></div>
+        </div>
+        <div class="timeline-rail" id="timeline-rail"></div>
+      </section>
+    </div>
+
+    <script>
+      (() => {
+        const data = JSON.parse(
+          document.getElementById("replay-data").textContent,
+        );
+        const events = Array.isArray(data.events) ? data.events : [];
+        const chapters = Array.isArray(data.chapters) ? data.chapters : [];
+        const state = {
+          index: 0,
+          playing: false,
+          speed: 1,
+          timerId: null,
+        };
+
+        const previewPriority = [
+          "diff_excerpt",
+          "output_excerpt",
+          "message",
+          "command",
+          "query",
+          "result_excerpt",
+          "stdout",
+          "stderr",
+        ];
+
+        const refs = {
+          title: document.getElementById("hero-title"),
+          subtitle: document.getElementById("hero-subtitle"),
+          statEvents: document.getElementById("stat-events"),
+          statFiles: document.getElementById("stat-files"),
+          statActors: document.getElementById("stat-actors"),
+          statChapters: document.getElementById("stat-chapters"),
+          statCurrent: document.getElementById("stat-current"),
+          chapterCount: document.getElementById("chapter-count"),
+          chapterRail: document.getElementById("chapter-rail"),
+          treeCount: document.getElementById("tree-count"),
+          treeList: document.getElementById("tree-list"),
+          focusLabel: document.getElementById("focus-label"),
+          focusSummary: document.getElementById("focus-summary"),
+          focusMeta: document.getElementById("focus-meta"),
+          focusPath: document.getElementById("focus-path"),
+          commandCard: document.getElementById("command-card"),
+          commandContent: document.getElementById("command-content"),
+          diffCard: document.getElementById("diff-card"),
+          diffContent: document.getElementById("diff-content"),
+          outputCard: document.getElementById("output-card"),
+          outputContent: document.getElementById("output-content"),
+          contextCard: document.getElementById("context-card"),
+          previewContent: document.getElementById("preview-content"),
+          jsonView: document.getElementById("json-view"),
+          feedList: document.getElementById("feed-list"),
+          feedRange: document.getElementById("feed-range"),
+          eventTypes: document.getElementById("event-types"),
+          timelineRail: document.getElementById("timeline-rail"),
+          timelineProgressBar: document.getElementById("timeline-progress-bar"),
+          playButton: document.getElementById("play-button"),
+          prevButton: document.getElementById("prev-button"),
+          nextButton: document.getElementById("next-button"),
+          speedSelect: document.getElementById("speed-select"),
+        };
+
+        function eventColor(type) {
+          if (type === "read" || type === "search" || type === "list_files") {
+            return "var(--read)";
+          }
+          if (type === "create") {
+            return "var(--create)";
+          }
+          if (
+            type === "update" ||
+            type === "command" ||
+            type === "action_start" ||
+            type === "action_finish"
+          ) {
+            return "var(--update)";
+          }
+          if (type === "delete" || type === "action_error") {
+            return "var(--delete)";
+          }
+          return "var(--note)";
+        }
+
+        function formatTimestamp(raw) {
+          if (!raw) {
+            return "No timestamp";
+          }
+          const parsed = new Date(raw);
+          if (Number.isNaN(parsed.getTime())) {
+            return raw;
+          }
+          return parsed.toLocaleString([], {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          });
+        }
+
+        function payloadFor(event) {
+          return event.data && typeof event.data === "object" ? event.data : {};
+        }
+
+        function firstText(payload, keys) {
+          for (const key of keys) {
+            const value = payload[key];
+            if (typeof value === "string" && value.trim()) {
+              return value;
+            }
+          }
+          return "";
+        }
+
+        function summarizePreview(event) {
+          const payload = payloadFor(event);
+          for (const key of previewPriority) {
+            const value = payload[key];
+            if (typeof value === "string" && value.trim()) {
+              return value;
+            }
+          }
+          if (event.path) {
+            return `Touched path: ${event.path}`;
+          }
+          return "No preview content for this event.";
+        }
+
+        function buildTree(index) {
+          const touched = new Map();
+          events.slice(0, index + 1).forEach((event, eventIndex) => {
+            if (!event.path) {
+              return;
+            }
+            touched.set(event.path, {
+              path: event.path,
+              type: event.type,
+              eventIndex,
+            });
+          });
+          return Array.from(touched.values()).sort((left, right) =>
+            left.path.localeCompare(right.path),
+          );
+        }
+
+        function renderTree(index) {
+          const touched = buildTree(index);
+          refs.treeCount.textContent = `${touched.length} touched`;
+          if (!touched.length) {
+            refs.treeList.innerHTML =
+              '<p class="empty-state">No file paths have been captured yet.</p>';
+            return;
+          }
+
+          const grouped = new Map();
+          touched.forEach((item) => {
+            const slashIndex = item.path.lastIndexOf("/");
+            const directory =
+              slashIndex >= 0 ? item.path.slice(0, slashIndex) : "(project root)";
+            if (!grouped.has(directory)) {
+              grouped.set(directory, []);
+            }
+            grouped.get(directory).push(item);
+          });
+
+          refs.treeList.innerHTML = "";
+          Array.from(grouped.entries())
+            .sort((left, right) => left[0].localeCompare(right[0]))
+            .forEach(([directory, items]) => {
+              const group = document.createElement("section");
+              group.className = "tree-group";
+
+              const label = document.createElement("div");
+              label.className = "tree-dir";
+              label.textContent = directory;
+              group.appendChild(label);
+
+              items
+                .sort((left, right) => left.path.localeCompare(right.path))
+                .forEach((item) => {
+                  const row = document.createElement("div");
+                  row.className = "tree-item";
+                  if (item.eventIndex === index) {
+                    row.classList.add("is-current");
+                  }
+
+                  const swatch = document.createElement("span");
+                  swatch.className = `swatch ${item.type}`;
+                  swatch.style.background = eventColor(item.type);
+                  row.appendChild(swatch);
+
+                  const content = document.createElement("div");
+                  const name = document.createElement("div");
+                  name.textContent = item.path.split("/").pop();
+                  content.appendChild(name);
+
+                  const meta = document.createElement("div");
+                  meta.className = "file-meta";
+                  meta.innerHTML = `<span class="pill">${item.type}</span>`;
+                  content.appendChild(meta);
+                  row.appendChild(content);
+                  group.appendChild(row);
+                });
+
+              refs.treeList.appendChild(group);
+          });
+        }
+
+        function renderChapters(index) {
+          const current = events[index];
+          refs.chapterCount.textContent = `${chapters.length} chapters`;
+          if (!chapters.length) {
+            refs.chapterRail.innerHTML =
+              '<p class="empty-state">No inferred chapters for this replay.</p>';
+            return;
+          }
+
+          refs.chapterRail.innerHTML = "";
+          chapters.forEach((chapter) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "chapter-card";
+            if (current.chapter_id === chapter.id) {
+              button.classList.add("is-current");
+            }
+            button.innerHTML = `
+              <div class="chapter-index">Chapter ${chapter.index}</div>
+              <h3 class="chapter-title">${chapter.title}</h3>
+              <div class="chapter-meta">
+                <span class="pill">${chapter.eventCount} events</span>
+                <span class="pill">steps ${chapter.startIndex + 1}-${chapter.endIndex + 1}</span>
+                <span class="pill">${chapter.leadType}</span>
+              </div>
+            `;
+            button.addEventListener("click", () => {
+              pause();
+              setIndex(chapter.startIndex);
+            });
+            refs.chapterRail.appendChild(button);
+          });
+        }
+
+        function setDetailCard(card, content, value) {
+          if (typeof value === "string" && value.trim()) {
+            card.classList.remove("is-hidden");
+            content.textContent = value;
+            return;
+          }
+          card.classList.add("is-hidden");
+          content.textContent = "";
+        }
+
+        function renderFocus(index) {
+          const event = events[index];
+          const payload = payloadFor(event);
+          refs.focusLabel.textContent = `Chapter ${event.chapter_index || 1} · Step ${index + 1} / ${events.length}`;
+          refs.focusSummary.textContent = event.summary;
+          refs.focusPath.textContent = event.path || "";
+          const command = firstText(payload, ["command"]);
+          const diff = firstText(payload, ["diff_excerpt"]);
+          const output = firstText(payload, [
+            "output_excerpt",
+            "result_excerpt",
+            "stdout",
+            "stderr",
+            "message",
+          ]);
+          const context = firstText(payload, ["query"]);
+          const fallbackContext =
+            context || (command || diff || output ? "" : summarizePreview(event));
+          setDetailCard(refs.commandCard, refs.commandContent, command);
+          setDetailCard(refs.diffCard, refs.diffContent, diff);
+          setDetailCard(refs.outputCard, refs.outputContent, output);
+          setDetailCard(refs.contextCard, refs.previewContent, fallbackContext);
+          refs.jsonView.textContent = JSON.stringify(payload, null, 2);
+          refs.statCurrent.textContent = String(index + 1);
+
+          const meta = [
+            event.type,
+            event.actor,
+            event.chapter_title || "",
+            event.status || "",
+            event.action || "",
+            formatTimestamp(event.t),
+          ].filter(Boolean);
+          refs.focusMeta.innerHTML = meta
+            .map((item) => `<span class="pill">${item}</span>`)
+            .join("");
+        }
+
+        function renderFeed(index) {
+          const start = Math.max(0, index - 7);
+          const feedEvents = events.slice(start, index + 1).reverse();
+          refs.feedRange.textContent = `Recent ${feedEvents.length}`;
+          refs.feedList.innerHTML = "";
+          feedEvents.forEach((event) => {
+            const item = document.createElement("article");
+            item.className = "feed-item";
+            if (event.id === events[index].id) {
+              item.classList.add("is-current");
+            }
+            const dot = `<span class="swatch ${event.type}" style="background:${eventColor(event.type)}"></span>`;
+            item.innerHTML = `
+              <div class="feed-meta">
+                <span class="pill">${dot}${event.type}</span>
+                <span class="pill">${event.actor}</span>
+              </div>
+              <p class="feed-summary">${event.summary}</p>
+              <div class="feed-meta">
+                ${event.path ? `<span class="pill">${event.path}</span>` : ""}
+                ${event.t ? `<span class="pill">${formatTimestamp(event.t)}</span>` : ""}
+              </div>
+            `;
+            refs.feedList.appendChild(item);
+          });
+        }
+
+        function renderEventTypes() {
+          const entries = Object.entries(data.stats.eventTypes || {});
+          refs.eventTypes.innerHTML = entries
+            .slice(0, 6)
+            .map(
+              ([type, count]) =>
+                `<span class="pill"><span class="swatch ${type}" style="background:${eventColor(type)}"></span>${type} ${count}</span>`,
+            )
+            .join("");
+        }
+
+        function renderTimeline(index) {
+          refs.timelineRail.innerHTML = "";
+          events.forEach((event, eventIndex) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "timeline-tick";
+            if (eventIndex === index) {
+              button.classList.add("is-current");
+            }
+            button.title = `${event.type}: ${event.summary}`;
+            button.innerHTML = `
+              <span class="timeline-dot" style="background:${eventColor(event.type)}"></span>
+              <span class="timeline-label">C${event.chapter_index || 1} · ${eventIndex + 1}<br>${event.type}</span>
+            `;
+            button.addEventListener("click", () => {
+              pause();
+              setIndex(eventIndex);
+            });
+            refs.timelineRail.appendChild(button);
+          });
+
+          const progress =
+            events.length <= 1 ? 100 : (index / (events.length - 1)) * 100;
+          refs.timelineProgressBar.style.width = `${progress}%`;
+        }
+
+        function renderStats() {
+          refs.statEvents.textContent = String(data.stats.eventCount || events.length);
+          refs.statFiles.textContent = String(data.stats.fileCount || 0);
+          refs.statActors.textContent = String(data.stats.actorCount || 0);
+          refs.statChapters.textContent = String(data.stats.chapterCount || chapters.length);
+        }
+
+        function renderAll() {
+          renderStats();
+          renderEventTypes();
+          renderChapters(state.index);
+          renderTree(state.index);
+          renderFocus(state.index);
+          renderFeed(state.index);
+          renderTimeline(state.index);
+        }
+
+        function getDelay(event) {
+          const base = {
+            note: 2100,
+            user_request: 2200,
+            command: 2600,
+            create: 1500,
+            update: 1500,
+            delete: 1500,
+            read: 1000,
+            search: 1100,
+            tool_call: 1500,
+            tool_result: 1500,
+          };
+          const chapterPause = event.step_in_chapter === 1 ? 500 : 0;
+          return Math.max(450, ((base[event.type] || 1200) + chapterPause) / state.speed);
+        }
+
+        function scheduleNext() {
+          clearTimeout(state.timerId);
+          if (!state.playing) {
+            return;
+          }
+          const event = events[state.index];
+          state.timerId = window.setTimeout(() => {
+            if (state.index >= events.length - 1) {
+              pause();
+              return;
+            }
+            setIndex(state.index + 1);
+            scheduleNext();
+          }, getDelay(event));
+        }
+
+        function setIndex(index) {
+          state.index = Math.max(0, Math.min(index, events.length - 1));
+          renderAll();
+        }
+
+        function play() {
+          state.playing = true;
+          refs.playButton.textContent = "Pause";
+          refs.playButton.classList.add("is-accent");
+          scheduleNext();
+        }
+
+        function pause() {
+          state.playing = false;
+          refs.playButton.textContent = "Play";
+          refs.playButton.classList.add("is-accent");
+          clearTimeout(state.timerId);
+        }
+
+        refs.playButton.addEventListener("click", () => {
+          if (state.playing) {
+            pause();
+            return;
+          }
+          play();
+        });
+
+        refs.prevButton.addEventListener("click", () => {
+          pause();
+          setIndex(state.index - 1);
+        });
+
+        refs.nextButton.addEventListener("click", () => {
+          pause();
+          setIndex(state.index + 1);
+        });
+
+        refs.speedSelect.addEventListener("change", (event) => {
+          state.speed = Number(event.target.value || 1);
+          if (state.playing) {
+            scheduleNext();
+          }
+        });
+
+        refs.title.textContent = data.title || refs.title.textContent;
+        refs.subtitle.textContent = data.subtitle || refs.subtitle.textContent;
+        renderAll();
+      })();
+    </script>
+  </body>
+</html>

@@ -30,6 +30,7 @@ def test_help_shows_primary_commands() -> None:
         "case",
         "runs",
         "analyze",
+        "demo",
         "update",
         "update-refs",
     ]:

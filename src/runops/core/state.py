@@ -12,6 +12,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from runops.core.event_log import emit_artifact_event
 from runops.core.exceptions import InvalidStateTransitionError
 
 
@@ -287,6 +288,13 @@ def _write_state_json(
     if slurm_state:
         state_json["slurm_state"] = slurm_state
     state_file = status_dir / "state.json"
+    existed_before = state_file.exists()
     with open(state_file, "w") as f:
         json.dump(state_json, f, indent=2)
         f.write("\n")
+    emit_artifact_event(
+        state_file,
+        operation="update" if existed_before else "create",
+        artifact_kind="state_mirror",
+        summary="Update status/state.json",
+    )

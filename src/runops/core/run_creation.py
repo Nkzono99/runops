@@ -20,6 +20,7 @@ from runops.core.case import (
     resolve_case,
 )
 from runops.core.discovery import collect_existing_run_ids
+from runops.core.event_log import emit_artifact_event
 from runops.core.exceptions import (
     DuplicateRunIdError,
     ParameterValidationError,
@@ -317,11 +318,12 @@ def _build_manifest(
     )
 
 
-def _copy_case_files(case_dir: Path, input_dir: Path) -> None:
+def _copy_case_files(case_dir: Path, input_dir: Path) -> list[str]:
     src_dir = case_dir / "input"
     if not src_dir.is_dir():
-        return
+        return []
     input_dir.mkdir(parents=True, exist_ok=True)
+    created: list[str] = []
     for src in src_dir.rglob("*"):
         if not src.is_file():
             continue
@@ -329,6 +331,8 @@ def _copy_case_files(case_dir: Path, input_dir: Path) -> None:
         dest = input_dir / rel
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dest)
+        created.append(str(Path("input") / rel))
+    return created
 
 
 def _merge_site_modules(
@@ -420,9 +424,19 @@ def create_prepared_run(
         created_at=created_at,
     )
     committed = False
+    pending_artifacts: list[tuple[Path, str, str, str]] = []
     try:
-        _copy_case_files(case_data.case_dir, staging_run_dir / "input")
-        adapter.render_inputs(validation_data, staging_run_dir)
+        copied_inputs = _copy_case_files(case_data.case_dir, staging_run_dir / "input")
+        created_inputs = adapter.render_inputs(validation_data, staging_run_dir)
+        for rel_path in copied_inputs + created_inputs:
+            pending_artifacts.append(
+                (
+                    final_run_dir / rel_path,
+                    "create",
+                    "input",
+                    f"Create {rel_path}",
+                )
+            )
 
         sim_config = _get_simulator_config(project, case_data.simulator)
         resolver_mode = sim_config.get("resolver_mode", "package")
@@ -464,6 +478,14 @@ def create_prepared_run(
             version_commands=version_commands,
             script_run_dir=final_run_dir,
         )
+        pending_artifacts.append(
+            (
+                final_run_dir / "submit" / "job.sh",
+                "create",
+                "job_script",
+                "Create submit/job.sh",
+            )
+        )
 
         manifest = _build_manifest(
             final_run_info,
@@ -475,11 +497,31 @@ def create_prepared_run(
             survey_id=survey_id,
             variation_keys=variation_keys,
         )
-        write_manifest(staging_run_dir, manifest)
+        write_manifest(
+            staging_run_dir,
+            manifest,
+            event_path=final_run_dir / "manifest.toml",
+            log_event=False,
+        )
         if final_run_dir.exists():
             raise DuplicateRunIdError(run_id, [str(final_run_dir)])
         staging_run_dir.rename(final_run_dir)
         committed = True
+        pending_artifacts.append(
+            (
+                final_run_dir / "manifest.toml",
+                "create",
+                "manifest",
+                "Create manifest.toml",
+            )
+        )
+        for artifact_path, operation, artifact_kind, summary in pending_artifacts:
+            emit_artifact_event(
+                artifact_path,
+                operation=operation,
+                artifact_kind=artifact_kind,
+                summary=summary,
+            )
     finally:
         if not committed and staging_run_dir.exists():
             shutil.rmtree(staging_run_dir, ignore_errors=True)

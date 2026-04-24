@@ -19,6 +19,7 @@ else:
 
 import tomli_w
 
+from runops.core.event_log import emit_artifact_event
 from runops.core.exceptions import ManifestError, ManifestNotFoundError
 
 _MANIFEST_FILE = "manifest.toml"
@@ -139,7 +140,13 @@ def read_manifest(run_dir: Path) -> ManifestData:
     return ManifestData.from_dict(data)
 
 
-def write_manifest(run_dir: Path, data: ManifestData) -> None:
+def write_manifest(
+    run_dir: Path,
+    data: ManifestData,
+    *,
+    event_path: Path | None = None,
+    log_event: bool = True,
+) -> None:
     """Write manifest data to manifest.toml atomically.
 
     Uses write-to-temp + rename to avoid partial writes if the process
@@ -149,6 +156,12 @@ def write_manifest(run_dir: Path, data: ManifestData) -> None:
     Args:
         run_dir: Path to the run directory.
         data: ManifestData to write.
+        event_path: Optional display path recorded in the event log.  This is
+            useful when the manifest is written into a staging directory and
+            later atomically moved into its final location.
+        log_event: Whether to emit a structured artifact event after the write
+            succeeds.  Callers that stage files before an atomic rename can
+            disable this and emit a final-path event after commit.
 
     Raises:
         ManifestError: If the file cannot be written.
@@ -157,6 +170,9 @@ def write_manifest(run_dir: Path, data: ManifestData) -> None:
     import tempfile
 
     manifest_path = run_dir / _MANIFEST_FILE
+
+    display_path = event_path or manifest_path
+    existed_before = display_path.exists()
 
     try:
         run_dir.mkdir(parents=True, exist_ok=True)
@@ -176,6 +192,15 @@ def write_manifest(run_dir: Path, data: ManifestData) -> None:
             raise
     except OSError as e:
         raise ManifestError(f"Failed to write {manifest_path}: {e}") from e
+
+    if log_event:
+        operation = "update" if existed_before else "create"
+        emit_artifact_event(
+            display_path,
+            operation=operation,
+            artifact_kind="manifest",
+            summary=f"{operation.title()} manifest.toml",
+        )
 
 
 def update_manifest(run_dir: Path, updates: dict[str, Any]) -> ManifestData:

@@ -6,8 +6,10 @@ from pathlib import Path
 
 from runops.core.actions.helpers import _error, _precondition_fail
 from runops.core.actions.result import ActionResult, ActionStatus
+from runops.core.event_log import logged_action
 
 
+@logged_action("save_insight")
 def save_insight(
     project_root: Path,
     *,
@@ -61,6 +63,7 @@ def save_insight(
     )
 
 
+@logged_action("add_fact")
 def add_fact(
     project_root: Path,
     *,
@@ -114,6 +117,7 @@ def add_fact(
     )
 
 
+@logged_action("promote_fact")
 def promote_fact(project_root: Path, fact_id: str) -> ActionResult:
     """Promote an imported candidate fact into local curated facts."""
     from runops.core.knowledge import promote_candidate_fact
