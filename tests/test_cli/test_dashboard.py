@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-import tomli_w
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+from tests.factories import create_minimal_project, create_run_manifest
 
 if TYPE_CHECKING:
     import pytest
@@ -16,15 +16,8 @@ if TYPE_CHECKING:
 runner = CliRunner()
 
 
-def _make_project(tmp_path: Path) -> Path:
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
-    (tmp_path / "cases").mkdir()
-    (tmp_path / "runs").mkdir()
-    return tmp_path
-
-
-def _create_run(
-    parent: Path,
+def _create_dashboard_run(
+    runs_dir: Path,
     run_id: str,
     *,
     status: str,
@@ -32,45 +25,31 @@ def _create_run(
     display_name: str = "",
     last_slurm_state: str = "",
 ) -> Path:
-    """Create a minimal run directory with manifest.toml under ``parent``."""
-    run_dir = parent / run_id
-    run_dir.mkdir(parents=True)
-    manifest: dict[str, Any] = {
-        "run": {
-            "id": run_id,
-            "display_name": display_name or f"d_{run_id}",
-            "status": status,
-        },
-        "job": {
-            "scheduler": "slurm",
-            "job_id": job_id,
-        },
-        "simulator": {
-            "name": "fake_sim",
-            "adapter": "fake_sim",
-        },
-    }
-    if last_slurm_state:
-        manifest["run"]["last_slurm_state"] = last_slurm_state
-    with open(run_dir / "manifest.toml", "wb") as f:
-        tomli_w.dump(manifest, f)
-    return run_dir
+    """Create a minimal dashboard run under ``runs_dir``."""
+    return create_run_manifest(
+        runs_dir / run_id,
+        run_id=run_id,
+        status=status,
+        job_id=job_id,
+        display_name=display_name or None,
+        last_slurm_state=last_slurm_state,
+    )
 
 
 class TestDashboard:
     """Tests for the basic (non-watch) dashboard command."""
 
     def test_dashboard_lists_active_runs(self, tmp_path: Path) -> None:
-        project_dir = _make_project(tmp_path)
+        project_dir = create_minimal_project(tmp_path)
         survey = project_dir / "runs" / "series_x"
-        _create_run(
+        _create_dashboard_run(
             survey,
             "R20260327-0001",
             status="running",
             job_id="11111",
             last_slurm_state="RUNNING",
         )
-        _create_run(
+        _create_dashboard_run(
             survey,
             "R20260327-0002",
             status="completed",
@@ -84,9 +63,11 @@ class TestDashboard:
         assert "R20260327-0002" not in result.output
 
     def test_dashboard_all_includes_completed(self, tmp_path: Path) -> None:
-        project_dir = _make_project(tmp_path)
+        project_dir = create_minimal_project(tmp_path)
         survey = project_dir / "runs" / "series_x"
-        _create_run(survey, "R20260327-0001", status="completed", job_id="11111")
+        _create_dashboard_run(
+            survey, "R20260327-0001", status="completed", job_id="11111"
+        )
 
         result = runner.invoke(app, ["runs", "dashboard", "--all", str(survey)])
         assert result.exit_code == 0
@@ -94,18 +75,20 @@ class TestDashboard:
         assert "completed" in result.output
 
     def test_dashboard_no_active_runs(self, tmp_path: Path) -> None:
-        project_dir = _make_project(tmp_path)
+        project_dir = create_minimal_project(tmp_path)
         survey = project_dir / "runs" / "series_x"
-        _create_run(survey, "R20260327-0001", status="completed", job_id="11111")
+        _create_dashboard_run(
+            survey, "R20260327-0001", status="completed", job_id="11111"
+        )
 
         result = runner.invoke(app, ["runs", "dashboard", str(survey)])
         assert result.exit_code == 0
         assert "No active runs" in result.output
 
     def test_dashboard_includes_state_column(self, tmp_path: Path) -> None:
-        project_dir = _make_project(tmp_path)
+        project_dir = create_minimal_project(tmp_path)
         survey = project_dir / "runs" / "series_x"
-        _create_run(
+        _create_dashboard_run(
             survey,
             "R20260327-0001",
             status="running",
@@ -126,9 +109,9 @@ class TestDashboard:
         self,
         tmp_path: Path,
     ) -> None:
-        project_dir = _make_project(tmp_path)
+        project_dir = create_minimal_project(tmp_path)
         survey = project_dir / "runs" / "series_x"
-        _create_run(
+        _create_dashboard_run(
             survey,
             "R20260327-0001",
             status="submitted",
@@ -151,9 +134,11 @@ class TestDashboardWatch:
     ) -> None:
         from runops.cli import dashboard as dashboard_cli
 
-        project_dir = _make_project(tmp_path)
+        project_dir = create_minimal_project(tmp_path)
         survey = project_dir / "runs" / "series_x"
-        _create_run(survey, "R20260327-0001", status="running", job_id="11111")
+        _create_dashboard_run(
+            survey, "R20260327-0001", status="running", job_id="11111"
+        )
 
         call_count = {"n": 0}
 

@@ -3,48 +3,16 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
 from unittest.mock import patch
 
-import tomli_w
 from typer.testing import CliRunner
 
 from runops.cli.main import app
 from runops.core.state import RunState
 from runops.slurm.query import JobStatus
+from tests.factories import create_minimal_project, create_run_manifest
 
 runner = CliRunner()
-
-
-def _write_manifest(run_dir: Path, data: dict[str, Any]) -> None:
-    """Write a manifest.toml into the given run directory."""
-    run_dir.mkdir(parents=True, exist_ok=True)
-    with open(run_dir / "manifest.toml", "wb") as f:
-        tomli_w.dump(data, f)
-
-
-def _create_run(
-    run_dir: Path,
-    *,
-    run_id: str = "R20260327-0001",
-    status: str = "submitted",
-    job_id: str = "12345",
-) -> None:
-    """Create a minimal run directory with manifest."""
-    manifest_data: dict[str, Any] = {
-        "run": {
-            "id": run_id,
-            "display_name": "test_run",
-            "status": status,
-            "created_at": "2026-03-27T13:00:00+09:00",
-        },
-        "job": {
-            "scheduler": "slurm",
-            "job_id": job_id,
-            "partition": "debug",
-        },
-    }
-    _write_manifest(run_dir, manifest_data)
 
 
 # ---------------------------------------------------------------------------
@@ -54,9 +22,9 @@ def _create_run(
 
 def test_status_shows_run_info(tmp_path: Path) -> None:
     """status should display run_id, state, and job_id."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir)
+    create_run_manifest(run_dir, status="submitted", job_id="12345")
 
     with (
         patch("runops.cli.status.Path.cwd", return_value=tmp_path),
@@ -76,9 +44,9 @@ def test_status_shows_run_info(tmp_path: Path) -> None:
 
 def test_status_no_job_id(tmp_path: Path) -> None:
     """status with no job_id should show 'not submitted'."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="created", job_id="")
+    create_run_manifest(run_dir, status="created", job_id="")
 
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
         result = runner.invoke(app, ["runs", "status", str(run_dir)])
@@ -89,9 +57,9 @@ def test_status_no_job_id(tmp_path: Path) -> None:
 
 def test_status_slurm_unavailable(tmp_path: Path) -> None:
     """status should gracefully handle missing Slurm commands."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir)
+    create_run_manifest(run_dir, status="submitted", job_id="12345")
 
     from runops.slurm.submit import SlurmNotFoundError
 
@@ -110,8 +78,7 @@ def test_status_slurm_unavailable(tmp_path: Path) -> None:
 
 def test_status_run_not_found(tmp_path: Path) -> None:
     """status for a non-existent run should error."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
-    (tmp_path / "runs").mkdir()
+    create_minimal_project(tmp_path, name="test")
 
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
         result = runner.invoke(app, ["runs", "status", "nonexistent"])
@@ -120,25 +87,18 @@ def test_status_run_not_found(tmp_path: Path) -> None:
 
 def test_status_short_lists_runs_compactly(tmp_path: Path) -> None:
     """--short produces 1 line per run and skips Slurm queries."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     survey = tmp_path / "runs" / "series_A"
 
     for i, state in enumerate(["completed", "running", "submitted"], start=1):
         run_dir = survey / f"R20260407-000{i}"
-        _write_manifest(
+        create_run_manifest(
             run_dir,
-            {
-                "run": {
-                    "id": f"R20260407-000{i}",
-                    "display_name": f"vti={0.02 * i:.2f}",
-                    "status": state,
-                },
-                "origin": {"case": "series_A_flat_plate"},
-                "job": {
-                    "scheduler": "slurm",
-                    "job_id": "" if state == "submitted" else "99",
-                },
-            },
+            run_id=f"R20260407-000{i}",
+            status=state,
+            display_name=f"vti={0.02 * i:.2f}",
+            job_id="" if state == "submitted" else "99",
+            origin_case="series_A_flat_plate",
         )
 
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
@@ -156,7 +116,7 @@ def test_status_short_lists_runs_compactly(tmp_path: Path) -> None:
 
 def test_status_summary_aggregates_by_case(tmp_path: Path) -> None:
     """--summary groups runs by origin.case x state."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     survey = tmp_path / "runs"
 
     layout = [
@@ -169,17 +129,13 @@ def test_status_summary_aggregates_by_case(tmp_path: Path) -> None:
         for _ in range(n):
             counter += 1
             run_dir = survey / case / f"R202604{counter:04d}"
-            _write_manifest(
+            create_run_manifest(
                 run_dir,
-                {
-                    "run": {
-                        "id": f"R202604{counter:04d}",
-                        "display_name": "x",
-                        "status": state,
-                    },
-                    "origin": {"case": case},
-                    "job": {"scheduler": "slurm", "job_id": ""},
-                },
+                run_id=f"R202604{counter:04d}",
+                status=state,
+                display_name="x",
+                job_id="",
+                origin_case=case,
             )
 
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
@@ -195,7 +151,7 @@ def test_status_summary_aggregates_by_case(tmp_path: Path) -> None:
 
 
 def test_status_short_and_summary_are_mutually_exclusive(tmp_path: Path) -> None:
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
         result = runner.invoke(app, ["runs", "status", "--short", "--summary"])
     assert result.exit_code == 2
@@ -209,9 +165,9 @@ def test_status_short_and_summary_are_mutually_exclusive(tmp_path: Path) -> None
 
 def test_sync_updates_state(tmp_path: Path) -> None:
     """sync should transition state and show old -> new."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="submitted", job_id="12345")
+    create_run_manifest(run_dir, status="submitted", job_id="12345")
 
     with (
         patch("runops.cli.status.Path.cwd", return_value=tmp_path),
@@ -240,9 +196,9 @@ def test_sync_updates_state(tmp_path: Path) -> None:
 
 def test_sync_no_change(tmp_path: Path) -> None:
     """sync should report no change when states match."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="running", job_id="12345")
+    create_run_manifest(run_dir, status="running", job_id="12345")
 
     with (
         patch("runops.cli.status.Path.cwd", return_value=tmp_path),
@@ -259,9 +215,9 @@ def test_sync_no_change(tmp_path: Path) -> None:
 
 def test_sync_no_job_id(tmp_path: Path) -> None:
     """sync without a job_id should error."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="created", job_id="")
+    create_run_manifest(run_dir, status="created", job_id="")
 
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
         result = runner.invoke(app, ["runs", "sync", str(run_dir)])
@@ -272,9 +228,9 @@ def test_sync_no_job_id(tmp_path: Path) -> None:
 
 def test_sync_slurm_query_failure(tmp_path: Path) -> None:
     """sync should handle Slurm query failures gracefully."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="submitted", job_id="12345")
+    create_run_manifest(run_dir, status="submitted", job_id="12345")
 
     from runops.slurm.query import SlurmQueryError
 
@@ -293,9 +249,9 @@ def test_sync_slurm_query_failure(tmp_path: Path) -> None:
 
 def test_sync_completed(tmp_path: Path) -> None:
     """sync should transition running -> completed."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="running", job_id="12345")
+    create_run_manifest(run_dir, status="running", job_id="12345")
 
     with (
         patch("runops.cli.status.Path.cwd", return_value=tmp_path),
@@ -325,15 +281,15 @@ def test_sync_completed(tmp_path: Path) -> None:
 
 def test_sync_survey_dir_processes_all_runs(tmp_path: Path) -> None:
     """Passing a survey directory syncs every run inside it."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     survey = tmp_path / "runs" / "series_x"
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0001",
         run_id="R20260327-0001",
         status="running",
         job_id="11111",
     )
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0002",
         run_id="R20260327-0002",
         status="running",
@@ -360,15 +316,15 @@ def test_sync_survey_dir_processes_all_runs(tmp_path: Path) -> None:
 
 def test_sync_bulk_skips_runs_without_job_id(tmp_path: Path) -> None:
     """In multi-target mode, runs without job_id are silently skipped."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     survey = tmp_path / "runs" / "series_x"
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0001",
         run_id="R20260327-0001",
         status="created",
         job_id="",
     )
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0002",
         run_id="R20260327-0002",
         status="running",
@@ -397,11 +353,11 @@ def test_sync_bulk_skips_runs_without_job_id(tmp_path: Path) -> None:
 
 def test_sync_multi_run_arguments(tmp_path: Path) -> None:
     """Passing multiple run paths processes each one."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run1 = tmp_path / "runs" / "R20260327-0001"
     run2 = tmp_path / "runs" / "R20260327-0002"
-    _create_run(run1, run_id="R20260327-0001", status="running", job_id="11111")
-    _create_run(run2, run_id="R20260327-0002", status="running", job_id="22222")
+    create_run_manifest(run1, run_id="R20260327-0001", status="running", job_id="11111")
+    create_run_manifest(run2, run_id="R20260327-0002", status="running", job_id="22222")
 
     with (
         patch("runops.cli.status.Path.cwd", return_value=tmp_path),
@@ -428,21 +384,21 @@ def test_sync_bulk_skips_terminal_states(tmp_path: Path) -> None:
     survey has finished — exactly the wrong behaviour for monitoring a
     long survey.
     """
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     survey = tmp_path / "runs" / "series_x"
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0001",
         run_id="R20260327-0001",
         status="completed",
         job_id="11111",
     )
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0002",
         run_id="R20260327-0002",
         status="running",
         job_id="22222",
     )
-    _create_run(
+    create_run_manifest(
         survey / "R20260327-0003",
         run_id="R20260327-0003",
         status="failed",
@@ -471,9 +427,9 @@ def test_sync_bulk_skips_terminal_states(tmp_path: Path) -> None:
 
 def test_sync_single_terminal_run_reports_skip(tmp_path: Path) -> None:
     """Single-target sync of a terminal run prints a skip notice (no error)."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run_dir = tmp_path / "runs" / "R20260327-0001"
-    _create_run(run_dir, status="completed", job_id="11111")
+    create_run_manifest(run_dir, status="completed", job_id="11111")
 
     with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
         result = runner.invoke(app, ["runs", "sync", str(run_dir)])
@@ -485,11 +441,11 @@ def test_sync_single_terminal_run_reports_skip(tmp_path: Path) -> None:
 
 def test_status_multi_run_arguments(tmp_path: Path) -> None:
     """Status accepts multiple targets and prints each."""
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    create_minimal_project(tmp_path, name="test")
     run1 = tmp_path / "runs" / "R20260327-0001"
     run2 = tmp_path / "runs" / "R20260327-0002"
-    _create_run(run1, run_id="R20260327-0001", status="running", job_id="11111")
-    _create_run(run2, run_id="R20260327-0002", status="running", job_id="22222")
+    create_run_manifest(run1, run_id="R20260327-0001", status="running", job_id="11111")
+    create_run_manifest(run2, run_id="R20260327-0002", status="running", job_id="22222")
 
     with (
         patch("runops.cli.status.Path.cwd", return_value=tmp_path),
