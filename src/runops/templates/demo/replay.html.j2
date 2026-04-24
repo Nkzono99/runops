@@ -175,6 +175,13 @@
         gap: 10px;
       }
 
+      .panel-tools {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
       .button,
       .speed-select {
         border: 1px solid var(--line);
@@ -201,11 +208,20 @@
         border-color: transparent;
       }
 
+      .button.is-subtle-active {
+        background: rgba(15, 122, 119, 0.14);
+        border-color: rgba(15, 122, 119, 0.18);
+      }
+
       .tree-list,
       .feed-list,
       .event-types {
         display: grid;
         gap: 10px;
+      }
+
+      .tree-list {
+        align-content: start;
       }
 
       .chapter-rail {
@@ -264,29 +280,71 @@
 
       .tree-group {
         display: grid;
-        gap: 8px;
+        gap: 10px;
+        padding: 12px 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        background: rgba(255, 255, 255, 0.6);
+      }
+
+      .tree-group.is-current {
+        border-color: rgba(15, 122, 119, 0.22);
+        background: rgba(15, 122, 119, 0.12);
       }
 
       .tree-dir {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
         font-size: 0.8rem;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--muted);
       }
 
-      .tree-item {
+      .tree-file-chips {
         display: flex;
-        align-items: center;
-        gap: 10px;
-        padding: 10px 12px;
-        border-radius: 14px;
-        background: rgba(255, 255, 255, 0.56);
-        border: 1px solid transparent;
+        flex-wrap: wrap;
+        gap: 8px;
       }
 
-      .tree-item.is-current {
-        border-color: rgba(15, 122, 119, 0.28);
-        background: rgba(15, 122, 119, 0.12);
+      .tree-file-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 100%;
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        background: rgba(255, 255, 255, 0.74);
+        font-size: 0.78rem;
+        line-height: 1.25;
+        color: var(--ink);
+      }
+
+      .tree-file-chip.is-current {
+        border-color: rgba(15, 122, 119, 0.22);
+        background: rgba(15, 122, 119, 0.16);
+      }
+
+      .tree-file-chip-name {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .tree-file-chip-meta {
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        font-size: 0.7rem;
+      }
+
+      .tree-more-button {
+        justify-self: start;
+        padding: 8px 12px;
+        font-size: 0.78rem;
       }
 
       .swatch {
@@ -624,7 +682,13 @@
         <section class="panel">
           <div class="panel-header">
             <h2 class="panel-title">File Tree</h2>
-            <div class="pill" id="tree-count">0 touched</div>
+            <div class="panel-tools">
+              <button class="button is-subtle-active" id="tree-scope-current" type="button">
+                Current Chapter
+              </button>
+              <button class="button" id="tree-scope-all" type="button">All</button>
+              <div class="pill" id="tree-count">0 touched</div>
+            </div>
           </div>
           <div class="panel-body">
             <div class="tree-list" id="tree-list"></div>
@@ -725,6 +789,8 @@
           playing: false,
           speed: 1,
           timerId: null,
+          treeScope: "current",
+          expandedTreeDirs: new Set(),
         };
 
         const previewPriority = [
@@ -750,6 +816,8 @@
           chapterRail: document.getElementById("chapter-rail"),
           treeCount: document.getElementById("tree-count"),
           treeList: document.getElementById("tree-list"),
+          treeScopeCurrent: document.getElementById("tree-scope-current"),
+          treeScopeAll: document.getElementById("tree-scope-all"),
           focusLabel: document.getElementById("focus-label"),
           focusSummary: document.getElementById("focus-summary"),
           focusMeta: document.getElementById("focus-meta"),
@@ -841,26 +909,49 @@
           return "No preview content for this event.";
         }
 
+        function treeEvents(index) {
+          if (state.treeScope !== "current") {
+            return events.slice(0, index + 1);
+          }
+          const currentChapterId = events[index] && events[index].chapter_id;
+          return events
+            .slice(0, index + 1)
+            .filter((event) => event.chapter_id === currentChapterId);
+        }
+
         function buildTree(index) {
           const touched = new Map();
-          events.slice(0, index + 1).forEach((event, eventIndex) => {
+          treeEvents(index).forEach((event, eventIndex) => {
             if (!event.path) {
               return;
             }
             touched.set(event.path, {
               path: event.path,
               type: event.type,
-              eventIndex,
+              eventIndex: events.findIndex((candidate) => candidate.id === event.id),
             });
           });
-          return Array.from(touched.values()).sort((left, right) =>
-            left.path.localeCompare(right.path),
-          );
+          return Array.from(touched.values());
         }
 
         function renderTree(index) {
           const touched = buildTree(index);
-          refs.treeCount.textContent = `${touched.length} touched`;
+          const currentEvent = events[index];
+          const directoryCount = new Set(
+            touched.map((item) => {
+              const slashIndex = item.path.lastIndexOf("/");
+              return slashIndex >= 0 ? item.path.slice(0, slashIndex) : "(project root)";
+            }),
+          ).size;
+          refs.treeCount.textContent = `${touched.length} files · ${directoryCount} dirs`;
+          refs.treeScopeCurrent.classList.toggle(
+            "is-subtle-active",
+            state.treeScope === "current",
+          );
+          refs.treeScopeAll.classList.toggle(
+            "is-subtle-active",
+            state.treeScope === "all",
+          );
           if (!touched.length) {
             refs.treeList.innerHTML =
               '<p class="empty-state">No file paths have been captured yet.</p>';
@@ -873,52 +964,81 @@
             const directory =
               slashIndex >= 0 ? item.path.slice(0, slashIndex) : "(project root)";
             if (!grouped.has(directory)) {
-              grouped.set(directory, []);
+              grouped.set(directory, {
+                items: [],
+                latestEventIndex: -1,
+              });
             }
-            grouped.get(directory).push(item);
+            const group = grouped.get(directory);
+            group.items.push(item);
+            group.latestEventIndex = Math.max(group.latestEventIndex, item.eventIndex);
           });
 
           refs.treeList.innerHTML = "";
           Array.from(grouped.entries())
-            .sort((left, right) => left[0].localeCompare(right[0]))
-            .forEach(([directory, items]) => {
+            .sort((left, right) => right[1].latestEventIndex - left[1].latestEventIndex)
+            .forEach(([directory, groupInfo]) => {
+              const items = groupInfo.items.sort(
+                (left, right) => right.eventIndex - left.eventIndex,
+              );
+              const expanded = state.expandedTreeDirs.has(directory);
+              const maxVisible = window.innerWidth < 860 ? 4 : 6;
+              const visibleItems = expanded ? items : items.slice(0, maxVisible);
+              const hiddenCount = items.length - visibleItems.length;
+              const hasCurrent = items.some(
+                (item) => item.eventIndex === index || item.path === currentEvent.path,
+              );
               const group = document.createElement("section");
               group.className = "tree-group";
+              if (hasCurrent) {
+                group.classList.add("is-current");
+              }
 
               const label = document.createElement("div");
               label.className = "tree-dir";
-              label.textContent = directory;
+              label.innerHTML = `
+                <span>${directory}</span>
+                <span class="pill">${items.length} file${items.length > 1 ? "s" : ""}</span>
+              `;
               group.appendChild(label);
 
-              items
-                .sort((left, right) => left.path.localeCompare(right.path))
-                .forEach((item) => {
-                  const row = document.createElement("div");
-                  row.className = "tree-item";
-                  if (item.eventIndex === index) {
-                    row.classList.add("is-current");
+              const chipWrap = document.createElement("div");
+              chipWrap.className = "tree-file-chips";
+              visibleItems.forEach((item) => {
+                const chip = document.createElement("div");
+                chip.className = "tree-file-chip";
+                if (item.eventIndex === index || item.path === currentEvent.path) {
+                  chip.classList.add("is-current");
+                }
+                chip.innerHTML = `
+                  <span class="swatch ${item.type}" style="background:${eventColor(item.type)}"></span>
+                  <span class="tree-file-chip-name">${item.path.split("/").pop()}</span>
+                  <span class="tree-file-chip-meta">${item.type}</span>
+                `;
+                chipWrap.appendChild(chip);
+              });
+              group.appendChild(chipWrap);
+
+              if (hiddenCount > 0) {
+                const toggle = document.createElement("button");
+                toggle.type = "button";
+                toggle.className = "button tree-more-button";
+                toggle.textContent = expanded
+                  ? "Show less"
+                  : `+${hiddenCount} more`;
+                toggle.addEventListener("click", () => {
+                  if (expanded) {
+                    state.expandedTreeDirs.delete(directory);
+                  } else {
+                    state.expandedTreeDirs.add(directory);
                   }
-
-                  const swatch = document.createElement("span");
-                  swatch.className = `swatch ${item.type}`;
-                  swatch.style.background = eventColor(item.type);
-                  row.appendChild(swatch);
-
-                  const content = document.createElement("div");
-                  const name = document.createElement("div");
-                  name.textContent = item.path.split("/").pop();
-                  content.appendChild(name);
-
-                  const meta = document.createElement("div");
-                  meta.className = "file-meta";
-                  meta.innerHTML = `<span class="pill">${item.type}</span>`;
-                  content.appendChild(meta);
-                  row.appendChild(content);
-                  group.appendChild(row);
+                  renderTree(state.index);
                 });
+                group.appendChild(toggle);
+              }
 
               refs.treeList.appendChild(group);
-          });
+            });
         }
 
         function renderChapters(index) {
@@ -1197,9 +1317,22 @@
           }
         });
 
+        refs.treeScopeCurrent.addEventListener("click", () => {
+          state.treeScope = "current";
+          state.expandedTreeDirs.clear();
+          renderTree(state.index);
+        });
+
+        refs.treeScopeAll.addEventListener("click", () => {
+          state.treeScope = "all";
+          state.expandedTreeDirs.clear();
+          renderTree(state.index);
+        });
+
         window.addEventListener("resize", () => {
           renderTimeline(state.index);
           renderChapters(state.index);
+          renderTree(state.index);
         });
 
         refs.title.textContent = data.title || refs.title.textContent;
