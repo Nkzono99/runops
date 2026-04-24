@@ -22,6 +22,8 @@
       "Bash(gh run *)",
       "Bash(mkdir *)",
       "Bash(python -c *)",
+      "Bash(python3 -c *)",
+      "Bash(python3 -m json.tool *)",
       "Bash(uv run python *)",
       "Bash(wc -l *)",
       "Bash(ls *)",

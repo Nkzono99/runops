@@ -8,7 +8,7 @@ core/         ← ドメインロジック。CLI / Slurm に依存しない
 adapters/     ← Simulator 固有処理の抽象化
 launchers/    ← MPI 起動方式の抽象化
 slurm/        ← Slurm CLI (sbatch, squeue, sacct) のラッパー
-harness/      ← Agent ハーネス (CLAUDE.md, settings, builder)
+harness/      ← project 側 Agent harness 生成 (builder, claude, codex)
 jobgen/       ← job.sh テンプレート生成
 templates/    ← Jinja2 + 静的テンプレート (init が scaffold に使う)
 ```
@@ -30,8 +30,8 @@ run の状態・由来・provenance はすべて `manifest.toml` に記録され
 
 runops は **2 種類のハーネス** を持つ:
 
-1. **このリポジトリ自身の `.claude/`** — runops 開発者向け
-2. **`src/runops/templates/` → `runops init` が生成するプロジェクト側ハーネス** — runops ユーザーのプロジェクト向け
+1. **このリポジトリ自身の `.claude/`, `.codex/`, `.agents/skills/`** — runops 開発者向け
+2. **`src/runops/templates/` → `runo init` が生成するプロジェクト側ハーネス** — runops ユーザーのプロジェクト向け
 
 `harness/builder.py` がプロジェクト側のハーネス生成を担う。
 `update-harness` が既存プロジェクトへの反映を担う。

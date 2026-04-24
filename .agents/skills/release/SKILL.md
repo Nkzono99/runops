@@ -93,6 +93,9 @@ git commit -m "chore: bump version to X.Y.Z"
 git tag -a vX.Y.Z -m "<日本語のリリースノート要約>"
 ```
 
+`git commit` と `git tag` は**順に**実行する。並列に走らせない。
+tag が直前の commit ではなく 1 つ前を指すと publish が壊れる。
+
 ### 6. push してリリース
 
 ユーザーの確認を得てから push する:
@@ -104,6 +107,8 @@ git push origin vX.Y.Z
 
 `v*` タグの push により `.github/workflows/publish.yml` が起動し、
 CI が自動で PyPI にパブリッシュする。
+
+`main` と tag の push も分けて順に実行する。
 
 ### 7. 確認
 

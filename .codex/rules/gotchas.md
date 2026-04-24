@@ -2,9 +2,9 @@
 
 ## Circular imports
 
-`harness/builder.py` が `cli/init.py` を import するとループする。
+`harness/builder.py` が `cli/init/command.py` を import するとループする。
 harness は templates と adapters.registry にだけ依存する。
-cli/init.py が harness/builder を import する方向は OK。
+`cli/init/command.py` が harness/builder を import する方向は OK。
 
 ## `_write_if_missing` のセマンティクス
 
@@ -22,6 +22,11 @@ cli/init.py が harness/builder を import する方向は OK。
 
 Python 3.11+ は `tomllib` が標準。3.10 では `tomli` を使う。
 ファイル先頭の `sys.version_info` 分岐を踏襲すること。
+
+## python vs python3
+
+この環境では `python` コマンドが無いことがある。
+ワンライナーや検証には `uv run python` か `python3` を使う。
 
 ## Claude / Codex settings
 
@@ -43,6 +48,12 @@ Adapter が返すリストは **累積** (重複排除) される。
 `pyproject.toml` の `version` と `src/runops/__init__.py` の `__version__` は
 **必ず同時に更新する**。片方だけ変えるとランタイム (`runo --version`) と
 PyPI パッケージのバージョンがずれる。`$release` スキルを使えば自動で両方更新される。
+
+## release の commit / tag 順序
+
+release では `git commit` の完了を待ってから `git tag -a` を切る。
+commit と tag を並列に走らせると、tag が 1 つ前の commit を指したまま push されることがある。
+push も `main` と tag を順に実行する。
 
 ## read_text() の encoding
 

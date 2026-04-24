@@ -44,5 +44,11 @@ CI でも同じチェックが走る。ruff format 違反は自動修正可 (`uv
 
 1. 品質ゲート通過を確認
 2. `pyproject.toml` と `src/runops/__init__.py` のバージョンを **同時に** 更新
-3. `git commit -m "chore: bump version to X.Y.Z"` + `git tag vX.Y.Z`
-4. `git push origin main --tags` で CI が PyPI にパブリッシュ
+3. 日本語のリリースノート草案を作る
+4. `git commit -m "chore: bump version to X.Y.Z"` を作成
+5. その commit を確認してから `git tag -a vX.Y.Z` を切る
+6. `git push origin main` と `git push origin vX.Y.Z` を **順に** 実行する
+7. `CI` と `Publish to PyPI` を確認し、GitHub Release 本文も日本語で作成する
+
+`git commit` と `git tag`, `git push origin main` と `git push origin vX.Y.Z` は
+並列化しない。tag が 1 つ前の commit を指すと publish が壊れる。

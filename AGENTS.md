@@ -31,6 +31,10 @@ Claude Code の `/check` などとは表記が異なる。
 
 Codex の project-local config は、この repo を trusted project として登録したときに読む。
 詳細は `.codex/README.md` を参照する。
+shared な運用変更を入れたら、`AGENTS.md`, `CLAUDE.md`,
+`.agents/skills/release/SKILL.md`, `.claude/skills/release/SKILL.md`,
+`.codex/rules/dev-workflow.md`, `.claude/rules/dev-workflow.md`,
+`.codex/rules/gotchas.md`, `.claude/rules/gotchas.md` の drift も点検する。
 
 ## プロジェクトでの利用方法
 
@@ -77,40 +81,31 @@ runops/
     runops/
       __init__.py
       cli/              # CLI エントリポイント (typer)
-        __init__.py
         main.py
-        init.py         # runo init / doctor
+        init/           # runo init / doctor / scaffold / bootstrap
+        knowledge/      # runo knowledge / knowledge source
         setup.py        # runo setup (clone + bootstrap)
-        context.py      # runo context
         new.py          # runo case new
         create.py       # runo runs create / sweep
         submit.py       # runo runs submit
         status.py       # runo runs status / sync
-        log.py          # runo runs log
-        jobs.py         # runo runs jobs (--watch 対応)
-        history.py      # runo runs history
-        list.py         # runo runs list (複数 PATH 対応)
-        dashboard.py    # runo runs dashboard (multi-run 進捗ビュー)
-        clone.py        # runo runs clone
-        extend.py       # runo runs extend
-        analyze.py      # runo analyze summarize / collect / plot
         manage.py       # runo runs archive / purge-work / cancel / delete
-        knowledge.py    # runo knowledge / knowledge source
-        config.py       # runo config
-        update.py       # runo update
-        update_refs.py  # runo update-refs
-        run_lookup.py   # run path / id lookup helper
+        update_harness.py
+        ...
       core/             # ドメインロジック
-        __init__.py
-        project.py      # Project 読込・検証
-        case.py         # Case 読込・展開
-        survey.py       # Survey 展開・parameter 直積
-        run.py          # Run 生成・run_id 採番
-        manifest.py     # manifest.toml 読書き
-        state.py        # 状態遷移管理
-        provenance.py   # コード provenance 取得
-        discovery.py    # runs/ 再帰探索・run_id 一意性検証
-        knowledge_source.py # 外部知識ソース管理
+        project.py
+        case.py
+        survey.py
+        run.py
+        manifest.py
+        state.py
+        provenance.py
+        discovery.py
+        knowledge_source.py
+        knowledge_source_render.py
+        knowledge_source_validation.py
+        publication.py
+        ...
       adapters/         # Simulator Adapter
         __init__.py
         base.py         # SimulatorAdapter 抽象基底クラス
@@ -132,9 +127,11 @@ runops/
         __init__.py
         camphor.toml
         camphor.md
-      harness/          # Agent harness 定義 (Claude Code 等)
+      harness/          # project 側 harness 生成 / 更新ロジック
         __init__.py
+        builder.py
         claude.py
+        codex.py
       templates/        # project / case / survey 用 静的テンプレート
         __init__.py
         ...
@@ -235,6 +232,8 @@ runops/
 - run の大容量出力 (work/outputs/, work/restart/, work/tmp/) は .gitignore で除外
 - テスト fixtures の TOML ファイルは Git 管理対象
 - `gh release create` などで release を切るときは、先に `pyproject.toml` の `[project].version` を更新し、Git tag / release 名と同じバージョンに揃えること
+- release の annotated tag message と GitHub Release 本文は日本語で書く
+- release の `git commit` → `git tag -a` → `git push origin main` → `git push origin vX.Y.Z` は順に実行し、並列化しない
 - Codex の個人用メモや一時 override は `AGENTS.override.md` に置き、Git 管理しない
 
 ## ビルド・実行

@@ -21,8 +21,10 @@ runops の開発ハーネスは `.claude/` だけではなく、`.codex/` と
 - Claude 固有設定は `.claude/`、Codex 固有設定は `.codex/` に置く
 - 共通ワークフローや運用知識は、tool 固有の文法差を除いて意図的な差分だけを残す
 - shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
-  `.claude/skills/improve-harness/SKILL.md`, `.agents/skills/improve-harness/SKILL.md`
-  の drift を点検する
+  `.claude/skills/improve-harness/SKILL.md`, `.agents/skills/improve-harness/SKILL.md`,
+  `.claude/skills/release/SKILL.md`, `.agents/skills/release/SKILL.md`,
+  `.claude/rules/dev-workflow.md`, `.codex/rules/dev-workflow.md`,
+  `.claude/rules/gotchas.md`, `.codex/rules/gotchas.md` の drift を点検する
 
 ## プロジェクトでの利用方法
 
@@ -52,13 +54,15 @@ source my-project/.venv/bin/activate && runo doctor
 ```
 src/runops/
   cli/           # CLI エントリポイント (typer) — 薄い層
+    init/        # runo init / doctor / scaffold / bootstrap
+    knowledge/   # runo knowledge / knowledge source
   core/          # ドメインロジック (CLI / Slurm に依存しない)
   adapters/      # Simulator Adapter (抽象基底 + registry)
   launchers/     # Launcher Profile (srun / mpirun / mpiexec)
   jobgen/        # job.sh 生成
   slurm/         # Slurm 連携 (sbatch / squeue / sacct)
   sites/         # bundled site preset
-  harness/       # Agent harness 定義
+  harness/       # project 側 harness 生成 / 更新 (builder / claude / codex)
   templates/     # project / case / survey 用 静的テンプレート
 tests/
   test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/
@@ -123,7 +127,7 @@ completed → archived → purged
 - docstring は Google style
 - テスト: Slurm はモック、TOML は fixtures、CLI は CliRunner
 - Git: 1 コミット = 1 論理変更、`--no-verify` / `--force` 禁止
-- release 時は `pyproject.toml` + `__init__.py` の version を同時に更新
+- release 時は `pyproject.toml` + `__init__.py` の version を同時に更新し、annotated tag / GitHub Release は日本語で書く
 
 ## Adapter 実装時の注意
 
