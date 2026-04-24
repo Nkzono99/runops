@@ -9,9 +9,10 @@ uv run ruff format --check src/ tests/
 uv run ruff check src/ tests/
 uv run mypy src/
 uv run pytest tests/ -x -q
+uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
 ```
 
-CI でも同じチェックが走る。ruff format 違反は自動修正可 (`uv run ruff format src/ tests/`)。
+CI でも同じチェックと分岐込み coverage floor が走る。ruff format 違反は自動修正可 (`uv run ruff format src/ tests/`)。
 
 ## コーディング規約
 

@@ -74,6 +74,7 @@ tests/
 ```bash
 uv sync --dev                              # 開発環境セットアップ
 uv run pytest                              # テスト
+uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80  # Coverage
 uv run ruff check src/ tests/              # Lint
 uv run ruff format --check src/ tests/     # Format check
 uv run mypy src/                           # 型チェック

@@ -9,6 +9,7 @@ consumed by ``runops.jobgen.generator._render_script``
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -409,6 +410,73 @@ class TestTransactionalRunCreation:
         assert f"cd {run_dir}" in job_sh
         assert str(run_dir / "input" / "params.json") in job_sh
         assert ".tmp-" not in job_sh
+
+    def test_stale_existing_ids_skip_existing_final_dir(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+        today = date.today().strftime("%Y%m%d")
+        stale_collision = parent_dir / f"R{today}-0001"
+        stale_collision.mkdir(parents=True)
+
+        result = create_prepared_run(
+            parent_dir=parent_dir,
+            case_data=case_data,
+            project=project,
+            adapter=GenericAdapter(),
+            launcher=_transactional_launcher(),
+            site=_standard_site(),
+            existing_ids=set(),
+        )
+
+        assert result.run_info.run_id == f"R{today}-0002"
+        assert result.run_info.run_dir.is_dir()
+        assert not any(path.name.startswith(".tmp-") for path in parent_dir.iterdir())
+
+    def test_commit_collision_retries_with_next_run_id(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+        today = date.today().strftime("%Y%m%d")
+        collisions: list[str] = []
+        real_write_manifest = run_creation_module.write_manifest
+
+        def write_manifest_with_collision(*args: object, **kwargs: object) -> None:
+            real_write_manifest(*args, **kwargs)
+            manifest = args[1]
+            run_id = str(manifest.run["id"])
+            if not collisions:
+                (parent_dir / run_id).mkdir(parents=True)
+                collisions.append(run_id)
+
+        monkeypatch.setattr(
+            run_creation_module,
+            "write_manifest",
+            write_manifest_with_collision,
+        )
+
+        result = create_prepared_run(
+            parent_dir=parent_dir,
+            case_data=case_data,
+            project=project,
+            adapter=GenericAdapter(),
+            launcher=_transactional_launcher(),
+            site=_standard_site(),
+            existing_ids=set(),
+        )
+
+        assert collisions == [f"R{today}-0001"]
+        assert result.run_info.run_id == f"R{today}-0002"
+        assert result.run_info.run_dir.is_dir()
+        assert (parent_dir / f"R{today}-0001").is_dir()
+        assert not any(path.name.startswith(".tmp-") for path in parent_dir.iterdir())
 
     def test_copy_failure_cleans_staging_and_final_dir(
         self,

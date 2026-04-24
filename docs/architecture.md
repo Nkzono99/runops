@@ -473,6 +473,18 @@ CLI: runo runs submit RUN
          manifest.toml と status/state.json を更新
 ```
 
+### status (状態確認)
+
+```
+CLI: runo runs status RUN
+  |
+  +--> resolve_run() --> read_manifest()
+  |      manifest.toml の run.status を表示
+  |
+  +--> query_job_status(job_id)  (job_id がある場合のみ best-effort)
+         live Slurm state を表示するが、manifest.toml と state.json は更新しない
+```
+
 ### sync (Slurm 状態同期)
 
 ```

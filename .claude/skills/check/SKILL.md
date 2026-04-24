@@ -1,6 +1,6 @@
 ---
 name: check
-description: "Run all quality checks (ruff format, ruff check, mypy, pytest) on the changed files. Report pass/fail for each step. If anything fails, show the error and suggest a fix."
+description: "Run all quality checks (ruff format, ruff check, mypy, pytest, branch coverage) on the changed files. Report pass/fail for each step. If anything fails, show the error and suggest a fix."
 ---
 
 # 品質チェック実行
@@ -12,6 +12,7 @@ uv run ruff format --check src/ tests/
 uv run ruff check src/ tests/
 uv run mypy src/
 uv run pytest tests/ -x -q
+uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
 ```
 
 失敗したステップがあればエラーを表示し、修正案を提示する。

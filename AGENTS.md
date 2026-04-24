@@ -245,6 +245,9 @@ uv sync --dev
 # テスト
 uv run pytest
 
+# Coverage (CI と同じ分岐込み floor)
+uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
+
 # Lint
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/

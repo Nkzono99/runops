@@ -59,7 +59,7 @@ jobs:
 
       - name: Run tests with coverage floor
         # Keep release verification aligned with CI's target minimum coverage.
-        run: uv run pytest --cov=runops --cov-report=term-missing --cov-fail-under=80
+        run: uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
 
   build:
     needs: verify

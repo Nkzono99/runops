@@ -1105,11 +1105,22 @@ curated layer との関係:
 
 ---
 
-## 19.4 `status`
+## 19.4 `status` / `sync`
 
-* `squeue` / `sacct` / adapter 判定により状態を更新
-* `status/state.json` を更新
-* manifest の `run.status` を同期
+`status` は観測表示、`sync` は manifest 更新を担当する。
+
+### `status`
+
+* manifest の `run.status` を表示する
+* `job_id` がある場合は `squeue` / `sacct` で live Slurm state を best-effort 表示する
+* manifest と `status/state.json` は更新しない
+* `--short` / `--summary` では live Slurm query を行わず、manifest のみを読む
+
+### `sync`
+
+* `squeue` / `sacct` により Slurm 状態を RunState に変換する
+* `status/state.json` を更新する
+* manifest の `run.status` と `run.last_slurm_state` を同期する
 * bulk モード (survey dir または複数 RUNS) では `job_id` 未記録 / terminal
   state な run を silent skip し、残りのみを処理する
 
