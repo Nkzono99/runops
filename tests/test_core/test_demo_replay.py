@@ -116,6 +116,8 @@ def test_build_demo_replay_ui_writes_self_contained_html(tmp_path: Path) -> None
         in html
     )
     assert "overflow-x: hidden;" in html
+    assert '<option value="64">64x</option>' in html
+    assert "Math.max(20" in html
 
 
 def test_load_demo_replay_bundle_rejects_empty_file(tmp_path: Path) -> None:
