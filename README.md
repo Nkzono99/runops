@@ -17,6 +17,7 @@ run ディレクトリを日常運用の主単位とし、パラメータサー�
 - **Provenance 記録**: git commit、executable hash、パラメータ snapshot を manifest.toml に自動記録
 - **多重ネスト対応**: `runs/` 以下を自由に階層化して分類・整理できる
 - **Agent/AI 対応**: TOML/JSON ベースの構造化データで AI エージェントとの連携が容易
+- **Demo Replay**: Codex session log から replay HTML を生成し、操作の流れを研究室向けに可視化できる
 - **知識層**: `notes/` と `materials/` を人間/Agent の共有作業場にし、`.runops/knowledge/` で生成済みコンテキストを提供
 - **外部知識ソース**: 共有知識リポジトリを project に接続し、profile ベースで必要な知識だけを投影
 - **Lab notebook**: `notes/YYYY-MM-DD.md` に append-only な時系列ノートを残し、`notes/reports/` で整理済みレポートに育てる
@@ -61,6 +62,19 @@ git clone https://github.com/Nkzono99/runops.git
 cd runops
 uv sync --dev
 ```
+
+## デモ作成
+
+Codex の session log から、研究室向けの replay UI を self-contained な HTML として生成できます。
+
+```bash
+uv run runo demo build-codex-replay \
+  ~/.codex/sessions/2026/04/24/rollout-....jsonl \
+  --out replay.html \
+  --workspace-root .
+```
+
+生成された `replay.html` には chapter ナビゲーション、ファイルツリー、現在イベントの command/diff/output 表示、activity feed、timeline が含まれます。詳細は [docs/demo-replay.md](docs/demo-replay.md) を参照してください。
 
 ## クイックスタート
 
