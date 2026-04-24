@@ -85,6 +85,7 @@ uv run runo demo render-replay \
 ## 現在の replay UI に含まれるもの
 
 - chapter ナビゲーション
+- current chapter の prompt 表示
 - 触れたファイルのツリー表示
 - 現在イベントの summary / path / metadata
 - command / diff / output / context の個別表示

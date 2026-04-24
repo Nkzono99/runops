@@ -278,6 +278,35 @@
         gap: 8px;
       }
 
+      .prompt-frame {
+        border: 1px solid rgba(31, 45, 46, 0.08);
+        border-radius: 20px;
+        background:
+          linear-gradient(135deg, rgba(15, 122, 119, 0.1), transparent 70%),
+          rgba(255, 255, 255, 0.68);
+        padding: 18px 20px;
+        display: grid;
+        gap: 14px;
+      }
+
+      .prompt-title {
+        margin: 0;
+        font-size: 1.1rem;
+        line-height: 1.4;
+      }
+
+      .prompt-body {
+        margin: 0;
+        font-size: 0.96rem;
+        line-height: 1.75;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .prompt-body.is-empty {
+        color: var(--muted);
+      }
+
       .tree-group {
         display: grid;
         gap: 10px;
@@ -742,6 +771,19 @@
         </div>
       </section>
 
+      <section class="panel">
+        <div class="panel-header">
+          <h2 class="panel-title">Chapter Prompt</h2>
+          <div class="pill" id="prompt-chapter">Chapter 1</div>
+        </div>
+        <div class="panel-body">
+          <div class="prompt-frame">
+            <h3 class="prompt-title" id="prompt-title"></h3>
+            <div class="prompt-body" id="prompt-body"></div>
+          </div>
+        </div>
+      </section>
+
       <div class="layout">
         <section class="panel">
           <div class="panel-header">
@@ -878,6 +920,9 @@
           statCurrent: document.getElementById("stat-current"),
           chapterCount: document.getElementById("chapter-count"),
           chapterRail: document.getElementById("chapter-rail"),
+          promptChapter: document.getElementById("prompt-chapter"),
+          promptTitle: document.getElementById("prompt-title"),
+          promptBody: document.getElementById("prompt-body"),
           treeCount: document.getElementById("tree-count"),
           treeList: document.getElementById("tree-list"),
           treeScopeCurrent: document.getElementById("tree-scope-current"),
@@ -1247,6 +1292,37 @@
           });
         }
 
+        function currentChapter(index) {
+          const current = events[index];
+          return (
+            chapters.find((chapter) => chapter.id === current.chapter_id) || null
+          );
+        }
+
+        function renderPrompt(index) {
+          const chapter = currentChapter(index);
+          if (!chapter) {
+            refs.promptChapter.textContent = "No chapter";
+            refs.promptTitle.textContent = "No chapter context";
+            refs.promptBody.classList.add("is-empty");
+            refs.promptBody.textContent =
+              "No inferred chapter is available for this replay.";
+            return;
+          }
+
+          refs.promptChapter.textContent = `Chapter ${chapter.index}`;
+          refs.promptTitle.textContent = chapter.title;
+          if (typeof chapter.prompt === "string" && chapter.prompt.trim()) {
+            refs.promptBody.classList.remove("is-empty");
+            refs.promptBody.textContent = chapter.prompt;
+            return;
+          }
+
+          refs.promptBody.classList.add("is-empty");
+          refs.promptBody.textContent =
+            "No explicit user prompt was captured for this chapter.";
+        }
+
         function setDetailCard(card, content, value) {
           if (typeof value === "string" && value.trim()) {
             card.classList.remove("is-hidden");
@@ -1406,6 +1482,7 @@
           renderStats();
           renderEventTypes();
           renderChapters(state.index);
+          renderPrompt(state.index);
           renderTree(state.index);
           renderFocus(state.index);
           renderFeed(state.index);

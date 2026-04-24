@@ -20,6 +20,7 @@ class DemoReplayChapter:
     id: str
     index: int
     title: str
+    prompt: str
     start_index: int
     end_index: int
     event_count: int
@@ -101,6 +102,7 @@ def render_demo_replay_html(bundle: DemoReplayBundle) -> str:
                 "id": chapter.id,
                 "index": chapter.index,
                 "title": chapter.title,
+                "prompt": chapter.prompt,
                 "startIndex": chapter.start_index,
                 "endIndex": chapter.end_index,
                 "eventCount": chapter.event_count,
@@ -216,6 +218,7 @@ def _infer_chapters(events: list[dict[str, Any]]) -> list[DemoReplayChapter]:
             id=f"chapter-{chapter_index:02d}",
             index=chapter_index,
             title=_chapter_title(lead_event, chapter_index),
+            prompt=_chapter_prompt(events, start_index),
             start_index=start_index,
             end_index=end_index,
             event_count=(end_index - start_index) + 1,
@@ -232,6 +235,7 @@ def _infer_chapters(events: list[dict[str, Any]]) -> list[DemoReplayChapter]:
             event["chapter_id"] = chapter.id
             event["chapter_index"] = chapter.index
             event["chapter_title"] = chapter.title
+            event["chapter_prompt"] = chapter.prompt
             event["step_in_chapter"] = offset
     return chapters
 
@@ -304,6 +308,20 @@ def _chapter_title(event: dict[str, Any], chapter_index: int) -> str:
     if event_type == "task_complete":
         return "Wrap Up"
     return _short_text(summary, limit=38)
+
+
+def _chapter_prompt(events: list[dict[str, Any]], start_index: int) -> str:
+    for index in range(start_index, -1, -1):
+        event = events[index]
+        if event.get("type") != "user_request":
+            continue
+        data = event.get("data")
+        if isinstance(data, dict):
+            message = _as_str(data.get("message"))
+            if message:
+                return message
+        return _as_str(event.get("summary"))
+    return ""
 
 
 def _command_label(event: dict[str, Any]) -> str:
