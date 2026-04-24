@@ -125,7 +125,13 @@ class TestUpdateHarnessBasic:
         assert result.exit_code == 0
         assert ".vscode/settings.json.new" in result.output
         assert settings_path.read_text(encoding="utf-8") == '{"files.exclude":{}}\n'
-        assert (tmp_path / ".vscode" / "settings.json.new").exists()
+        new_settings_path = tmp_path / ".vscode" / "settings.json.new"
+        assert new_settings_path.exists()
+        new_settings = json.loads(new_settings_path.read_text(encoding="utf-8"))
+        analysis_exclude = new_settings["python.analysis.exclude"]
+        assert "**/node_modules" in analysis_exclude
+        assert "**/__pycache__" in analysis_exclude
+        assert "**/.*" in analysis_exclude
 
     def test_backfills_visible_workspace_when_missing(self, tmp_path: Path) -> None:
         """update-harness recreates missing notes/materials scaffold."""

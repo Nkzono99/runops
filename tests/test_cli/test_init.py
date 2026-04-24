@@ -201,6 +201,9 @@ class TestInit:
         assert watcher_exclude["runs/**/status/**"] is True
 
         analysis_exclude = settings["python.analysis.exclude"]
+        assert "**/node_modules" in analysis_exclude
+        assert "**/__pycache__" in analysis_exclude
+        assert "**/.*" in analysis_exclude
         assert ".venv" in analysis_exclude
         assert ".ruff_cache" in analysis_exclude
         assert ".pytest_cache" in analysis_exclude
