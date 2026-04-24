@@ -281,13 +281,21 @@
       .tree-group {
         display: grid;
         gap: 10px;
+      }
+
+      .tree-group-top {
         padding: 12px 14px;
         border-radius: 18px;
         border: 1px solid rgba(31, 45, 46, 0.08);
         background: rgba(255, 255, 255, 0.6);
       }
 
-      .tree-group.is-current {
+      .tree-group-nested {
+        padding-left: 14px;
+        border-left: 1px solid rgba(31, 45, 46, 0.1);
+      }
+
+      .tree-group.is-current.tree-group-top {
         border-color: rgba(15, 122, 119, 0.22);
         background: rgba(15, 122, 119, 0.12);
       }
@@ -297,10 +305,72 @@
         align-items: center;
         justify-content: space-between;
         gap: 10px;
-        font-size: 0.8rem;
-        letter-spacing: 0.08em;
+        min-width: 0;
+      }
+
+      .tree-folder-button {
+        width: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+        min-width: 0;
+      }
+
+      .tree-folder-button:hover .tree-folder-name {
+        color: var(--accent);
+      }
+
+      .tree-folder-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-width: 0;
+      }
+
+      .tree-toggle {
+        font-size: 0.9rem;
+        color: var(--muted);
+        width: 0.9rem;
+        text-align: center;
+        flex: 0 0 auto;
+      }
+
+      .tree-folder-name {
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font-size: 0.82rem;
+        letter-spacing: 0.06em;
         text-transform: uppercase;
         color: var(--muted);
+      }
+
+      .tree-folder-meta {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: flex-end;
+      }
+
+      .tree-children {
+        display: grid;
+        gap: 10px;
+      }
+
+      .tree-files {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
       }
 
       .tree-file-chips {
@@ -339,12 +409,6 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
         font-size: 0.7rem;
-      }
-
-      .tree-more-button {
-        justify-self: start;
-        padding: 8px 12px;
-        font-size: 0.78rem;
       }
 
       .swatch {
@@ -934,15 +998,195 @@
           return Array.from(touched.values());
         }
 
+        function buildNestedTree(index) {
+          const root = {
+            name: "(project root)",
+            path: "",
+            dirs: new Map(),
+            files: [],
+            latestEventIndex: -1,
+          };
+          buildTree(index).forEach((item) => {
+            const parts = item.path.split("/").filter(Boolean);
+            if (!parts.length) {
+              return;
+            }
+            let node = root;
+            let currentPath = "";
+            if (parts.length === 1) {
+              root.files.push(item);
+              root.latestEventIndex = Math.max(root.latestEventIndex, item.eventIndex);
+              return;
+            }
+            parts.slice(0, -1).forEach((part) => {
+              currentPath = currentPath ? `${currentPath}/${part}` : part;
+              if (!node.dirs.has(part)) {
+                node.dirs.set(part, {
+                  name: part,
+                  path: currentPath,
+                  dirs: new Map(),
+                  files: [],
+                  latestEventIndex: -1,
+                });
+              }
+              node = node.dirs.get(part);
+              node.latestEventIndex = Math.max(node.latestEventIndex, item.eventIndex);
+            });
+            node.files.push(item);
+            node.latestEventIndex = Math.max(node.latestEventIndex, item.eventIndex);
+            root.latestEventIndex = Math.max(root.latestEventIndex, item.eventIndex);
+          });
+          return root;
+        }
+
+        function countNestedDirs(node) {
+          let count = 0;
+          node.dirs.forEach((child) => {
+            count += 1 + countNestedDirs(child);
+          });
+          return count;
+        }
+
+        function countNestedFiles(node) {
+          let count = node.files.length;
+          node.dirs.forEach((child) => {
+            count += countNestedFiles(child);
+          });
+          return count;
+        }
+
+        function currentPathAncestors(path) {
+          const ancestors = new Set();
+          if (!path) {
+            return ancestors;
+          }
+          const parts = path.split("/").filter(Boolean);
+          let currentPath = "";
+          parts.slice(0, -1).forEach((part) => {
+            currentPath = currentPath ? `${currentPath}/${part}` : part;
+            ancestors.add(currentPath);
+          });
+          return ancestors;
+        }
+
+        function renderFileChip(item, currentIndex, currentPath) {
+          const chip = document.createElement("div");
+          chip.className = "tree-file-chip";
+          if (item.eventIndex === currentIndex || item.path === currentPath) {
+            chip.classList.add("is-current");
+          }
+          chip.innerHTML = `
+            <span class="swatch ${item.type}" style="background:${eventColor(item.type)}"></span>
+            <span class="tree-file-chip-name">${item.path.split("/").pop()}</span>
+            <span class="tree-file-chip-meta">${item.type}</span>
+          `;
+          return chip;
+        }
+
+        function renderTreeNode(node, options) {
+          const {
+            currentIndex,
+            currentPath,
+            currentAncestors,
+            depth,
+          } = options;
+          const group = document.createElement("section");
+          group.className = `tree-group ${
+            depth === 0 ? "tree-group-top" : "tree-group-nested"
+          }`;
+
+          const isCurrent =
+            currentPath &&
+            (node.path === currentPath ||
+              currentAncestors.has(node.path) ||
+              (node.path === "" && !currentPath.includes("/")));
+          if (isCurrent) {
+            group.classList.add("is-current");
+          }
+
+          const totalFiles = countNestedFiles(node);
+          const totalDirs = countNestedDirs(node);
+          const expanded =
+            depth === 0 ||
+            currentAncestors.has(node.path) ||
+            state.expandedTreeDirs.has(node.path);
+
+          const label = document.createElement("div");
+          label.className = "tree-dir";
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "tree-folder-button";
+          button.innerHTML = `
+            <span class="tree-folder-label">
+              <span class="tree-toggle">${expanded ? "▾" : "▸"}</span>
+              <span class="tree-folder-name">${node.name}</span>
+            </span>
+            <span class="tree-folder-meta">
+              <span class="pill">${totalFiles} file${totalFiles > 1 ? "s" : ""}</span>
+              ${
+                totalDirs > 0
+                  ? `<span class="pill">${totalDirs} dir${totalDirs > 1 ? "s" : ""}</span>`
+                  : ""
+              }
+            </span>
+          `;
+          button.addEventListener("click", () => {
+            if (depth === 0) {
+              return;
+            }
+            if (state.expandedTreeDirs.has(node.path)) {
+              state.expandedTreeDirs.delete(node.path);
+            } else {
+              state.expandedTreeDirs.add(node.path);
+            }
+            renderTree(state.index);
+          });
+          label.appendChild(button);
+          group.appendChild(label);
+
+          if (!expanded) {
+            return group;
+          }
+
+          const children = document.createElement("div");
+          children.className = "tree-children";
+
+          if (node.files.length) {
+            const files = document.createElement("div");
+            files.className = "tree-files";
+            node.files
+              .slice()
+              .sort((left, right) => right.eventIndex - left.eventIndex)
+              .forEach((item) => {
+                files.appendChild(renderFileChip(item, currentIndex, currentPath));
+              });
+            children.appendChild(files);
+          }
+
+          Array.from(node.dirs.values())
+            .sort((left, right) => right.latestEventIndex - left.latestEventIndex)
+            .forEach((child) => {
+              children.appendChild(
+                renderTreeNode(child, {
+                  currentIndex,
+                  currentPath,
+                  currentAncestors,
+                  depth: depth + 1,
+                }),
+              );
+            });
+
+          group.appendChild(children);
+          return group;
+        }
+
         function renderTree(index) {
+          const root = buildNestedTree(index);
           const touched = buildTree(index);
           const currentEvent = events[index];
-          const directoryCount = new Set(
-            touched.map((item) => {
-              const slashIndex = item.path.lastIndexOf("/");
-              return slashIndex >= 0 ? item.path.slice(0, slashIndex) : "(project root)";
-            }),
-          ).size;
+          const currentPath = currentEvent.path || "";
+          const currentAncestors = currentPathAncestors(currentPath);
+          const directoryCount = countNestedDirs(root);
           refs.treeCount.textContent = `${touched.length} files · ${directoryCount} dirs`;
           refs.treeScopeCurrent.classList.toggle(
             "is-subtle-active",
@@ -958,87 +1202,15 @@
             return;
           }
 
-          const grouped = new Map();
-          touched.forEach((item) => {
-            const slashIndex = item.path.lastIndexOf("/");
-            const directory =
-              slashIndex >= 0 ? item.path.slice(0, slashIndex) : "(project root)";
-            if (!grouped.has(directory)) {
-              grouped.set(directory, {
-                items: [],
-                latestEventIndex: -1,
-              });
-            }
-            const group = grouped.get(directory);
-            group.items.push(item);
-            group.latestEventIndex = Math.max(group.latestEventIndex, item.eventIndex);
-          });
-
           refs.treeList.innerHTML = "";
-          Array.from(grouped.entries())
-            .sort((left, right) => right[1].latestEventIndex - left[1].latestEventIndex)
-            .forEach(([directory, groupInfo]) => {
-              const items = groupInfo.items.sort(
-                (left, right) => right.eventIndex - left.eventIndex,
-              );
-              const expanded = state.expandedTreeDirs.has(directory);
-              const maxVisible = window.innerWidth < 860 ? 4 : 6;
-              const visibleItems = expanded ? items : items.slice(0, maxVisible);
-              const hiddenCount = items.length - visibleItems.length;
-              const hasCurrent = items.some(
-                (item) => item.eventIndex === index || item.path === currentEvent.path,
-              );
-              const group = document.createElement("section");
-              group.className = "tree-group";
-              if (hasCurrent) {
-                group.classList.add("is-current");
-              }
-
-              const label = document.createElement("div");
-              label.className = "tree-dir";
-              label.innerHTML = `
-                <span>${directory}</span>
-                <span class="pill">${items.length} file${items.length > 1 ? "s" : ""}</span>
-              `;
-              group.appendChild(label);
-
-              const chipWrap = document.createElement("div");
-              chipWrap.className = "tree-file-chips";
-              visibleItems.forEach((item) => {
-                const chip = document.createElement("div");
-                chip.className = "tree-file-chip";
-                if (item.eventIndex === index || item.path === currentEvent.path) {
-                  chip.classList.add("is-current");
-                }
-                chip.innerHTML = `
-                  <span class="swatch ${item.type}" style="background:${eventColor(item.type)}"></span>
-                  <span class="tree-file-chip-name">${item.path.split("/").pop()}</span>
-                  <span class="tree-file-chip-meta">${item.type}</span>
-                `;
-                chipWrap.appendChild(chip);
-              });
-              group.appendChild(chipWrap);
-
-              if (hiddenCount > 0) {
-                const toggle = document.createElement("button");
-                toggle.type = "button";
-                toggle.className = "button tree-more-button";
-                toggle.textContent = expanded
-                  ? "Show less"
-                  : `+${hiddenCount} more`;
-                toggle.addEventListener("click", () => {
-                  if (expanded) {
-                    state.expandedTreeDirs.delete(directory);
-                  } else {
-                    state.expandedTreeDirs.add(directory);
-                  }
-                  renderTree(state.index);
-                });
-                group.appendChild(toggle);
-              }
-
-              refs.treeList.appendChild(group);
-            });
+          refs.treeList.appendChild(
+            renderTreeNode(root, {
+              currentIndex: index,
+              currentPath,
+              currentAncestors,
+              depth: 0,
+            }),
+          );
         }
 
         function renderChapters(index) {

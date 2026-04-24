@@ -121,6 +121,10 @@ def test_build_demo_replay_ui_writes_self_contained_html(tmp_path: Path) -> None
     assert "Math.max(20" in html
     assert 'id="tree-scope-current"' in html
     assert 'id="tree-scope-all"' in html
+    assert "function buildNestedTree(index)" in html
+    assert "function renderTreeNode(node, options)" in html
+    assert "tree-folder-button" in html
+    assert "(project root)" in html
 
 
 def test_load_demo_replay_bundle_rejects_empty_file(tmp_path: Path) -> None:
