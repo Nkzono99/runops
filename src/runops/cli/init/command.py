@@ -132,7 +132,7 @@ def init(
         f"\n[harness]\nupstream_feedback = {'true' if upstream_feedback else 'false'}\n"
     )
     simproject_content = (
-        f"#:schema {_SCHEMA_BASE_URL}/simproject.json\n"
+        f"#:schema {_SCHEMA_BASE_URL}/runops.json\n"
         f'[project]\nname = "{project_name}"\ndescription = ""\n' + harness_line
     )
     if _write_if_missing(project_dir / _SIMPROJECT_FILE, simproject_content):

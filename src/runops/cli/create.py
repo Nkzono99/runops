@@ -8,10 +8,11 @@ from typing import Annotated, Any, Optional
 import typer
 
 from runops.core.actions import ActionStatus, execute_action
-from runops.core.case import JobData, load_case, resolve_case
+from runops.core.case import JobData
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
-from runops.core.survey import expand_survey, generate_display_name, load_survey
+from runops.core.run_creation import plan_survey_runs
+from runops.core.survey import generate_display_name
 
 
 def _echo_warnings(warnings: list[str], *, context: str = "") -> None:
@@ -143,49 +144,42 @@ def sweep(
 def _sweep_dry_run(survey_dir: Path) -> None:
     """Print the planned runs without writing files."""
     try:
-        survey_data = load_survey(survey_dir)
-    except SimctlError as exc:
-        typer.echo(f"Error: {exc}", err=True)
-        raise typer.Exit(code=1) from exc
-
-    try:
         project_root = find_project_root(survey_dir)
     except SimctlError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    # Look up the base case so we can show the resolved job (the survey's
-    # own [job] block, when present, overrides the case's).
     try:
         project = load_project(project_root)
-        case_dir = resolve_case(survey_data.base_case, project.root_dir)
-        case_data = load_case(case_dir)
+        plan = plan_survey_runs(project, survey_dir)
     except SimctlError as exc:
-        typer.echo(f"Error resolving base case: {exc}", err=True)
+        typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
 
-    effective_job = survey_data.job if survey_data.job.partition else case_data.job
-
-    combinations = expand_survey(survey_data.axes, survey_data.linked)
+    combinations = list(plan.combinations)
     if not combinations:
         typer.echo("No parameter combinations to expand.")
         raise typer.Exit(code=0)
 
     n = len(combinations)
     typer.echo(f"[dry-run] {n} runs would be created in {survey_dir}")
-    typer.echo(f"  base case  : {survey_data.base_case}")
-    typer.echo(f"  simulator  : {survey_data.simulator}")
-    typer.echo(f"  launcher   : {survey_data.launcher}")
-    if survey_data.naming_template:
-        typer.echo(f"  display    : {survey_data.naming_template}")
-    typer.echo(_format_job_summary(effective_job))
-    typer.echo(_format_resource_estimate(effective_job, n))
+    typer.echo(f"  base case  : {plan.survey_data.base_case}")
+    typer.echo(f"  simulator  : {plan.effective_case.simulator}")
+    typer.echo(f"  launcher   : {plan.effective_case.launcher}")
+    if plan.survey_data.naming_template:
+        typer.echo(f"  display    : {plan.survey_data.naming_template}")
+    typer.echo(_format_job_summary(plan.effective_case.job))
+    typer.echo(_format_resource_estimate(plan.effective_case.job, n))
 
     # Print one line per combination so the user can scan parameters.
     typer.echo("")
     typer.echo("Planned runs:")
     for combo in combinations:
-        display_name = generate_display_name(survey_data.naming_template, combo)
+        merged_params = {**plan.base_case.params, **combo}
+        display_name = generate_display_name(
+            plan.survey_data.naming_template,
+            merged_params,
+        )
         params_str = _format_combo(combo)
         if display_name:
             typer.echo(f"  {display_name:<24} {params_str}")

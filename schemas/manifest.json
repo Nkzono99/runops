@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "manifest.toml",
-  "description": "Run manifest — the source of truth for a runops run",
+  "description": "Run manifest, the source of truth for a runops run",
   "type": "object",
   "required": ["run"],
   "properties": {
@@ -11,61 +11,148 @@
       "properties": {
         "id": {
           "type": "string",
-          "pattern": "^R\\d{8}-\\d{4}$",
-          "description": "Unique run ID (e.g. R20260329-0001)"
+          "pattern": "^R\\d{8}-\\d{4}$"
         },
+        "display_name": { "type": "string" },
         "status": {
           "type": "string",
-          "enum": ["created", "submitted", "running", "completed", "failed", "cancelled", "archived", "purged"],
-          "description": "Current run state"
+          "enum": [
+            "created",
+            "submitted",
+            "running",
+            "completed",
+            "failed",
+            "cancelled",
+            "archived",
+            "purged"
+          ]
         },
         "created_at": {
           "type": "string",
-          "format": "date-time",
-          "description": "ISO 8601 creation timestamp"
+          "format": "date-time"
         },
-        "simulator": {
-          "type": "string",
-          "description": "Simulator name"
-        },
-        "case": {
-          "type": "string",
-          "description": "Source case name or path"
-        },
-        "parent_run_id": {
-          "type": "string",
-          "description": "Parent run ID (for cloned runs)"
-        }
-      }
-    },
-    "params": {
-      "type": "object",
-      "description": "Parameter snapshot (frozen at run creation)",
+        "failure_reason": { "type": "string" },
+        "last_slurm_state": { "type": "string" }
+      },
       "additionalProperties": true
     },
-    "slurm": {
+    "path": {
       "type": "object",
-      "description": "Slurm job information",
       "properties": {
-        "job_id": { "type": "string" },
-        "partition": { "type": "string" },
-        "nodes": { "type": "integer" },
-        "ntasks": { "type": "integer" },
-        "time": { "type": "string" },
-        "submitted_at": { "type": "string", "format": "date-time" }
-      }
+        "run_dir": { "type": "string" }
+      },
+      "additionalProperties": true
     },
-    "provenance": {
+    "origin": {
       "type": "object",
-      "description": "Code provenance information",
+      "properties": {
+        "case": { "type": "string" },
+        "survey": { "type": "string" },
+        "parent_run": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "classification": {
+      "type": "object",
+      "properties": {
+        "model": { "type": "string" },
+        "submodel": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "simulator": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "adapter": { "type": "string" },
+        "resolver_mode": {
+          "type": "string",
+          "enum": ["local_executable", "local_source", "package"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "launcher": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "simulator_source": {
+      "type": "object",
+      "description": "Simulator runtime and source provenance",
       "properties": {
         "resolver_mode": { "type": "string" },
         "executable": { "type": "string" },
         "exe_hash": { "type": "string" },
         "git_commit": { "type": "string" },
         "git_dirty": { "type": "boolean" },
-        "source_repo": { "type": "string" }
-      }
+        "source_repo": { "type": "string" },
+        "build_command": { "type": "string" },
+        "package_version": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "job": {
+      "type": "object",
+      "description": "Scheduler job configuration and latest submission state",
+      "properties": {
+        "scheduler": { "type": "string" },
+        "job_id": { "type": "string" },
+        "partition": { "type": "string" },
+        "nodes": { "type": "integer" },
+        "ntasks": { "type": "integer" },
+        "processes": { "type": "integer" },
+        "threads": { "type": "integer" },
+        "cores": { "type": "integer" },
+        "memory": { "type": "string" },
+        "gpus": { "type": "integer" },
+        "qos": { "type": "string" },
+        "walltime": { "type": "string" },
+        "submitted_at": { "type": "string" },
+        "attempt": { "type": "integer" },
+        "queue": { "type": "string" },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "variation": {
+      "type": "object",
+      "properties": {
+        "changed_keys": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "params_snapshot": {
+      "type": "object",
+      "description": "Full parameter snapshot frozen at run creation",
+      "additionalProperties": true
+    },
+    "files": {
+      "type": "object",
+      "properties": {
+        "input_dir": { "type": "string" },
+        "submit_dir": { "type": "string" },
+        "work_dir": { "type": "string" },
+        "analysis_dir": { "type": "string" },
+        "status_dir": { "type": "string" }
+      },
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": true
 }

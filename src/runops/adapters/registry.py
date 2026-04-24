@@ -8,6 +8,7 @@ shared global instance.
 from __future__ import annotations
 
 import importlib
+import importlib.util
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -15,6 +16,10 @@ if TYPE_CHECKING:
     from runops.adapters.base import SimulatorAdapter
 
 logger = logging.getLogger(__name__)
+
+
+class AdapterImportError(RuntimeError):
+    """Raised when a discovered adapter module fails during import."""
 
 
 class AdapterRegistry:
@@ -131,6 +136,12 @@ class AdapterRegistry:
                 f"runops.adapters.{adapter_name}",
             ):
                 try:
+                    spec = importlib.util.find_spec(module_path)
+                except (AttributeError, ImportError):
+                    spec = None
+                if spec is None:
+                    continue
+                try:
                     importlib.import_module(module_path)
                     logger.debug(
                         "Auto-imported adapter module '%s' for simulator '%s'",
@@ -139,8 +150,11 @@ class AdapterRegistry:
                     )
                     imported = True
                     break
-                except ImportError:
-                    continue
+                except ImportError as exc:
+                    raise AdapterImportError(
+                        "Failed to import adapter module "
+                        f"'{module_path}' for simulator '{sim_name}': {exc}"
+                    ) from exc
             if not imported:
                 logger.warning(
                     "Could not import adapter for simulator '%s'",

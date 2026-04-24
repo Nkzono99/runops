@@ -378,6 +378,44 @@ class TestSweep:
         ]
         assert run_dirs == []
 
+    def test_sweep_dry_run_uses_partial_survey_job_overrides(
+        self, tmp_path: Path
+    ) -> None:
+        """--dry-run reports the same merged job settings as real sweep."""
+        project_dir = _make_project(tmp_path)
+        _make_case(project_dir, "base_case")
+        survey_dir = project_dir / "runs" / "my_survey"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text(
+            "[survey]\n"
+            'id = "S20260327-partial"\n'
+            'name = "Partial override survey"\n'
+            'base_case = "base_case"\n'
+            'simulator = "test_sim"\n'
+            'launcher = "slurm_srun"\n'
+            "\n"
+            "[axes]\n"
+            "nx = [32]\n"
+            "\n"
+            "[job]\n"
+            'walltime = "02:30:00"\n'
+        )
+
+        result = runner.invoke(app, ["runs", "sweep", "--dry-run", str(survey_dir)])
+
+        assert result.exit_code == 0, result.output
+        assert "partition=debug" in result.output
+        assert "ntasks=4" in result.output
+        assert "walltime=02:30:00" in result.output
+        assert "2.5 h walltime" in result.output
+        assert "10 core-hours" in result.output
+        run_dirs = [
+            d
+            for d in survey_dir.iterdir()
+            if d.is_dir() and (d / "manifest.toml").exists()
+        ]
+        assert run_dirs == []
+
     def test_sweep_dry_run_lists_combinations(self, tmp_path: Path) -> None:
         """--dry-run prints one line per planned run with its parameters."""
         project_dir = _make_project(tmp_path)

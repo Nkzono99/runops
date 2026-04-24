@@ -69,9 +69,7 @@ def discover_codex_session_log(
     )
 
     if not search_root.is_dir():
-        raise SessionImportError(
-            f"Codex sessions directory not found: {search_root}"
-        )
+        raise SessionImportError(f"Codex sessions directory not found: {search_root}")
 
     latest_match: DiscoveredCodexSessionLog | None = None
     latest_key: tuple[str, int] | None = None

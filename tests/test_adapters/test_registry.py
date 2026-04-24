@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
+import importlib.machinery
 from pathlib import Path
 from typing import Any
 
 import pytest
 
 from runops.adapters.base import SimulatorAdapter
-from runops.adapters.registry import AdapterRegistry
+from runops.adapters.registry import AdapterImportError, AdapterRegistry
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -140,6 +141,41 @@ def test_load_from_config_unknown_module(registry: AdapterRegistry) -> None:
     # Should not raise, just warn
     registry.load_from_config(config)
     assert "totally_fake_adapter" not in registry.list_adapters()
+
+
+def test_load_from_config_raises_for_broken_adapter_module(
+    registry: AdapterRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A discovered adapter module with broken imports should fail loudly."""
+    config = {
+        "simulators": {
+            "broken_sim": {
+                "adapter": "broken_adapter",
+                "resolver_mode": "package",
+            }
+        }
+    }
+
+    def fake_find_spec(module_path: str):
+        if module_path == "runops.adapters.contrib.broken_adapter":
+            return importlib.machinery.ModuleSpec(module_path, loader=None)
+        return None
+
+    def fake_import_module(module_path: str):
+        raise ImportError("missing optional dependency")
+
+    monkeypatch.setattr(
+        "runops.adapters.registry.importlib.util.find_spec",
+        fake_find_spec,
+    )
+    monkeypatch.setattr(
+        "runops.adapters.registry.importlib.import_module",
+        fake_import_module,
+    )
+
+    with pytest.raises(AdapterImportError, match="missing optional dependency"):
+        registry.load_from_config(config)
 
 
 def test_load_from_config_skips_already_registered(

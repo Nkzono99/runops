@@ -463,6 +463,9 @@ class TestInit:
         for filename in ("runops.toml", "simulators.toml", "launchers.toml"):
             content = (tmp_path / filename).read_text(encoding="utf-8")
             assert "#:schema" in content
+        runops_content = (tmp_path / "runops.toml").read_text(encoding="utf-8")
+        assert "/schemas/runops.json" in runops_content
+        assert "simproject.json" not in runops_content
 
     def test_init_references_tools_dir(self, tmp_path: Path) -> None:
         """CLAUDE.md references tools/runops/ for docs."""

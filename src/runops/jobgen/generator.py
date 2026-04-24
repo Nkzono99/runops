@@ -11,6 +11,8 @@ Supports two resource specification modes:
 
 from __future__ import annotations
 
+import re
+import shlex
 import stat
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -21,6 +23,9 @@ if TYPE_CHECKING:
 
 class JobScriptError(RuntimeError):
     """Raised when job script generation fails due to invalid parameters."""
+
+
+_SHELL_IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def generate_job_script(
@@ -182,6 +187,18 @@ def _validate_job_config(job_config: dict[str, Any]) -> None:
         raise JobScriptError(f"Missing required job config keys: {', '.join(missing)}")
 
 
+def _quote_words(words: list[str]) -> str:
+    """Quote a list of shell words while preserving simple values."""
+    return " ".join(shlex.quote(word) for word in words)
+
+
+def _export_line(key: str, value: str) -> str:
+    """Render a safe shell export assignment."""
+    if not _SHELL_IDENTIFIER_RE.match(key):
+        raise JobScriptError(f"Invalid environment variable name: {key!r}")
+    return f"export {key}={shlex.quote(value)}"
+
+
 def _render_script(
     *,
     job_config: dict[str, Any],
@@ -256,19 +273,19 @@ def _render_script(
 
     # --- Module loads ---
     if modules:
-        lines.append(f"module load {' '.join(modules)}")
+        lines.append(f"module load {_quote_words(modules)}")
         lines.append("")
 
     # --- Environment variables ---
     if extra_env:
         for key, value in sorted(extra_env.items()):
-            lines.append(f"export {key}={value}")
+            lines.append(_export_line(str(key), str(value)))
         lines.append("")
 
     # --- Change to run directory ---
     # Use absolute path so the script works regardless of sbatch cwd.
     # Simulators refer to input/ and work/ relative to the run root.
-    lines.append(f"cd {run_dir}")
+    lines.append(f"cd {shlex.quote(str(run_dir))}")
     lines.append("")
 
     lines.append("date")

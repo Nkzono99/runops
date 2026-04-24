@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import shlex
 from pathlib import Path
 
 import pytest
@@ -140,6 +141,41 @@ class TestGenerateJobScript:
         path = generate_job_script(run_dir, job_config, "srun ./solver")
         content = path.read_text()
         assert f"cd {run_dir}" in content
+
+    def test_shell_fragments_are_quoted(self, tmp_path: Path) -> None:
+        """Generated shell fragments quote values that may contain spaces."""
+        run_dir = tmp_path / "project with spaces" / "R20260327-0001"
+        (run_dir / "work").mkdir(parents=True)
+
+        path = generate_job_script(
+            run_dir,
+            {
+                "partition": "debug",
+                "nodes": 1,
+                "ntasks": 4,
+                "walltime": "00:10:00",
+            },
+            "srun ./solver",
+            modules=["gcc/12.0", "my module/1"],
+            extra_env={"RUNOPS_LABEL": "hello world"},
+        )
+        content = path.read_text()
+
+        assert "module load gcc/12.0 'my module/1'" in content
+        assert "export RUNOPS_LABEL='hello world'" in content
+        assert f"cd {shlex.quote(str(run_dir))}" in content
+
+    def test_invalid_env_name_raises(
+        self, run_dir: Path, job_config: dict[str, object]
+    ) -> None:
+        """Environment variable names are identifiers, not raw shell text."""
+        with pytest.raises(JobScriptError, match="Invalid environment variable"):
+            generate_job_script(
+                run_dir,
+                job_config,
+                "srun ./solver",
+                extra_env={"BAD-NAME": "value"},
+            )
 
     def test_executable_bit(self, run_dir: Path, job_config: dict[str, object]) -> None:
         path = generate_job_script(run_dir, job_config, "srun ./solver")

@@ -97,6 +97,19 @@
           }
         }
       }
+    },
+    "harness": {
+      "type": "object",
+      "description": "AI harness generation options",
+      "properties": {
+        "upstream_feedback": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether generated agent docs include upstream feedback guidance"
+        }
+      },
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": true
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import shutil
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from uuid import uuid4
 
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
-from runops.adapters.registry import load_from_config
+from runops.adapters.registry import AdapterImportError, load_from_config
 from runops.core.case import (
     CaseData,
     ClassificationData,
@@ -30,7 +31,12 @@ from runops.core.manifest import ManifestData, write_manifest
 from runops.core.project import ProjectConfig, find_project_root, load_project
 from runops.core.run import RunInfo, create_run_directory, next_run_id
 from runops.core.site import SiteProfile, load_site_profile
-from runops.core.survey import expand_survey, generate_display_name, load_survey
+from runops.core.survey import (
+    SurveyData,
+    expand_survey,
+    generate_display_name,
+    load_survey,
+)
 from runops.jobgen.generator import generate_job_script
 from runops.launchers.base import Launcher, load_launchers
 
@@ -41,6 +47,17 @@ class CreatedRunResult:
 
     run_info: RunInfo
     warnings: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class SurveyExpansionPlan:
+    """Resolved survey expansion shared by dry-run and real sweep creation."""
+
+    survey_data: SurveyData
+    base_case: CaseData
+    effective_case: CaseData
+    combinations: tuple[dict[str, Any], ...]
+    variation_keys: tuple[str, ...]
 
 
 def load_project_from_path(path: Path) -> ProjectConfig:
@@ -54,7 +71,10 @@ def load_adapter_for_simulator(
     simulator_name: str,
 ) -> SimulatorAdapter:
     """Instantiate the adapter referenced by a simulator entry."""
-    load_from_config(project.simulators)
+    try:
+        load_from_config(project.simulators)
+    except AdapterImportError as exc:
+        raise ProjectConfigError(str(exc)) from exc
     sim_config = project.simulators.get(simulator_name, {})
     adapter_name = sim_config.get("adapter", simulator_name)
     try:
@@ -373,6 +393,61 @@ def _rewrite_staging_paths(
     return [value.replace(staging, final) for value in values]
 
 
+def plan_survey_runs(
+    project: ProjectConfig,
+    survey_dir: Path,
+) -> SurveyExpansionPlan:
+    """Resolve a survey into the exact run plan used by sweep creation.
+
+    Args:
+        project: Loaded project configuration.
+        survey_dir: Directory containing ``survey.toml``.
+
+    Returns:
+        Resolved survey data, merged case metadata/job settings, parameter
+        combinations, and variation keys.
+    """
+    survey_data = load_survey(survey_dir)
+    case_dir = resolve_case(survey_data.base_case, project.root_dir)
+    case_data = load_case(case_dir)
+
+    simulator_name = survey_data.simulator or case_data.simulator
+    launcher_name = survey_data.launcher or case_data.launcher
+    effective_case = CaseData(
+        name=case_data.name,
+        simulator=simulator_name,
+        launcher=launcher_name,
+        description=case_data.description,
+        classification=_merge_classification(
+            case_data.classification,
+            survey_data.classification,
+            survey_data.raw.get("classification", {}),
+        ),
+        job=_merge_job(
+            case_data.job,
+            survey_data.job,
+            survey_data.raw.get("job", {}),
+        ),
+        params=case_data.params,
+        case_dir=case_data.case_dir,
+        raw=case_data.raw,
+    )
+    validate_case_references(project, effective_case)
+
+    combinations = tuple(expand_survey(survey_data.axes, survey_data.linked))
+    variation_keys = list(survey_data.axes.keys())
+    for group in survey_data.linked:
+        variation_keys.extend(group.keys())
+
+    return SurveyExpansionPlan(
+        survey_data=survey_data,
+        base_case=case_data,
+        effective_case=effective_case,
+        combinations=combinations,
+        variation_keys=tuple(variation_keys),
+    )
+
+
 def create_prepared_run(
     parent_dir: Path,
     case_data: CaseData,
@@ -465,7 +540,7 @@ def create_prepared_run(
         extra_setup: list[str] = []
         venv_activate = project.root_dir / ".venv" / "bin" / "activate"
         if venv_activate.exists():
-            extra_setup.append(f"source {venv_activate}")
+            extra_setup.append(f"source {shlex.quote(str(venv_activate))}")
 
         generate_job_script(
             staging_run_dir,
@@ -706,56 +781,26 @@ def create_survey_runs(
     survey_dir: Path,
 ) -> list[CreatedRunResult]:
     """Expand a survey and create all runs declared by it."""
-    survey_data = load_survey(survey_dir)
-    case_dir = resolve_case(survey_data.base_case, project.root_dir)
-    case_data = load_case(case_dir)
-
-    simulator_name = survey_data.simulator or case_data.simulator
-    launcher_name = survey_data.launcher or case_data.launcher
-    adapter = load_adapter_for_simulator(project, simulator_name)
-    launcher = load_launcher_for_name(project, launcher_name)
-    site = load_site_profile(project.root_dir)
-
-    combinations = expand_survey(survey_data.axes, survey_data.linked)
-    if not combinations:
+    plan = plan_survey_runs(project, survey_dir)
+    if not plan.combinations:
         return []
 
-    effective_case = CaseData(
-        name=case_data.name,
-        simulator=simulator_name,
-        launcher=launcher_name,
-        description=case_data.description,
-        classification=_merge_classification(
-            case_data.classification,
-            survey_data.classification,
-            survey_data.raw.get("classification", {}),
-        ),
-        job=_merge_job(
-            case_data.job,
-            survey_data.job,
-            survey_data.raw.get("job", {}),
-        ),
-        params=case_data.params,
-        case_dir=case_data.case_dir,
-        raw=case_data.raw,
-    )
-
-    variation_keys = list(survey_data.axes.keys())
-    for group in survey_data.linked:
-        variation_keys.extend(group.keys())
+    adapter = load_adapter_for_simulator(project, plan.effective_case.simulator)
+    launcher = load_launcher_for_name(project, plan.effective_case.launcher)
+    site = load_site_profile(project.root_dir)
 
     existing_ids = collect_existing_run_ids(project.root_dir / "runs")
     results: list[CreatedRunResult] = []
-    for combo in combinations:
-        merged_params = {**case_data.params, **combo}
+    for combo in plan.combinations:
+        merged_params = {**plan.base_case.params, **combo}
         display_name = generate_display_name(
-            survey_data.naming_template,
+            plan.survey_data.naming_template,
             merged_params,
         )
         results.append(
             create_prepared_run(
                 parent_dir=survey_dir,
-                case_data=effective_case,
+                case_data=plan.effective_case,
                 project=project,
                 adapter=adapter,
                 launcher=launcher,
@@ -763,8 +808,8 @@ def create_survey_runs(
                 existing_ids=existing_ids,
                 params=merged_params,
                 display_name=display_name,
-                survey_id=survey_data.id,
-                variation_keys=variation_keys,
+                survey_id=plan.survey_data.id,
+                variation_keys=list(plan.variation_keys),
             )
         )
     return results

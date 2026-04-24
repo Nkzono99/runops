@@ -1,17 +1,17 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "survey.toml",
-  "description": "Parameter survey definition for runops (Cartesian product and co-varying expansion). See SPEC section 11 and docs/toml-reference.md.",
+  "description": "Parameter survey definition for runops",
   "type": "object",
   "required": ["survey"],
   "properties": {
     "survey": {
       "type": "object",
-      "required": ["base_case", "simulator"],
+      "required": ["base_case", "simulator", "launcher"],
       "properties": {
         "id": {
           "type": "string",
-          "description": "Survey identifier (e.g. 'S20260327-cavity-u-a')"
+          "description": "Survey identifier, e.g. S20260327-cavity-u-a"
         },
         "name": {
           "type": "string",
@@ -19,55 +19,48 @@
         },
         "base_case": {
           "type": "string",
-          "description": "Name of the base case to derive runs from (must match a cases/<name>/case.toml)"
+          "description": "Case name to derive runs from"
         },
         "simulator": {
           "type": "string",
-          "description": "Simulator name (must match simulators.toml)"
+          "description": "Simulator entry name from simulators.toml"
         },
         "launcher": {
           "type": "string",
-          "description": "Launcher profile name (must match launchers.toml)"
+          "description": "Launcher profile name from launchers.toml"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "classification": {
       "type": "object",
-      "description": "Optional metadata for organizing runs",
+      "description": "Optional metadata overlay for generated runs",
       "properties": {
-        "model": {
-          "type": "string",
-          "description": "Physical model category (e.g. 'sheath', 'wave')"
-        },
-        "submodel": {
-          "type": "string",
-          "description": "Subcategory (e.g. 'flat_surface', 'periodic')"
-        },
+        "model": { "type": "string" },
+        "submodel": { "type": "string" },
         "tags": {
           "type": "array",
-          "items": { "type": "string" },
-          "description": "Free-form tags for filtering"
+          "items": { "type": "string" }
         }
-      }
+      },
+      "additionalProperties": true
     },
     "axes": {
       "type": "object",
-      "description": "Parameter axes for Cartesian product expansion. Each key is a dot-notation parameter path, value is an array of values to sweep.",
+      "description": "Cartesian product parameter axes. Keys may use dot notation.",
       "additionalProperties": {
         "type": "array",
-        "minItems": 1,
-        "description": "Array of values for this parameter axis"
+        "minItems": 1
       }
     },
     "linked": {
       "type": "array",
-      "description": "Co-varying parameter groups. Parameters within each group are zipped (must have equal-length arrays). Multiple groups are combined via Cartesian product with each other and with [axes].",
+      "description": "Co-varying parameter groups. Values in each group are zipped.",
       "items": {
         "type": "object",
         "additionalProperties": {
           "type": "array",
-          "minItems": 1,
-          "description": "Array of values for this co-varying parameter"
+          "minItems": 1
         }
       }
     },
@@ -77,23 +70,40 @@
       "properties": {
         "display_name": {
           "type": "string",
-          "description": "Template for run display names. Use {key} placeholders where key is the leaf name after the last dot."
+          "description": "Template for run display names"
         }
-      }
+      },
+      "additionalProperties": true
     },
     "job": {
       "type": "object",
-      "description": "Slurm job parameters shared across all generated runs",
+      "description": "Partial job overlay applied to the base case job section",
       "properties": {
-        "partition": { "type": "string", "description": "Partition/queue name" },
-        "nodes": { "type": "integer", "description": "Number of nodes" },
-        "ntasks": { "type": "integer", "description": "Number of MPI tasks" },
-        "cpus_per_task": { "type": "integer", "description": "CPUs per task" },
-        "walltime": { "type": "string", "description": "Wall time limit (HH:MM:SS)" },
-        "job_name": { "type": "string", "description": "Job name prefix" },
-        "threads_per_process": { "type": "integer", "description": "Threads per process (for rsc style)" },
-        "cores_per_thread": { "type": "integer", "description": "Cores per thread (for rsc style)" }
-      }
+        "partition": { "type": "string" },
+        "nodes": { "type": "integer" },
+        "ntasks": { "type": "integer" },
+        "walltime": { "type": "string" },
+        "processes": { "type": "integer" },
+        "threads": { "type": "integer" },
+        "cores": { "type": "integer" },
+        "memory": { "type": "string" },
+        "gpus": { "type": "integer" },
+        "qos": { "type": "string" },
+        "modules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pre_commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "post_commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": true
 }

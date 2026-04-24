@@ -1,49 +1,80 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "case.toml",
-  "description": "Case template definition for runops",
+  "description": "Reusable case template definition for runops",
   "type": "object",
   "required": ["case"],
   "properties": {
     "case": {
       "type": "object",
-      "required": ["simulator"],
+      "required": ["name", "simulator", "launcher"],
       "properties": {
+        "name": {
+          "type": "string",
+          "description": "Case name"
+        },
         "simulator": {
           "type": "string",
-          "description": "Simulator name (must match simulators.toml)"
+          "description": "Simulator entry name from simulators.toml"
         },
-        "case_dir": {
+        "launcher": {
           "type": "string",
-          "description": "Path to case template directory"
-        },
-        "input_files": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Input file paths to copy"
+          "description": "Launcher profile name from launchers.toml"
         },
         "description": {
           "type": "string",
           "description": "Case description"
         }
-      }
-    },
-    "params": {
-      "type": "object",
-      "description": "Default parameter overrides (dot-notation keys)",
+      },
       "additionalProperties": true
     },
-    "slurm": {
+    "classification": {
       "type": "object",
-      "description": "Slurm job parameters",
+      "description": "Metadata for organizing runs",
+      "properties": {
+        "model": { "type": "string" },
+        "submodel": { "type": "string" },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "job": {
+      "type": "object",
+      "description": "Slurm job parameters for runs created from this case",
       "properties": {
         "partition": { "type": "string" },
         "nodes": { "type": "integer" },
         "ntasks": { "type": "integer" },
-        "cpus_per_task": { "type": "integer" },
-        "time": { "type": "string" },
-        "job_name": { "type": "string" }
-      }
+        "walltime": { "type": "string" },
+        "processes": { "type": "integer" },
+        "threads": { "type": "integer" },
+        "cores": { "type": "integer" },
+        "memory": { "type": "string" },
+        "gpus": { "type": "integer" },
+        "qos": { "type": "string" },
+        "modules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "pre_commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "post_commands": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "params": {
+      "type": "object",
+      "description": "Default simulator parameters",
+      "additionalProperties": true
     }
-  }
+  },
+  "additionalProperties": true
 }

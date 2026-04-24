@@ -9,12 +9,20 @@
       "type": "object",
       "additionalProperties": {
         "type": "object",
-        "required": ["type"],
+        "anyOf": [
+          { "required": ["type"] },
+          { "required": ["kind"] }
+        ],
         "properties": {
           "type": {
             "type": "string",
             "enum": ["srun", "mpirun", "mpiexec"],
             "description": "Launcher type"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["srun", "mpirun", "mpiexec"],
+            "description": "Legacy alias for launcher type"
           },
           "command": {
             "type": "string",

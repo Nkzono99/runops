@@ -23,6 +23,7 @@ from runops.core.run_creation import (
     _merge_classification,
     _merge_job,
     create_prepared_run,
+    plan_survey_runs,
 )
 from runops.core.site import SiteProfile
 from runops.jobgen.generator import generate_job_script
@@ -290,6 +291,74 @@ class TestSurveyOverrides:
             == classification
         )
         assert _merge_job(job, JobData(partition="ignored"), {}) == job
+
+    def test_plan_survey_runs_reuses_partial_override_logic(
+        self, tmp_path: Path
+    ) -> None:
+        """Planning and real sweep creation share the same merged case state."""
+        project = ProjectConfig(
+            name="test-project",
+            description="",
+            root_dir=tmp_path,
+            simulators={
+                "generic": {
+                    "adapter": "generic",
+                    "executable": "echo",
+                    "resolver_mode": "package",
+                }
+            },
+            launchers={"srun": {"type": "srun"}},
+        )
+        case_dir = tmp_path / "cases" / "base_case"
+        case_dir.mkdir(parents=True)
+        (case_dir / "case.toml").write_text(
+            "[case]\n"
+            'name = "base_case"\n'
+            'simulator = "generic"\n'
+            'launcher = "srun"\n'
+            "\n"
+            "[classification]\n"
+            'model = "base"\n'
+            'tags = ["baseline"]\n'
+            "\n"
+            "[job]\n"
+            'partition = "compute"\n'
+            "nodes = 2\n"
+            "ntasks = 16\n"
+            'walltime = "01:00:00"\n'
+            "\n"
+            "[params]\n"
+            "nx = 64\n"
+        )
+        survey_dir = tmp_path / "runs" / "survey"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text(
+            "[survey]\n"
+            'id = "S20260327-test"\n'
+            'base_case = "base_case"\n'
+            'simulator = "generic"\n'
+            'launcher = "srun"\n'
+            "\n"
+            "[classification]\n"
+            'tags = ["scan"]\n'
+            "\n"
+            "[axes]\n"
+            "nx = [32, 64]\n"
+            "\n"
+            "[job]\n"
+            'walltime = "02:30:00"\n'
+        )
+
+        plan = plan_survey_runs(project, survey_dir)
+
+        assert len(plan.combinations) == 2
+        assert plan.variation_keys == ("nx",)
+        assert plan.effective_case.classification.model == "base"
+        assert plan.effective_case.classification.tags == ["scan"]
+        assert plan.effective_case.job.partition == "compute"
+        assert plan.effective_case.job.nodes == 2
+        assert plan.effective_case.job.ntasks == 16
+        assert plan.effective_case.job.walltime == "02:30:00"
 
 
 class RenderFailAdapter(GenericAdapter):
