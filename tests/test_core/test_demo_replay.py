@@ -110,6 +110,12 @@ def test_build_demo_replay_ui_writes_self_contained_html(tmp_path: Path) -> None
     assert '"eventCount": 2' in html
     assert '"chapterCount": 1' in html
     assert '"type": "note"' in html
+    assert "function timelineBuckets()" in html
+    assert (
+        "grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));"
+        in html
+    )
+    assert "overflow-x: hidden;" in html
 
 
 def test_load_demo_replay_bundle_rejects_empty_file(tmp_path: Path) -> None:
