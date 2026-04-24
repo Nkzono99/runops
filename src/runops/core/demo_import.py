@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 from collections import Counter
 from dataclasses import dataclass
@@ -33,6 +34,16 @@ class DemoImportResult:
     event_counts: dict[str, int]
 
 
+@dataclass(frozen=True)
+class DiscoveredCodexSessionLog:
+    """Metadata for one Codex session log discovered on disk."""
+
+    path: Path
+    session_id: str | None
+    cwd: Path | None
+    started_at: str | None
+
+
 def import_codex_session_log(
     session_log: Path | str,
     output_path: Path | str,
@@ -42,6 +53,100 @@ def import_codex_session_log(
     """Import a Codex session JSONL into replay-friendly demo events JSONL."""
     importer = _CodexSessionImporter(workspace_root=workspace_root)
     return importer.import_file(Path(session_log), Path(output_path))
+
+
+def discover_codex_session_log(
+    *,
+    workspace_root: Path | str,
+    sessions_root: Path | str | None = None,
+) -> DiscoveredCodexSessionLog:
+    """Find the latest Codex session log whose cwd matches ``workspace_root``."""
+    workspace = _canonicalize_path(Path(workspace_root))
+    search_root = (
+        _canonicalize_path(Path(sessions_root))
+        if sessions_root is not None
+        else _default_codex_sessions_root()
+    )
+
+    if not search_root.is_dir():
+        raise SessionImportError(
+            f"Codex sessions directory not found: {search_root}"
+        )
+
+    latest_match: DiscoveredCodexSessionLog | None = None
+    latest_key: tuple[str, int] | None = None
+    for session_log in search_root.rglob("*.jsonl"):
+        candidate = _read_codex_session_meta(session_log)
+        if candidate is None or candidate.cwd != workspace:
+            continue
+        sort_key = (candidate.started_at or "", _file_mtime_ns(candidate.path))
+        if latest_key is None or sort_key > latest_key:
+            latest_match = candidate
+            latest_key = sort_key
+
+    if latest_match is None:
+        raise SessionImportError(
+            f"no Codex session logs found for workspace {workspace} under {search_root}"
+        )
+
+    return latest_match
+
+
+def _default_codex_sessions_root() -> Path:
+    codex_home = Path(os.environ.get("CODEX_HOME", "~/.codex"))
+    return _canonicalize_path(codex_home) / "sessions"
+
+
+def _canonicalize_path(path: Path) -> Path:
+    return path.expanduser().resolve(strict=False)
+
+
+def _file_mtime_ns(path: Path) -> int:
+    try:
+        return path.stat().st_mtime_ns
+    except OSError:
+        return 0
+
+
+def _read_codex_session_meta(session_log: Path) -> DiscoveredCodexSessionLog | None:
+    try:
+        with session_log.open(encoding="utf-8") as src:
+            for line_number, line in enumerate(src, start=1):
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    record = json.loads(stripped)
+                except JSONDecodeError:
+                    return None
+
+                if record.get("type") != "session_meta":
+                    if line_number >= 20:
+                        return None
+                    continue
+
+                payload = record.get("payload")
+                if not isinstance(payload, dict):
+                    return None
+
+                cwd_value = payload.get("cwd")
+                cwd = (
+                    _canonicalize_path(Path(cwd_value))
+                    if isinstance(cwd_value, str) and cwd_value.strip()
+                    else None
+                )
+                session_id = payload.get("id")
+                started_at = payload.get("timestamp") or record.get("timestamp")
+                return DiscoveredCodexSessionLog(
+                    path=session_log,
+                    session_id=session_id if isinstance(session_id, str) else None,
+                    cwd=cwd,
+                    started_at=started_at if isinstance(started_at, str) else None,
+                )
+    except OSError:
+        return None
+
+    return None
 
 
 class _CodexSessionImporter:

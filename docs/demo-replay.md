@@ -26,6 +26,20 @@ uv run runo demo build-codex-replay \
   --title "RunOps Session Replay"
 ```
 
+session log を毎回手で指定したくない場合は、`build-codex-replay` の
+第 1 引数を省略できます。この場合、`--workspace-root` に一致する
+最新の Codex session を `~/.codex/sessions` から自動探索します。
+
+```bash
+uv run runo demo build-codex-replay \
+  --out replay.html \
+  --workspace-root . \
+  --title "RunOps Session Replay"
+```
+
+`CODEX_HOME` を独自に切っている場合はその配下の `sessions/` を使います。
+探索先を明示したい場合は `--sessions-root` で上書きできます。
+
 このコマンドは内部で次の 2 段階を実行します。
 
 1. session log を `demo-events.jsonl` に正規化する
@@ -39,6 +53,16 @@ uv run runo demo build-codex-replay \
   --events-out demo-events.jsonl \
   --out replay.html \
   --workspace-root .
+```
+
+自動探索と `--events-out` を併用することもできます。
+
+```bash
+uv run runo demo build-codex-replay \
+  --events-out demo-events.jsonl \
+  --out replay.html \
+  --workspace-root . \
+  --sessions-root ~/.codex/sessions
 ```
 
 ## 2 段階で実行する場合

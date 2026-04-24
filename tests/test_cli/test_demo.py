@@ -219,3 +219,79 @@ def test_build_codex_replay_command_creates_events_and_html(tmp_path: Path) -> N
     html = html_out.read_text(encoding="utf-8")
     assert "<title>Build Replay</title>" in html
     assert "survey.toml" in html
+
+
+def test_build_codex_replay_command_auto_discovers_session_log(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    sessions_root = tmp_path / "codex" / "sessions"
+    session_log = sessions_root / "2026" / "04" / "24" / "rollout-demo.jsonl"
+    session_log.parent.mkdir(parents=True, exist_ok=True)
+    html_out = tmp_path / "replay.html"
+    events_out = tmp_path / "demo-events.jsonl"
+    source_file = project_root / "campaign.toml"
+
+    _write_jsonl(
+        session_log,
+        [
+            {
+                "timestamp": "2026-04-24T03:07:15.536Z",
+                "type": "session_meta",
+                "payload": {
+                    "id": "sess-auto",
+                    "cwd": str(project_root),
+                    "source": "vscode",
+                },
+            },
+            {
+                "timestamp": "2026-04-24T03:07:22.000Z",
+                "type": "event_msg",
+                "payload": {
+                    "type": "exec_command_end",
+                    "call_id": "call-exec",
+                    "command": [
+                        "/usr/bin/bash",
+                        "-lc",
+                        f"sed -n '1,20p' {source_file}",
+                    ],
+                    "cwd": str(project_root),
+                    "parsed_cmd": [
+                        {
+                            "type": "read",
+                            "cmd": f"sed -n '1,20p' {source_file}",
+                            "name": "campaign.toml",
+                            "path": str(source_file),
+                        }
+                    ],
+                    "aggregated_output": "title = 'demo'",
+                    "exit_code": 0,
+                },
+            },
+        ],
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "demo",
+            "build-codex-replay",
+            "--out",
+            str(html_out),
+            "--events-out",
+            str(events_out),
+            "--workspace-root",
+            str(project_root),
+            "--sessions-root",
+            str(sessions_root),
+            "--title",
+            "Auto Replay",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert f"Auto-discovered session log: {session_log}" in result.output
+    assert "Imported 3 events" in result.output
+    assert html_out.is_file()
+    assert events_out.is_file()

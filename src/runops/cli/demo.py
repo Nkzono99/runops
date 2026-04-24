@@ -6,7 +6,10 @@ from pathlib import Path
 
 import typer
 
-from runops.core.demo_import import import_codex_session_log
+from runops.core.demo_import import (
+    discover_codex_session_log,
+    import_codex_session_log,
+)
 from runops.core.demo_replay import build_demo_replay_ui
 from runops.core.exceptions import DemoReplayError, SessionImportError
 
@@ -115,13 +118,16 @@ def render_replay(
 
 @demo_app.command("build-codex-replay")
 def build_codex_replay(
-    session_log: Path = typer.Argument(
-        ...,
+    session_log: Path | None = typer.Argument(
+        None,
         exists=True,
         dir_okay=False,
         readable=True,
         resolve_path=True,
-        help="Codex session JSONL to import and render.",
+        help=(
+            "Codex session JSONL to import and render. "
+            "If omitted, the latest session matching --workspace-root is discovered."
+        ),
     ),
     out: Path = typer.Option(
         ...,
@@ -138,6 +144,17 @@ def build_codex_replay(
         file_okay=False,
         resolve_path=True,
         help="Project root used to relativize imported file paths.",
+    ),
+    sessions_root: Path | None = typer.Option(
+        None,
+        "--sessions-root",
+        exists=True,
+        file_okay=False,
+        resolve_path=True,
+        help=(
+            "Optional Codex sessions directory used for auto-discovery. "
+            "Defaults to $CODEX_HOME/sessions or ~/.codex/sessions."
+        ),
     ),
     events_out: Path | None = typer.Option(
         None,
@@ -162,8 +179,17 @@ def build_codex_replay(
     resolved_events_out = events_out or out.with_suffix(".events.jsonl")
 
     try:
+        resolved_session_log = session_log
+        if resolved_session_log is None:
+            discovered = discover_codex_session_log(
+                workspace_root=workspace_root,
+                sessions_root=sessions_root,
+            )
+            resolved_session_log = discovered.path
+            typer.echo(f"Auto-discovered session log: {resolved_session_log}")
+
         import_result = import_codex_session_log(
-            session_log,
+            resolved_session_log,
             resolved_events_out,
             workspace_root=workspace_root,
         )

@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from runops.core.demo_import import import_codex_session_log
+from runops.core.demo_import import discover_codex_session_log, import_codex_session_log
 from runops.core.exceptions import SessionImportError
 
 
@@ -24,6 +24,30 @@ def _read_jsonl(path: Path) -> list[dict[str, object]]:
         for line in path.read_text(encoding="utf-8").splitlines()
         if line.strip()
     ]
+
+
+def _write_session_meta(
+    path: Path,
+    *,
+    session_id: str,
+    cwd: Path,
+    started_at: str,
+) -> None:
+    _write_jsonl(
+        path,
+        [
+            {
+                "timestamp": started_at,
+                "type": "session_meta",
+                "payload": {
+                    "id": session_id,
+                    "timestamp": started_at,
+                    "cwd": str(cwd),
+                    "source": "vscode",
+                },
+            }
+        ],
+    )
 
 
 def test_import_codex_session_log_normalizes_demo_events(tmp_path: Path) -> None:
@@ -197,3 +221,69 @@ def test_import_codex_session_log_reports_invalid_json_line(tmp_path: Path) -> N
 
     with pytest.raises(SessionImportError, match="line 2"):
         import_codex_session_log(session_log, tmp_path / "out.jsonl")
+
+
+def test_discover_codex_session_log_picks_latest_matching_workspace(
+    tmp_path: Path,
+) -> None:
+    project_root = tmp_path / "project"
+    other_root = tmp_path / "other"
+    project_root.mkdir()
+    other_root.mkdir()
+    sessions_root = tmp_path / "codex" / "sessions"
+
+    older = sessions_root / "2026" / "04" / "23" / "rollout-older.jsonl"
+    newer = sessions_root / "2026" / "04" / "24" / "rollout-newer.jsonl"
+    unrelated = sessions_root / "2026" / "04" / "24" / "rollout-other.jsonl"
+    older.parent.mkdir(parents=True, exist_ok=True)
+    newer.parent.mkdir(parents=True, exist_ok=True)
+
+    _write_session_meta(
+        older,
+        session_id="sess-older",
+        cwd=project_root,
+        started_at="2026-04-23T10:00:00Z",
+    )
+    _write_session_meta(
+        newer,
+        session_id="sess-newer",
+        cwd=project_root,
+        started_at="2026-04-24T10:00:00Z",
+    )
+    _write_session_meta(
+        unrelated,
+        session_id="sess-other",
+        cwd=other_root,
+        started_at="2026-04-24T11:00:00Z",
+    )
+
+    discovered = discover_codex_session_log(
+        workspace_root=project_root,
+        sessions_root=sessions_root,
+    )
+
+    assert discovered.path == newer
+    assert discovered.session_id == "sess-newer"
+    assert discovered.cwd == project_root.resolve()
+    assert discovered.started_at == "2026-04-24T10:00:00Z"
+
+
+def test_discover_codex_session_log_reports_no_match(tmp_path: Path) -> None:
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    sessions_root = tmp_path / "codex" / "sessions"
+    session_log = sessions_root / "2026" / "04" / "24" / "rollout-other.jsonl"
+    session_log.parent.mkdir(parents=True, exist_ok=True)
+
+    _write_session_meta(
+        session_log,
+        session_id="sess-other",
+        cwd=tmp_path / "other",
+        started_at="2026-04-24T11:00:00Z",
+    )
+
+    with pytest.raises(SessionImportError, match="no Codex session logs found"):
+        discover_codex_session_log(
+            workspace_root=project_root,
+            sessions_root=sessions_root,
+        )
