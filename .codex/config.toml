@@ -8,10 +8,9 @@
 #
 # See .codex/README.md for the full wiring guide.
 
-# Default approval behaviour for this project.
-# Keep this conservative because runops manages HPC jobs and can spend cluster
-# resources when submit/cancel/delete workflows are invoked.
-approval_policy = "on-request"
+# Keep this file to repo-stable defaults. Runtime-sensitive options
+# such as approval and network policy belong in the Codex runtime or
+# user-local config; see .codex/README.md for the responsibility split.
 
 # Workspace-write is the intended default for day-to-day development. It allows
 # edits in this repository while protecting unrelated paths.
@@ -20,8 +19,3 @@ sandbox_mode = "workspace-write"
 # AGENTS.md is intentionally substantial because it doubles as the project
 # onboarding document for Codex.
 project_doc_max_bytes = 65536
-
-[sandbox_workspace_write]
-# Networked operations such as GitHub, PyPI, git clone, or knowledge-source sync
-# should be explicit user-approved actions in normal Codex sessions.
-network_access = false

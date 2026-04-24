@@ -8,22 +8,14 @@
 #
 # See .codex/README.md for the full wiring guide.
 
-# Default approval behaviour for this project.
-# "on-request" lets Codex ask before running commands outside the
-# sandbox. Keep this conservative for HPC projects.
-approval_policy = "on-request"
+# Keep this file to repo-stable defaults. Runtime-sensitive options
+# such as approval and network policy belong in the Codex runtime or
+# user-local config; see .codex/README.md for the responsibility split.
 
-# Sandbox: workspace-write allows edits inside the project root
-# and protects writes outside the tree. Network is disabled below;
-# with approval_policy = "on-request", Codex can still ask before
-# running networked setup/sync commands outside the sandbox.
+# Sandbox: workspace-write allows edits inside the project root and
+# protects writes outside the tree.
 sandbox_mode = "workspace-write"
 
 # runops AGENTS.md can grow as simulators and knowledge sources are
 # added. Give Codex enough room before project instructions truncate.
 project_doc_max_bytes = 65536
-
-[sandbox_workspace_write]
-# Keep repo-local Codex work offline by default. Networked operations
-# such as git/knowledge sync should be explicit user-approved actions.
-network_access = false

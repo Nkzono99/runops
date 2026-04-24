@@ -12,7 +12,7 @@ Claude Code 用の `.claude/` と同じ運用思想を共有しますが、Codex
 - `.agents/skills/<name>/SKILL.md`
   — Codex の Agent Skill。`$skill-name` または自動発火で呼ばれる。
 - `.codex/config.toml`
-  — approval policy / sandbox mode などの project 既定値。
+  — sandbox mode や project doc budget などの repo-local 既定値。
 - `.codex/rules/runops.rules`
   — sandbox 外実行に escalation するときの command policy。
 - `.codex/rules/*.md`
@@ -36,6 +36,27 @@ trust_level = "trusted"
 | `.claude/agents/<name>.md` | `.agents/skills/<name>/SKILL.md` | Codex では専用 agent 定義ではなく skill として読む |
 | `.claude/rules/*.md` | `.codex/rules/*.md` / `AGENTS.md` | 設計・運用リファレンス |
 | `.claude/settings.json` | `.codex/config.toml` / `.codex/rules/*.rules` | permissions allowlist の完全互換はない |
+
+## 設定の責務分離
+
+`.codex/config.toml` は、Git 管理しても環境差が出にくい repo-local default
+だけを置きます。この repository では `sandbox_mode` と
+`project_doc_max_bytes` を共有し、`approval_policy` と `network_access` は
+書きません。
+
+- `.codex/config.toml`
+  — repo-local default。project trust 後に読むが、実行時の許可モードを
+  固定する場所ではない。
+- `.codex/rules/*.rules`
+  — `submit`, `delete`, `rm -rf` など高リスク command の policy。
+- Codex runtime / `~/.codex/config.toml`
+  — approval mode、network policy、auto-review など、実行環境や作業者に
+  依存する設定。
+
+`network_access` は shell sandbox の network 設定であり、検索・閲覧など
+Codex 側の別機能全体を説明するものではありません。network を使う
+GitHub, PyPI, `git clone`, `runo knowledge source sync` などは、runtime policy と
+会話上の確認に従って実行してください。
 
 ## 個人用上書き
 

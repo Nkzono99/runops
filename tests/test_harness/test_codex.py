@@ -10,15 +10,15 @@ from runops.harness import (
 )
 
 
-def test_build_codex_config_includes_project_name_and_policy() -> None:
-    """Config echoes the project name and sets approval / sandbox defaults."""
+def test_build_codex_config_keeps_repo_stable_defaults() -> None:
+    """Config echoes the project name and avoids runtime-sensitive policy."""
     content = build_codex_config("demo")
     assert "demo" in content
-    assert 'approval_policy = "on-request"' in content
     assert 'sandbox_mode = "workspace-write"' in content
     assert "project_doc_max_bytes = 65536" in content
-    assert "[sandbox_workspace_write]" in content
-    assert "network_access = false" in content
+    assert "approval_policy =" not in content
+    assert "network_access =" not in content
+    assert "[sandbox_workspace_write]" not in content
 
 
 def test_build_codex_config_documents_trust_requirement() -> None:
@@ -70,6 +70,18 @@ def test_build_codex_readme_explains_auto_loaded_paths() -> None:
     assert ".codex/hooks.json" in content
     # Clarifies the non-auto-loaded pieces.
     assert "~/.codex/prompts/" in content
+
+
+def test_build_codex_readme_explains_runtime_policy_split() -> None:
+    """README separates repo-local config from runtime/user-local policy."""
+    content = build_codex_readme("demo")
+    assert "設定の責務分離" in content
+    assert "repo-local default" in content
+    assert "approval_policy" in content
+    assert "network_access" in content
+    assert "~/.codex/config.toml" in content
+    assert ".codex/rules/*.rules" in content
+    assert "runtime policy" in content
 
 
 def test_build_codex_readme_explains_submit_policy_opt_in() -> None:
