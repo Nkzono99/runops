@@ -127,6 +127,49 @@ def test_build_demo_replay_ui_writes_self_contained_html(tmp_path: Path) -> None
     assert "(project root)" in html
 
 
+def test_task_start_does_not_force_new_chapter(tmp_path: Path) -> None:
+    events_path = tmp_path / "demo-events.jsonl"
+    _write_jsonl(
+        events_path,
+        [
+            {
+                "t": "2026-04-24T03:07:15Z",
+                "type": "user_request",
+                "actor": "user",
+                "summary": "Create a replay demo",
+            },
+            {
+                "t": "2026-04-24T03:07:16Z",
+                "type": "task_start",
+                "actor": "system",
+                "summary": "Task started",
+            },
+            {
+                "t": "2026-04-24T03:07:20Z",
+                "type": "read",
+                "actor": "agent",
+                "summary": "Read campaign.toml",
+                "path": "campaign.toml",
+            },
+            {
+                "t": "2026-04-24T03:07:28Z",
+                "type": "command",
+                "actor": "agent",
+                "summary": "Execute sweep",
+                "data": {"command": "runo runs sweep cases/base"},
+            },
+        ],
+    )
+
+    bundle = load_demo_replay_bundle(events_path)
+
+    assert bundle.chapter_count == 2
+    assert bundle.events[0]["chapter_index"] == 1
+    assert bundle.events[1]["chapter_index"] == 1
+    assert bundle.events[2]["chapter_index"] == 1
+    assert bundle.events[3]["chapter_index"] == 2
+
+
 def test_load_demo_replay_bundle_rejects_empty_file(tmp_path: Path) -> None:
     events_path = tmp_path / "empty.jsonl"
     events_path.write_text("", encoding="utf-8")

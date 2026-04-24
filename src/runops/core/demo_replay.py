@@ -244,7 +244,7 @@ def _starts_new_chapter(
     event = events[index]
     distance = index - current_start
     event_type = event["type"]
-    if event_type in {"user_request", "task_start"}:
+    if event_type == "user_request":
         return True
     if event_type == "command" and distance >= 2 and _is_primary_command(event):
         return True
