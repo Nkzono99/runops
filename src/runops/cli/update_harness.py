@@ -119,8 +119,8 @@ def _pull_tools_repo(project_dir: Path) -> str | None:
 
 def _restart_with_skip_pull() -> None:
     """Re-exec ``update-harness`` so the pulled editable install is reloaded."""
-    argv = [sys.executable, "-m", "runops.cli.main", *sys.argv[1:]]
-    if "--skip-pull" not in argv[3:]:
+    argv = [sys.executable, "-I", "-m", "runops.cli.main", *sys.argv[1:]]
+    if "--skip-pull" not in argv[4:]:
         argv.append("--skip-pull")
 
     env = dict(os.environ)
