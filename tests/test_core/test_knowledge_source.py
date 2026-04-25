@@ -325,6 +325,25 @@ def test_sync_source_path_not_found(tmp_path: Path) -> None:
         sync_source(project, source)
 
 
+def test_sync_source_rejects_mount_path_outside_project(tmp_path: Path) -> None:
+    from runops.core.exceptions import KnowledgeSourceError
+
+    kb_dir = _create_knowledge_source(tmp_path)
+    project = tmp_path / "project"
+    project.mkdir()
+
+    source = KnowledgeSource(
+        name="test-kb",
+        source_type="path",
+        url=str(kb_dir),
+        kind="profiles",
+        mount="../outside",
+    )
+
+    with pytest.raises(KnowledgeSourceError, match="escapes project root"):
+        sync_source(project, source)
+
+
 def test_sync_source_git_clone(tmp_path: Path) -> None:
     project = tmp_path / "project"
     project.mkdir()

@@ -492,6 +492,32 @@ def test_detach_not_found(tmp_path: Path) -> None:
     assert "Source not found" in result.output
 
 
+def test_detach_refuses_to_remove_path_outside_project(tmp_path: Path) -> None:
+    outside_dir = tmp_path.parent / "outside-kb"
+    outside_dir.mkdir()
+    (outside_dir / "data.txt").write_text("keep", encoding="utf-8")
+    toml = f"""
+[knowledge]
+enabled = true
+
+[[knowledge.sources]]
+name = "test-kb"
+type = "path"
+kind = "profiles"
+path = "/some/path"
+mount = "{outside_dir}"
+"""
+    project_root = _create_project(tmp_path, toml)
+
+    with patch("runops.cli.knowledge.Path.cwd", return_value=project_root):
+        result = runner.invoke(app, ["knowledge", "source", "detach", "test-kb"])
+
+    assert result.exit_code == 0
+    assert "Detached: test-kb" in result.output
+    assert "refusing to remove mount outside project root" in result.output
+    assert outside_dir.exists()
+
+
 def test_render_generates_imports(tmp_path: Path) -> None:
     toml = """
 [knowledge]
