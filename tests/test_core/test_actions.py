@@ -171,7 +171,7 @@ def test_collect_survey_writes_aggregate_artifacts(tmp_path: Path) -> None:
     assert Path(result.data["report_path"]).exists()
 
 
-def test_collect_survey_auto_summarizes_completed_runs(tmp_path: Path) -> None:
+def test_collect_survey_does_not_auto_summarize_completed_runs(tmp_path: Path) -> None:
     run_dir = tmp_path / "R20260330-0001"
     _write_manifest(
         run_dir,
@@ -194,9 +194,10 @@ def test_collect_survey_auto_summarizes_completed_runs(tmp_path: Path) -> None:
     with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
         result = collect_survey(tmp_path)
 
-    assert result.status is ActionStatus.SUCCESS
-    assert result.data["generated_summaries"] == 1
-    assert (run_dir / "analysis" / "summary.json").exists()
+    assert result.status is ActionStatus.ERROR
+    assert "No summaries found" in result.message
+    assert not (run_dir / "analysis" / "summary.json").exists()
+    mock_adapter.summarize.assert_not_called()
 
 
 def test_summarize_run_writes_summary_json(tmp_path: Path) -> None:
