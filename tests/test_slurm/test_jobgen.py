@@ -165,6 +165,29 @@ class TestGenerateJobScript:
         content = path.read_text()
         assert "#SBATCH -p" not in content
 
+    def test_qos_directive_is_rendered(self, run_dir: Path) -> None:
+        """Valid qos is rendered as a single SBATCH directive."""
+        path = generate_job_script(
+            run_dir,
+            {"partition": "debug", "walltime": "01:00:00", "qos": "normal"},
+            "srun ./solver",
+        )
+        content = path.read_text()
+        assert "#SBATCH --qos=normal" in content
+
+    def test_qos_with_newline_raises(self, run_dir: Path) -> None:
+        """Reject qos values that could inject extra shell lines."""
+        with pytest.raises(JobScriptError, match="Invalid qos"):
+            generate_job_script(
+                run_dir,
+                {
+                    "partition": "debug",
+                    "walltime": "01:00:00",
+                    "qos": "normal\nid > /tmp/pwned",
+                },
+                "srun ./solver",
+            )
+
     def test_creates_submit_dir(
         self, tmp_path: Path, job_config: dict[str, object]
     ) -> None:

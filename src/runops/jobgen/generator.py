@@ -181,6 +181,10 @@ def _validate_job_config(job_config: dict[str, Any]) -> None:
     if missing:
         raise JobScriptError(f"Missing required job config keys: {', '.join(missing)}")
 
+    qos = job_config.get("qos")
+    if isinstance(qos, str) and any(char in qos for char in ("\n", "\r")):
+        raise JobScriptError("Invalid qos: newline characters are not allowed")
+
 
 def _render_script(
     *,
