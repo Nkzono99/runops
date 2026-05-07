@@ -227,3 +227,5 @@ runs/**/work/*.log
 runs/**/analysis/cache/
 runs/**/analysis/.ipynb_checkpoints/
 simproject.toml
+
+refs/
