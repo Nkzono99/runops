@@ -6,7 +6,6 @@ action registry so analysis behavior stays consistent.
 
 from __future__ import annotations
 
-import dataclasses as _dataclasses
 import importlib.util
 import json
 import math
@@ -27,8 +26,6 @@ from runops.core.readiness import evaluate_run_readiness
 _FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
 _PLOT_KINDS = {"auto", "line", "scatter", "bar"}
 
-# Keep historical module attributes available for import compatibility.
-dataclass = _dataclasses.dataclass
 ResolvedSurveyPlotRecipe = _analysis_models.ResolvedSurveyPlotRecipe
 RunSummaryResult = _analysis_models.RunSummaryResult
 SurveyCollectionResult = _analysis_models.SurveyCollectionResult

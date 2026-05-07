@@ -6,7 +6,6 @@ knowledge sources defined in runops.toml's ``[knowledge]`` section.
 
 from __future__ import annotations
 
-import dataclasses as _dataclasses
 import logging
 import os
 import shutil
@@ -40,9 +39,6 @@ _DEFAULT_DERIVED_DIR = _knowledge_models.DEFAULT_DERIVED_DIR
 _SOURCE_TYPES = frozenset({"git", "path"})
 _SOURCE_KINDS = frozenset({"profiles", "project", "insights"})
 
-# Keep historical module attributes available for import compatibility.
-dataclass = _dataclasses.dataclass
-field = _dataclasses.field
 ExternalKnowledgeMount = _knowledge_models.ExternalKnowledgeMount
 KnowledgeConfig = _knowledge_models.KnowledgeConfig
 KnowledgeEntrypoints = _knowledge_models.KnowledgeEntrypoints

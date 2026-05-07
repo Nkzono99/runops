@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import re
 import sys
-from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +19,7 @@ try:
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
 
+from runops.core import _knowledge_records
 from runops.core.event_log import emit_artifact_event
 
 logger = logging.getLogger(__name__)
@@ -50,28 +50,8 @@ FACT_TYPES = frozenset(
     }
 )
 
-
-@dataclass(frozen=True)
-class Insight:
-    """A single knowledge insight.
-
-    Attributes:
-        name: Filename stem (e.g. ``"emses_cfl_limit"``).
-        type: One of :data:`INSIGHT_TYPES`.
-        simulator: Simulator name this insight applies to.
-        tags: Searchable tags.
-        source_project: Project where this insight originated.
-        created: ISO-format creation timestamp.
-        content: Markdown body of the insight.
-    """
-
-    name: str
-    type: str
-    simulator: str
-    tags: list[str] = field(default_factory=list)
-    source_project: str = ""
-    created: str = ""
-    content: str = ""
+Insight = _knowledge_records.Insight
+Fact = _knowledge_records.Fact
 
 
 def get_runops_dir(project_root: Path) -> Path:
@@ -227,86 +207,6 @@ def list_insights(
 
 _FACTS_FILE = "facts.toml"
 _FACT_ID_RE = re.compile(r"f(\d+)")
-
-
-@dataclass
-class Fact:
-    """A structured, machine-readable knowledge claim.
-
-    Unlike Insight (free-form markdown), a Fact is designed for
-    programmatic consumption by AI agents and validation tools.
-
-    Attributes:
-        id: Unique fact identifier (e.g. ``"f001"``).
-        claim: The knowledge claim (one sentence).
-        fact_type: One of :data:`FACT_TYPES`
-            (``"observation"``, ``"constraint"``, ``"dependency"``,
-            ``"policy"``, ``"hypothesis"``).
-        simulator: Simulator this fact applies to (empty = general).
-        scope_case: Case pattern this applies to (e.g. ``"mag_scan"``).
-        scope_text: Free-text scope description for humans.
-        param_name: Parameter name this fact is about (dot-notation).
-        confidence: ``"high"``, ``"medium"``, or ``"low"``.
-        source_run: Run ID that produced this evidence (if any).
-        source_project: Project where the fact was established.
-        evidence_kind: Type of evidence (``"run_observation"``,
-            ``"calculation"``, ``"literature"``, ``"heuristic"``).
-        evidence_ref: Reference to evidence source
-            (e.g. ``"run:R20260330-0004"``).
-        created_at: ISO-format timestamp.
-        tags: Searchable tags.
-        supersedes: ID of the fact this one replaces (if any).
-        storage: ``"local"`` or ``"candidate"``.
-        transport_source: Candidate source identifier for imported facts.
-        transport_kind: Candidate source kind (``project`` / ``insights``).
-        transport_path: Source path used during transport.
-        upstream_id: Original fact ID before local namespacing.
-    """
-
-    id: str
-    claim: str
-    fact_type: str = "observation"
-    simulator: str = ""
-    scope_case: str = ""
-    scope_text: str = ""
-    param_name: str = ""
-    confidence: str = "medium"
-    source_run: str = ""
-    source_project: str = ""
-    evidence_kind: str = ""
-    evidence_ref: str = ""
-    created_at: str = ""
-    tags: list[str] = field(default_factory=list)
-    supersedes: str = ""
-    storage: str = "local"
-    transport_source: str = ""
-    transport_kind: str = ""
-    transport_path: str = ""
-    upstream_id: str = ""
-
-    # Kept for backward compatibility with old facts.toml files
-    # that use "scope" and "evidence" as flat strings.
-    @property
-    def scope(self) -> str:
-        """Backward-compatible scope string."""
-        parts = []
-        if self.simulator:
-            parts.append(self.simulator)
-        if self.scope_case:
-            parts.append(self.scope_case)
-        if self.scope_text:
-            parts.append(self.scope_text)
-        return ", ".join(parts) if parts else ""
-
-    @property
-    def evidence(self) -> str:
-        """Backward-compatible evidence string."""
-        parts = []
-        if self.evidence_kind:
-            parts.append(self.evidence_kind)
-        if self.evidence_ref:
-            parts.append(self.evidence_ref)
-        return ": ".join(parts) if parts else ""
 
 
 def _load_facts_document(path: Path) -> dict[str, Any]:

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import dataclasses as _dataclasses
 import hashlib
 import json
 import mimetypes
@@ -33,8 +32,6 @@ from runops.core.state import RunState
 _EXPORT_MODES = {"copy", "symlink"}
 _PAPER_STATUSES = {"accepted", "placeholder", "retry_planned", "excluded", "superseded"}
 
-# Keep historical module attributes available for import compatibility.
-dataclass = _dataclasses.dataclass
 PublicationExportFile = _publication_models.PublicationExportFile
 PublicationExportResult = _publication_models.PublicationExportResult
 PublicationSourceArtifact = _publication_models.PublicationSourceArtifact

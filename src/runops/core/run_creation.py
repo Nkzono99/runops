@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shlex
 import shutil
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,6 +13,7 @@ from uuid import uuid4
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.registry import AdapterImportError, load_from_config
+from runops.core import _run_creation_models
 from runops.core.case import (
     CaseData,
     ClassificationData,
@@ -32,7 +33,6 @@ from runops.core.project import ProjectConfig, find_project_root, load_project
 from runops.core.run import RunInfo, create_run_directory, next_run_id
 from runops.core.site import SiteProfile, load_site_profile
 from runops.core.survey import (
-    SurveyData,
     expand_survey,
     generate_display_name,
     load_survey,
@@ -42,6 +42,10 @@ from runops.launchers.base import Launcher, load_launchers
 
 _RUN_ID_ALLOCATION_ATTEMPTS = 10_000
 
+CreatedRunResult = _run_creation_models.CreatedRunResult
+RegenerateResult = _run_creation_models.RegenerateResult
+SurveyExpansionPlan = _run_creation_models.SurveyExpansionPlan
+
 
 class _RunIdCollisionError(Exception):
     """Internal signal that a run_id was claimed before commit."""
@@ -49,25 +53,6 @@ class _RunIdCollisionError(Exception):
     def __init__(self, run_id: str) -> None:
         super().__init__(run_id)
         self.run_id = run_id
-
-
-@dataclass(frozen=True)
-class CreatedRunResult:
-    """One created run plus non-fatal validation warnings."""
-
-    run_info: RunInfo
-    warnings: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class SurveyExpansionPlan:
-    """Resolved survey expansion shared by dry-run and real sweep creation."""
-
-    survey_data: SurveyData
-    base_case: CaseData
-    effective_case: CaseData
-    combinations: tuple[dict[str, Any], ...]
-    variation_keys: tuple[str, ...]
 
 
 def load_project_from_path(path: Path) -> ProjectConfig:
@@ -636,23 +621,6 @@ def create_prepared_run(
     raise SimctlError(
         f"Could not allocate a free run_id after {_RUN_ID_ALLOCATION_ATTEMPTS} attempts"
     )
-
-
-@dataclass(frozen=True)
-class RegenerateResult:
-    """File-level diff of a ``regenerate_run`` call."""
-
-    run_id: str
-    case_name: str
-    added: tuple[str, ...]
-    modified: tuple[str, ...]
-    removed: tuple[str, ...]
-    unchanged: tuple[str, ...]
-    work_exists: bool
-
-    @property
-    def has_changes(self) -> bool:
-        return bool(self.added or self.modified or self.removed)
 
 
 _REGENERATE_ALLOWED_STATES = frozenset({"created", "failed", "cancelled"})
