@@ -34,7 +34,7 @@ ls src/runops/templates/skills/
 - アーキテクチャ境界
 - よくあるミス (Gotchas)
 - ワークフロー規約
-- 高リスク command の escalation policy
+- 高コスト / 不可逆 command の policy
 
 **スキル (`.agents/skills/<name>/SKILL.md`)** — 繰り返す定型作業
 - description はトリガー条件を書く (「いつ発火すべきか」)
@@ -46,7 +46,7 @@ ls src/runops/templates/skills/
 - シミュレータ系 (emses, beach)
 - レビュー系 (spec-reviewer, test-writer)
 
-**設定 / policy (`.codex/config.toml`, `.codex/rules/*.rules`)** — 実行環境と高リスク操作
+**設定 / policy (`.codex/config.toml`, `.codex/rules/*.rules`)** — 実行環境と高コスト / 不可逆操作
 - `approval_policy`, `sandbox_mode` — Codex の既定実行モード
 - `prefix_rule(...)` — `submit`, `delete`, `rm -rf`, `git reset --hard` などの扱い
 
@@ -78,5 +78,5 @@ ls -la .codex/rules/ .agents/skills/
 - ルールファイルを追加しただけでは `build_harness_bundle` に含まれない。
   builder.py にエントリを足す必要がある (プロジェクトハーネスの場合)
 - 開発ハーネス (`.claude/`, `.codex/`, `.agents/skills/`) は builder を経由しない。直接ファイルを置く
-- `.claude/settings.json` の `allow` / `deny` と `.codex/rules/*.rules` は完全互換ではない。Codex 側は高リスク操作の policy に絞る
-- AGENTS.md は長くなりすぎないようにする。定型手順は `.agents/skills/`、高リスク command policy は `.codex/rules/` に分離
+- `.claude/settings.json` の `allow` / `deny` と `.codex/rules/*.rules` は完全互換ではない。Codex 側は高コスト / 不可逆操作の policy に絞る
+- AGENTS.md は長くなりすぎないようにする。定型手順は `.agents/skills/`、高コスト / 不可逆 command policy は `.codex/rules/` に分離

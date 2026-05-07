@@ -60,6 +60,6 @@
 この 2 つは役割が違います。
 
 - `.gitignore` は Git に載せないものを決めます。`.venv/`、`tools/`、`refs/`、`runs/**/work/`、`.runops/knowledge/` などの再生成可能または大きい成果物を対象にします。
-- VS Code の `files.exclude` は Explorer のノイズを減らします。生成済み run artifact や内部状態は隠しますが、`campaign.toml`、`cases/**`、`runs/**/survey.toml`、`notes/**`、`materials/**` は見えるままにします。
+- VS Code の `files.exclude` は Explorer のノイズを減らします。`work/` は運用中にログや出力を直接確認しやすいよう見えるままにし、`status/`、`submit/`、`manifest.toml` などの内部状態だけを隠します。`campaign.toml`、`cases/**`、`runs/**/survey.toml`、`notes/**`、`materials/**` も見えるままにします。
 - VS Code の `search.exclude` は検索ノイズを減らします。PDF などの人間が置いた資料は Explorer からは隠さず、検索対象からだけ外すのが基本です。
 - `files.watcherExclude` と `python.analysis.exclude` は editor の負荷を下げるための設定で、runops の保護ルールや Git 管理とは別物です。

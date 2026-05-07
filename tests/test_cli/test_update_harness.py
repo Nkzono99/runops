@@ -389,6 +389,7 @@ class TestUpdateHarnessReexec:
         assert captured["executable"] == "/usr/bin/python3"
         assert captured["argv"] == [
             "/usr/bin/python3",
+            "-I",
             "-m",
             "runops.cli.main",
             "update-harness",

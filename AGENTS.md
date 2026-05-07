@@ -23,7 +23,7 @@ run ディレクトリを日常運用の主単位とし、パラメータサー�
 | 定型スキル | `.agents/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` |
 | 専門 agent 由来の知識 | `.agents/skills/<name>/SKILL.md` | `.claude/agents/<name>.md` |
 | 実行設定 | `.codex/config.toml` | `.claude/settings.json` |
-| 高リスク command policy | `.codex/rules/runops.rules` | `.claude/settings.json` permissions |
+| 高コスト / 不可逆 command policy | `.codex/rules/runops.rules` | `.claude/settings.json` permissions |
 | 設計・運用リファレンス | `.codex/rules/*.md` | `.claude/rules/*.md` |
 
 Codex ではスキルを `$check`, `$release`, `$implement-core` のように `$` 付きで呼ぶ。

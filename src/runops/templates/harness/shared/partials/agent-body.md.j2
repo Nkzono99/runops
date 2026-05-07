@@ -93,13 +93,15 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 | 種類 | 性質 | 書き先 | スキル |
 |---|---|---|---|
-| 時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `{{ skill_prefix }}note` |
+| 再開可能な時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `{{ skill_prefix }}note` |
 | 論文・manual・図・snippet | visible source material | `materials/` | 直接編集 |
 | 機械的に再利用する知見 | advanced, structured | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |
 
 - 「結果をまとめて」「知見を記録して」等の整理済情報はまず **`notes/reports/` に**
 - 機械的に再利用したい atomic な知見だけ **`{{ skill_prefix }}learn` で advanced knowledge レイヤに**
-- 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`{{ skill_prefix }}note` で lab notebook に**
+- 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`{{ skill_prefix }}note` で lab notebook に**。
+  短くてよいが、`Context:` と `Evidence:` を残し、model 名だけ・figure path だけで
+  前提を推測させない。
 - 参照 PDF / manual / snippet は **`materials/` に**
 - どちらも Agent 自身の memory に保存してはいけない (会話を跨いで失われる)
 - 共有 source 由来の candidate fact を採用するときは
@@ -116,6 +118,11 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 - 「no_plate ケースは EMSES v4.9.0 で動かないので保留」
 - 「smoke test に R20260330-0001 / -0010 / -0019 を選んだ。両端と中央」
 - 「Series A を先に投入する。Series B はこの結果を見てから」
+
+結果や図を残す entry では、`Observation:` と `Interpretation:` を分ける。
+図を生成した場合は、原則として Markdown image を note に埋め込み、caption と
+`Artifacts:` (figure / script / data path) を添える。大量の図は contact sheet
+または代表図だけを埋め込み、全 figure path は `Artifacts:` に列挙する。
 
 設計フェーズの skill (`{{ skill_prefix }}setup-campaign`, `{{ skill_prefix }}new-case`,
 `{{ skill_prefix }}create-run`, `{{ skill_prefix }}survey-design`,

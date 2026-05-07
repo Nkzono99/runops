@@ -75,6 +75,12 @@ _ALLOW_BASH: Final[tuple[str, ...]] = (
         "notes list*",
         "notes show*",
     ),
+    # Slurm submission is non-destructive but spends queue/HPC resources.
+    # Allow it at the permission layer; workflow rules require dry-run review
+    # and explicit chat confirmation before real submission.
+    *_cli_bash_patterns(
+        "runs submit*",
+    ),
     # Refs / config additions (mutates the corresponding TOML, which is
     # itself ask-listed below — the resulting prompt happens once, not twice)
     *_cli_bash_patterns(
@@ -106,7 +112,6 @@ _ALLOW_BASH: Final[tuple[str, ...]] = (
 # as possible — every entry here trains the user to dismiss prompts.
 _ASK_BASH: Final[tuple[str, ...]] = (
     *_cli_bash_patterns(
-        "runs submit*",  # spends HPC resources
         "runs purge-work*",  # deletes work/ files irreversibly
         "runs delete*",  # removes run directory irreversibly
     ),

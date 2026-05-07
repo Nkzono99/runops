@@ -67,6 +67,11 @@ class TestInit:
         assert "lab notebook" in readme
         assert "runo notes append" in readme
         assert "notes/YYYY-MM-DD.md" in readme
+        assert "再開できるログ" in readme
+        assert "Context:" in readme
+        assert "Evidence:" in readme
+        assert "Observation:" in readme
+        assert "Interpretation:" in readme
 
     def test_init_materials_readme_content(self, tmp_path: Path) -> None:
         """materials/README.md describes visible source material storage."""
@@ -96,6 +101,9 @@ class TestInit:
         assert "`/note`" in content
         assert "`$note`" in codex_content
         assert "`/note`" not in codex_content
+        assert "Model name must not stand alone" in codex_content
+        assert "Figures are first-class note content" in codex_content
+        assert "Quality gate before append" in codex_content
 
     def test_init_simproject_content(self, tmp_path: Path) -> None:
         """runops.toml has correct project name derived from dir name."""
@@ -160,11 +168,11 @@ class TestInit:
         assert "!materials/index.toml" in content
         assert "AGENTS.override.md" in content
 
-    def test_init_vscode_settings_hide_generated_artifacts(
+    def test_init_vscode_settings_keep_work_visible(
         self,
         tmp_path: Path,
     ) -> None:
-        """VS Code hides generated/internal files while keeping sources visible."""
+        """VS Code keeps run work visible while hiding internal files."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         settings = json.loads(
             (tmp_path / ".vscode" / "settings.json").read_text(encoding="utf-8")
@@ -178,7 +186,7 @@ class TestInit:
         assert files_exclude["refs"] is True
         assert files_exclude[".runops/knowledge"] is True
         assert files_exclude[".runops/environment.toml"] is True
-        assert files_exclude["runs/**/work"] is True
+        assert "runs/**/work" not in files_exclude
         assert files_exclude["runs/**/status"] is True
         assert files_exclude["runs/**/submit"] is True
         assert files_exclude["runs/**/manifest.toml"] is True
@@ -190,6 +198,7 @@ class TestInit:
         search_exclude = settings["search.exclude"]
         assert search_exclude[".ruff_cache"] is True
         assert search_exclude[".pytest_cache"] is True
+        assert search_exclude["runs/**/work"] is True
         assert search_exclude["materials/**/*.pdf"] is True
         assert "materials" not in search_exclude
 
@@ -344,8 +353,10 @@ class TestInit:
         assert any("runops" in r for r in data["permissions"]["allow"])
         assert "Edit(/campaign.toml)" in data["permissions"]["allow"]
         assert "Edit(/tools/runops/**)" in data["permissions"]["allow"]
-        assert "Bash(runo runs submit*)" in data["permissions"]["ask"]
-        assert "Bash(runops runs submit*)" in data["permissions"]["ask"]
+        assert "Bash(runo runs submit*)" in data["permissions"]["allow"]
+        assert "Bash(runops runs submit*)" in data["permissions"]["allow"]
+        assert "Bash(runo runs submit*)" not in data["permissions"]["ask"]
+        assert "Bash(runops runs submit*)" not in data["permissions"]["ask"]
         assert "Write(/runops.toml)" in data["permissions"]["ask"]
         assert "Write(/SITE.md)" in data["permissions"]["deny"]
         assert "Edit(/runs/**/manifest.toml)" in data["permissions"]["deny"]
@@ -370,9 +381,9 @@ class TestInit:
         )
         assert 'pattern = ["runo", "runs", "submit", "--dry-run"]' in rules
         assert 'pattern = ["runops", "runs", "submit", "--dry-run"]' in rules
+        assert 'pattern = ["runo", "runs", "submit"]' in rules
+        assert 'pattern = ["runops", "runs", "submit"]' in rules
         assert 'decision = "allow"' in rules
-        assert 'pattern = ["runo", "runs", "submit", "--all"]' in rules
-        assert 'pattern = ["runops", "runs", "submit", "--all"]' in rules
         assert 'decision = "prompt"' in rules
         assert 'pattern = ["rm", "-rf"]' in rules
         assert 'decision = "forbidden"' in rules

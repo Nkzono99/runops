@@ -20,7 +20,6 @@ from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.project import find_project_root
-from runops.core.state import RunState
 
 _FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
 _PLOT_KINDS = {"auto", "line", "scatter", "bar"}
@@ -958,31 +957,6 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                 else ""
             ),
         }
-
-        if not summary_path.is_file() and state == RunState.COMPLETED.value:
-            try:
-                generated = generate_run_summary(run_dir)
-            except (
-                KeyError,
-                OSError,
-                TypeError,
-                json.JSONDecodeError,
-                SimctlError,
-            ) as exc:
-                warnings.append(
-                    f"{run_id}: failed to auto-summarize during collect: {exc}"
-                )
-            else:
-                summary_path = generated.summary_path
-                row["summary_available"] = True
-                row["summary_path"] = str(summary_path.relative_to(survey_dir)).replace(
-                    "\\",
-                    "/",
-                )
-                generated_count += 1
-                warnings.extend(
-                    f"{run_id}: {warning}" for warning in generated.warnings
-                )
 
         if not summary_path.is_file():
             missing_count += 1

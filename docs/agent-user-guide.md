@@ -65,7 +65,7 @@ Agent 自身の memory には保存しない。
 
 | 種類 | 性質 | 書き先 | コマンド |
 |---|---|---|---|
-| 時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runo notes append` |
+| 再開可能な時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runo notes append` |
 | 長文 refined レポート | refined, 改稿可 | `notes/reports/<topic>.md` | (直接編集) |
 | 論文・manual・図・snippet | visible source material | `materials/` | (直接編集) |
 | 整理済の名前付き知見 | advanced, durable, 上書き可 | `.runops/insights/<name>.md` | `runo knowledge save` |
@@ -79,7 +79,10 @@ Agent 自身の memory には保存しない。
 `/note` skill は **準備フェーズから使う**。campaign 設計, case 設計,
 survey 設計, run 生成, 投入の各タイミングで意思決定の理由・トレードオフ・
 却下した代替案を `notes/YYYY-MM-DD.md` に残しておくと、後の `/learn`
-(curated 化) の素材として再利用できる。
+(curated 化) の素材として再利用できる。短くてよいが、`Context:` と
+`Evidence:` を置き、model 名だけ・figure path だけで前提を推測させない。
+図を生成したら原則 Markdown image として埋め込み、`Observation:` と
+`Interpretation:` を分ける。
 
 ```bash
 # 準備フェーズで意思決定を残す
@@ -107,7 +110,8 @@ Claude Code 向けに project 内の保護ルールを設定する。
 - 直接編集してはいけないのは `runs/**/manifest.toml`、`input/**`、`submit/**`、`work/**`、`SITE.md`
 - `.runops/insights/` と `.runops/facts.toml` は `runo knowledge save` / `add-fact` を使う
 - `notes/YYYY-MM-DD.md` は `runo notes append` 経由で append-only に追記する (既存 entry を書き換えない)
-- `runo runs submit` は `--dry-run` を除いて実行前に確認を挟む
+- `runo runs submit` は破壊的操作ではないが、HPC 資源・queue・quota に影響する。
+  Agent には許可するが、実行前に dry-run 結果、対象 run、queue、資源量を提示する
 - `runo runs cancel` は harness 上 allow 扱いだが、実行前に対象 run と理由は報告する
 
 ## 状態遷移

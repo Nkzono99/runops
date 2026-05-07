@@ -41,11 +41,13 @@ def test_settings_allow_tools_hpc_runops_writes() -> None:
     assert "Write(/tools/runops/**)" not in data["permissions"]["ask"]
 
 
-def test_runs_submit_is_ask_listed() -> None:
-    """runo/runops submit must be ask-listed (the old hook is now a rule)."""
+def test_runs_submit_is_allow_listed() -> None:
+    """runo/runops submit is allowed; workflow rules require review first."""
     data = json.loads(build_claude_settings())
-    assert "Bash(runo runs submit*)" in data["permissions"]["ask"]
-    assert "Bash(runops runs submit*)" in data["permissions"]["ask"]
+    assert "Bash(runo runs submit*)" in data["permissions"]["allow"]
+    assert "Bash(runops runs submit*)" in data["permissions"]["allow"]
+    assert "Bash(runo runs submit*)" not in data["permissions"]["ask"]
+    assert "Bash(runops runs submit*)" not in data["permissions"]["ask"]
 
 
 def test_settings_does_not_install_pretooluse_hooks() -> None:

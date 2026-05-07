@@ -9,22 +9,25 @@ description: Generate and submit all runs from a survey. Use when ready to launc
 
 1. `runo runs sweep` で run 生成
 2. `runo runs list` で確認
-3. run 数と queue を報告して承認を取る
-4. `runo runs submit --all` で投入
+3. `runo runs submit --dry-run --all` で投入対象と skip を確認
+4. run 数、queue、資源量、実行 command を報告して明示確認を取る
+5. `runo runs submit --all` で投入
 
 ```bash
 runo runs sweep $ARGUMENTS
 runo runs list $ARGUMENTS
-# → run 数と queue を確認してから投入
 cd $ARGUMENTS
+runo runs submit --dry-run --all -qn <queue>
+# → run 数、skip、queue、資源量を報告してから投入
 runo runs submit --all -qn <queue>
 ```
 
 ## 注意
 
-- `run --all` は高コスト操作。事前に plan を出す
+- `runs submit --all` は破壊的操作ではないが、HPC 資源・queue・quota に影響する高コスト操作
 - 初回の大規模 survey は承認を取る
-- dry-run で確認: `runo runs submit --dry-run --all`
+- policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。
+  止まった理由と予定していた command をユーザーへ返す
 
 ## `{{ skill_prefix }}note` で残すべきこと
 

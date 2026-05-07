@@ -36,7 +36,7 @@ project-local default だけを置きます。初期状態では `sandbox_mode` 
   — repo-local default。project trust 後に読むが、実行時の許可モードを
   固定する場所ではない。
 - `.codex/rules/*.rules`
-  — `submit`, `delete`, `rm -rf` など高リスク command の policy。
+  — `submit`, `delete`, `rm -rf` など高コストまたは不可逆な command の policy。
 - Codex runtime / `~/.codex/config.toml`
   — approval mode、network policy、auto-review など、実行環境や作業者に
   依存する設定。
@@ -65,43 +65,27 @@ Codex は各ディレクトリで `AGENTS.override.md` があれば `AGENTS.md` 
 `.codex/rules/*.rules` は sandbox 外実行への escalation に効く
 command policy です。runops は `submit`, `delete`, `purge-work`,
 `rm -rf`, `git reset --hard`, `git push --force`
-のような高リスク操作だけをここに書きます。
+のような高コストまたは不可逆な操作だけをここに書きます。
 
-`runo runs submit --dry-run` は HPC 資源を使わない確認コマンドなので allow
-しています。ただし Codex execpolicy は prefix-based で、`prompt` は `allow`
-より安全側に倒れるため、`--dry-run` は必ず `submit` の直後に置いてください:
+`runo runs submit --dry-run` は HPC 資源を使わない確認コマンドです:
 
 ```bash
 runo runs submit --dry-run --all runs/survey -qn gr10451a
 ```
 
-実投入は必ず会話上でユーザー確認を得てから実行します。
-default の project rule は `runo` と `runops` の両方について、`--all`, `-qn`,
-`--queue-name`, `--qos`, `--afterok` など、HPC 資源を使う submit option prefix
-を `prompt` にします。一方で `pattern = ["runo", "runs", "submit"]` や
-`pattern = ["runops", "runs", "submit"]` という広い rule は置きません。
-これを置くと dry-run も同時に match し、`approval_policy = "never"` 環境で
-安全確認の dry-run まで hard block されるためです。
+実投入は必ず会話上でユーザー確認を得てから実行します。`submit` は破壊的操作
+ではありませんが、HPC 資源・queue・quota に影響します。default の project
+rule は `runo runs submit` / `runops runs submit` を permission layer では
+`allow` します。ここで `--all` だけを `prompt` にすると、`approval_policy =
+"never"` 環境で bulk submit が hard block され、Agent が個別 submit に分解して
+迂回する悪い動きを誘発するためです。
 
-`approval_policy = "never"` / `AskForApproval = Never` の環境では `prompt`
-rule が hard block になるため、実投入まで Codex に任せる project では
-個人用の `AGENTS.override.md` と user-local execpolicy で明示 opt-in してください。
-例:
+Agent 側の行動ルールは AGENTS.md / skills 側に置きます:
 
-```starlark
-# ~/.codex/rules/runops-submit-approved.rules など user-local に置く
-prefix_rule(
-    pattern = ["runo", "runs", "submit"],
-    decision = "allow",
-    justification = "Only use after explicit chat confirmation in this project.",
-)
-
-prefix_rule(
-    pattern = ["uv", "run", "runo", "runs", "submit"],
-    decision = "allow",
-    justification = "Only use after explicit chat confirmation in this project.",
-)
-```
+- まず `runo runs submit --dry-run ...` で対象 run と skip を確認する
+- 実行前に command、対象 run、queue、QOS、資源量を会話上で提示する
+- ユーザーの明示確認後に submit する
+- policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない
 
 ルールを変更したら、最低限次を確認してください:
 
@@ -113,18 +97,19 @@ codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   runo runs submit --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
+  runo runs submit R20260419-0001
+codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   rm -rf runs/R20260419-0001
 ```
 
-2 つ目のように `--dry-run` を後ろに置いた submit が `prompt` になる場合は、
-1 つ目の順序に直してください。
+submit 系は `allow`、`rm -rf` は `forbidden` になっていることを確認してください。
 
 ## Hooks
 
 Codex hooks は experimental で、利用には `~/.codex/config.toml` などで
 `[features].codex_hooks = true` が必要です。runops は初期状態では
 `.codex/hooks.json` を生成しません。通常の運用ルールは `AGENTS.md`、
-定型ワークフローは `.agents/skills/`、高リスク command の扱いは
+定型ワークフローは `.agents/skills/`、高コストまたは不可逆な command の扱いは
 `.codex/rules/runops.rules` に置きます。
 
 ## なぜ Claude と Codex で skills ディレクトリが分かれるのか

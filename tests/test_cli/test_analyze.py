@@ -407,7 +407,9 @@ class TestCollect:
         assert "Collected 1 summaries" in result.output
         assert "1 runs missing" in result.output
 
-    def test_collect_auto_summarizes_completed_runs(self, tmp_path: Path) -> None:
+    def test_collect_does_not_auto_summarize_completed_runs(
+        self, tmp_path: Path
+    ) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001")
 
         mock_adapter = MagicMock()
@@ -417,10 +419,11 @@ class TestCollect:
         with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "collect", str(tmp_path)])
 
-        assert result.exit_code == 0
-        assert "Collected 1 summaries" in result.output
-        assert "Auto-summarized: 1" in result.output
-        assert (run_dir / "analysis" / "summary.json").exists()
+        assert result.exit_code == 1
+        assert "No summaries found" in result.output
+        assert "Auto-summarized" not in result.output
+        assert not (run_dir / "analysis" / "summary.json").exists()
+        mock_adapter.summarize.assert_not_called()
 
     def test_collect_flattens_nested_metrics_and_indexes_figures(
         self, tmp_path: Path

@@ -33,7 +33,7 @@ Python 3.11+ は `tomllib` が標準。3.10 では `tomli` を使う。
 - `.claude/settings.json` — Git 管理。チーム共有の permissions / model
 - `.claude/settings.local.json` — .gitignore 済。個人の許可パターン
 - `.codex/config.toml` — Git 管理。Codex の project-local config
-- `.codex/rules/runops.rules` — Git 管理。高リスク command の policy
+- `.codex/rules/runops.rules` — Git 管理。高コストまたは不可逆な command の policy
 
 Claude Code では local が team を **マージ上書き** する。同じキーを両方に書くと
 local が勝つ。Codex の個人用メモや一時 override は `AGENTS.override.md` に置く。

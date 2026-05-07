@@ -34,7 +34,7 @@ ls src/runops/templates/skills/
 - アーキテクチャ境界
 - よくあるミス (Gotchas)
 - ワークフロー規約
-- 高リスク command の escalation policy
+- 高コスト / 不可逆 command の policy
 
 **スキル (`.claude/skills/<name>/SKILL.md`, `.agents/skills/<name>/SKILL.md`)** — 繰り返す定型作業
 - description はトリガー条件を書く (「いつ発火すべきか」)
@@ -82,8 +82,8 @@ ls -la .codex/rules/ .agents/skills/
   builder.py にエントリを足す必要がある (プロジェクトハーネスの場合)
 - 開発ハーネス (`.claude/`, `.codex/`, `.agents/skills/`) は builder を経由しない。直接ファイルを置く
 - `.claude/settings.json` の `allow` / `deny` と `.codex/rules/*.rules` は完全互換ではない。
-  Codex 側は高リスク操作の policy に絞る
+  Codex 側は高コスト / 不可逆操作の policy に絞る
 - settings.json の `allow` / `deny` は **先頭一致** でマッチする。
   パターンが広すぎると意図しないコマンドまで通る
 - CLAUDE.md / AGENTS.md は長くなりすぎないようにする。定型手順は skill、
-  高リスク command policy は settings / rules に分離
+  高コスト / 不可逆 command policy は settings / rules に分離

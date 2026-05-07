@@ -161,7 +161,27 @@ def _resolve_path_source(project_root: Path, raw_path: str) -> Path:
 def _mount_path(project_root: Path, source: KnowledgeSource) -> Path | None:
     if not source.mount:
         return None
-    return project_root / source.mount
+    mount = Path(source.mount)
+    if mount.is_absolute():
+        msg = (
+            f"Knowledge source '{source.name}' mount path must be relative: "
+            f"{source.mount}"
+        )
+        raise KnowledgeSourceError(msg)
+
+    resolved_root = project_root.resolve()
+    candidate = project_root / mount
+    resolved_parent = candidate.parent.resolve()
+    try:
+        resolved_parent.relative_to(resolved_root)
+    except ValueError as exc:
+        msg = (
+            f"Knowledge source '{source.name}' mount path escapes project root: "
+            f"{source.mount}"
+        )
+        raise KnowledgeSourceError(msg) from exc
+
+    return resolved_parent / candidate.name
 
 
 def _source_root(project_root: Path, source: KnowledgeSource) -> Path:
@@ -632,7 +652,10 @@ def collect_external_knowledge(project_root: Path) -> list[ExternalKnowledgeMoun
             try:
                 source_path = _source_root(project_root, source)
             except KnowledgeSourceError:
-                fallback_mount = _mount_path(project_root, source)
+                try:
+                    fallback_mount = _mount_path(project_root, source)
+                except KnowledgeSourceError:
+                    fallback_mount = None
                 source_path = fallback_mount or project_root
             available = source_path.is_dir()
             entries.append(

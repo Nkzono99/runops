@@ -312,10 +312,25 @@ def detach(
     config = load_knowledge_config(root)
     mount_path: Path | None = None
     if config:
+        resolved_root = root.resolve()
         for source in config.sources:
-            if source.name == name:
-                mount_path = root / source.mount
+            if source.name != name or not source.mount:
+                continue
+            candidate = root / source.mount
+            try:
+                resolved_parent = candidate.parent.resolve()
+                resolved_parent.relative_to(resolved_root)
+            except ValueError:
+                typer.echo(
+                    "Warning: refusing to remove mount outside project root: "
+                    f"{source.mount}",
+                    err=True,
+                )
+                mount_path = None
                 break
+            resolved_mount = resolved_parent / candidate.name
+            mount_path = resolved_mount
+            break
 
     try:
         removed = remove_knowledge_source(root, name)

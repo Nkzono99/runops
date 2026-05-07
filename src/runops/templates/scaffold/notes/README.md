@@ -27,18 +27,31 @@
 
 - **append-only**: 新しい entry を **末尾に追記**する。過去の entry は触らない
 - 1 ファイル = 1 日。日付は ISO 形式 (`2026-04-08.md`)
-- 各 entry は `## HH:MM <短いタイトル>` で始まる
-- 内容は自由 (試したこと, 見たこと, 仮説, 失敗, TODO, etc.)
-- 思考の chain of thought を残しておく場所と思えばよい
+- 各 entry は `## HH:MM <TYPE object — action/claim>` で始まる
+- 目的は「短い時系列ログ」ではなく、**短いが後続の人間/Agent が再開できるログ**にすること
+- title の TYPE は `DESIGN`, `MODEL`, `EXEC`, `STATUS`, `ANALYSIS`, `FIGURE`, `DEBUG`, `DECISION`, `HANDOFF` を推奨
+
+#### 再開可能な entry の最低条件
+
+- 冒頭に `Context:` を置き、campaign / survey / run / model / purpose を分かる範囲で書く
+- model 名だけで済ませない。1 行定義、または model card / report / case / survey への link を付ける
+- 数値・図・結論・異常判定には `Evidence:` として run、manifest、summary、script、figure、CSV、stdout/stderr などの path を付ける
+- 図を生成したら原則 Markdown image で埋め込み、caption、observation、interpretation、caveat を添える。大量図は contact sheet または代表図にする
+- `Observation:` は見えた事実、`Interpretation:` は推測・仮説、`Caveat/Next:` は未確認点と次の一手に分ける
+- 不明点は曖昧に省略せず、`unknown` / `not checked` として残す
 
 例:
 
 ```markdown
-## 14:32 cs scaling preview
+## 14:32 ANALYSIS Series A — cs scaling preview
 
-3 点で `tan α = 0.79 (cs/vflow) + 0.02, R² = 0.9997` が出た。vti scaling
-(R² = 0.991, intercept 0.073) より明らかに良い。3 点だけなのが心配。
-Series B 完走で確かめる。
+Context: campaign=ion-angle; survey=runs/series_a; run=R20260408-0001..0003; model=flat_plate baseline (case: cases/flat_plate/case.toml); purpose=quick check before submitting Series B.
+
+Action: Collected 3 completed summaries and fit tan(alpha) against cs/vflow.
+Evidence: summary=runs/series_a/analysis/summary.csv; script=runs/series_a/analysis/fit_alpha.py.
+Observation: `tan α = 0.79 (cs/vflow) + 0.02`, R^2=0.9997; vti-only fit has R^2=0.991.
+Interpretation: cs/vflow is the stronger organizing variable for this subset.
+Caveat/Next: Only 3 points; confirm after Series B completes.
 ```
 
 ### 長文レポート (`notes/reports/<topic>.md`)

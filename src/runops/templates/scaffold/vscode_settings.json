@@ -14,7 +14,6 @@
         "refs": true,
         ".runops/knowledge": true,
         ".runops/environment.toml": true,
-        "runs/**/work": true,
         "runs/**/status": true,
         "runs/**/input/plasma.inp": true,
         "runs/**/submit": true,

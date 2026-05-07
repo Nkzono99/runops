@@ -448,7 +448,7 @@ runo notes show 2026-04-08 # 特定日
 ### 昇格パス
 
 ```
-notes/YYYY-MM-DD.md           ← 日次の chain of thought
+notes/YYYY-MM-DD.md           ← 日次の意思決定・観察ログ
         ↓ (ストーリーが固まる)
 notes/reports/<topic>.md      ← refined long-form report
         ↓ (atomic な知見を抽出)

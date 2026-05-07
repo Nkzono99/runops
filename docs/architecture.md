@@ -665,7 +665,7 @@ notes/reports/<topic>.md   ← refined long-form (改稿可)
 curated knowledge と lab notebook は **二層構造**:
 
 - 整理済の永続知見 (上書き可・名前付き) は `.runops/insights/` / `facts.toml`
-- 時系列の chain of thought (準備フェーズの意思決定・観察・仮説・TODO) は `notes/YYYY-MM-DD.md`
+- 時系列の意思決定・観察ログ (準備フェーズの意思決定・観察・仮説・TODO) は `notes/YYYY-MM-DD.md`
 - `runo notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
 - 価値が出てきたら notes → reports → insights / facts.toml の順に昇格
 
