@@ -50,6 +50,7 @@ class TestInit:
         # Lab notebook scaffolding
         assert (tmp_path / "notes").is_dir()
         assert (tmp_path / "notes" / "reports").is_dir()
+        assert (tmp_path / "notes" / "history").is_dir()
         assert (tmp_path / "notes" / "README.md").is_file()
         # Source material scaffolding
         assert (tmp_path / "materials").is_dir()
@@ -72,7 +73,9 @@ class TestInit:
         readme = (tmp_path / "notes" / "README.md").read_text(encoding="utf-8")
         assert "lab notebook" in readme
         assert "runo notes append" in readme
+        assert "runo notes archive" in readme
         assert "notes/YYYY-MM-DD.md" in readme
+        assert "notes/history/YYYY/YYYY-MM-DD.md" in readme
         assert "再開できるログ" in readme
         assert "Context:" in readme
         assert "Evidence:" in readme

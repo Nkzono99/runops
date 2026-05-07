@@ -186,8 +186,9 @@ runops/
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
 | `runo notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
-| `runo notes list` | 最近の lab notebook 日付一覧 |
-| `runo notes show [DATE\|today\|latest]` | 指定日 (省略時 today) の lab notebook を表示 |
+| `runo notes list` | active / history の lab notebook 日付一覧 |
+| `runo notes show [DATE\|today\|latest]` | active / history から指定日の lab notebook を表示 |
+| `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
 | `runo runs archive [RUN]` | run アーカイブ (completed のみ) |
 | `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
 | `runo runs cancel [RUN]` | scancel + sync を同時実行し、submitted/running な run を停止 |
@@ -305,14 +306,14 @@ AI エージェントがシミュレーションを自律的に行うための�
 - **研究意図**: `campaign.toml` (ユーザーが記述)
 - **実験知見 (curated)**: `.runops/insights/` (knowledge save / knowledge source sync で管理)
 - **構造化知識 (curated)**: `.runops/facts.toml` (knowledge add-fact / knowledge facts で管理)
-- **lab notebook (chronological)**: `notes/YYYY-MM-DD.md` (`runo notes append` で時系列追記)
+- **lab notebook (chronological)**: `notes/YYYY-MM-DD.md` (`runo notes append` で時系列追記)、古い日次ノートは `notes/history/YYYY/YYYY-MM-DD.md`
 - **長文レポート**: `notes/reports/<topic>.md` (改稿可)
 - **研究判断の台帳**: `research/agenda.md` (現在の高レベルな研究判断。本文は日本語)
 
 curated knowledge / lab notebook / research agenda は役割を分ける:
 
 - `.runops/insights/` / `.runops/facts.toml` は整理済の永続知見 (上書き可・名前付き・atomic)
-- `notes/YYYY-MM-DD.md` は append-only な時系列ログ。準備フェーズの意思決定・観察・仮説・TODO をその場で残す
+- `notes/YYYY-MM-DD.md` は append-only な時系列ログ。準備フェーズの意思決定・観察・仮説・TODO をその場で残し、古くなったら `notes/history/YYYY/` に archive する
 - `research/agenda.md` は mutable な現在判断の正本。TODO ではなく、active question、current decision、paused/killed、判断が変わる条件を残す
 - 価値が出てきたら `notes/reports/` で refined version を書き、さらに `.runops/insights/` / `facts.toml` に昇格
 

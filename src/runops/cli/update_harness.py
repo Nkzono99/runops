@@ -371,6 +371,7 @@ def _missing_workspace_scaffold(
             [
                 "notes/",
                 "notes/reports/",
+                "notes/history/",
                 "notes/README.md",
             ]
         )

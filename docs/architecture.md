@@ -663,6 +663,8 @@ insights のインポート       ← プロジェクト横断の知識共有
 
 ```
 notes/YYYY-MM-DD.md        ← runo notes append (append-only)
+notes/history/YYYY/YYYY-MM-DD.md
+                             ← 古い日次 notebook (runo notes archive)
 notes/reports/<topic>.md   ← refined long-form (改稿可)
     ↓ /learn で素材として読む
 .runops/insights/, facts.toml ← curated 化
@@ -673,6 +675,7 @@ curated knowledge と lab notebook は **二層構造**:
 - 整理済の永続知見 (上書き可・名前付き) は `.runops/insights/` / `facts.toml`
 - 時系列の意思決定・観察ログ (準備フェーズの意思決定・観察・仮説・TODO) は `notes/YYYY-MM-DD.md`
 - `runo notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
+- `runo notes archive` は古い日次ファイルだけを `notes/history/YYYY/` に移し、`notes list/show` は active と history を透過検索する
 - 価値が出てきたら notes → reports → insights / facts.toml の順に昇格
 
 ### Research layer (decision ledger)

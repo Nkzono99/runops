@@ -26,6 +26,7 @@ from runops.cli.log import log
 from runops.cli.manage import archive, cancel, delete, purge_work
 from runops.cli.new import new
 from runops.cli.notes import append as notes_append
+from runops.cli.notes import archive as notes_archive
 from runops.cli.notes import list_notes as notes_list
 from runops.cli.notes import show as notes_show
 from runops.cli.regenerate import regenerate
@@ -87,6 +88,7 @@ notes_app = typer.Typer(
 notes_app.command("append")(notes_append)
 notes_app.command("list")(notes_list)
 notes_app.command("show")(notes_show)
+notes_app.command("archive")(notes_archive)
 
 
 def _build_app(name: str) -> typer.Typer:

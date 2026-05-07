@@ -15,6 +15,7 @@
 | 場所                          | 用途                                     | 性質                |
 | ---                           | ---                                      | ---                 |
 | **`notes/YYYY-MM-DD.md`**     | **日次の lab notebook (append-only)**    | **chronological**   |
+| `notes/history/YYYY/YYYY-MM-DD.md` | 古い日次 lab notebook の archive     | chronological       |
 | **`notes/reports/<topic>.md`**| **長文レポート / 解析記事**              | **refined, 改稿可** |
 | **`research/agenda.md`**      | **現在の高レベルな研究判断**             | **mutable ledger**  |
 | **`materials/`**              | **論文・manual・図・snippet**            | **source material** |
@@ -29,6 +30,9 @@
 
 - **append-only**: 新しい entry を **末尾に追記**する。過去の entry は触らない
 - 1 ファイル = 1 日。日付は ISO 形式 (`2026-04-08.md`)
+- 直近の active notebook は `notes/` 直下に置く。古い notebook は
+  `runo notes archive --older-than 7d` で `notes/history/YYYY/YYYY-MM-DD.md`
+  に移す
 - 各 entry は `## HH:MM <TYPE object — action/claim>` で始まる
 - 目的は「短い時系列ログ」ではなく、**短いが後続の人間/Agent が再開できるログ**にすること
 - title の TYPE は `DESIGN`, `MODEL`, `EXEC`, `STATUS`, `ANALYSIS`, `FIGURE`, `DEBUG`, `DECISION`, `HANDOFF` を推奨
@@ -68,8 +72,10 @@ Caveat/Next: Only 3 points; confirm after Series B completes.
 
 - **`runo notes append "<title>" "<body>"`** — 今日の `notes/YYYY-MM-DD.md`
   に新しい entry を append する。`-` または引数省略で stdin から本文を読む
-- **`runo notes list`** — 最近の lab notebook 日付一覧
-- **`runo notes show [DATE|today|latest]`** — 指定日 (省略時は today) の内容を表示
+- **`runo notes list`** — active と history の lab notebook 日付一覧
+- **`runo notes show [DATE|today|latest]`** — active と history から指定日の内容を表示
+- **`runo notes archive --older-than 7d`** — 古い active notebook を
+  `notes/history/YYYY/` に移す (`notes/reports/` は触らない)
 - **`/note` skill** — agent から呼んで note を append (内部で `runo notes append` を呼ぶ)
 
 ## なぜ `runo knowledge save` ではダメか
@@ -86,6 +92,8 @@ Caveat/Next: Only 3 points; confirm after Series B completes.
 materials/                  ← source material (papers, manuals, snippets)
         ↓ (読んだこと・観察したことを記録)
 notes/YYYY-MM-DD.md          ← 日次の observation / work log
+notes/history/YYYY/YYYY-MM-DD.md
+                              ← 古い日次 notebook
         ↓ (ストーリーが固まる)
 notes/reports/<topic>.md     ← 整理済 long form report
 research/agenda.md           ← 現在の見立て / active question / 次の判断

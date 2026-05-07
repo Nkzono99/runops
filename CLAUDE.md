@@ -117,7 +117,7 @@ completed → archived → purged
 | `runo runs submit [--all] [-qn] [--qos]` | ジョブ投入 |
 | `runo runs status` / `sync` / `log` / `dashboard` | モニタリング |
 | `runo analyze summarize` / `collect` | 解析 |
-| `runo notes append` / `knowledge save` | 知見管理 |
+| `runo notes append` / `notes archive` / `knowledge save` | 知見管理 |
 | `runo runs archive` / `purge-work` / `cancel` / `delete` | ライフサイクル |
 
 全コマンド一覧: `.claude/rules/commands.md`

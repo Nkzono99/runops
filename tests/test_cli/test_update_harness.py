@@ -316,6 +316,7 @@ class TestUpdateHarnessBasic:
         """update-harness recreates missing visible workspace scaffold."""
         _init_project(tmp_path)
         (tmp_path / "notes" / "README.md").unlink()
+        (tmp_path / "notes" / "history").rmdir()
         (tmp_path / "materials" / "README.md").unlink()
         (tmp_path / "materials" / "papers").rmdir()
         (tmp_path / "research" / "agenda.md").unlink()
@@ -326,6 +327,7 @@ class TestUpdateHarnessBasic:
         assert result.exit_code == 0
         assert "Backfilled" in result.output
         assert (tmp_path / "notes" / "README.md").is_file()
+        assert (tmp_path / "notes" / "history").is_dir()
         assert (tmp_path / "materials" / "README.md").is_file()
         assert (tmp_path / "materials" / "papers").is_dir()
         assert (tmp_path / "research" / "agenda.md").is_file()

@@ -27,6 +27,8 @@ from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root
 
 JST = timezone(timedelta(hours=9))
+_HISTORY_DIR = "history"
+_NOTE_DATE_FORMAT = "%Y-%m-%d"
 
 
 def _resolve_notes_dir(explicit: Optional[Path] = None) -> Path:
@@ -47,6 +49,74 @@ def _resolve_notes_dir(explicit: Optional[Path] = None) -> Path:
 def _today_path(notes_dir: Path, *, now: Optional[datetime] = None) -> Path:
     today = (now or datetime.now(JST)).date().isoformat()
     return notes_dir / f"{today}.md"
+
+
+def _parse_note_date(value: str) -> datetime | None:
+    try:
+        return datetime.strptime(value, _NOTE_DATE_FORMAT)
+    except ValueError:
+        return None
+
+
+def _is_daily_note(path: Path) -> bool:
+    return path.suffix == ".md" and _parse_note_date(path.stem) is not None
+
+
+def _iter_note_files(notes_dir: Path) -> list[Path]:
+    """Return daily notebook files from active notes and history.
+
+    Active files in ``notes/YYYY-MM-DD.md`` win if the same date also exists
+    under ``notes/history/``.
+    """
+    by_date: dict[str, Path] = {}
+    for path in sorted(
+        notes_dir.glob("*.md"),
+        key=lambda item: item.stem,
+        reverse=True,
+    ):
+        if _is_daily_note(path):
+            by_date[path.stem] = path
+
+    history_dir = notes_dir / _HISTORY_DIR
+    if history_dir.is_dir():
+        for path in sorted(
+            history_dir.rglob("*.md"),
+            key=lambda item: item.stem,
+            reverse=True,
+        ):
+            if _is_daily_note(path):
+                by_date.setdefault(path.stem, path)
+
+    return sorted(by_date.values(), key=lambda item: item.stem, reverse=True)
+
+
+def _find_note_file(notes_dir: Path, date_str: str) -> Path | None:
+    active = notes_dir / f"{date_str}.md"
+    if active.is_file():
+        return active
+    for path in _iter_note_files(notes_dir):
+        if path.stem == date_str:
+            return path
+    return None
+
+
+def _parse_older_than(value: str) -> int:
+    raw = value.strip().lower()
+    if raw.endswith("d"):
+        raw = raw[:-1]
+    try:
+        days = int(raw)
+    except ValueError as exc:
+        msg = "expected a duration like '7d' or a positive day count"
+        raise ValueError(msg) from exc
+    if days <= 0:
+        raise ValueError("duration must be positive")
+    return days
+
+
+def _history_path_for(notes_dir: Path, note_path: Path) -> Path:
+    year = note_path.stem[:4]
+    return notes_dir / _HISTORY_DIR / year / note_path.name
 
 
 def _read_body(body_args: list[str]) -> str:
@@ -182,11 +252,7 @@ def list_notes(
         typer.echo("No notes/ directory found.")
         return
 
-    files = sorted(
-        (p for p in target_dir.glob("*.md") if p.stem != "README"),
-        key=lambda p: p.stem,
-        reverse=True,
-    )
+    files = _iter_note_files(target_dir)
     if not files:
         typer.echo("No notes yet.")
         return
@@ -252,11 +318,7 @@ def show(
     if date is None or date == "today":
         path = _today_path(target_dir)
     elif date == "latest":
-        files = sorted(
-            (p for p in target_dir.glob("*.md") if p.stem != "README"),
-            key=lambda p: p.stem,
-            reverse=True,
-        )
+        files = _iter_note_files(target_dir)
         if not files:
             typer.echo("No notes yet.")
             raise typer.Exit(code=1)
@@ -264,14 +326,96 @@ def show(
     else:
         date_str: str = date
         try:
-            datetime.strptime(date_str, "%Y-%m-%d")
+            datetime.strptime(date_str, _NOTE_DATE_FORMAT)
         except ValueError as exc:
             typer.echo(f"Error: invalid date '{date_str}': {exc}", err=True)
             raise typer.Exit(code=2) from None
-        path = target_dir / f"{date_str}.md"
+        path = _find_note_file(target_dir, date_str) or target_dir / f"{date_str}.md"
 
     if not path.is_file():
         typer.echo(f"No notes for {path.stem}.")
         raise typer.Exit(code=1)
 
     typer.echo(path.read_text(encoding="utf-8"), nl=False)
+
+
+def archive(
+    notes_dir: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--notes-dir",
+            help="Override the notes directory (defaults to <project>/notes).",
+        ),
+    ] = None,
+    older_than: Annotated[
+        str,
+        typer.Option(
+            "--older-than",
+            help="Archive active daily notebooks older than this duration, e.g. 7d.",
+        ),
+    ] = "7d",
+    dry_run: Annotated[
+        bool,
+        typer.Option(
+            "--dry-run",
+            help="Show which files would move without modifying the filesystem.",
+        ),
+    ] = False,
+) -> None:
+    """Move old active daily notebooks under ``notes/history/YYYY/``.
+
+    Only root-level daily notebooks (``notes/YYYY-MM-DD.md``) are moved.
+    ``notes/reports/`` and existing history files are never touched.
+    """
+    try:
+        days = _parse_older_than(older_than)
+    except ValueError as exc:
+        typer.echo(f"Error: invalid --older-than '{older_than}': {exc}", err=True)
+        raise typer.Exit(code=2) from None
+
+    target_dir = _resolve_notes_dir(notes_dir)
+    if not target_dir.is_dir():
+        typer.echo("No notes/ directory found.")
+        return
+
+    cutoff = datetime.now(JST).date() - timedelta(days=days)
+    candidates: list[tuple[Path, Path]] = []
+    for path in sorted(target_dir.glob("*.md"), key=lambda item: item.stem):
+        parsed = _parse_note_date(path.stem)
+        if parsed is None or parsed.date() >= cutoff:
+            continue
+        candidates.append((path, _history_path_for(target_dir, path)))
+
+    if not candidates:
+        typer.echo("No active daily notebooks to archive.")
+        return
+
+    moved = 0
+    skipped = 0
+    for source, dest in candidates:
+        try:
+            source_display = source.relative_to(Path.cwd())
+        except ValueError:
+            source_display = source
+        try:
+            dest_display = dest.relative_to(Path.cwd())
+        except ValueError:
+            dest_display = dest
+
+        if dest.exists():
+            skipped += 1
+            typer.echo(f"Skipped {source_display}: destination exists ({dest_display})")
+            continue
+
+        if dry_run:
+            typer.echo(f"Would archive {source_display} -> {dest_display}")
+            moved += 1
+            continue
+
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        source.rename(dest)
+        typer.echo(f"Archived {source_display} -> {dest_display}")
+        moved += 1
+
+    action = "would be archived" if dry_run else "archived"
+    typer.echo(f"\n{moved} note(s) {action}; {skipped} skipped.")

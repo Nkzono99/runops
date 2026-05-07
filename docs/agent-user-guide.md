@@ -39,8 +39,9 @@ runops プロジェクトにおける Agent の作業ガイド。
 | 集計 | `runo analyze collect` |
 | 論文向け export | `runo analyze export <run-or-survey> --paper <paper-id>` |
 | lab notebook に追記 | `runo notes append "<title>" "<body>"` |
-| lab notebook 日付一覧 | `runo notes list` |
-| lab notebook 内容表示 | `runo notes show [DATE\|today\|latest]` |
+| lab notebook 日付一覧 (active/history) | `runo notes list` |
+| lab notebook 内容表示 (active/history) | `runo notes show [DATE\|today\|latest]` |
+| 古い日次 notebook の整理 | `runo notes archive --older-than 7d` |
 | 知見保存 (curated) | `runo knowledge save` |
 | 知見一覧 | `runo knowledge list` |
 | 知見表示 | `runo knowledge show <name>` |
@@ -66,7 +67,7 @@ Agent 自身の memory には保存しない。
 
 | 種類 | 性質 | 書き先 | コマンド |
 |---|---|---|---|
-| 再開可能な時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runo notes append` |
+| 再開可能な時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md`, `notes/history/YYYY/YYYY-MM-DD.md` | `runo notes append`, `runo notes archive` |
 | 長文 refined レポート | refined, 改稿可 | `notes/reports/<topic>.md` | (直接編集) |
 | 現在の高レベルな研究判断 | mutable decision ledger | `research/agenda.md` | `/research-agenda` / `$research-agenda` |
 | 論文・manual・図・snippet | visible source material | `materials/` | (直接編集) |
@@ -112,6 +113,7 @@ runo notes list
 runo notes show 2026-04-08
 runo notes show today    # 今日
 runo notes show latest   # 一番新しい日
+runo notes archive --older-than 7d
 
 # /learn 時に notes を素材として読み込む
 runo notes show latest | head -100
@@ -126,6 +128,7 @@ Claude Code 向けに project 内の保護ルールを設定する。
 - 直接編集してはいけないのは `runs/**/manifest.toml`、`input/**`、`submit/**`、`work/**`、`SITE.md`
 - `.runops/insights/` と `.runops/facts.toml` は `runo knowledge save` / `add-fact` を使う
 - `notes/YYYY-MM-DD.md` は `runo notes append` 経由で append-only に追記する (既存 entry を書き換えない)
+- `runo notes archive` は古い日次 notebook だけを `notes/history/YYYY/` に移し、`notes/reports/` には触れない
 - `runo runs submit` は破壊的操作ではないが、HPC 資源・queue・quota に影響する。
   Agent には許可するが、実行前に dry-run 結果、対象 run、queue、資源量を提示する
 - `runo runs cancel` は harness 上 allow 扱いだが、実行前に対象 run と理由は報告する

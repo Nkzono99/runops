@@ -76,6 +76,9 @@ project/
   notes/                         # Lab notebook (chronological, append-only)
     2026-04-08.md                # 日次の作業ノート (`runo notes append`)
     2026-04-09.md
+    history/                     # 古い日次 notebook (`runo notes archive`)
+      2026/
+        2026-03-30.md
     reports/                     # 長文 refined レポート
       cs_vs_vti_scaling.md
     README.md                    # notes / materials / .runops の役割
@@ -365,7 +368,7 @@ lab notebook はこの隙間を埋める:
 
 | 用途 | 場所 | 性質 | コマンド |
 |---|---|---|---|
-| 日次の lab notebook | `notes/YYYY-MM-DD.md` | append-only, chronological | `runo notes append` |
+| 日次の lab notebook | `notes/YYYY-MM-DD.md`, `notes/history/YYYY/YYYY-MM-DD.md` | append-only, chronological | `runo notes append`, `runo notes archive` |
 | 長文 refined レポート | `notes/reports/<topic>.md` | refined, 改稿可 | (直接編集) |
 | source material | `materials/` | visible, inspectable | (直接編集) |
 | 整理済の名前付き知見 | `.runops/insights/<name>.md` | advanced, durable, 上書き可 | `runo knowledge save` |
@@ -377,6 +380,9 @@ lab notebook はこの隙間を埋める:
 - 既存ファイルが無ければ `# YYYY-MM-DD — lab notebook` ヘッダを付けて新規作成
 - 各 entry は `## HH:MM <title>` 直下に本文 (markdown 自由)
 - **append-only**: 既存 entry には触らない
+- 古い日次 notebook は `runo notes archive --older-than 7d` で
+  `notes/history/YYYY/YYYY-MM-DD.md` に移す。`notes list/show` は active と
+  history を透過的に検索する
 
 例:
 
@@ -420,6 +426,9 @@ runo notes list -n 30
 runo notes show today      # 今日 (JST)
 runo notes show latest     # 最新の日
 runo notes show 2026-04-08 # 特定日
+
+# 古い日次 notebook を notes/history/YYYY/ に移動
+runo notes archive --older-than 7d
 ```
 
 ### いつ書くか — フェーズ別ガイド
@@ -455,6 +464,8 @@ runo notes show 2026-04-08 # 特定日
 
 ```
 notes/YYYY-MM-DD.md           ← 日次の意思決定・観察ログ
+notes/history/YYYY/YYYY-MM-DD.md
+                               ← 古い日次 notebook
         ↓ (ストーリーが固まる)
 notes/reports/<topic>.md      ← refined long-form report
         ↓ (atomic な知見を抽出)

@@ -29,14 +29,16 @@ EOF
 書き込み先:
 
 - `notes/YYYY-MM-DD.md` (JST の今日)
+- 古い日次 notebook は `notes/history/YYYY/YYYY-MM-DD.md`
 - 無ければ `# YYYY-MM-DD — lab notebook` ヘッダ付きで新規作成
 - 各 entry は `## HH:MM <title>` で始まる
 - append-only。既存 entry は編集しない
 
 関連コマンド:
 
-- `runo notes list` — 最近の lab notebook 日付一覧
-- `runo notes show [DATE|today|latest]` — 指定日 (省略時は today) の内容を表示
+- `runo notes list` — active と history の lab notebook 日付一覧
+- `runo notes show [DATE|today|latest]` — active と history から指定日の内容を表示
+- `runo notes archive --older-than 7d` — 古い日次 notebook を history に移す
 
 ## ノートの基本原則
 

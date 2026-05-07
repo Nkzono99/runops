@@ -66,7 +66,7 @@ def _create_runops_skeleton(project_dir: Path, created: list[str]) -> None:
 
 
 def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
-    """Create the lab-notebook skeleton (``notes/`` + README + ``reports/``).
+    """Create the lab-notebook skeleton.
 
     The lab notebook is a visible human/agent workspace for chronological
     append-only entries, edited via
@@ -81,6 +81,8 @@ def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
         created.append("notes/")
     if _mkdir_if_missing(notes_dir / "reports"):
         created.append("notes/reports/")
+    if _mkdir_if_missing(notes_dir / "history"):
+        created.append("notes/history/")
 
     from runops.templates import load_static
 
