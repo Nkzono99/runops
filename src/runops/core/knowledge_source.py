@@ -27,22 +27,22 @@ except ImportError:
 
 from tomlkit import aot, array, nl, parse, table
 
-from runops.core import _knowledge_models
 from runops.core.exceptions import KnowledgeSourceError
+from runops.core.models import knowledge_source as knowledge_models
 
 logger = logging.getLogger(__name__)
 
 _PROJECT_FILE = "runops.toml"
 _ENTRYPOINTS_FILE = "entrypoints.toml"
-_DEFAULT_MOUNT_DIR = _knowledge_models.DEFAULT_MOUNT_DIR
-_DEFAULT_DERIVED_DIR = _knowledge_models.DEFAULT_DERIVED_DIR
+_DEFAULT_MOUNT_DIR = knowledge_models.DEFAULT_MOUNT_DIR
+_DEFAULT_DERIVED_DIR = knowledge_models.DEFAULT_DERIVED_DIR
 _SOURCE_TYPES = frozenset({"git", "path"})
 _SOURCE_KINDS = frozenset({"profiles", "project", "insights"})
 
-ExternalKnowledgeMount = _knowledge_models.ExternalKnowledgeMount
-KnowledgeConfig = _knowledge_models.KnowledgeConfig
-KnowledgeEntrypoints = _knowledge_models.KnowledgeEntrypoints
-KnowledgeSource = _knowledge_models.KnowledgeSource
+ExternalKnowledgeMount = knowledge_models.ExternalKnowledgeMount
+KnowledgeConfig = knowledge_models.KnowledgeConfig
+KnowledgeEntrypoints = knowledge_models.KnowledgeEntrypoints
+KnowledgeSource = knowledge_models.KnowledgeSource
 
 
 def _normalize_source_type(value: Any) -> str:

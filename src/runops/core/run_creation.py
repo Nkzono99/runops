@@ -13,7 +13,6 @@ from uuid import uuid4
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.registry import AdapterImportError, load_from_config
-from runops.core import _run_creation_models
 from runops.core.case import (
     CaseData,
     ClassificationData,
@@ -29,6 +28,7 @@ from runops.core.exceptions import (
     SimctlError,
 )
 from runops.core.manifest import ManifestData, write_manifest
+from runops.core.models import run_creation as run_creation_models
 from runops.core.project import ProjectConfig, find_project_root, load_project
 from runops.core.run import RunInfo, create_run_directory, next_run_id
 from runops.core.site import SiteProfile, load_site_profile
@@ -42,9 +42,9 @@ from runops.launchers.base import Launcher, load_launchers
 
 _RUN_ID_ALLOCATION_ATTEMPTS = 10_000
 
-CreatedRunResult = _run_creation_models.CreatedRunResult
-RegenerateResult = _run_creation_models.RegenerateResult
-SurveyExpansionPlan = _run_creation_models.SurveyExpansionPlan
+CreatedRunResult = run_creation_models.CreatedRunResult
+RegenerateResult = run_creation_models.RegenerateResult
+SurveyExpansionPlan = run_creation_models.SurveyExpansionPlan
 
 
 class _RunIdCollisionError(Exception):

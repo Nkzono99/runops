@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import Any
 
 from runops import __version__
-from runops.core import _publication_models
 from runops.core.analysis import (
     SurveyCollectionResult,
     collect_survey_summaries,
@@ -24,6 +23,7 @@ from runops.core.analysis import (
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import ProvenanceError, SimctlError
 from runops.core.manifest import ManifestData, read_manifest
+from runops.core.models import publication as publication_models
 from runops.core.project import find_project_root, load_project
 from runops.core.provenance import collect_git_provenance
 from runops.core.readiness import RunReadiness, evaluate_run_readiness
@@ -32,9 +32,9 @@ from runops.core.state import RunState
 _EXPORT_MODES = {"copy", "symlink"}
 _PAPER_STATUSES = {"accepted", "placeholder", "retry_planned", "excluded", "superseded"}
 
-PublicationExportFile = _publication_models.PublicationExportFile
-PublicationExportResult = _publication_models.PublicationExportResult
-PublicationSourceArtifact = _publication_models.PublicationSourceArtifact
+PublicationExportFile = publication_models.PublicationExportFile
+PublicationExportResult = publication_models.PublicationExportResult
+PublicationSourceArtifact = publication_models.PublicationSourceArtifact
 
 
 def _slugify(value: str) -> str:

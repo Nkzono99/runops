@@ -15,25 +15,25 @@ from pathlib import Path
 from typing import Any
 
 from runops.adapters.registry import get as get_adapter
-from runops.core import _analysis_models
 from runops.core._analysis_report import write_survey_report
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
+from runops.core.models import analysis as analysis_models
 from runops.core.project import find_project_root
 from runops.core.readiness import evaluate_run_readiness
 
 _FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
 _PLOT_KINDS = {"auto", "line", "scatter", "bar"}
 
-ResolvedSurveyPlotRecipe = _analysis_models.ResolvedSurveyPlotRecipe
-RunSummaryResult = _analysis_models.RunSummaryResult
-SurveyCollectionResult = _analysis_models.SurveyCollectionResult
-SurveyPlotDataResult = _analysis_models.SurveyPlotDataResult
-SurveyPlotRecipe = _analysis_models.SurveyPlotRecipe
-SurveyPlotResult = _analysis_models.SurveyPlotResult
-SurveyPlotSeries = _analysis_models.SurveyPlotSeries
-SurveyTableResult = _analysis_models.SurveyTableResult
+ResolvedSurveyPlotRecipe = analysis_models.ResolvedSurveyPlotRecipe
+RunSummaryResult = analysis_models.RunSummaryResult
+SurveyCollectionResult = analysis_models.SurveyCollectionResult
+SurveyPlotDataResult = analysis_models.SurveyPlotDataResult
+SurveyPlotRecipe = analysis_models.SurveyPlotRecipe
+SurveyPlotResult = analysis_models.SurveyPlotResult
+SurveyPlotSeries = analysis_models.SurveyPlotSeries
+SurveyTableResult = analysis_models.SurveyTableResult
 
 
 def _resolve_adapter_name(manifest: ManifestData) -> str:

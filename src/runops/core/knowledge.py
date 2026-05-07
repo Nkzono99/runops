@@ -19,8 +19,8 @@ try:
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
 
-from runops.core import _knowledge_records
 from runops.core.event_log import emit_artifact_event
+from runops.core.models import knowledge as knowledge_records
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +50,8 @@ FACT_TYPES = frozenset(
     }
 )
 
-Insight = _knowledge_records.Insight
-Fact = _knowledge_records.Fact
+Insight = knowledge_records.Insight
+Fact = knowledge_records.Fact
 
 
 def get_runops_dir(project_root: Path) -> Path:
