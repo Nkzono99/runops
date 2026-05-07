@@ -133,7 +133,7 @@ completed → archived → purged
 ## Adapter 実装時の注意
 
 1. `adapters/base.py` の `SimulatorAdapter` を継承
-2. 全抽象メソッドを実装 + オプションメソッド
+2. 全抽象メソッドを実装 + `required_outputs` などのオプションメソッド
 3. `adapters/registry.py` に登録 → `simulators.toml` にエントリ追加
 4. テストを `tests/test_adapters/` に追加
 

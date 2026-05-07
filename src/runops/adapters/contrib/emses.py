@@ -101,6 +101,11 @@ class EmseAdapter(SimulatorAdapter):
         }
 
     @classmethod
+    def required_outputs(cls) -> dict[str, str]:
+        """Return EMSES outputs required for analysis readiness."""
+        return {"hdf5_fields": "EMSES HDF5 field output files"}
+
+    @classmethod
     def interactive_config(cls) -> dict[str, Any]:
         """Interactively prompt for EMSES configuration."""
         import typer

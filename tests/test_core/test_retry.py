@@ -7,6 +7,7 @@ from pathlib import Path
 import tomli_w
 
 from runops.core.retry import (
+    assess_retry_for_run,
     get_attempt_count,
     suggest_retry,
     suggest_retry_for_run,
@@ -106,3 +107,30 @@ def test_suggest_retry_for_run_returns_empty_for_non_failed_run(tmp_path: Path) 
         )
 
     assert suggest_retry_for_run(run_dir) == []
+
+
+def test_assess_retry_for_run_detects_partial_outputs(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260507-0001"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    (run_dir / "work").mkdir()
+    (run_dir / "work" / "ex00_0000.h5").write_bytes(b"")
+    with open(run_dir / "manifest.toml", "wb") as f:
+        tomli_w.dump(
+            {
+                "run": {
+                    "id": "R20260507-0001",
+                    "status": "failed",
+                    "failure_reason": "timeout",
+                },
+                "job": {"attempt": 1},
+                "simulator": {"name": "emses", "adapter": "emses"},
+            },
+            f,
+        )
+
+    assessment = assess_retry_for_run(run_dir)
+
+    assert assessment.retry_status == "partial"
+    assert assessment.has_partial_outputs is True
+    assert assessment.partial_outputs == {"hdf5_fields": 1}
+    assert "Partial outputs detected" in assessment.warnings[0]

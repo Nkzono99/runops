@@ -255,6 +255,10 @@ class SimulatorAdapter(ABC):
     def collect_provenance(self, runtime_info) -> dict: ...
 ```
 
+`required_outputs()` は任意メソッドで、`detect_outputs()` の top-level key のうち
+analysis-ready 判定に必須のカテゴリを宣言します。`runo runs status` と
+`runo context` は、scheduler の `completed` と required artifact の充足を分けて表示します。
+
 ### GenericAdapter
 
 `adapters/generic.py` に組み込みの汎用 Adapter が実装されています。多くのシンプルなシミュレータはこの Adapter で対応可能です:
@@ -616,12 +620,14 @@ refs/{repo}/docs/          ← シミュレータ開発者が管理
     ↓ AI が参照
 adapter.parameter_schema() ← 構造化メタデータ
 adapter.validate_params()  ← 物理的バリデーション
+adapter.required_outputs() ← analysis-ready に必要な成果物
 ```
 
 - `refs/`: `runo init` 時に `doc_repos()` からクローン
 - `knowledge_sources()`: インデックス対象のファイルパターン
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
 - `validate_params()`: CFL 条件、Debye 長解像度など
+- `required_outputs()`: completed run を analysis-ready とみなす前に必要な出力カテゴリ
 
 ### 実行環境知識
 

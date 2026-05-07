@@ -501,6 +501,60 @@ class TestCollect:
         assert aggregate["runs"][0]["flat_metadata"]["origin.case"] == "cavity_base"
         assert aggregate["runs"][0]["flat_metadata"]["param.u"] == 400000.0
 
+    def test_collect_includes_readiness_diagnostics(self, tmp_path: Path) -> None:
+        ready_run = _create_run(
+            tmp_path,
+            "R20260507-0001",
+            simulator_name="emses",
+            adapter_name="emses",
+        )
+        incomplete_run = _create_run(
+            tmp_path,
+            "R20260507-0002",
+            simulator_name="emses",
+            adapter_name="emses",
+        )
+        for run_dir in (ready_run, incomplete_run):
+            with open(run_dir / "input" / "plasma.toml", "wb") as f:
+                tomli_w.dump({"jobcon": {"nstep": 100}}, f)
+            (run_dir / "work" / "energy").write_text(
+                "100 1.0 2.0\n",
+                encoding="utf-8",
+            )
+            with open(
+                run_dir / "analysis" / "summary.json",
+                "w",
+                encoding="utf-8",
+            ) as f:
+                json.dump({"status": "completed", "energy": 10.0}, f)
+        (ready_run / "work" / "ex00_0000.h5").write_bytes(b"")
+
+        result = runner.invoke(app, ["analyze", "collect", str(tmp_path)])
+
+        assert result.exit_code == 0, result.output
+        assert "Readiness issues: 1 run(s)" in result.output
+
+        csv_content = (tmp_path / "summary" / "survey_summary.csv").read_text(
+            encoding="utf-8"
+        )
+        assert "analysis_status" in csv_content
+        assert "missing_required_artifacts" in csv_content
+
+        aggregate = json.loads(
+            (tmp_path / "summary" / "survey_summary.json").read_text(encoding="utf-8")
+        )
+        assert aggregate["readiness_counts"]["ready"] == 1
+        assert aggregate["readiness_counts"]["incomplete"] == 1
+        assert aggregate["readiness_issues"][0]["missing_required_artifacts"] == [
+            "hdf5_fields"
+        ]
+
+        report = (tmp_path / "summary" / "survey_summary.md").read_text(
+            encoding="utf-8"
+        )
+        assert "## Analysis Readiness" in report
+        assert "R20260507-0002" in report
+
     def test_collect_nonexistent_dir(self) -> None:
         result = runner.invoke(app, ["analyze", "collect", "/nonexistent/path"])
         assert result.exit_code == 1
@@ -651,6 +705,8 @@ class TestExport:
                 "draft-a",
                 "--name",
                 "fig2-baseline",
+                "--paper-status",
+                "placeholder",
             ],
         )
 
@@ -689,6 +745,8 @@ class TestExport:
         assert manifest["export"]["id"] == "draft-a/fig2-baseline"
         assert manifest["source"]["run_count"] == 1
         assert manifest["source"]["run"]["figure_count"] == 1
+        assert manifest["source"]["run"]["execution_status"] == "completed"
+        assert manifest["source"]["run"]["paper_status"] == "placeholder"
         assert manifest["files"][0]["sha256"].startswith("sha256:")
 
     def test_export_survey_collects_summary_outputs(self, tmp_path: Path) -> None:

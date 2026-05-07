@@ -46,8 +46,15 @@ def context(
 
         runs = ctx.get("runs", {})
         if runs.get("total", 0) > 0:
-            parts = [f"{k}={v}" for k, v in runs.items()]
+            parts = [f"{k}={v}" for k, v in runs.items() if k != "analysis_problems"]
             typer.echo(f"Runs: {', '.join(parts)}")
+            analysis_problems = runs.get("analysis_problems", [])
+            if analysis_problems:
+                typer.echo(f"Analysis readiness issues ({len(analysis_problems)}):")
+                for problem in analysis_problems:
+                    warnings = problem.get("warnings", [])
+                    summary = "; ".join(warnings) if warnings else "not ready"
+                    typer.echo(f"  {problem.get('run_id', '?')}: {summary}")
 
         failures = ctx.get("recent_failures", [])
         if failures:

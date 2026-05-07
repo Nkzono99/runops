@@ -118,6 +118,7 @@ def test_contract_metadata_methods_return_expected_types(
     assert defaults.get("adapter") == spec.name
     assert isinstance(spec.adapter_cls.parameter_schema(), dict)
     assert isinstance(spec.adapter_cls.default_plot_recipes(), dict)
+    assert isinstance(spec.adapter_cls.required_outputs(), dict)
     assert isinstance(spec.adapter_cls.knowledge_sources(), dict)
     assert isinstance(spec.adapter_cls.doc_repos(), list)
     assert isinstance(spec.adapter_cls.pip_packages(), list)

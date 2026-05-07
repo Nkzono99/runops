@@ -13,7 +13,8 @@ from runops.core.actions import sync_run as sync_run_action
 from runops.core.exceptions import (
     ManifestNotFoundError,
 )
-from runops.core.manifest import read_manifest
+from runops.core.manifest import ManifestData, read_manifest
+from runops.core.readiness import RunReadiness, evaluate_run_readiness
 from runops.core.state import RunState
 from runops.slurm.query import SlurmQueryError, query_job_status
 from runops.slurm.submit import SlurmNotFoundError
@@ -169,6 +170,22 @@ def _print_status_one(run_dir: Path) -> None:
     typer.echo(f"Run:    {run_id}")
     typer.echo(f"Path:   {run_dir}")
     typer.echo(f"State:  {current_status}")
+    readiness = _readiness_for_display(run_dir, manifest)
+    if readiness is not None:
+        typer.echo(f"Analysis: {readiness.analysis_status}")
+        if readiness.missing_required_artifacts:
+            typer.echo(
+                "Missing artifacts: " + ", ".join(readiness.missing_required_artifacts)
+            )
+        for warning in readiness.warnings:
+            typer.echo(f"Readiness warning: {warning}")
+    retry_status = str(manifest.run.get("retry_status", "")).strip()
+    if retry_status:
+        typer.echo(f"Retry:  {retry_status}")
+        partial_outputs = manifest.run.get("partial_outputs", {})
+        if isinstance(partial_outputs, dict) and partial_outputs:
+            parts = [f"{key}={value}" for key, value in sorted(partial_outputs.items())]
+            typer.echo(f"Partial outputs: {', '.join(parts)}")
 
     # Show failure reason if recorded
     failure_reason = manifest.run.get("failure_reason", "")
@@ -190,6 +207,16 @@ def _print_status_one(run_dir: Path) -> None:
             typer.echo(f"Slurm:  (query failed: {e})")
     else:
         typer.echo("Job ID: (not submitted)")
+
+
+def _readiness_for_display(
+    run_dir: Path,
+    manifest: ManifestData,
+) -> RunReadiness | None:
+    """Return readiness details for completed runs."""
+    if manifest.run.get("status") != RunState.COMPLETED.value:
+        return None
+    return evaluate_run_readiness(run_dir, manifest=manifest)
 
 
 def sync(

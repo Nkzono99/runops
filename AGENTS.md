@@ -167,6 +167,7 @@ runops/
 | `runo runs list [PATHS...]` | run 一覧表示 (複数 PATH 指定可) |
 | `runo runs clone` | run 複製・派生 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
+| `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備。`--plan` では状態を戻さず partial output と retry intent を記録 |
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
 | `runo notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
@@ -273,7 +274,7 @@ completed → archived → purged
 新しい Simulator Adapter を追加する場合:
 1. `src/runops/adapters/base.py` の `SimulatorAdapter` を継承
 2. 全抽象メソッドを実装: render_inputs, resolve_runtime, build_program_command, detect_outputs, detect_status, summarize, collect_provenance
-3. オプションメソッドの実装: parameter_schema, validate_params, knowledge_sources, agent_guide, case_template, doc_repos, pip_packages
+3. オプションメソッドの実装: parameter_schema, validate_params, required_outputs, knowledge_sources, agent_guide, case_template, doc_repos, pip_packages
 4. `adapters/registry.py` に登録
 5. `simulators.toml` に設定エントリを追加
 6. テストを `tests/test_adapters/` に追加

@@ -229,18 +229,51 @@ def _collect_run_stats(
     try:
         from runops.core.discovery import discover_runs
         from runops.core.manifest import read_manifest
+        from runops.core.readiness import evaluate_run_readiness
 
         run_dirs = discover_runs(runs_dir)
         counts: dict[str, int] = {s.value: 0 for s in RunState}
+        analysis_ready = 0
+        analysis_incomplete = 0
+        analysis_unknown = 0
+        analysis_problems: list[dict[str, Any]] = []
         for rd in run_dirs:
             try:
                 m = read_manifest(rd)
                 state = m.run.get("status", "unknown")
                 counts[state] = counts.get(state, 0) + 1
+                if state == RunState.COMPLETED.value:
+                    readiness = evaluate_run_readiness(rd, manifest=m)
+                    if readiness.analysis_ready:
+                        analysis_ready += 1
+                    elif readiness.analysis_status == "unknown":
+                        analysis_unknown += 1
+                    else:
+                        analysis_incomplete += 1
+                    if not readiness.analysis_ready:
+                        analysis_problems.append(
+                            {
+                                "run_id": readiness.run_id,
+                                "run_dir": str(rd),
+                                "analysis_status": readiness.analysis_status,
+                                "missing_required_artifacts": list(
+                                    readiness.missing_required_artifacts
+                                ),
+                                "warnings": list(readiness.warnings),
+                            }
+                        )
             except SimctlError:
                 counts["unknown"] = counts.get("unknown", 0) + 1
 
-        non_zero = {k: v for k, v in counts.items() if v > 0}
+        non_zero: dict[str, Any] = {k: v for k, v in counts.items() if v > 0}
+        if analysis_ready:
+            non_zero["analysis_ready"] = analysis_ready
+        if analysis_incomplete:
+            non_zero["analysis_incomplete"] = analysis_incomplete
+        if analysis_unknown:
+            non_zero["analysis_unknown"] = analysis_unknown
+        if analysis_problems:
+            non_zero["analysis_problems"] = analysis_problems[:10]
         non_zero["total"] = len(run_dirs)
         return non_zero
     except Exception as exc:
@@ -259,7 +292,7 @@ def _collect_recent_failures(
     section_status: dict[str, str],
     *,
     limit: int = 10,
-) -> list[dict[str, str]]:
+) -> list[dict[str, Any]]:
     runs_dir = root / "runs"
     if not runs_dir.is_dir():
         return []
@@ -268,16 +301,22 @@ def _collect_recent_failures(
         from runops.core.discovery import discover_runs
         from runops.core.manifest import read_manifest
 
-        failures: list[dict[str, str]] = []
+        failures: list[dict[str, Any]] = []
         for rd in discover_runs(runs_dir):
             try:
                 m = read_manifest(rd)
                 if m.run.get("status") == "failed":
+                    partial_outputs = m.run.get("partial_outputs", {})
+                    partial_outputs_data = (
+                        partial_outputs if isinstance(partial_outputs, dict) else {}
+                    )
                     failures.append(
                         {
                             "run_id": m.run.get("id", ""),
                             "reason": m.run.get("failure_reason", ""),
                             "display_name": m.run.get("display_name", ""),
+                            "retry_status": m.run.get("retry_status", ""),
+                            "partial_outputs": partial_outputs_data,
                         }
                     )
             except SimctlError:

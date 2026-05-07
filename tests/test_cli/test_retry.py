@@ -10,6 +10,7 @@ import tomli_w
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+from runops.core.manifest import read_manifest
 
 runner = CliRunner()
 
@@ -125,6 +126,41 @@ def test_retry_adjustments_parse_key_value(tmp_path: Path) -> None:
         )
 
     assert result.exit_code == 0, result.output
+
+
+def test_retry_plan_records_intent_without_reset(tmp_path: Path) -> None:
+    """--plan records retry metadata and leaves state unchanged."""
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    run_dir = _create_run(
+        tmp_path,
+        "R20260507-0001",
+        status="failed",
+        failure_reason="timeout",
+        attempt=1,
+    )
+    (run_dir / "work" / "partial.dat").write_text("partial", encoding="utf-8")
+
+    with patch("runops.cli.retry.Path.cwd", return_value=tmp_path):
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "retry",
+                str(run_dir),
+                "--plan",
+                "-a",
+                "walltime=24:00:00",
+            ],
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "Planned retry" in result.output
+    assert "Retry status: retry_planned" in result.output
+    assert "Partial outputs:" in result.output
+    manifest = read_manifest(run_dir)
+    assert manifest.run["status"] == "failed"
+    assert manifest.run["retry_status"] == "retry_planned"
+    assert manifest.job["retry_adjustments"] == {"walltime": "24:00:00"}
 
 
 def test_retry_rejects_invalid_adjustment(tmp_path: Path) -> None:

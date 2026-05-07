@@ -541,6 +541,35 @@ submitted/running -> cancelled
 completed -> archived -> purged
 ```
 
+### Execution state と analysis readiness
+
+`run.status = "completed"` は scheduler / lifecycle 上の完了を表す。解析に必要な
+成果物が揃っているかは別レイヤとして扱い、`runo runs status` と
+`runo context --json` が adapter の `detect_status()` と
+`required_outputs()` から analysis readiness を計算する。
+
+- EMSES は `hdf5_fields` (field HDF5) を required output として扱う
+- BEACH は `summary` (`summary.txt`) を required output として扱う
+- required output が欠ける completed run は `analysis_status = "incomplete"`
+  として表示されるが、manifest の `run.status` は書き換えない
+
+### Retry / partial output metadata
+
+`runo runs retry --plan` は `failed` / `cancelled` run の状態を `created` に戻さず、
+retry intent と partial output の検出結果だけを manifest に記録する。
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `run.retry_status` | string | `partial`, `retry_planned`, `retry_ready`, `manual_review`, `not_retryable` |
+| `run.partial_outputs` | table | adapter の `detect_outputs()` から検出した partial output category と件数 |
+| `run.retry_note` | string | `--note` で記録した任意メモ |
+| `job.retry_adjustments` | table | 次 attempt に適用予定の調整値 |
+| `job.next_attempt` | int | plan 時点で予定される次 attempt 番号 |
+
+通常の `runo runs retry` は failed/cancelled run を `created` に戻し、
+`run.retry_status = "retry_ready"` を記録する。partial output は消さずに
+`run.partial_outputs` に件数を残す。
+
 ### `[params]`
 
 Frozen parameter snapshot at run creation time.
@@ -681,8 +710,8 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
 
 | File | Description |
 |------|-------------|
-| `summary/survey_summary.csv` | ネストをフラット化した run 一覧。list/dict は JSON 文字列として保持。`origin.*`, `classification.*`, `variation.*`, `param.*` など manifest 由来の列も含む |
-| `summary/survey_summary.json` | run ごとの summary 原本、状態数、数値統計、warning を含む集計 JSON |
+| `summary/survey_summary.csv` | ネストをフラット化した run 一覧。list/dict は JSON 文字列として保持。`origin.*`, `classification.*`, `variation.*`, `param.*`, `analysis_status`, `missing_required_artifacts` なども含む |
+| `summary/survey_summary.json` | run ごとの summary 原本、状態数、analysis readiness、数値統計、warning を含む集計 JSON |
 | `summary/figures_index.json` | `analysis/figures/` と `summary.figures[]` を run ごとに引いた索引 |
 | `summary/survey_summary.md` | すぐ読める Markdown レポート |
 | `summary/plots/*.png` | `runo analyze plot` が生成する survey 可視化 |
@@ -690,8 +719,12 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
 ### 収集ルール
 
 - `analysis/summary.json` がある run はそれを利用する
-- completed run で `analysis/summary.json` が無い場合は自動 summarize してから集計する
+- completed run でも `analysis/summary.json` が無い場合は missing summary として記録する
 - completed 以外の run は state count には含めるが、summary が無ければ集計対象外
+- completed run は adapter の `required_outputs()` と `detect_status()` で
+  `analysis_status = ready | incomplete | unknown` を診断する
+- `analysis/summary.json` の `status` が `completed` 以外、または `partial = true`
+  の場合は partial summary として `analysis_status = incomplete` にする
 
 ### survey_summary.json の概要
 
@@ -701,11 +734,23 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
   "survey_dir": "runs/beach_smoke",
   "total_runs": 2,
   "summaries_collected": 2,
-  "generated_summaries": 1,
+  "generated_summaries": 0,
   "missing_summaries": 0,
   "state_counts": {
     "completed": 2
   },
+  "readiness_counts": {
+    "ready": 1,
+    "incomplete": 1
+  },
+  "readiness_issues": [
+    {
+      "run_id": "R20260401-0002",
+      "analysis_status": "incomplete",
+      "missing_required_artifacts": ["hdf5_fields"],
+      "warnings": ["Missing required artifact: hdf5_fields (EMSES HDF5 field output files)"]
+    }
+  ],
   "numeric_stats": {
     "potential_final_v": {
       "count": 2,
@@ -719,6 +764,9 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
     {
       "run_id": "R20260401-0001",
       "status": "completed",
+      "analysis_status": "ready",
+      "analysis_ready": true,
+      "missing_required_artifacts": [],
       "summary": {
         "potential_final_v": 1.15
       }
@@ -782,11 +830,26 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成す
 - `source`: `run` / `survey` のどちらを切り出したか、対象 run 一覧、集計状況
 - `files[]`: 各 exported file の `role`, `source_path`, `export_path`, `size_bytes`, `sha256`, `media_type`, `run_id`, `caption`
 
+`source.runs[]` では execution と paper-facing status を分けて記録する。
+
+| Field | Description |
+|-------|-------------|
+| `execution_status` | runops lifecycle / scheduler 由来の状態 (`completed`, `failed`, `cancelled` など) |
+| `analysis_status` | required artifact と summary を踏まえた解析 readiness (`ready`, `incomplete`, `unknown`) |
+| `paper_status` | paper 側の扱い (`accepted`, `placeholder`, `retry_planned`, `excluded`, `superseded`) |
+| `retry_status` | retry workflow の状態 (`retry_planned`, `retry_ready`, `partial` など) |
+
+`runo analyze export --paper-status placeholder` のように指定すると、export 内の
+source run に対する paper-facing status を上書きできる。指定しない場合、
+analysis-ready な completed run は `accepted`、required artifact が欠ける completed
+run は `placeholder`、retry planned run は `retry_planned` として推定する。
+
 ### 例
 
 ```bash
 runo analyze export runs/sheath/angle_scan --paper draft-a
 runo analyze export R20260412-0003 --paper draft-a --name fig2-baseline
+runo analyze export R20260412-0003 --paper draft-a --paper-status placeholder
 runo analyze export runs/sheath/angle_scan --paper draft-a --mode symlink
 ```
 

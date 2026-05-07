@@ -25,9 +25,11 @@ from runops.core.exceptions import ProvenanceError, SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.project import find_project_root, load_project
 from runops.core.provenance import collect_git_provenance
+from runops.core.readiness import RunReadiness, evaluate_run_readiness
 from runops.core.state import RunState
 
 _EXPORT_MODES = {"copy", "symlink"}
+_PAPER_STATUSES = {"accepted", "placeholder", "retry_planned", "excluded", "superseded"}
 
 
 @dataclass(frozen=True)
@@ -232,9 +234,16 @@ def _simulator_source_snapshot(manifest: ManifestData) -> dict[str, Any]:
     return snapshot
 
 
-def _build_run_record(project_root: Path, run_dir: Path) -> dict[str, Any]:
+def _build_run_record(
+    project_root: Path,
+    run_dir: Path,
+    *,
+    paper_status: str = "",
+) -> dict[str, Any]:
     manifest = read_manifest(run_dir)
     run_id = str(manifest.run.get("id", run_dir.name)).strip() or run_dir.name
+    execution_status = str(manifest.run.get("status", "")).strip()
+    readiness = evaluate_run_readiness(run_dir, manifest=manifest)
     summary_path = run_dir / "analysis" / "summary.json"
     summary_available = summary_path.is_file()
     summary_keys: list[str] = []
@@ -249,7 +258,16 @@ def _build_run_record(project_root: Path, run_dir: Path) -> dict[str, Any]:
         "run_id": run_id,
         "path": _relative_to_project(project_root, run_dir),
         "display_name": str(manifest.run.get("display_name", "")).strip(),
-        "status": str(manifest.run.get("status", "")).strip(),
+        "status": execution_status,
+        "execution_status": execution_status,
+        "analysis_status": readiness.analysis_status,
+        "analysis_ready": readiness.analysis_ready,
+        "paper_status": _resolve_paper_status(
+            manifest,
+            readiness,
+            paper_status=paper_status,
+        ),
+        "retry_status": str(manifest.run.get("retry_status", "")).strip(),
         "case": str(manifest.origin.get("case", "")).strip(),
         "survey": str(manifest.origin.get("survey", "")).strip(),
         "simulator": str(
@@ -273,6 +291,34 @@ def _build_run_record(project_root: Path, run_dir: Path) -> dict[str, Any]:
     if simulator_source:
         record["simulator_source"] = simulator_source
     return record
+
+
+def _resolve_paper_status(
+    manifest: ManifestData,
+    readiness: RunReadiness,
+    *,
+    paper_status: str,
+) -> str:
+    explicit = paper_status.strip() or str(manifest.run.get("paper_status", "")).strip()
+    if explicit:
+        _validate_paper_status(explicit)
+        return explicit
+    retry_status = str(manifest.run.get("retry_status", "")).strip()
+    if retry_status == "retry_planned":
+        return "retry_planned"
+    if readiness.execution_status == RunState.COMPLETED.value:
+        return "accepted" if readiness.analysis_ready else "placeholder"
+    if retry_status in {"partial", "retry_ready"}:
+        return "placeholder"
+    return "excluded"
+
+
+def _validate_paper_status(value: str) -> None:
+    if value not in _PAPER_STATUSES:
+        raise SimctlError(
+            f"Unknown paper status: {value!r}. Use one of: "
+            f"{', '.join(sorted(_PAPER_STATUSES))}"
+        )
 
 
 def _collect_run_export_sources(
@@ -454,6 +500,14 @@ def _artifact_role_counts(files: tuple[PublicationExportFile, ...]) -> dict[str,
     return counts
 
 
+def _paper_status_counts(run_records: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for record in run_records:
+        status = str(record.get("paper_status", "")).strip() or "unknown"
+        counts[status] = counts.get(status, 0) + 1
+    return counts
+
+
 def _build_run_source_metadata(
     *,
     project_root: Path,
@@ -466,6 +520,7 @@ def _build_run_source_metadata(
         "path": _relative_to_project(project_root, target_path),
         "run_count": 1,
         "artifact_counts": _artifact_role_counts(files),
+        "paper_status_counts": _paper_status_counts([run_record]),
         "runs": [run_record],
         "run": run_record,
     }
@@ -487,6 +542,7 @@ def _build_survey_source_metadata(
         "path": _relative_to_project(project_root, target_path),
         "run_count": len(run_records),
         "artifact_counts": _artifact_role_counts(files),
+        "paper_status_counts": _paper_status_counts(run_records),
         "runs": run_records,
         "survey": {
             "survey_toml": (
@@ -578,6 +634,7 @@ def export_publication_bundle(
     mode: str = "copy",
     include_figures: bool = True,
     include_plots: bool = True,
+    paper_status: str = "",
     force: bool = False,
 ) -> PublicationExportResult:
     """Export publication-facing artifacts for one run or survey-like directory."""
@@ -631,7 +688,11 @@ def export_publication_bundle(
                 files_dir=files_dir,
                 mode=normalized_mode,
             )
-            run_record = _build_run_record(project_root, target_path)
+            run_record = _build_run_record(
+                project_root,
+                target_path,
+                paper_status=paper_status,
+            )
             source_run_ids = (str(run_record["run_id"]),)
             source_metadata = _build_run_source_metadata(
                 project_root=project_root,
@@ -653,7 +714,7 @@ def export_publication_bundle(
                 mode=normalized_mode,
             )
             run_records = [
-                _build_run_record(project_root, run_dir)
+                _build_run_record(project_root, run_dir, paper_status=paper_status)
                 for run_dir in discover_runs(target_path)
             ]
             source_run_ids = tuple(record["run_id"] for record in run_records)

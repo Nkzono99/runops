@@ -28,6 +28,7 @@
 | `runo runs submit --all [DIR]` | created な run を一括投入 |
 | `runo runs clone` | run 複製・派生 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
+| `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備 (`--plan` は状態を戻さず記録のみ) |
 
 ## モニタリング
 

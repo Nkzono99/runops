@@ -109,6 +109,11 @@ runo runs clone --set dt=0.5e-8 --set nx=128
 runo runs extend
 runo runs extend --nstep 200000
 runo runs extend --run         # 生成して即投入
+
+# retry / partial output
+runo runs retry --plan         # 状態を戻さず retry intent を記録
+runo runs retry -a walltime=24:00:00
+runo runs retry --and-submit
 ```
 
 ## 解析

@@ -16,6 +16,7 @@ from runops.core.actions import (
     create_survey,
     execute_action,
     export_publication,
+    plan_retry,
     promote_fact,
     purge_work,
     retry_run,
@@ -359,6 +360,35 @@ def test_retry_run_respects_max_attempts(tmp_path: Path) -> None:
 
     assert result.status is ActionStatus.PRECONDITION_FAILED
     assert "Max attempts" in result.message
+
+
+def test_plan_retry_records_partial_outputs_without_reset(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260507-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260507-0001",
+                "status": "failed",
+                "failure_reason": "timeout",
+            },
+            "job": {"job_id": "123", "attempt": 1},
+            "simulator": {"name": "emses", "adapter": "emses"},
+        },
+    )
+    (run_dir / "work").mkdir(exist_ok=True)
+    (run_dir / "work" / "ex00_0000.h5").write_bytes(b"")
+
+    result = plan_retry(run_dir, adjustments={"walltime": "24:00:00"}, note="timeout")
+
+    assert result.status is ActionStatus.SUCCESS
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["status"] == "failed"
+    assert updated.run["retry_status"] == "retry_planned"
+    assert updated.run["partial_outputs"] == {"hdf5_fields": 1}
+    assert updated.job["next_attempt"] == 2
 
 
 def test_add_fact_supports_superseding_fact(tmp_path: Path) -> None:

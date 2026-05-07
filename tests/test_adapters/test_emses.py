@@ -336,6 +336,14 @@ class TestDetectOutputs:
         assert outputs["hdf5_fields"] == ["work/latest/ex00_0000.h5"]
         assert "work/latest/energy" in outputs["diagnostics"]
 
+    def test_declares_hdf5_fields_as_required_output(
+        self,
+        adapter: EmseAdapter,
+    ) -> None:
+        assert adapter.required_outputs() == {
+            "hdf5_fields": "EMSES HDF5 field output files"
+        }
+
 
 # ===================================================================
 # 6. detect_status

@@ -194,6 +194,35 @@ def test_collect_run_stats_counts_states_and_broken_manifests(tmp_path: Path) ->
     assert diagnostics == []
 
 
+def test_collect_run_stats_includes_completed_readiness_problems(
+    tmp_path: Path,
+) -> None:
+    runs_dir = tmp_path / "runs"
+    run_dir = runs_dir / "R20260507-0001"
+    _write_toml(
+        run_dir / "manifest.toml",
+        {
+            "run": {"id": "R20260507-0001", "status": "completed"},
+            "simulator": {"name": "emses", "adapter": "emses"},
+        },
+    )
+    _write_toml(run_dir / "input" / "plasma.toml", {"jobcon": {"nstep": 100}})
+    (run_dir / "work").mkdir(parents=True, exist_ok=True)
+    (run_dir / "work" / "energy").write_text("100 1.0 2.0\n", encoding="utf-8")
+
+    diagnostics: list[dict[str, str]] = []
+    section_status: dict[str, str] = {}
+
+    stats = _collect_run_stats(tmp_path, diagnostics, section_status)
+
+    assert stats["completed"] == 1
+    assert stats["analysis_incomplete"] == 1
+    assert stats["analysis_problems"][0]["run_id"] == "R20260507-0001"
+    assert stats["analysis_problems"][0]["missing_required_artifacts"] == [
+        "hdf5_fields"
+    ]
+
+
 def test_collect_recent_failures_returns_only_failed_runs(tmp_path: Path) -> None:
     runs_dir = tmp_path / "runs"
     _write_toml(
@@ -236,6 +265,8 @@ def test_collect_recent_failures_returns_only_failed_runs(tmp_path: Path) -> Non
             "run_id": "R20260409-0001",
             "reason": "timeout",
             "display_name": "first",
+            "retry_status": "",
+            "partial_outputs": {},
         }
     ]
 

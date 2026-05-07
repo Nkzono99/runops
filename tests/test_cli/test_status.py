@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 from runops.cli.main import app
 from runops.core.state import RunState
 from runops.slurm.query import JobStatus
-from tests.factories import create_minimal_project, create_run_manifest
+from tests.factories import create_minimal_project, create_run_manifest, write_toml
 
 runner = CliRunner()
 
@@ -53,6 +53,29 @@ def test_status_no_job_id(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "not submitted" in result.output
+
+
+def test_status_shows_completed_run_readiness_warning(tmp_path: Path) -> None:
+    """Completed scheduler state should not hide missing required artifacts."""
+    create_minimal_project(tmp_path, name="test")
+    run_dir = tmp_path / "runs" / "R20260507-0001"
+    create_run_manifest(
+        run_dir,
+        status="completed",
+        simulator_name="emses",
+        adapter="emses",
+    )
+    write_toml(run_dir / "input" / "plasma.toml", {"jobcon": {"nstep": 100}})
+    (run_dir / "work").mkdir(parents=True, exist_ok=True)
+    (run_dir / "work" / "energy").write_text("100 1.0 2.0\n", encoding="utf-8")
+
+    with patch("runops.cli.status.Path.cwd", return_value=tmp_path):
+        result = runner.invoke(app, ["runs", "status", str(run_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "State:  completed" in result.output
+    assert "Analysis: incomplete" in result.output
+    assert "Missing artifacts: hdf5_fields" in result.output
 
 
 def test_status_slurm_unavailable(tmp_path: Path) -> None:

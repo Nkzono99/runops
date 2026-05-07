@@ -141,6 +141,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
             "mode",
             "include_figures",
             "include_plots",
+            "paper_status",
             "force",
         ),
         preconditions=("target exists", "target is a run or contains runs"),
@@ -159,6 +160,18 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         confirmation_conditions=(
             "required when retry adjustments increase walltime, memory, or nodes",
         ),
+    ),
+    "plan_retry": ActionSpec(
+        name="plan_retry",
+        description=(
+            "Record retry intent and partial-output diagnostics without "
+            "resetting the run."
+        ),
+        required_params=("run_dir",),
+        optional_params=("adjustments", "reviewed_log", "note"),
+        preconditions=("run state == failed or cancelled",),
+        risk_level="low",
+        cost_class="low",
     ),
     "archive_run": ActionSpec(
         name="archive_run",

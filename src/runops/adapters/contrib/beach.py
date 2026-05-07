@@ -81,6 +81,11 @@ class BeachAdapter(SimulatorAdapter):
         }
 
     @classmethod
+    def required_outputs(cls) -> dict[str, str]:
+        """Return BEACH outputs required for analysis readiness."""
+        return {"summary": "BEACH summary.txt completion summary"}
+
+    @classmethod
     def interactive_config(cls) -> dict[str, Any]:
         """Interactively prompt for BEACH configuration."""
         import typer

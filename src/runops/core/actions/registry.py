@@ -18,6 +18,7 @@ from runops.core.actions.result import ActionResult, ActionStatus
 from runops.core.actions.run_lifecycle import (
     create_run,
     create_survey,
+    plan_retry,
     retry_run,
     submit_run,
     sync_run,
@@ -36,6 +37,7 @@ _DISPATCH: dict[str, Callable[..., ActionResult]] = {
     "summarize_run": summarize_run,
     "collect_survey": collect_survey,
     "export_publication": export_publication,
+    "plan_retry": plan_retry,
     "retry_run": retry_run,
     "archive_run": archive_run,
     "purge_work": purge_work,

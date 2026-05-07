@@ -211,6 +211,16 @@ def detect_outputs(self, run_dir: Path) -> dict[str, Any]:
     return outputs
 ```
 
+`runo runs status` / `runo context` の analysis readiness は、この戻り値と
+`required_outputs()` を組み合わせて判定する。解析に必須の出力カテゴリがある
+adapter は、`detect_outputs()` の top-level key に合わせて宣言する。
+
+```python
+@classmethod
+def required_outputs(cls) -> dict[str, str]:
+    return {"fields": "field HDF5 output files"}
+```
+
 #### 5. `detect_status(run_dir) -> str`
 
 出力ファイルからシミュレーションの成功/失敗を判定します。

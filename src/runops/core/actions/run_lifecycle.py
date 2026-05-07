@@ -293,6 +293,70 @@ def sync_run(run_dir: Path) -> ActionResult:
     )
 
 
+@logged_action("plan_retry")
+def plan_retry(
+    run_dir: Path,
+    *,
+    adjustments: dict[str, str] | None = None,
+    reviewed_log: bool = False,
+    note: str = "",
+) -> ActionResult:
+    """Record retry intent for a failed or cancelled run without resetting it."""
+    from runops.core.manifest import read_manifest, update_manifest
+    from runops.core.retry import assess_retry_for_run
+
+    state_str, err = _require_state(run_dir, RunState.FAILED, RunState.CANCELLED)
+    if err:
+        return _precondition_fail("plan_retry", err)
+
+    manifest = read_manifest(run_dir)
+    failure_reason = manifest.run.get("failure_reason", "")
+    if failure_reason == "exit_error" and not reviewed_log:
+        return _precondition_fail(
+            "plan_retry",
+            "failure_reason 'exit_error' requires log review before planning retry",
+        )
+
+    assessment = assess_retry_for_run(run_dir)
+    if assessment.attempt >= assessment.max_attempts:
+        return _precondition_fail(
+            "plan_retry",
+            f"Max attempts ({assessment.max_attempts}) reached. "
+            "Manual inspection required.",
+        )
+
+    run_updates: dict[str, Any] = {
+        "retry_status": "retry_planned",
+        "partial_outputs": assessment.partial_outputs,
+    }
+    if note:
+        run_updates["retry_note"] = note
+    update_manifest(
+        run_dir,
+        {
+            "run": run_updates,
+            "job": {
+                "retry_adjustments": adjustments or {},
+                "next_attempt": assessment.attempt + 1,
+            },
+        },
+    )
+
+    planned = assess_retry_for_run(run_dir)
+    return ActionResult(
+        action="plan_retry",
+        status=ActionStatus.SUCCESS,
+        message=f"Planned retry for {planned.run_id} (attempt {planned.attempt + 1})",
+        data={
+            "assessment": planned.to_dict(),
+            "adjustments": adjustments or {},
+            "note": note,
+        },
+        state_before=state_str,
+        state_after=state_str,
+    )
+
+
 @logged_action("retry_run")
 def retry_run(
     run_dir: Path,
@@ -302,7 +366,7 @@ def retry_run(
 ) -> ActionResult:
     """Resubmit a failed or cancelled run as a new attempt."""
     from runops.core.manifest import read_manifest
-    from runops.core.retry import get_attempt_count
+    from runops.core.retry import assess_retry_for_run, get_attempt_count
     from runops.core.state import reset_state_for_retry
 
     state_str, err = _require_state(run_dir, RunState.FAILED, RunState.CANCELLED)
@@ -312,6 +376,7 @@ def retry_run(
     manifest = read_manifest(run_dir)
     attempt = get_attempt_count(manifest.job)
     failure_reason = manifest.run.get("failure_reason", "")
+    assessment = assess_retry_for_run(run_dir)
 
     if attempt >= 3:
         return _precondition_fail(
@@ -326,6 +391,10 @@ def retry_run(
 
     reset_state_for_retry(
         run_dir,
+        run_updates={
+            "retry_status": "retry_ready",
+            "partial_outputs": assessment.partial_outputs,
+        },
         job_updates={
             "attempt": attempt,
             "retry_adjustments": adjustments or {},
@@ -340,6 +409,7 @@ def retry_run(
             "previous_attempt": attempt,
             "next_attempt": attempt + 1,
             "adjustments": adjustments or {},
+            "assessment": assessment.to_dict(),
         },
         state_before=state_str,
         state_after=RunState.CREATED.value,

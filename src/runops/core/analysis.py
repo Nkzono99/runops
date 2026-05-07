@@ -20,6 +20,7 @@ from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.project import find_project_root
+from runops.core.readiness import evaluate_run_readiness
 
 _FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
 _PLOT_KINDS = {"auto", "line", "scatter", "bar"}
@@ -46,6 +47,8 @@ class SurveyCollectionResult:
     summaries_collected: int
     generated_summaries: int
     missing_summaries: int
+    readiness_counts: dict[str, int]
+    readiness_issues: tuple[dict[str, Any], ...]
     state_counts: dict[str, int]
     csv_path: Path
     json_path: Path
@@ -565,6 +568,8 @@ def _write_survey_report(
     summaries_collected: int,
     generated_summaries: int,
     missing_summaries: int,
+    readiness_counts: dict[str, int],
+    readiness_issues: list[dict[str, Any]],
     state_counts: dict[str, int],
     numeric_stats: dict[str, dict[str, float]],
     figures: list[dict[str, str]],
@@ -589,6 +594,25 @@ def _write_survey_report(
             lines.append(f"- `{state}`: {count}")
     else:
         lines.append("- No manifest states found.")
+
+    lines.extend(["", "## Analysis Readiness", ""])
+    if readiness_counts:
+        for status, count in sorted(readiness_counts.items()):
+            lines.append(f"- `{status}`: {count}")
+    else:
+        lines.append("- No readiness diagnostics were available.")
+
+    if readiness_issues:
+        lines.extend(["", "### Runs Requiring Attention", ""])
+        for issue in readiness_issues:
+            missing = issue.get("missing_required_artifacts", [])
+            missing_text = ", ".join(missing) if missing else "none"
+            warnings_text = "; ".join(issue.get("warnings", [])) or "not ready"
+            lines.append(
+                f"- `{issue.get('run_id', '')}`: "
+                f"{issue.get('analysis_status', 'unknown')} "
+                f"(missing: {missing_text}) - {warnings_text}"
+            )
 
     lines.extend(["", "## Numeric Metrics", ""])
     if numeric_stats:
@@ -623,11 +647,21 @@ def _ordered_columns(rows: list[dict[str, Any]]) -> list[str]:
     columns: set[str] = set()
     for row in rows:
         columns.update(row.keys())
-    return [
+    preferred = [
         "run_id",
         "display_name",
         "status",
-        *sorted(columns - {"run_id", "display_name", "status"}),
+        "analysis_status",
+        "analysis_ready",
+        "simulator_status",
+        "summary_available",
+        "summary_status",
+        "summary_partial",
+        "missing_required_artifacts",
+    ]
+    return [
+        *[column for column in preferred if column in columns],
+        *sorted(columns - set(preferred)),
     ]
 
 
@@ -645,6 +679,17 @@ def _flatten_aggregate_run_row(run: dict[str, Any]) -> dict[str, Any]:
         "display_name": run.get("display_name", ""),
         "status": run.get("status", ""),
     }
+    for key in (
+        "analysis_status",
+        "analysis_ready",
+        "simulator_status",
+        "summary_available",
+        "summary_status",
+        "summary_partial",
+        "missing_required_artifacts",
+    ):
+        if key in run:
+            row[key] = run[key]
     flat_metadata = run.get("flat_metadata", {})
     if isinstance(flat_metadata, dict):
         row.update(flat_metadata)
@@ -916,6 +961,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
     csv_rows: list[dict[str, Any]] = []
     figure_rows: list[dict[str, str]] = []
     state_counts: dict[str, int] = {}
+    readiness_counts: dict[str, int] = {}
+    readiness_issues: list[dict[str, Any]] = []
     generated_count = 0
     missing_count = 0
     warnings: list[str] = []
@@ -926,6 +973,11 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         state = ""
         flat_metadata: dict[str, Any] = {}
         metadata_sections: dict[str, Any] = {}
+        analysis_ready = False
+        analysis_status = ""
+        simulator_status = ""
+        missing_required_artifacts: list[str] = []
+        readiness_warnings: list[str] = []
         try:
             manifest = read_manifest(run_dir)
             run_id = str(manifest.run.get("id", run_id))
@@ -942,6 +994,12 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                 "variation": dict(manifest.variation),
                 "param": dict(manifest.params_snapshot),
             }
+            readiness = evaluate_run_readiness(run_dir, manifest=manifest)
+            analysis_ready = readiness.analysis_ready
+            analysis_status = readiness.analysis_status
+            simulator_status = readiness.simulator_status
+            missing_required_artifacts = list(readiness.missing_required_artifacts)
+            readiness_warnings = list(readiness.warnings)
         except SimctlError:
             manifest = None
 
@@ -956,21 +1014,70 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                 if summary_path.is_file()
                 else ""
             ),
+            "analysis_status": analysis_status,
+            "analysis_ready": analysis_ready,
+            "simulator_status": simulator_status,
+            "missing_required_artifacts": missing_required_artifacts,
+            "readiness_warnings": readiness_warnings,
         }
 
         if not summary_path.is_file():
             missing_count += 1
+            if state == "completed":
+                analysis_ready = False
+                if analysis_status in {"", "ready"}:
+                    analysis_status = "incomplete"
+                readiness_warnings.append("analysis/summary.json missing")
+                row["analysis_status"] = analysis_status
+                row["analysis_ready"] = analysis_ready
+                row["readiness_warnings"] = readiness_warnings
+            if analysis_status:
+                readiness_counts[analysis_status] = (
+                    readiness_counts.get(analysis_status, 0) + 1
+                )
+            if state == "completed" and not analysis_ready:
+                readiness_issues.append(
+                    {
+                        "run_id": run_id,
+                        "run_dir": str(run_dir),
+                        "analysis_status": analysis_status or "unknown",
+                        "missing_required_artifacts": missing_required_artifacts,
+                        "warnings": readiness_warnings,
+                    }
+                )
+                warnings.extend(
+                    f"{run_id}: {warning}" for warning in readiness_warnings
+                )
             run_rows.append(row)
             continue
 
         with open(summary_path, encoding="utf-8") as f:
             summary: dict[str, Any] = json.load(f)
+        summary_status = str(summary.get("status", "")).strip()
+        summary_partial = bool(summary.get("partial", False))
+        if summary_status and summary_status != "completed":
+            summary_partial = True
+        if summary_partial:
+            analysis_ready = False
+            if analysis_status in {"", "ready"}:
+                analysis_status = "incomplete"
+            warning_status = summary_status or "partial"
+            readiness_warnings.append(
+                f"analysis/summary.json status is {warning_status}"
+            )
 
         flat_summary = _flatten_summary(summary)
         csv_row: dict[str, Any] = {
             "run_id": run_id,
             "display_name": display_name,
             "status": state,
+            "analysis_status": analysis_status,
+            "analysis_ready": analysis_ready,
+            "simulator_status": simulator_status,
+            "summary_available": True,
+            "summary_status": summary_status,
+            "summary_partial": summary_partial,
+            "missing_required_artifacts": missing_required_artifacts,
         }
         csv_row.update(flat_metadata)
         csv_row.update(flat_summary)
@@ -991,6 +1098,11 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
             )
 
         row["summary"] = summary
+        row["analysis_status"] = analysis_status
+        row["analysis_ready"] = analysis_ready
+        row["summary_status"] = summary_status
+        row["summary_partial"] = summary_partial
+        row["readiness_warnings"] = readiness_warnings
         row["metadata"] = metadata_sections
         row["flat_metadata"] = {
             key: _csv_cell_value(value) for key, value in flat_metadata.items()
@@ -999,6 +1111,21 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
             key: _csv_cell_value(value) for key, value in flat_summary.items()
         }
         row["figures"] = figures
+        if analysis_status:
+            readiness_counts[analysis_status] = (
+                readiness_counts.get(analysis_status, 0) + 1
+            )
+        if state == "completed" and not analysis_ready:
+            readiness_issues.append(
+                {
+                    "run_id": run_id,
+                    "run_dir": str(run_dir),
+                    "analysis_status": analysis_status or "unknown",
+                    "missing_required_artifacts": missing_required_artifacts,
+                    "warnings": readiness_warnings,
+                }
+            )
+            warnings.extend(f"{run_id}: {warning}" for warning in readiness_warnings)
         run_rows.append(row)
 
     if not csv_rows:
@@ -1035,6 +1162,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         "summaries_collected": len(csv_rows),
         "generated_summaries": generated_count,
         "missing_summaries": missing_count,
+        "readiness_counts": readiness_counts,
+        "readiness_issues": readiness_issues,
         "state_counts": state_counts,
         "numeric_stats": numeric_stats,
         "warnings": warnings,
@@ -1055,6 +1184,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         summaries_collected=len(csv_rows),
         generated_summaries=generated_count,
         missing_summaries=missing_count,
+        readiness_counts=readiness_counts,
+        readiness_issues=readiness_issues,
         state_counts=state_counts,
         numeric_stats=numeric_stats,
         figures=figure_rows,
@@ -1067,6 +1198,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         summaries_collected=len(csv_rows),
         generated_summaries=generated_count,
         missing_summaries=missing_count,
+        readiness_counts=readiness_counts,
+        readiness_issues=tuple(readiness_issues),
         state_counts=state_counts,
         csv_path=csv_path,
         json_path=json_path,

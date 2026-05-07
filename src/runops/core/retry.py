@@ -31,6 +31,35 @@ class RetrySuggestion:
     adjustments: dict[str, Any] | None = None
 
 
+@dataclass(frozen=True)
+class RetryAssessment:
+    """Current retry/partial-output status for a run."""
+
+    run_id: str
+    state: str
+    failure_reason: str
+    attempt: int
+    max_attempts: int
+    retry_status: str
+    has_partial_outputs: bool
+    partial_outputs: dict[str, int]
+    warnings: tuple[str, ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        """Return a JSON/TOML-friendly representation."""
+        return {
+            "run_id": self.run_id,
+            "state": self.state,
+            "failure_reason": self.failure_reason,
+            "attempt": self.attempt,
+            "max_attempts": self.max_attempts,
+            "retry_status": self.retry_status,
+            "has_partial_outputs": self.has_partial_outputs,
+            "partial_outputs": dict(self.partial_outputs),
+            "warnings": list(self.warnings),
+        }
+
+
 #: Maps failure_reason to a list of suggestions (first = most preferred).
 _SUGGESTION_TABLE: dict[str, list[RetrySuggestion]] = {
     "timeout": [
@@ -94,6 +123,8 @@ _SUGGESTION_TABLE: dict[str, list[RetrySuggestion]] = {
         ),
     ],
 }
+
+_LOG_OUTPUT_KEYS = {"logs", "stdout", "stderr"}
 
 
 def suggest_retry(
@@ -191,3 +222,126 @@ def suggest_retry_for_run(run_dir: Path) -> list[RetrySuggestion]:
     attempt = get_attempt_count(manifest.job)
 
     return suggest_retry(reason, attempt=attempt)
+
+
+def assess_retry_for_run(
+    run_dir: Path,
+    *,
+    max_attempts: int = 3,
+) -> RetryAssessment:
+    """Assess partial outputs and retry readiness for one run.
+
+    Args:
+        run_dir: Path to the run directory.
+        max_attempts: Maximum attempts before manual review is required.
+
+    Returns:
+        Retry assessment with a derived ``retry_status``. This does not mutate
+        the manifest.
+    """
+    from runops.core.manifest import read_manifest
+
+    manifest = read_manifest(Path(run_dir))
+    run_id = str(manifest.run.get("id", Path(run_dir).name))
+    state = str(manifest.run.get("status", ""))
+    failure_reason = str(manifest.run.get("failure_reason", ""))
+    attempt = get_attempt_count(manifest.job)
+    partial_outputs = _detect_partial_outputs(Path(run_dir), manifest.simulator)
+    warnings: list[str] = []
+    if partial_outputs:
+        warnings.append(
+            "Partial outputs detected; preserve them before overwriting work/."
+        )
+
+    retry_status = _derive_retry_status(
+        state=state,
+        attempt=attempt,
+        max_attempts=max_attempts,
+        has_partial_outputs=bool(partial_outputs),
+    )
+    recorded_status = str(manifest.run.get("retry_status", "")).strip()
+    if recorded_status:
+        retry_status = recorded_status
+
+    return RetryAssessment(
+        run_id=run_id,
+        state=state,
+        failure_reason=failure_reason,
+        attempt=attempt,
+        max_attempts=max_attempts,
+        retry_status=retry_status,
+        has_partial_outputs=bool(partial_outputs),
+        partial_outputs=partial_outputs,
+        warnings=tuple(warnings),
+    )
+
+
+def _derive_retry_status(
+    *,
+    state: str,
+    attempt: int,
+    max_attempts: int,
+    has_partial_outputs: bool,
+) -> str:
+    if state not in {RunState.FAILED.value, RunState.CANCELLED.value}:
+        return "not_retryable"
+    if attempt >= max_attempts:
+        return "manual_review"
+    if has_partial_outputs:
+        return "partial"
+    return "retry_ready"
+
+
+def _detect_partial_outputs(
+    run_dir: Path,
+    simulator_section: dict[str, Any],
+) -> dict[str, int]:
+    adapter_name = str(
+        simulator_section.get("adapter") or simulator_section.get("name") or ""
+    )
+    outputs: dict[str, Any] = {}
+    if adapter_name:
+        try:
+            from runops.adapters import get as get_adapter
+
+            adapter_cls = get_adapter(adapter_name)
+            outputs = adapter_cls().detect_outputs(run_dir)
+        except KeyError:
+            outputs = {}
+    if not outputs:
+        return _fallback_partial_outputs(run_dir)
+
+    partial: dict[str, int] = {}
+    for key, value in outputs.items():
+        if key in _LOG_OUTPUT_KEYS:
+            continue
+        count = _output_count(value)
+        if count:
+            partial[key] = count
+    return partial
+
+
+def _fallback_partial_outputs(run_dir: Path) -> dict[str, int]:
+    work_dir = run_dir / "work"
+    if not work_dir.is_dir():
+        return {}
+    count = 0
+    for path in work_dir.rglob("*"):
+        if not path.is_file():
+            continue
+        if path.suffix in {".log", ".out", ".err"}:
+            continue
+        count += 1
+    return {"work_files": count} if count else {}
+
+
+def _output_count(value: Any) -> int:
+    if value is None:
+        return 0
+    if isinstance(value, (str, Path)):
+        return 1
+    if isinstance(value, dict):
+        return sum(_output_count(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)):
+        return sum(_output_count(item) for item in value)
+    return 1

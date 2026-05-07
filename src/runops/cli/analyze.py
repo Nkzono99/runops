@@ -122,6 +122,9 @@ def collect(
     missing_summaries = int(result.data.get("missing_summaries", 0))
     if missing_summaries > 0:
         typer.echo(f"  ({missing_summaries} runs missing summary.json)")
+    readiness_issues = result.data.get("readiness_issues", [])
+    if readiness_issues:
+        typer.echo(f"  Readiness issues: {len(readiness_issues)} run(s)")
     for warning in result.data.get("warnings", []):
         typer.echo(f"Warning: {warning}", err=True)
 
@@ -298,6 +301,14 @@ def export(
             "Include survey summary plots under summary/plots/ when exporting a survey."
         ),
     ),
+    paper_status: str = typer.Option(
+        "",
+        "--paper-status",
+        help=(
+            "Override paper-facing status for exported runs: accepted, "
+            "placeholder, retry_planned, excluded, or superseded."
+        ),
+    ),
     force: bool = typer.Option(
         False,
         "--force",
@@ -319,6 +330,7 @@ def export(
             mode=mode,
             include_figures=include_figures,
             include_plots=include_plots,
+            paper_status=paper_status,
             force=force,
         )
     except (OSError, TypeError, json.JSONDecodeError, SimctlError) as e:

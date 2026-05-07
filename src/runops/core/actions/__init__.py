@@ -54,6 +54,9 @@ from runops.core.actions.run_lifecycle import (
     create_survey as create_survey,
 )
 from runops.core.actions.run_lifecycle import (
+    plan_retry as plan_retry,
+)
+from runops.core.actions.run_lifecycle import (
     retry_run as retry_run,
 )
 from runops.core.actions.run_lifecycle import (
@@ -91,6 +94,7 @@ __all__ = [
     "export_publication",
     "get_action_spec",
     "list_actions",
+    "plan_retry",
     "promote_fact",
     "purge_work",
     "retry_run",

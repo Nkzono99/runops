@@ -191,6 +191,17 @@ class SimulatorAdapter(ABC):
         return []
 
     @classmethod
+    def required_outputs(cls) -> dict[str, str]:
+        """Return output categories required before a run is analysis-ready.
+
+        Keys must match the top-level labels returned by
+        :meth:`detect_outputs`; values are short human-readable descriptions.
+        Adapters that cannot define simulator-specific requirements should
+        return an empty mapping.
+        """
+        return {}
+
+    @classmethod
     def agent_guide(cls) -> str:
         """Return AI agent guide for this simulator as markdown.
 

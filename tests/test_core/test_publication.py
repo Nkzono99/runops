@@ -109,6 +109,32 @@ def test_export_publication_bundle_supports_symlink_mode(tmp_path: Path) -> None
     assert exported_figure.resolve() == run_dir / "analysis" / "figures" / "phi.png"
 
 
+def test_export_manifest_separates_execution_and_paper_status(
+    tmp_path: Path,
+) -> None:
+    _create_project(tmp_path)
+    run_dir = _create_completed_run(tmp_path / "runs", "R20260507-0001")
+    (run_dir / "work").mkdir(exist_ok=True)
+    (run_dir / "work" / "exit_code").write_text("0", encoding="utf-8")
+
+    result = export_publication_bundle(
+        run_dir,
+        paper_id="draft-a",
+        name="placeholder",
+        paper_status="placeholder",
+    )
+
+    with open(result.manifest_path, encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    run_record = manifest["source"]["run"]
+    assert run_record["execution_status"] == "completed"
+    assert run_record["status"] == "completed"
+    assert run_record["analysis_status"] == "ready"
+    assert run_record["paper_status"] == "placeholder"
+    assert manifest["source"]["paper_status_counts"] == {"placeholder": 1}
+
+
 def test_force_export_preserves_existing_bundle_on_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

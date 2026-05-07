@@ -126,6 +126,8 @@ def collect_survey(survey_dir: Path) -> ActionResult:
             "report_path": str(result.report_path),
             "generated_summaries": result.generated_summaries,
             "missing_summaries": result.missing_summaries,
+            "readiness_counts": result.readiness_counts,
+            "readiness_issues": list(result.readiness_issues),
             "figure_count": len(result.figures),
             "warnings": list(result.warnings),
         },
@@ -141,6 +143,7 @@ def export_publication(
     mode: str = "copy",
     include_figures: bool = True,
     include_plots: bool = True,
+    paper_status: str = "",
     force: bool = False,
 ) -> ActionResult:
     """Create a project-side publication export bundle."""
@@ -154,6 +157,7 @@ def export_publication(
             mode=mode,
             include_figures=include_figures,
             include_plots=include_plots,
+            paper_status=paper_status,
             force=force,
         )
     except SimctlError as e:
