@@ -228,6 +228,10 @@ def _pull_tools_repo(project_dir: Path) -> str | None:
     if not (runops_dir / ".git").is_dir():
         return None
 
+    blocker = _tools_repo_update_blocker(runops_dir)
+    if blocker is not None:
+        return f"blocked: {blocker}"
+
     result = subprocess.run(
         ["git", "pull", "--ff-only"],
         cwd=str(runops_dir),
@@ -243,6 +247,70 @@ def _pull_tools_repo(project_dir: Path) -> str | None:
             return "already up to date"
         return "updated"
     return f"pull failed: {(result.stderr or '').strip()[:200]}"
+
+
+def _run_tools_git(
+    runops_dir: Path, args: list[str]
+) -> subprocess.CompletedProcess[str]:
+    """Run a git command in ``tools/runops`` and return the completed process."""
+    return subprocess.run(
+        ["git", *args],
+        cwd=str(runops_dir),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=False,
+    )
+
+
+def _tools_repo_update_blocker(runops_dir: Path) -> str | None:
+    """Return why ``tools/runops`` should not be pulled automatically."""
+    status = _run_tools_git(runops_dir, ["status", "--porcelain"])
+    if status.returncode != 0:
+        detail = (status.stderr or status.stdout or "").strip()[:200]
+        return f"could not inspect git status ({detail})"
+    if status.stdout.strip():
+        return (
+            "local uncommitted changes exist; commit/stash them, use "
+            "patch-runops, or rerun update-harness with --skip-pull to render "
+            "the current local templates"
+        )
+
+    branch = _run_tools_git(runops_dir, ["branch", "--show-current"])
+    if branch.returncode != 0:
+        detail = (branch.stderr or branch.stdout or "").strip()[:200]
+        return f"could not inspect current branch ({detail})"
+    branch_name = branch.stdout.strip()
+    if branch_name and branch_name != "main":
+        return (
+            f"current branch is {branch_name!r}; finish the local patch, open a "
+            "feedback issue / draft PR, or switch back to main before pulling"
+        )
+
+    upstream = _run_tools_git(
+        runops_dir,
+        ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+    )
+    if upstream.returncode != 0:
+        detail = (upstream.stderr or upstream.stdout or "").strip()[:200]
+        return f"no upstream tracking branch is configured ({detail})"
+
+    ahead = _run_tools_git(runops_dir, ["rev-list", "--count", "@{u}..HEAD"])
+    if ahead.returncode != 0:
+        detail = (ahead.stderr or ahead.stdout or "").strip()[:200]
+        return f"could not inspect local commits ({detail})"
+    try:
+        ahead_count = int(ahead.stdout.strip() or "0")
+    except ValueError:
+        return f"could not parse local commit count ({ahead.stdout.strip()!r})"
+    if ahead_count > 0:
+        return (
+            f"tools/runops has {ahead_count} local commit(s); push a PR, file a "
+            "feedback issue, or rebase manually before pulling upstream"
+        )
+
+    return None
 
 
 def _restart_with_skip_pull() -> None:
@@ -406,6 +474,15 @@ def update_harness(
         pull_status = _pull_tools_repo(project_dir)
         if pull_status is not None:
             typer.echo(f"tools/runops: {pull_status}")
+            if pull_status.startswith("blocked:"):
+                typer.echo(
+                    "Local tools/runops changes were preserved. Commit/stash "
+                    "them, use patch-runops to finish the local patch, or rerun "
+                    "with --skip-pull to refresh harness files from the current "
+                    "local tools/runops checkout.",
+                    err=True,
+                )
+                raise typer.Exit(code=1)
             needs_refresh = pull_status == "updated"
             if pull_status == "already up to date":
                 needs_refresh = _editable_install_needs_refresh(project_dir)

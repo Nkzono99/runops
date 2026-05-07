@@ -73,6 +73,30 @@ small な挙動改善は以下の手順で直接 upstream に投げられる:
 大きな変更 (API 変更, 新 adapter, ワークフロー変更) は PR の前に issue で
 先に設計を合意する。
 
+{{ rule_heading | default("#") }}# local patch から upstream へ戻す判断
+
+current project で今すぐ必要な修正は、`tools/runops` を local patch して
+即利用してよい。その後、必ず upstream disposition を決める:
+
+| 判定 | 意味 | 次の動き |
+|------|------|----------|
+| `local-only` | project 固有 | project 側に残す |
+| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `feedback-runops` で issue |
+| `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
+| `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
+
+local patch の正本は `tools/runops` 内の Git branch / commit とする。
+別枠の mutable patch 履歴はデフォルトでは作らない。必要な handoff は
+`notes/YYYY-MM-DD.md` に残し、長期化する場合だけ
+`notes/reports/runops-local-patches.md` のような project-local index を作る。
+
+project 側の生成物をそのまま upstream しない。汎用化する場合は source
+template / command / docs に戻す:
+
+- `.agents/skills/*` / `.claude/skills/*` → `tools/runops/src/runops/templates/skills/`
+- `AGENTS.md` / `CLAUDE.md` → `tools/runops/src/runops/templates/harness/`
+- `research/*` scaffold → `tools/runops/src/runops/templates/scaffold/research/`
+
 {{ rule_heading | default("#") }}# しないこと
 
 - ユーザーに相談せずに issue や PR を作らない

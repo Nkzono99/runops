@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -40,6 +41,13 @@ def _init_project(tmp_path: Path) -> None:
     assert result.exit_code == 0
 
 
+def _make_tools_runops_repo(project_dir: Path) -> Path:
+    """Create the minimum ``tools/runops/.git`` shape for update tests."""
+    runops_dir = project_dir / "tools" / "runops"
+    (runops_dir / ".git").mkdir(parents=True)
+    return runops_dir
+
+
 class TestUpdateHarnessBasic:
     """Basic update-harness scenarios."""
 
@@ -63,10 +71,175 @@ class TestUpdateHarnessBasic:
         assert ".codex/config.toml" in lock
         assert ".codex/rules/runops.rules" in lock
         assert ".agents/skills/new-case/SKILL.md" in lock
+        assert ".agents/skills/patch-runops/SKILL.md" in lock
         assert ".agents/skills/research-agenda/SKILL.md" in lock
         assert "cases/AGENTS.md" in lock
         assert "runs/AGENTS.md" in lock
         assert GITIGNORE_PATH in lock
+
+    def test_pull_tools_repo_blocks_dirty_checkout(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """tools/runops updates never pull over uncommitted local patches."""
+        _make_tools_runops_repo(tmp_path)
+        calls: list[list[str]] = []
+
+        def fake_run(
+            cmd: list[str],
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            calls.append(cmd)
+            if cmd == ["git", "status", "--porcelain"]:
+                return subprocess.CompletedProcess(
+                    cmd,
+                    0,
+                    stdout=" M src/runops/foo.py\n",
+                    stderr="",
+                )
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+
+        status = update_harness_module._pull_tools_repo(tmp_path)
+
+        assert status is not None
+        assert status.startswith("blocked:")
+        assert "uncommitted" in status
+        assert ["git", "pull", "--ff-only"] not in calls
+
+    def test_pull_tools_repo_blocks_local_branch(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """update-runops does not switch away from active patch branches."""
+        _make_tools_runops_repo(tmp_path)
+
+        def fake_run(
+            cmd: list[str],
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            if cmd == ["git", "status", "--porcelain"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            if cmd == ["git", "branch", "--show-current"]:
+                return subprocess.CompletedProcess(
+                    cmd, 0, stdout="fix/demo\n", stderr=""
+                )
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+
+        status = update_harness_module._pull_tools_repo(tmp_path)
+
+        assert status is not None
+        assert status.startswith("blocked:")
+        assert "fix/demo" in status
+
+    def test_pull_tools_repo_blocks_local_commits(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """local commits are protected until they are pushed or triaged."""
+        _make_tools_runops_repo(tmp_path)
+
+        def fake_run(
+            cmd: list[str],
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            if cmd == ["git", "status", "--porcelain"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            if cmd == ["git", "branch", "--show-current"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="main\n", stderr="")
+            if cmd == [
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "@{u}",
+            ]:
+                return subprocess.CompletedProcess(
+                    cmd,
+                    0,
+                    stdout="origin/main\n",
+                    stderr="",
+                )
+            if cmd == ["git", "rev-list", "--count", "@{u}..HEAD"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="2\n", stderr="")
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+
+        status = update_harness_module._pull_tools_repo(tmp_path)
+
+        assert status is not None
+        assert status.startswith("blocked:")
+        assert "2 local commit" in status
+
+    def test_pull_tools_repo_allows_clean_main(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """clean main checkouts still pull normally."""
+        _make_tools_runops_repo(tmp_path)
+
+        def fake_run(
+            cmd: list[str],
+            **_kwargs: object,
+        ) -> subprocess.CompletedProcess[str]:
+            if cmd == ["git", "status", "--porcelain"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+            if cmd == ["git", "branch", "--show-current"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="main\n", stderr="")
+            if cmd == [
+                "git",
+                "rev-parse",
+                "--abbrev-ref",
+                "--symbolic-full-name",
+                "@{u}",
+            ]:
+                return subprocess.CompletedProcess(
+                    cmd,
+                    0,
+                    stdout="origin/main\n",
+                    stderr="",
+                )
+            if cmd == ["git", "rev-list", "--count", "@{u}..HEAD"]:
+                return subprocess.CompletedProcess(cmd, 0, stdout="0\n", stderr="")
+            if cmd == ["git", "pull", "--ff-only"]:
+                return subprocess.CompletedProcess(
+                    cmd,
+                    0,
+                    stdout="Already up to date.\n",
+                    stderr="",
+                )
+            raise AssertionError(f"unexpected command: {cmd}")
+
+        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+
+        assert update_harness_module._pull_tools_repo(tmp_path) == "already up to date"
+
+    def test_update_harness_stops_when_tools_repo_pull_is_blocked(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """update-harness preserves local tools/runops work by stopping."""
+        _init_project(tmp_path)
+        monkeypatch.setattr(
+            update_harness_module,
+            "_pull_tools_repo",
+            lambda _project_dir: "blocked: local uncommitted changes exist",
+        )
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "tools/runops: blocked:" in result.output
+        assert "Local tools/runops changes were preserved" in result.output
 
     def test_overwrites_unedited_files(self, tmp_path: Path) -> None:
         """Files matching their lock hash are silently overwritten."""

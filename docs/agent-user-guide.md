@@ -86,6 +86,14 @@ survey 設計, run 生成, 投入の各タイミングで意思決定の理由�
 図を生成したら原則 Markdown image として埋め込み、`Observation:` と
 `Interpretation:` を分ける。
 
+## tools/runops の local patch
+
+current project で runops 本体の修正が今すぐ必要な場合は、`patch-runops`
+skill で `tools/runops` を local patch して即利用できる。local patch の正本は
+`tools/runops` 内の Git branch / commit とし、設計が必要な upstream 候補は
+`feedback-runops` で issue 化する。詳細は
+[Local runops Patches](local-runops-patches.md) を参照。
+
 ```bash
 # 準備フェーズで意思決定を残す
 runo notes append "Series A 設計" - <<'EOF'

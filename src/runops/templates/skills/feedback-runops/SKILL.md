@@ -5,13 +5,17 @@ description: Send feedback (bug report, feature request, improvement suggestion)
 
 # runops へフィードバックを送る
 
-`/feedback-runops` は runops 本体への **バグ報告・機能要望・改善提案** を
+`{{ skill_prefix }}feedback-runops` は runops 本体への **バグ報告・機能要望・改善提案** を
 GitHub issue として起票するスキル。現在の作業を止めずにサイドチャネルとして
 フィードバックを送れる。
 
+`tools/runops` に local patch がある場合も、この skill を使ってよい。
+特に、汎用価値はありそうだが設計がまだ粗い、一部だけ汎用、draft PR には早い、
+という場合は PR ではなく issue で upstream design discussion に回す。
+
 ## 引数なしの場合: フィードバック候補をリストアップ
 
-引数なしで `/feedback-runops` を呼んだ場合、**今のセッション中に気づいた
+引数なしで `{{ skill_prefix }}feedback-runops` を呼んだ場合、**今のセッション中に気づいた
 フィードバック候補** を洗い出して一覧表示する。
 
 以下の観点で候補を探す:
@@ -21,6 +25,7 @@ GitHub issue として起票するスキル。現在の作業を止めずにサ�
 - ドキュメントやヘルプが不足していると感じた場面
 - 「こうなっていれば便利だった」と思った機能
 - `tools/runops/` のコードを読んで気づいたバグ・改善点
+- `tools/runops` local patch のうち、設計議論が必要な upstream 候補
 
 出力フォーマット:
 
@@ -31,7 +36,7 @@ GitHub issue として起票するスキル。現在の作業を止めずにサ�
 2. [feature] `runo runs submit` — <欲しい機能>
 3. [improvement] `update-harness` — <改善提案>
 
-→ 起票するものがあれば `/feedback-runops <番号 or 内容>` で issue 化できます
+→ 起票するものがあれば `{{ skill_prefix }}feedback-runops <番号 or 内容>` で issue 化できます
 ```
 
 候補がなければ「現時点でフィードバック候補はありません」と報告する。
@@ -48,6 +53,8 @@ GitHub issue として起票するスキル。現在の作業を止めずにサ�
 - **種別**: bug / feature / improvement / docs
 - **要約**: 1 行のタイトル
 - **詳細**: 概要・再現手順・期待する挙動
+- **local patch がある場合**: branch / commit / current project で効いたこと /
+  upstreamable parts / project-specific parts
 
 ### 2. 重複 issue を確認する
 
@@ -90,6 +97,14 @@ gh issue create \
 ## 補足
 <ログ抜粋, 関連情報, 既に試した workaround など>
 
+## Local patch / workaround (該当する場合)
+- branch:
+- commit:
+- current project check:
+- upstreamable parts:
+- project-specific parts to exclude:
+- open design questions:
+
 ## 環境
 - runops version: <収集した情報>
 - OS: <収集した情報>
@@ -111,6 +126,8 @@ runo notes append "upstream feedback" "Filed <issue-url>: <タイトル>"
 - **ユーザー確認なしに issue を投げない** — 必ず内容を見せて OK をもらう
 - プロジェクト固有の private 情報 (実データパス, クラスタ固有の秘密) を
   issue 本文に含めない
+- project 固有の generated harness や研究状態を、そのまま upstream issue / PR
+  に貼らない。汎用化できる source template / command / docs の話に分解する
 - 同じ内容の重複 issue を切らない
 - フィードバックを理由に **現在の研究タスクを止めない** — workaround で
   作業を進めつつ、サイドチャネルとして issue を投げる

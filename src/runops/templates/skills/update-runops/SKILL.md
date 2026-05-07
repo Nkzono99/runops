@@ -11,11 +11,17 @@ description: Update runops itself and refresh harness files. Use when runops has
 cd tools/runops && git pull && cd -
 ```
 
-pull が失敗した場合 (diverge 等):
+`tools/runops` に未コミット変更、local branch、未 push commit がある場合、
+`runo update-harness` は pull せず停止する。local patch を壊さないため、
+`git reset --hard` での自動復旧は標準手順にしない。
 
-```bash
-cd tools/runops && git fetch origin && git reset --hard origin/main && cd -
-```
+停止した場合の選択肢:
+
+- local patch をこの project で使い続ける
+- `{{ skill_prefix }}patch-runops` で branch / commit / upstream disposition を整理する
+- 設計が必要なら `{{ skill_prefix }}feedback-runops` で issue 化する
+- 実装案を見せたいなら draft PR にする
+- PR / rebase / stash / commit が終わってから改めて `update-runops`
 
 ## 2. ハーネスファイルを再生成
 
@@ -55,5 +61,7 @@ runo update-harness && runo update
 ## 注意
 
 - `tools/runops/` に未コミットの変更がある場合は pull 前にコミットまたは stash する
+- local patch の正本は `tools/runops` 内の Git branch / commit とする。
+  別枠の mutable patch 履歴はデフォルトでは作らない
 - `update-harness` で `.new` ファイルが生成されたら、差分を確認してから元ファイルに反映する
 - 更新後は `runo doctor` で環境が正常か確認するとよい

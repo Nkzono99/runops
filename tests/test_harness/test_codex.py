@@ -97,11 +97,13 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".codex/rules/runops.rules" in bundle.files
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
+    assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
     assert "cases/AGENTS.md" in bundle.files
     assert "runs/AGENTS.md" in bundle.files
     agents = bundle.files["AGENTS.md"]
     assert "性質ごとに書き先を分ける" in agents
     assert "$research-agenda" in agents
+    assert "$patch-runops" in agents
     assert "active question、current decision、paused/killed" in agents
     # Skills share the same frontmatter, but use each agent's native
     # invocation syntax in the body.
