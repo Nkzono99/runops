@@ -111,6 +111,7 @@ completed → archived → purged
 
 | コマンド | 説明 |
 |---------|------|
+| `runo --version` | version 確認 |
 | `runo init` / `setup` / `doctor` | プロジェクト管理 |
 | `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
 | `runo runs submit [--all] [-qn] [--qos]` | ジョブ投入 |

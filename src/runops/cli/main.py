@@ -8,6 +8,7 @@ from typing import Annotated
 
 import typer
 
+from runops import __version__
 from runops.cli.analyze import collect, export, plot, summarize
 from runops.cli.clone import clone
 from runops.cli.config import config_app
@@ -97,6 +98,7 @@ def _build_app(name: str) -> typer.Typer:
             "Preferred command: runo. Stable alias: runops."
         ),
         no_args_is_help=True,
+        invoke_without_command=True,
     )
 
     @cli_app.callback()
@@ -122,8 +124,20 @@ def _build_app(name: str) -> typer.Typer:
                 case_sensitive=False,
             ),
         ] = None,
+        version: Annotated[
+            bool,
+            typer.Option(
+                "--version",
+                help="Show the runops package version and exit.",
+                is_eager=True,
+            ),
+        ] = False,
     ) -> None:
         """Configure optional structured event logging for the current command."""
+        if version:
+            typer.echo(f"{name} {__version__}")
+            raise typer.Exit()
+
         try:
             configure_event_logging(event_log, mode=event_log_mode, actor=name)
         except ValueError as exc:

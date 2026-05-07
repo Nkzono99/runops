@@ -15,6 +15,7 @@ runops プロジェクトにおける Agent の作業ガイド。
 
 | 操作 | コマンド |
 |------|---------|
+| version 確認 | `runo --version` |
 | プロジェクト状況把握 | `runo context --json` |
 | case テンプレート生成 | `runo case new <name>` |
 | 最小 case テンプレート生成 | `runo case new <name> --minimal` |

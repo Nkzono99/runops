@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typer.testing import CliRunner
 
+from runops import __version__
 from runops.cli.main import app, runops_app
 
 runner = CliRunner()
@@ -46,6 +47,20 @@ def test_runops_compatibility_app_keeps_legacy_name() -> None:
     assert result.exit_code == 0
     assert runops_app.info.name == "runops"
     assert "Usage: runops" in result.output
+
+
+def test_version_option_reports_runo_version() -> None:
+    result = runner.invoke(app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == f"runo {__version__}"
+
+
+def test_version_option_reports_runops_alias_version() -> None:
+    result = runner.invoke(runops_app, ["--version"])
+
+    assert result.exit_code == 0
+    assert result.output.strip() == f"runops {__version__}"
 
 
 def test_case_help_shows_grouped_case_commands() -> None:

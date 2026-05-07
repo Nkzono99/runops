@@ -163,6 +163,7 @@ runops/
 
 | コマンド | 説明 |
 |---------|------|
+| `runo --version` | runops package version を表示 |
 | `runo init [SIMS...] -y` | Project 初期化 (対話型がデフォルト) |
 | `runo setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
 | `runo doctor` | 環境検査 |
