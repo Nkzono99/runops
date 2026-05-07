@@ -185,6 +185,7 @@ runops/
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備。`--plan` では状態を戻さず partial output と retry intent を記録 |
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
+| `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runo notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
 | `runo notes list` | active / history の lab notebook 日付一覧 |
 | `runo notes show [DATE\|today\|latest]` | active / history から指定日の lab notebook を表示 |

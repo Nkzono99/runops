@@ -9,7 +9,7 @@ from typing import Annotated
 import typer
 
 from runops import __version__
-from runops.cli.analyze import collect, export, plot, summarize
+from runops.cli.analyze import collect, export, new_comparison, plot, summarize
 from runops.cli.clone import clone
 from runops.cli.config import config_app
 from runops.cli.context import context
@@ -80,6 +80,7 @@ analyze_app.command("summarize")(summarize)
 analyze_app.command("collect")(collect)
 analyze_app.command("plot")(plot)
 analyze_app.command("export")(export)
+analyze_app.command("new-comparison")(new_comparison)
 
 notes_app = typer.Typer(
     name="notes",

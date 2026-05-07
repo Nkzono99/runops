@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from .comparison import (
+    ComparisonWorkspaceResult,
+    create_comparison_workspace,
+    slugify_comparison_id,
+)
 from .workflow import (
     PLOT_KINDS,
     ResolvedSurveyPlotRecipe,
@@ -26,6 +31,7 @@ from .workflow import (
 
 __all__ = [
     "PLOT_KINDS",
+    "ComparisonWorkspaceResult",
     "ResolvedSurveyPlotRecipe",
     "RunSummaryResult",
     "SurveyCollectionResult",
@@ -35,6 +41,7 @@ __all__ = [
     "SurveyPlotSeries",
     "SurveyTableResult",
     "collect_survey_summaries",
+    "create_comparison_workspace",
     "extract_run_figures",
     "find_summarize_script",
     "generate_run_summary",
@@ -44,4 +51,5 @@ __all__ = [
     "render_survey_plot",
     "resolve_survey_plot_recipe",
     "run_summarize_script",
+    "slugify_comparison_id",
 ]

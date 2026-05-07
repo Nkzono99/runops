@@ -10,6 +10,7 @@ import typer
 from runops.cli.run_lookup import find_project_runs_dir, resolve_run_or_cwd
 from runops.core.actions import ActionStatus, execute_action
 from runops.core.analysis import (
+    create_comparison_workspace,
     list_survey_plot_recipes,
     load_survey_plot_table,
     render_survey_plot,
@@ -17,6 +18,7 @@ from runops.core.analysis import (
 )
 from runops.core.discovery import discover_runs, resolve_run
 from runops.core.exceptions import SimctlError
+from runops.core.project import find_project_root
 
 
 def _resolve_export_target(target: str | None, *, search_dir: Path) -> Path:
@@ -265,6 +267,43 @@ def plot(
             "  Auto-summarized:"
             f" {result.generated_summaries} completed runs during plot"
         )
+
+
+def new_comparison(
+    name: str = typer.Argument(help="Human-readable comparison name."),
+    comparison_id: str = typer.Option(
+        "",
+        "--id",
+        help=(
+            "Stable comparison id under analysis/cross_run/. "
+            "Defaults to a slugified name."
+        ),
+    ),
+    sources: list[Path] | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Run, survey, or path source to record in manifest.toml.",
+    ),
+) -> None:
+    """Create a cross-run comparison workspace under analysis/cross_run/."""
+    try:
+        project_root = find_project_root(Path.cwd())
+        result = create_comparison_workspace(
+            project_root,
+            name=name,
+            comparison_id=comparison_id,
+            sources=tuple(sources or []),
+        )
+    except (OSError, SimctlError) as e:
+        typer.echo(f"Error creating comparison workspace: {e}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Comparison workspace created: {result.comparison_dir}")
+    typer.echo(f"  ID: {result.comparison_id}")
+    typer.echo(f"  Manifest: {result.manifest_path}")
+    typer.echo(f"  README: {result.readme_path}")
+    typer.echo(f"  Sources: {result.source_count}")
 
 
 def export(

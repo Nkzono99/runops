@@ -48,9 +48,11 @@
 |---------|------|
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
+| `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runo notes append TITLE [BODY]` | lab notebook に追記 |
-| `runo notes list` | lab notebook 日付一覧 |
-| `runo notes show [DATE]` | 指定日の lab notebook を表示 |
+| `runo notes list` | active/history の lab notebook 日付一覧 |
+| `runo notes show [DATE]` | active/history から指定日の lab notebook を表示 |
+| `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
 | `runo knowledge save` | 知見を .runops/insights/ に保存 |
 | `runo knowledge add-fact` | 構造化 fact を追加 |
 | `runo knowledge list` / `show` / `facts` | 知見の表示 |

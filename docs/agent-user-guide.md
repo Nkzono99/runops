@@ -37,6 +37,7 @@ runops プロジェクトにおける Agent の作業ガイド。
 | run のハード削除 (created/failed/cancelled) | `runo runs delete` |
 | 解析 | `runo analyze summarize` |
 | 集計 | `runo analyze collect` |
+| cross-run 比較 workspace 作成 | `runo analyze new-comparison <name> --source <run-or-survey>` |
 | 論文向け export | `runo analyze export <run-or-survey> --paper <paper-id>` |
 | lab notebook に追記 | `runo notes append "<title>" "<body>"` |
 | lab notebook 日付一覧 (active/history) | `runo notes list` |

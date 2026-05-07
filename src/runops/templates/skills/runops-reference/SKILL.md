@@ -125,6 +125,7 @@ runo analyze plot runs/sheath/angle_scan --list-columns
 runo analyze plot runs/sheath/angle_scan --list-recipes
 runo analyze plot runs/sheath/angle_scan --recipe completion-vs-dt
 runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux
+runo analyze new-comparison "landau model comparison" --source runs/sheath/angle_scan
 runo analyze export runs/sheath/angle_scan --paper draft-a
 ```
 

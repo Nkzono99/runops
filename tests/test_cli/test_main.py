@@ -92,7 +92,7 @@ def test_runs_help_shows_grouped_run_commands() -> None:
 def test_analyze_help_shows_grouped_analysis_commands() -> None:
     result = runner.invoke(app, ["analyze", "--help"])
     assert result.exit_code == 0
-    for cmd in ["summarize", "collect", "plot", "export"]:
+    for cmd in ["summarize", "collect", "plot", "export", "new-comparison"]:
         assert cmd in result.output
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import textwrap
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,11 @@ from typer.testing import CliRunner
 
 from runops.cli.main import app
 from runops.core.analysis import ResolvedSurveyPlotRecipe, SurveyPlotRecipe
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 runner = CliRunner()
 
@@ -53,6 +59,51 @@ def _create_run(
     with open(run_dir / "manifest.toml", "wb") as f:
         tomli_w.dump(manifest, f)
     return run_dir
+
+
+class TestNewComparison:
+    def test_new_comparison_creates_workspace(self, tmp_path: Path) -> None:
+        _write_project_file(tmp_path)
+        run_dir = _create_run(tmp_path / "runs", "R20260501-0001")
+
+        with patch("runops.cli.analyze.Path.cwd", return_value=tmp_path):
+            result = runner.invoke(
+                app,
+                [
+                    "analyze",
+                    "new-comparison",
+                    "Landau model comparison",
+                    "--source",
+                    str(run_dir),
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        comparison_dir = tmp_path / "analysis" / "cross_run" / "landau-model-comparison"
+        assert comparison_dir.is_dir()
+        assert (comparison_dir / "scripts" / ".gitkeep").is_file()
+        assert (comparison_dir / "data" / ".gitkeep").is_file()
+        assert (comparison_dir / "figures" / ".gitkeep").is_file()
+        with open(comparison_dir / "manifest.toml", "rb") as f:
+            manifest = tomllib.load(f)
+        assert manifest["comparison"]["id"] == "landau-model-comparison"
+        assert manifest["sources"][0]["kind"] == "run"
+        assert manifest["sources"][0]["run_id"] == "R20260501-0001"
+        assert "Comparison workspace created" in result.output
+
+    def test_new_comparison_reports_duplicate_workspace(self, tmp_path: Path) -> None:
+        _write_project_file(tmp_path)
+        comparison_dir = tmp_path / "analysis" / "cross_run" / "existing"
+        comparison_dir.mkdir(parents=True)
+
+        with patch("runops.cli.analyze.Path.cwd", return_value=tmp_path):
+            result = runner.invoke(
+                app,
+                ["analyze", "new-comparison", "Existing", "--id", "existing"],
+            )
+
+        assert result.exit_code == 1
+        assert "already exists" in result.output
 
 
 class TestSummarize:

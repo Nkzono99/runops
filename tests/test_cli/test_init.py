@@ -390,6 +390,7 @@ class TestInit:
         )
         assert "--list-recipes" in analyze_content
         assert "analysis/scratch/" in analyze_content
+        assert "analysis/cross_run/" in analyze_content
 
     def test_init_skills_with_packages(self, tmp_path: Path) -> None:
         """Setup-env skill includes pip packages when simulators specified."""

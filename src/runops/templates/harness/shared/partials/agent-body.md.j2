@@ -33,7 +33,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | `{{ skill_prefix }}survey-design` | パラメータサーベイを設計する |
 | `{{ skill_prefix }}run-all` | survey の全 run を生成して投入する |
 | `{{ skill_prefix }}check-status` | run / survey の状態を確認・同期する |
-| `{{ skill_prefix }}analyze` | 完了 run の結果を解析・集計する |
+| `{{ skill_prefix }}analyze` | 完了 run の結果を解析・集計し、cross-run 比較 workspace を作る |
 | `{{ skill_prefix }}debug-failed` | 失敗 run を診断する |
 | `{{ skill_prefix }}cleanup` | run のアーカイブ・整理 |
 | `{{ skill_prefix }}learn` | 知見を記録する (curated, 名前付き) |
@@ -97,7 +97,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 | 種類 | 性質 | 書き先 | スキル |
 |---|---|---|---|
-| 再開可能な時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `{{ skill_prefix }}note` |
+| 再開可能な時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md`, `notes/history/YYYY/YYYY-MM-DD.md` | `{{ skill_prefix }}note`, `runo notes archive` |
 | 現在の高レベルな研究判断 | mutable decision ledger | `research/agenda.md` | `{{ skill_prefix }}research-agenda` |
 | 論文・manual・図・snippet | visible source material | `materials/` | 直接編集 |
 | 機械的に再利用する知見 | advanced, structured | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |

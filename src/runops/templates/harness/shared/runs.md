@@ -19,6 +19,7 @@ runs/<path>/Rxxxx/
 - `manifest.toml` を手動編集しない
 - `input/*`, `submit/job.sh` を直接作らない
 - 状態確認は `runo runs status`、同期は `runo runs sync`
-- 解析は `runo analyze summarize` / `runo analyze collect`
+- run 単体の解析は `runo analyze summarize`、survey 集計は `runo analyze collect`
+- 複数 run / survey をまたぐ比較は `runo analyze new-comparison` で `analysis/cross_run/<id>/` を作る
 - 試行中の図・メモ・一時解析物は `analysis/scratch/` に置く
 - 共有したい図や summary は `analysis/` の curated 出力に昇格する

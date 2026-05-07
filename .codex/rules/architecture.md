@@ -29,9 +29,9 @@ run の状態・由来・provenance はすべて `manifest.toml` に記録され
 ## research/ は研究判断の隔離層
 
 生成 project 側の `research/agenda.md` は mutable な現在判断の台帳。
-`notes/YYYY-MM-DD.md` の時系列ログ、`.runops/` の機械状態、`.agents/skills/`
-の手順とは混ぜない。本文は日本語で書き、コード・コマンド・ファイルパス・run_id
-は実際の表記のまま残す。
+`notes/YYYY-MM-DD.md` / `notes/history/YYYY/YYYY-MM-DD.md` の時系列ログ、
+`.runops/` の機械状態、`.agents/skills/` の手順とは混ぜない。
+本文は日本語で書き、コード・コマンド・ファイルパス・run_id は実際の表記のまま残す。
 
 ## ハーネス二重構造
 

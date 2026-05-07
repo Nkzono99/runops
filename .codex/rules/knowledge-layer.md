@@ -13,13 +13,15 @@ AI エージェントがシミュレーションを自律的に行うための�
 | 研究意図 | `campaign.toml` | ユーザーが記述 |
 | 実験知見 (curated) | `.runops/insights/` | `knowledge save` / `knowledge source sync` |
 | 構造化知識 (curated) | `.runops/facts.toml` | `knowledge add-fact` / `knowledge facts` |
-| lab notebook | `notes/YYYY-MM-DD.md` | `runo notes append` |
+| lab notebook | `notes/YYYY-MM-DD.md`, `notes/history/YYYY/YYYY-MM-DD.md` | `runo notes append`, `runo notes archive` |
 | 長文レポート | `notes/reports/<topic>.md` | 直接編集 (改稿可) |
+| 研究判断の台帳 | `research/agenda.md` | 直接編集 (現在判断の更新) |
 
 ## 二層構造
 
 - `.runops/insights/` / `.runops/facts.toml` は整理済の永続知見 (上書き可・名前付き・atomic)
-- `notes/YYYY-MM-DD.md` は append-only な時系列ログ
+- `notes/YYYY-MM-DD.md` は append-only な時系列ログ。古い日次 notebook は `notes/history/YYYY/` に archive する
+- `research/agenda.md` は mutable な現在判断の正本。TODO ではなく active question / current decision / paused-killed / 判断が変わる条件を置く
 - 価値が出てきたら `notes/reports/` → `.runops/insights/` / `facts.toml` に昇格
 
 ## 外部知識ソース

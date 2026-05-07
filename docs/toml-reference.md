@@ -803,6 +803,61 @@ runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group pa
 
 ---
 
+## cross-run comparison workspace
+
+複数 run / survey をまたぐ比較・可視化では、比較単位の成果物を
+`analysis/cross_run/<comparison_id>/` にまとめる。
+
+```bash
+runo analyze new-comparison "landau model comparison" --source runs/series_a
+runo analyze new-comparison "no_plate vs flat_plate" \
+  --source runs/no_plate_scan \
+  --source runs/flat_plate_scan
+```
+
+### 生成されるファイル
+
+| File | Description |
+|------|-------------|
+| `analysis/cross_run/<id>/manifest.toml` | 比較の正本。source run/survey/path、scripts/data/figures の置き場、artifact index を記録 |
+| `analysis/cross_run/<id>/README.md` | 人間/Agent 向けの短い workspace 説明 |
+| `analysis/cross_run/<id>/scripts/` | 比較専用 script。project-wide reusable script は project root の `scripts/` に置き、manifest から参照してよい |
+| `analysis/cross_run/<id>/data/` | 比較用 CSV/JSON/中間表 |
+| `analysis/cross_run/<id>/figures/` | 比較図・contact sheet |
+
+### manifest.toml の概要
+
+```toml
+[comparison]
+schema_version = 1
+id = "landau-model-comparison"
+name = "landau model comparison"
+created_at = "2026-05-08T12:00:00+00:00"
+status = "draft"
+description = ""
+
+[[sources]]
+kind = "survey"
+path = "runs/series_a"
+run_ids = ["R20260501-0001", "R20260501-0002"]
+
+[paths]
+scripts = "scripts"
+data = "data"
+figures = "figures"
+
+[artifacts]
+scripts = []
+data = []
+figures = []
+```
+
+`runo analyze collect` / `plot` が作る survey-local な `summary/` とは別に、
+cross-run comparison workspace は複数 survey や手書き script を束ねるための
+project-level analysis layer として使う。
+
+---
+
 ## publication export outputs
 
 `runo analyze export <run-or-survey> --paper <paper-id>` は、paper repo に渡しやすい
