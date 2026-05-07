@@ -9,7 +9,7 @@ from pathlib import Path
 
 import typer
 
-from runops.harness.builder import _collect_pip_packages
+from runops.harness._adapters import collect_pip_packages as _collect_pip_packages
 
 
 def _safe_echo(message: str, *, err: bool = False) -> None:

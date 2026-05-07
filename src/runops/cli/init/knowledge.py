@@ -8,7 +8,7 @@ from pathlib import Path
 
 import typer
 
-from runops.harness.builder import _collect_doc_repos
+from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 
 logger = logging.getLogger(__name__)
 
