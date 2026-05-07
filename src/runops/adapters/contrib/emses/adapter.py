@@ -32,42 +32,20 @@ from runops.adapters._utils import find_venv
 from runops.adapters._utils.toml_utils import apply_dotted_overrides
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.contrib._paths import relative_to_run
+from runops.adapters.contrib.emses.constants import (
+    INPUT_DIR,
+    LATEST_OUTPUT_DIR,
+    WORK_DIR,
+)
+from runops.adapters.contrib.emses.validation import (
+    resolve_config as resolve_emses_config,
+)
+from runops.adapters.contrib.emses.validation import (
+    validate_params as validate_emses_params,
+)
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
-
-INPUT_DIR = "input"
-WORK_DIR = "work"
-LATEST_OUTPUT_DIR = f"{WORK_DIR}/latest"
-
-# Domain decomposition: [mpi] group, nodes = [nxdiv, nydiv, nzdiv]
-DOMAIN_DECOMP_SECTION = "mpi"
-DOMAIN_DECOMP_KEY = "nodes"
-
-
-def compute_mpi_processes(config: dict[str, Any]) -> int | None:
-    """Compute the required MPI process count from domain decomposition.
-
-    In MPIEMSES3D, the ``[mpi]`` section's ``nodes`` parameter
-    (a list ``[nxdiv, nydiv, nzdiv]``) defines the domain
-    decomposition.  Total processes = product(nodes).
-
-    Args:
-        config: Parsed plasma.toml configuration dictionary.
-
-    Returns:
-        Total MPI process count, or ``None`` if nodes is not specified.
-    """
-    mpi_section = config.get(DOMAIN_DECOMP_SECTION, {})
-    nodes = mpi_section.get(DOMAIN_DECOMP_KEY)
-    if nodes is None:
-        return None
-    if isinstance(nodes, (list, tuple)):
-        result = 1
-        for n in nodes:
-            result *= int(n)
-        return result
-    return int(nodes)
 
 
 class EmseAdapter(SimulatorAdapter):
@@ -344,144 +322,13 @@ class EmseAdapter(SimulatorAdapter):
         self,
         case_data: dict[str, Any],
     ) -> list[ValidationIssue]:
-        """Validate EMSES parameters against physics constraints.
-
-        Checks: CFL condition, Debye length resolution, domain
-        decomposition consistency, and grid divisibility.
-        """
-        issues: list[ValidationIssue] = []
-        config = self._resolve_config(case_data)
-        if not config:
-            return issues
-
-        tmgrid = config.get("tmgrid", {})
-        plasma = config.get("plasma", {})
-        esorem = config.get("esorem", {})
-        mpi_sec = config.get(DOMAIN_DECOMP_SECTION, {})
-        species_list = config.get("species", [])
-
-        dt = tmgrid.get("dt")
-        nx = tmgrid.get("nx")
-        ny = tmgrid.get("ny")
-        nz = tmgrid.get("nz")
-        cv = plasma.get("cv", 1.0)
-
-        # CFL condition: dt * cv < dx (dx = 1.0 in normalized units)
-        # Only applies to electromagnetic mode (emflag=1); in electrostatic
-        # mode (emflag=0) cv is a normalization constant, not a wave speed.
-        emflag = esorem.get("emflag", 1)
-        if dt is not None and cv is not None and emflag != 0:
-            cfl_ratio = float(dt) * float(cv)
-            if cfl_ratio >= 1.0:
-                issues.append(
-                    ValidationIssue(
-                        severity="error",
-                        message=(
-                            f"CFL condition violated: dt*cv = {cfl_ratio:.3f} >= 1.0. "
-                            f"Reduce dt below {1.0 / float(cv):.3f}."
-                        ),
-                        parameter="tmgrid.dt",
-                        constraint_name="cfl_condition",
-                        details={
-                            "dt": dt,
-                            "cv": cv,
-                            "cfl_ratio": cfl_ratio,
-                            "max_dt": 1.0 / float(cv),
-                        },
-                    )
-                )
-            elif cfl_ratio > 0.8:
-                issues.append(
-                    ValidationIssue(
-                        severity="warning",
-                        message=(
-                            f"CFL ratio dt*cv = {cfl_ratio:.3f} is close to "
-                            f"stability limit (1.0). Consider reducing dt."
-                        ),
-                        parameter="tmgrid.dt",
-                        constraint_name="cfl_condition",
-                        details={"cfl_ratio": cfl_ratio},
-                    )
-                )
-
-        # Debye length resolution check
-        for i, sp in enumerate(species_list):
-            wp = sp.get("wp")
-            vdthz = sp.get("vdthz") or sp.get("vdth", {}).get("z")
-            if wp and vdthz and float(wp) > 0:
-                debye = float(vdthz) / float(wp)
-                # dx = 1.0 in normalized units; want debye >= ~0.5 dx
-                if debye < 0.5:
-                    issues.append(
-                        ValidationIssue(
-                            severity="warning",
-                            message=(
-                                f"Species {i}: Debye length ({debye:.3f} dx) "
-                                f"is under-resolved by grid (dx=1). "
-                                f"Increase grid resolution or reduce density."
-                            ),
-                            parameter=f"species.{i}.wp",
-                            constraint_name="debye_resolution",
-                            details={
-                                "species_index": i,
-                                "debye_length": debye,
-                                "wp": float(wp),
-                                "vdthz": float(vdthz),
-                            },
-                        )
-                    )
-
-        # Domain decomposition consistency
-        nodes = mpi_sec.get(DOMAIN_DECOMP_KEY)
-        if nodes and isinstance(nodes, (list, tuple)):
-            total_procs = 1
-            for n in nodes:
-                total_procs *= int(n)
-
-            # Grid divisibility
-            dims = [("nx", nx), ("ny", ny), ("nz", nz)]
-            for idx, (dim_name, dim_val) in enumerate(dims):
-                if dim_val is not None and idx < len(nodes):
-                    ndiv = int(nodes[idx])
-                    if int(dim_val) % ndiv != 0:
-                        issues.append(
-                            ValidationIssue(
-                                severity="error",
-                                message=(
-                                    f"Grid {dim_name}={dim_val} is not "
-                                    f"divisible by MPI decomposition "
-                                    f"nodes[{idx}]={ndiv}."
-                                ),
-                                parameter=f"tmgrid.{dim_name}",
-                                constraint_name="grid_divisibility",
-                                details={
-                                    "dimension": dim_name,
-                                    "grid_size": int(dim_val),
-                                    "mpi_division": ndiv,
-                                },
-                            )
-                        )
-
-        return issues
+        """Validate EMSES parameters against physics constraints."""
+        return validate_emses_params(case_data)
 
     @staticmethod
     def _resolve_config(case_data: dict[str, Any]) -> dict[str, Any]:
         """Load template config and apply param overrides."""
-        case_section = case_data.get("case", {})
-        params = case_data.get("params", {})
-        config: dict[str, Any] = {}
-
-        case_dir_str = case_section.get("case_dir", "")
-        if case_dir_str:
-            candidate = Path(case_dir_str) / "plasma.toml"
-            if candidate.is_file():
-                with open(candidate, "rb") as f:
-                    config = tomllib.load(f)
-
-        if params and config:
-            config = apply_dotted_overrides(config, params)
-
-        return config
+        return resolve_emses_config(case_data)
 
     @classmethod
     def agent_guide(cls) -> str:

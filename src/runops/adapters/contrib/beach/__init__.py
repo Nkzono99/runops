@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from .adapter import (
+from .adapter import BeachAdapter
+from .constants import (
     INPUT_DIR,
     LATEST_OUTPUT_DIR,
     WORK_DIR,
-    BeachAdapter,
 )
 
 __all__ = [
