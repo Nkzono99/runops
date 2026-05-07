@@ -1,0 +1,3 @@
+display_name: Python Package Refactor
+short_description: Safely refactor Python packages with API guards and verification gates.
+default_prompt: Refactor this Python package safely. Inspect the repository, preserve public APIs, make small behavior-preserving changes, and run appropriate verification gates.

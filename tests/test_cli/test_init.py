@@ -141,6 +141,29 @@ class TestInit:
         assert "本文は日本語" in content
         assert "判断の台帳" in codex_content
 
+    def test_init_creates_python_package_refactor_skill_resources(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Skill resources are scaffolded beside python-package-refactor."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        codex_skill_dir = tmp_path / ".agents" / "skills" / "python-package-refactor"
+        claude_skill_dir = tmp_path / ".claude" / "skills" / "python-package-refactor"
+
+        assert (codex_skill_dir / "SKILL.md").is_file()
+        assert (codex_skill_dir / "scripts" / "inspect_python_package.py").is_file()
+        assert (codex_skill_dir / "references" / "refactor-playbook.md").is_file()
+        assert not (codex_skill_dir / "README.md").exists()
+        assert not (codex_skill_dir / "manifest.txt").exists()
+        assert (claude_skill_dir / "scripts" / "inspect_python_package.py").is_file()
+
+        codex_content = (codex_skill_dir / "SKILL.md").read_text(encoding="utf-8")
+        claude_content = (claude_skill_dir / "SKILL.md").read_text(encoding="utf-8")
+        assert "name: python-package-refactor" in codex_content
+        assert ".agents/skills/python-package-refactor/scripts/" in codex_content
+        assert ".claude/skills/python-package-refactor/scripts/" in claude_content
+        assert "{{ skills_dir }}" not in codex_content
+
     def test_init_simproject_content(self, tmp_path: Path) -> None:
         """runops.toml has correct project name derived from dir name."""
         result = runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])

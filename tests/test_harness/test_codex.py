@@ -98,12 +98,24 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
+    assert ".agents/skills/python-package-refactor/SKILL.md" in bundle.files
+    assert (
+        ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
+        in bundle.files
+    )
+    assert (
+        ".agents/skills/python-package-refactor/references/refactor-playbook.md"
+        in bundle.files
+    )
+    assert ".agents/skills/python-package-refactor/README.md" not in bundle.files
+    assert ".agents/skills/python-package-refactor/manifest.txt" not in bundle.files
     assert "cases/AGENTS.md" in bundle.files
     assert "runs/AGENTS.md" in bundle.files
     agents = bundle.files["AGENTS.md"]
     assert "性質ごとに書き先を分ける" in agents
     assert "$research-agenda" in agents
     assert "$patch-runops" in agents
+    assert "$python-package-refactor" in agents
     assert "active question、current decision、paused/killed" in agents
     # Skills share the same frontmatter, but use each agent's native
     # invocation syntax in the body.
@@ -123,6 +135,11 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     codex_run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
     assert "runo runs submit --dry-run --all" in codex_run_all
     assert "runo runs submit --all --dry-run" not in codex_run_all
+    codex_refactor = bundle.files[".agents/skills/python-package-refactor/SKILL.md"]
+    claude_refactor = bundle.files[".claude/skills/python-package-refactor/SKILL.md"]
+    assert ".agents/skills/python-package-refactor/scripts/" in codex_refactor
+    assert ".claude/skills/python-package-refactor/scripts/" in claude_refactor
+    assert "{{ skills_dir }}" not in codex_refactor
 
 
 def test_bundle_does_not_emit_project_local_codex_prompts() -> None:

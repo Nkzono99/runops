@@ -43,6 +43,9 @@ line-length = 88
 src = ["src", "tests"]
 extend-exclude = [
     "src/runops/templates/scaffold/vscode_settings.json",
+    # Bundled skill helper scripts are copied into generated projects and are
+    # validated by their skill-level smoke tests, not runops's lint profile.
+    "src/runops/templates/skills/*/scripts/*.py",
 ]
 
 [tool.ruff.lint]
@@ -75,12 +78,12 @@ strict = true
 warn_return_any = true
 warn_unused_configs = true
 mypy_path = "src"
-# Scaffolded summarize.py files under templates/adapters/ are reference
-# implementations copied into user projects.  They depend on third-party
-# scientific stacks (numpy, pandas, matplotlib, emout, beach) that are
-# intentionally not in runops's own dependencies.
+# Scaffolded scripts under templates/ are reference implementations copied into
+# user projects.  They may target the generated project environment rather than
+# runops's strict internal mypy profile.
 exclude = [
     "^src/runops/templates/adapters/.*/summarize\\.py$",
+    "^src/runops/templates/skills/.*/scripts/.*\\.py$",
 ]
 
 [tool.pytest.ini_options]

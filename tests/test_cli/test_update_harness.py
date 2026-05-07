@@ -72,6 +72,11 @@ class TestUpdateHarnessBasic:
         assert ".codex/rules/runops.rules" in lock
         assert ".agents/skills/new-case/SKILL.md" in lock
         assert ".agents/skills/patch-runops/SKILL.md" in lock
+        assert ".agents/skills/python-package-refactor/SKILL.md" in lock
+        assert (
+            ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
+            in lock
+        )
         assert ".agents/skills/research-agenda/SKILL.md" in lock
         assert "cases/AGENTS.md" in lock
         assert "runs/AGENTS.md" in lock

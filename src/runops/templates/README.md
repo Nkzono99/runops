@@ -10,9 +10,10 @@ Current layout:
   `harness/<agent>/`; shared instruction templates live under
   `harness/shared/`. `CLAUDE.md` and `AGENTS.md` have separate entrypoint
   templates and include shared partials where their behaviour overlaps.
-- `skills/` — shared `SKILL.md` source templates. They render to both
+- `skills/` — shared skill source templates. `SKILL.md` renders to both
   `.claude/skills/` and `.agents/skills/`, with agent-specific invocation
-  syntax injected by the harness builder.
+  syntax injected by the harness builder. Support resources such as
+  `scripts/`, `references/`, and `examples/` are copied beside `SKILL.md`.
 - `scaffold/` — generic project scaffold files that are not primarily agent
   harness files, such as `.gitignore`, `campaign.toml`, `notes/`,
   `materials/`, `research/`, and editor settings.

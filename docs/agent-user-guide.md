@@ -94,6 +94,11 @@ skill で `tools/runops` を local patch して即利用できる。local patch 
 `feedback-runops` で issue 化する。詳細は
 [Local runops Patches](local-runops-patches.md) を参照。
 
+Python package の構造整理、module 分割、循環 import 解消、packaging 整理などは
+`python-package-refactor` skill を使う。`scripts/` と `references/` 付きで
+project harness に展開され、API surface snapshot、import smoke、quality gate
+plan を取りながら小さい refactor batch に分けて進める。
+
 ```bash
 # 準備フェーズで意思決定を残す
 runo notes append "Series A 設計" - <<'EOF'
