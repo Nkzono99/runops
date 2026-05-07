@@ -31,6 +31,7 @@ except ImportError:
 from runops.adapters._utils import find_venv
 from runops.adapters._utils.toml_utils import apply_dotted_overrides
 from runops.adapters.base import SimulatorAdapter
+from runops.adapters.contrib._paths import relative_to_run
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -38,12 +39,6 @@ logger = logging.getLogger(__name__)
 INPUT_DIR = "input"
 WORK_DIR = "work"
 LATEST_OUTPUT_DIR = f"{WORK_DIR}/latest"
-
-
-def _relative_to_run(path: Path, run_dir: Path) -> str:
-    """Return a stable POSIX-style relative path under the run directory."""
-    return path.relative_to(run_dir).as_posix()
-
 
 # Domain decomposition: [mpi] group, nodes = [nxdiv, nydiv, nzdiv]
 DOMAIN_DECOMP_SECTION = "mpi"
@@ -562,7 +557,7 @@ class EmseAdapter(SimulatorAdapter):
                 elif src.name != "plasma.toml":
                     dest = input_dir / src.name
                     shutil.copy2(src, dest)
-                    created.append(_relative_to_run(dest, run_dir))
+                    created.append(relative_to_run(dest, run_dir))
 
         # Apply parameter overrides
         if params and template_config:
@@ -576,7 +571,7 @@ class EmseAdapter(SimulatorAdapter):
             plasma_toml = input_dir / "plasma.toml"
             with open(plasma_toml, "wb") as f:
                 tomli_w.dump(template_config, f)
-            created.append(_relative_to_run(plasma_toml, run_dir))
+            created.append(relative_to_run(plasma_toml, run_dir))
 
         # Copy additional input files (e.g., mesh files)
         for src_str in input_files:
@@ -588,7 +583,7 @@ class EmseAdapter(SimulatorAdapter):
                 continue  # Already handled
             dest = input_dir / src.name
             shutil.copy2(src, dest)
-            created.append(_relative_to_run(dest, run_dir))
+            created.append(relative_to_run(dest, run_dir))
 
         return created
 
@@ -693,9 +688,7 @@ class EmseAdapter(SimulatorAdapter):
 
             h5_files = sorted(output_dir.glob("*.h5"))
             if h5_files:
-                outputs["hdf5_fields"] = [
-                    _relative_to_run(f, run_dir) for f in h5_files
-                ]
+                outputs["hdf5_fields"] = [relative_to_run(f, run_dir) for f in h5_files]
 
             diag_files: list[str] = []
             for f in sorted(output_dir.iterdir()):
@@ -703,7 +696,7 @@ class EmseAdapter(SimulatorAdapter):
                     continue
                 if any(f.match(p) for p in log_patterns):
                     continue
-                diag_files.append(_relative_to_run(f, run_dir))
+                diag_files.append(relative_to_run(f, run_dir))
             if diag_files:
                 outputs["diagnostics"] = diag_files
 
@@ -712,7 +705,7 @@ class EmseAdapter(SimulatorAdapter):
                 snap_files = sorted(snapshot_dir.glob("esdat*.h5"))
                 if snap_files:
                     outputs["snapshots"] = [
-                        _relative_to_run(f, run_dir) for f in snap_files
+                        relative_to_run(f, run_dir) for f in snap_files
                     ]
 
             if outputs:
@@ -722,7 +715,7 @@ class EmseAdapter(SimulatorAdapter):
         logs: list[str] = []
         for pattern in ("stdout.*.log", "stderr.*.log", "*.out", "*.err"):
             for f in sorted(work_dir.glob(pattern)):
-                logs.append(_relative_to_run(f, run_dir))
+                logs.append(relative_to_run(f, run_dir))
         if logs:
             outputs["logs"] = logs
 

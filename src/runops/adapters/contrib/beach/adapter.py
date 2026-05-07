@@ -27,6 +27,7 @@ except ImportError:
 from runops.adapters._utils import find_venv
 from runops.adapters._utils.toml_utils import apply_dotted_overrides
 from runops.adapters.base import SimulatorAdapter
+from runops.adapters.contrib._paths import relative_to_run
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -34,12 +35,6 @@ logger = logging.getLogger(__name__)
 INPUT_DIR = "input"
 WORK_DIR = "work"
 LATEST_OUTPUT_DIR = f"{WORK_DIR}/latest"
-
-
-def _relative_to_run(path: Path, run_dir: Path) -> str:
-    """Return a stable POSIX-style relative path under the run directory."""
-    return path.relative_to(run_dir).as_posix()
-
 
 # Known BEACH output files (label -> filename)
 _OUTPUT_FILES = {
@@ -476,7 +471,7 @@ class BeachAdapter(SimulatorAdapter):
                 elif src.name not in ("beach.toml", "beach_template.toml"):
                     dest = input_dir / src.name
                     shutil.copy2(src, dest)
-                    created.append(_relative_to_run(dest, run_dir))
+                    created.append(relative_to_run(dest, run_dir))
 
         # Apply parameter overrides
         if params and template_config:
@@ -495,7 +490,7 @@ class BeachAdapter(SimulatorAdapter):
             beach_toml = input_dir / "beach.toml"
             with open(beach_toml, "wb") as f:
                 tomli_w.dump(template_config, f)
-            created.append(_relative_to_run(beach_toml, run_dir))
+            created.append(relative_to_run(beach_toml, run_dir))
 
         # Copy OBJ mesh files if referenced
         obj_path_str = template_config.get("mesh", {}).get("obj_path", "")
@@ -504,7 +499,7 @@ class BeachAdapter(SimulatorAdapter):
             if obj_path.is_file():
                 dest = input_dir / obj_path.name
                 shutil.copy2(obj_path, dest)
-                created.append(_relative_to_run(dest, run_dir))
+                created.append(relative_to_run(dest, run_dir))
 
         return created
 
@@ -610,7 +605,7 @@ class BeachAdapter(SimulatorAdapter):
             for label, filename in _OUTPUT_FILES.items():
                 f = output_dir / filename
                 if f.is_file():
-                    outputs[label] = _relative_to_run(f, run_dir)
+                    outputs[label] = relative_to_run(f, run_dir)
             if outputs:
                 break
 
@@ -618,7 +613,7 @@ class BeachAdapter(SimulatorAdapter):
         logs: list[str] = []
         for pattern in ("stdout.*.log", "stderr.*.log", "*.out", "*.err"):
             for f in sorted(work_dir.glob(pattern)):
-                logs.append(_relative_to_run(f, run_dir))
+                logs.append(relative_to_run(f, run_dir))
         if logs:
             outputs["logs"] = logs
 
