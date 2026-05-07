@@ -40,6 +40,8 @@
 - `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。
 - `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。
 - `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。
+- `research/agenda.md` は現在の高レベルな研究判断の台帳です。TODO ではなく、
+  active question、current decision、paused/killed、次に何をなぜ行うかを残します。
 - 解析後の観察はまず `notes/` や `notes/reports/` に残し、機械的に再利用したいものだけ `insight` や `fact` として `.runops/` に戻します。
 - つまり日常運用は `設計 -> 実行 -> 観測 -> 解析 -> 学習 -> 設計` のループです。
 
@@ -48,7 +50,9 @@
 - 最初の依頼では、研究テーマ、仮説、独立変数、観測量、使いたいベース入力だけを Agent に渡す。
 - run ごとの場当たり的な修正は避け、再利用価値がある変更は `campaign.toml`、`case.toml`、`survey.toml` に戻す。
 - 毎回いきなり大量投入せず、Agent に `context` と `plan` を見せてもらってから初回 bulk submit に進む。
-- 解析が終わったら `knowledge save` や `add-fact` まで含めて 1 セットで閉じると、次の実験設計が速くなります。
+- 解析が終わったら `notes/` に観察を残し、必要なら `research/agenda.md` の
+  current decision を更新する。機械的に再利用したい知見だけ `knowledge save`
+  や `add-fact` で `.runops/` に昇格します。
 
 ## Git ignore と VS Code 表示
 
@@ -56,10 +60,10 @@
 既存プロジェクトでは `runo update-harness` が `.vscode/settings.json` を再同期し、
 `.gitignore` の runops managed block も更新します。managed block がまだ無い
 既存 `.gitignore` には `.gitignore.new` を出して手動マージに回し、
-`notes/` と `materials/` の不足分も補完します。
+`notes/`、`materials/`、`research/` の不足分も補完します。
 この 2 つは役割が違います。
 
 - `.gitignore` は Git に載せないものを決めます。`.venv/`、`tools/`、`refs/`、`runs/**/work/`、`.runops/knowledge/` などの再生成可能または大きい成果物を対象にします。
-- VS Code の `files.exclude` は Explorer のノイズを減らします。`work/` は運用中にログや出力を直接確認しやすいよう見えるままにし、`status/`、`submit/`、`manifest.toml` などの内部状態だけを隠します。`campaign.toml`、`cases/**`、`runs/**/survey.toml`、`notes/**`、`materials/**` も見えるままにします。
+- VS Code の `files.exclude` は Explorer のノイズを減らします。`work/` は運用中にログや出力を直接確認しやすいよう見えるままにし、`status/`、`submit/`、`manifest.toml` などの内部状態だけを隠します。`campaign.toml`、`cases/**`、`runs/**/survey.toml`、`notes/**`、`materials/**`、`research/**` も見えるままにします。
 - VS Code の `search.exclude` は検索ノイズを減らします。PDF などの人間が置いた資料は Explorer からは隠さず、検索対象からだけ外すのが基本です。
 - `files.watcherExclude` と `python.analysis.exclude` は editor の負荷を下げるための設定で、runops の保護ルールや Git 管理とは別物です。

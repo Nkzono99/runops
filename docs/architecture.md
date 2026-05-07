@@ -675,6 +675,18 @@ curated knowledge と lab notebook は **二層構造**:
 - `runo notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
 - 価値が出てきたら notes → reports → insights / facts.toml の順に昇格
 
+### Research layer (decision ledger)
+
+```
+research/agenda.md          ← 現在の高レベルな研究判断 (mutable)
+research/proposals/         ← 高コスト・方向転換前の任意 proposal
+research/reviews/           ← agenda checkpoint の snapshot
+```
+
+`research/agenda.md` は TODO リストではなく、現在の見立て、active question、
+paused/killed、次に何をなぜ行うかを残す判断の台帳。本文は日本語で書き、
+コード・コマンド・ファイルパス・run_id は実際の表記のまま残す。
+
 詳細は [docs/knowledge-layer.md](knowledge-layer.md) を参照。
 
 ## テスタビリティ

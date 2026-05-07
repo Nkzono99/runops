@@ -186,6 +186,11 @@ sim-manager/
     YYYY-MM-DD.md        # 日次の append-only ノート (`runops notes append`)
     reports/             # 長文 refined レポート
     README.md            # 二層 (curated vs lab notebook) 規約
+  research/              # current high-level research decision ledger
+    README.md
+    agenda.md            # mutable current decision state
+    proposals/           # optional pre-execution decisions
+    reviews/             # optional checkpoint snapshots
 ```
 
 ---
@@ -1069,6 +1074,16 @@ curated layer との関係:
 * `notes/reports/<topic>.md` は refined long-form (改稿可)
 * `.runops/insights/<name>.md` / `.runops/facts.toml` は curated, durable
 * 価値が出てきたら `notes/` → `reports/` → `insights/` / `facts.toml` の順で昇格
+
+### 18.9.1 Research layer
+
+`research/` は現在の高レベルな研究判断を隔離する project workspace。
+`research/agenda.md` は TODO リストではなく、mutable な decision ledger とする。
+
+* 本文は日本語で書く。コード・コマンド・ファイルパス・run_id は実際の表記のまま残す
+* `notes/YYYY-MM-DD.md` は append-only な時系列ログ、`research/agenda.md` は現在判断の正本
+* `research/proposals/` は高コスト・方向転換・新 model などの実行前判断を必要時に残す
+* `research/reviews/` は主要 result / failed run / pause / kill / pivot などの checkpoint snapshot を残す
 
 ---
 

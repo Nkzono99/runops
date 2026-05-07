@@ -96,6 +96,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".codex/README.md" in bundle.files
     assert ".codex/rules/runops.rules" in bundle.files
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
+    assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
     assert "cases/AGENTS.md" in bundle.files
     assert "runs/AGENTS.md" in bundle.files
     # Skills share the same frontmatter, but use each agent's native

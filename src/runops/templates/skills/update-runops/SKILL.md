@@ -26,7 +26,7 @@ runo update-harness
 - 未編集のファイルは自動で上書きされる
 - ユーザーが編集済みのファイルは `<path>.new` として出力される → diff を確認してマージ
 - `.vscode/settings.json` もこの更新対象に含まれる
-- `notes/` と `materials/` は不足している scaffold だけ補完される
+- `notes/`, `materials/`, `research/` は不足している scaffold だけ補完される
 - `--dry-run` で事前確認、`--force` で全上書き
 
 ## 3. シミュレータパッケージを更新

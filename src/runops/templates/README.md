@@ -14,8 +14,8 @@ Current layout:
   `.claude/skills/` and `.agents/skills/`, with agent-specific invocation
   syntax injected by the harness builder.
 - `scaffold/` — generic project scaffold files that are not primarily agent
-  harness files, such as `.gitignore`, `campaign.toml`, `notes/`, and editor
-  settings.
+  harness files, such as `.gitignore`, `campaign.toml`, `notes/`,
+  `materials/`, `research/`, and editor settings.
 - `adapters/` — simulator-specific case/input templates and adapter guides.
 - Root-level templates are legacy convenience paths. Avoid adding new files at
   the root; place them in the domain-specific directory instead.

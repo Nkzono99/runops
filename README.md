@@ -18,9 +18,10 @@ run ディレクトリを日常運用の主単位とし、パラメータサー�
 - **多重ネスト対応**: `runs/` 以下を自由に階層化して分類・整理できる
 - **Agent/AI 対応**: TOML/JSON ベースの構造化データで AI エージェントとの連携が容易
 - **Demo Replay**: Codex session log から replay HTML を生成し、操作の流れを研究室向けに可視化できる
-- **知識層**: `notes/` と `materials/` を人間/Agent の共有作業場にし、`.runops/knowledge/` で生成済みコンテキストを提供
+- **知識層**: `notes/`, `materials/`, `research/` を人間/Agent の共有作業場にし、`.runops/knowledge/` で生成済みコンテキストを提供
 - **外部知識ソース**: 共有知識リポジトリを project に接続し、profile ベースで必要な知識だけを投影
 - **Lab notebook**: `notes/YYYY-MM-DD.md` に append-only な時系列ノートを残し、`notes/reports/` で整理済みレポートに育てる
+- **Research Layer**: `research/agenda.md` に現在の高レベルな研究判断を残す
 - **パラメータバリデーション**: 物理的制約 (CFL 条件, Debye 長等) を run 生成前にチェック
 - **Research Campaign**: campaign.toml で研究仮説・変数・観測量を構造化し、実験設計を明示
 
@@ -118,6 +119,11 @@ my-simulation-project/
     YYYY-MM-DD.md      # 日次の作業ログ (`runo notes append` で追記)
     reports/           # 長文レポート (改稿可)
     README.md          # notes / materials / .runops の役割
+  research/            # Current high-level research decisions
+    README.md
+    agenda.md          # mutable decision ledger
+    proposals/         # optional pre-execution decisions
+    reviews/           # optional checkpoint snapshots
   materials/           # Human-provided source material for Agent
     papers/            # PDF, BibTeX, paper notes
     manuals/           # Site / simulator / tool manuals
@@ -337,13 +343,14 @@ runo runs list runs/cavity/scan
 `notes/` は append-only な実験ノートと、改稿可能な `notes/reports/` を置く
 人間/Agent 共有の知識層です。準備フェーズの意思決定、観察、仮説、TODO を
 その場で残し、価値が出てきたら `notes/reports/` の long-form レポートに
-整理します。`materials/` には論文 PDF、manual、図、snippet などの source
-material を置きます。
+整理します。`research/agenda.md` は TODO ではなく、現在の見立て、active
+question、paused/killed、次に何をなぜ行うかを残す mutable な判断の台帳です。
+`materials/` には論文 PDF、manual、図、snippet などの source material を置きます。
 
 `.runops/knowledge/enabled/imports.md` は source knowledge から生成される
 Agent context です。`.runops/insights/` と `.runops/facts.toml` は互換性のため
 残る advanced/structured knowledge store として扱い、日常のメモやレポートは
-まず `notes/` と `materials/` に置くことを推奨します。
+まず `notes/`, `materials/`, `research/` に置くことを推奨します。
 
 ### 知識管理
 
@@ -366,7 +373,7 @@ Agent context です。`.runops/insights/` と `.runops/facts.toml` は互換性
 
 知識管理は三層構造:
 - **source knowledge** — 外部共有知識リポジトリ (`refs/knowledge/` にマウント)
-- **visible project knowledge** — 人間と Agent が直接読む `notes/` と `materials/`
+- **visible project knowledge** — 人間と Agent が直接読む `notes/`, `materials/`, `research/`
 - **derived / structured knowledge** — source と local から生成される `imports.md`、candidate fact transport、advanced な insights/facts
 
 profile source は repo ルートの `entrypoints.toml` で import 対象を明示できる。

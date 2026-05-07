@@ -26,6 +26,13 @@ templates/    ← Jinja2 + 静的テンプレート (init が scaffold に使う
 run の状態・由来・provenance はすべて `manifest.toml` に記録される。
 手動編集は禁止。`core/manifest.py` 経由のみ。
 
+## research/ は研究判断の隔離層
+
+生成 project 側の `research/agenda.md` は mutable な現在判断の台帳。
+`notes/YYYY-MM-DD.md` の時系列ログ、`.runops/` の機械状態、`.claude/skills/`
+の手順とは混ぜない。本文は日本語で書き、コード・コマンド・ファイルパス・run_id
+は実際の表記のまま残す。
+
 ## ハーネス二重構造
 
 runops は **2 種類のハーネス** を持つ:

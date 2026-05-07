@@ -292,11 +292,13 @@ AI エージェントがシミュレーションを自律的に行うための�
 - **構造化知識 (curated)**: `.runops/facts.toml` (knowledge add-fact / knowledge facts で管理)
 - **lab notebook (chronological)**: `notes/YYYY-MM-DD.md` (`runo notes append` で時系列追記)
 - **長文レポート**: `notes/reports/<topic>.md` (改稿可)
+- **研究判断の台帳**: `research/agenda.md` (現在の高レベルな研究判断。本文は日本語)
 
-curated knowledge と lab notebook は **二層構造**:
+curated knowledge / lab notebook / research agenda は役割を分ける:
 
 - `.runops/insights/` / `.runops/facts.toml` は整理済の永続知見 (上書き可・名前付き・atomic)
 - `notes/YYYY-MM-DD.md` は append-only な時系列ログ。準備フェーズの意思決定・観察・仮説・TODO をその場で残す
+- `research/agenda.md` は mutable な現在判断の正本。TODO ではなく、active question、current decision、paused/killed、判断が変わる条件を残す
 - 価値が出てきたら `notes/reports/` で refined version を書き、さらに `.runops/insights/` / `facts.toml` に昇格
 
 ### 外部知識ソース

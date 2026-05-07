@@ -15,6 +15,7 @@ from runops.cli.init.prompting import _BundledSiteProfile
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
     _create_notes_skeleton,
+    _create_research_skeleton,
     _create_runops_skeleton,
     _mkdir_if_missing,
     _write_if_missing,
@@ -271,6 +272,9 @@ def init(
 
     # materials/ skeleton (human-provided source material for agents)
     _create_materials_skeleton(project_dir, created)
+
+    # research/ skeleton (mutable decision ledger + optional snapshots)
+    _create_research_skeleton(project_dir, created)
 
     # refs/ — clone simulator doc repos
     if sim_names:

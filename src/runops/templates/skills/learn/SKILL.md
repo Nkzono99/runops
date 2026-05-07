@@ -8,16 +8,18 @@ description: Save advanced knowledge insights and structured facts from experime
 `{{ skill_prefix }}learn` は advanced / structured knowledge
 (`.runops/insights/`, `.runops/facts.toml`) への永続化スキル。これに対して
 `{{ skill_prefix }}note` は raw な lab notebook (`notes/`) への時系列追記で、
+`{{ skill_prefix }}research-agenda` は現在の研究判断 (`research/agenda.md`) の更新、
 論文・manual・図・snippet などの source material は `materials/` に置く。
 
-日常の知識共有はまず `notes/` と `materials/` に寄せる。`{{ skill_prefix }}learn`
+日常の知識共有はまず `notes/`, `materials/`, `research/` に寄せる。`{{ skill_prefix }}learn`
 は **機械的に再利用したい、安定した知見だけを抽出する** ときに使う。
 
 ## 手順
 
-1. **`notes/` と `materials/` を素材として集める** (structured knowledge を作る前段)
+1. **`notes/`, `materials/`, `research/` を素材として集める** (structured knowledge を作る前段)
    - `runo notes list` で最近の lab notebook 日付を確認
    - 関連するテーマの `runo notes show <YYYY-MM-DD>` で読む
+   - `research/agenda.md` で現在の見立てと active question を確認する
    - `materials/index.toml` や `materials/README.md` で関連資料を確認
    - 散らばった観察・仮説・反例・却下案を集める
 2. 完了した run の結果 (`runo analyze summarize`, ログ, 出力) を読む

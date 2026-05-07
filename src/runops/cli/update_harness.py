@@ -4,8 +4,8 @@
 AGENTS.md, .claude/skills/, .claude/rules/, .claude/settings.json,
 .vscode/settings.json, the managed block inside ``.gitignore``, etc.) from
 the current version of runops and writes them into the project. It also
-backfills the visible ``notes/`` and ``materials/`` workspace scaffold when
-those paths are missing.
+backfills the visible ``notes/``, ``materials/``, and ``research/`` workspace
+scaffold when those paths are missing.
 
 Collision detection:  If the on-disk file matches the hash recorded in
 ``.runops/harness.lock``, it is assumed to be unedited and is silently
@@ -34,6 +34,7 @@ else:
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
     _create_notes_skeleton,
+    _create_research_skeleton,
 )
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
@@ -293,6 +294,7 @@ def _missing_workspace_scaffold(
     *,
     include_notes: bool,
     include_materials: bool,
+    include_research: bool,
 ) -> list[str]:
     """Return missing visible workspace scaffold paths."""
     expected: list[str] = []
@@ -314,6 +316,18 @@ def _missing_workspace_scaffold(
                 "materials/snippets/",
                 "materials/README.md",
                 "materials/index.toml",
+            ]
+        )
+    if include_research:
+        expected.extend(
+            [
+                "research/",
+                "research/README.md",
+                "research/agenda.md",
+                "research/proposals/",
+                "research/proposals/.gitkeep",
+                "research/reviews/",
+                "research/reviews/.gitkeep",
             ]
         )
 
@@ -355,7 +369,8 @@ def update_harness(
             "--only",
             help=(
                 "Comma-separated list of files to update"
-                " (e.g. 'CLAUDE.md,.claude/rules,.vscode,notes,materials')."
+                " (e.g. 'CLAUDE.md,.claude/rules,.vscode,notes,materials,"
+                "research')."
             ),
         ),
     ] = None,
@@ -547,12 +562,14 @@ def update_harness(
 
     include_notes = _workspace_target_requested(only_prefixes, "notes")
     include_materials = _workspace_target_requested(only_prefixes, "materials")
+    include_research = _workspace_target_requested(only_prefixes, "research")
     if dry_run:
         backfilled_workspace.extend(
             _missing_workspace_scaffold(
                 project_dir,
                 include_notes=include_notes,
                 include_materials=include_materials,
+                include_research=include_research,
             )
         )
     else:
@@ -560,6 +577,8 @@ def update_harness(
             _create_notes_skeleton(project_dir, backfilled_workspace)
         if include_materials:
             _create_materials_skeleton(project_dir, backfilled_workspace)
+        if include_research:
+            _create_research_skeleton(project_dir, backfilled_workspace)
 
     if not dry_run:
         save_harness_lock(project_dir, updated_lock)

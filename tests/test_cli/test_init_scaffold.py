@@ -30,18 +30,25 @@ def test_create_scaffolds_populate_expected_project_files(tmp_path: Path) -> Non
     scaffold_mod._create_runops_skeleton(tmp_path, created)
     scaffold_mod._create_notes_skeleton(tmp_path, created)
     scaffold_mod._create_materials_skeleton(tmp_path, created)
+    scaffold_mod._create_research_skeleton(tmp_path, created)
 
     assert (tmp_path / ".runops" / "facts.toml").is_file()
     assert (tmp_path / ".runops" / "knowledge" / "enabled").is_dir()
     assert (tmp_path / "notes" / "README.md").is_file()
     assert (tmp_path / "materials" / "README.md").is_file()
     assert (tmp_path / "materials" / "index.toml").is_file()
+    assert (tmp_path / "research" / "README.md").is_file()
+    assert (tmp_path / "research" / "agenda.md").is_file()
+    assert (tmp_path / "research" / "proposals" / ".gitkeep").is_file()
+    assert (tmp_path / "research" / "reviews" / ".gitkeep").is_file()
     assert "materials/figures/" in created
+    assert "research/agenda.md" in created
 
     created_second: list[str] = []
     scaffold_mod._create_runops_skeleton(tmp_path, created_second)
     scaffold_mod._create_notes_skeleton(tmp_path, created_second)
     scaffold_mod._create_materials_skeleton(tmp_path, created_second)
+    scaffold_mod._create_research_skeleton(tmp_path, created_second)
     assert created_second == []
 
 

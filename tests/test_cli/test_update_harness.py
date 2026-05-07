@@ -63,6 +63,7 @@ class TestUpdateHarnessBasic:
         assert ".codex/config.toml" in lock
         assert ".codex/rules/runops.rules" in lock
         assert ".agents/skills/new-case/SKILL.md" in lock
+        assert ".agents/skills/research-agenda/SKILL.md" in lock
         assert "cases/AGENTS.md" in lock
         assert "runs/AGENTS.md" in lock
         assert GITIGNORE_PATH in lock
@@ -134,11 +135,13 @@ class TestUpdateHarnessBasic:
         assert "**/.*" in analysis_exclude
 
     def test_backfills_visible_workspace_when_missing(self, tmp_path: Path) -> None:
-        """update-harness recreates missing notes/materials scaffold."""
+        """update-harness recreates missing visible workspace scaffold."""
         _init_project(tmp_path)
         (tmp_path / "notes" / "README.md").unlink()
         (tmp_path / "materials" / "README.md").unlink()
         (tmp_path / "materials" / "papers").rmdir()
+        (tmp_path / "research" / "agenda.md").unlink()
+        (tmp_path / "research" / "reviews" / ".gitkeep").unlink()
 
         result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
 
@@ -147,15 +150,19 @@ class TestUpdateHarnessBasic:
         assert (tmp_path / "notes" / "README.md").is_file()
         assert (tmp_path / "materials" / "README.md").is_file()
         assert (tmp_path / "materials" / "papers").is_dir()
+        assert (tmp_path / "research" / "agenda.md").is_file()
+        assert (tmp_path / "research" / "reviews" / ".gitkeep").is_file()
         lock = load_harness_lock(tmp_path)
         assert "notes/README.md" not in lock
         assert "materials/README.md" not in lock
+        assert "research/agenda.md" not in lock
 
     def test_only_can_limit_workspace_backfill(self, tmp_path: Path) -> None:
-        """--only respects notes/materials workspace backfill targets."""
+        """--only respects visible workspace backfill targets."""
         _init_project(tmp_path)
         (tmp_path / "notes" / "README.md").unlink()
         (tmp_path / "materials" / "README.md").unlink()
+        (tmp_path / "research" / "agenda.md").unlink()
 
         result = runner.invoke(
             app,
@@ -171,6 +178,7 @@ class TestUpdateHarnessBasic:
         assert result.exit_code == 0
         assert not (tmp_path / "notes" / "README.md").exists()
         assert (tmp_path / "materials" / "README.md").is_file()
+        assert not (tmp_path / "research" / "agenda.md").exists()
 
     def test_dry_run_no_writes(self, tmp_path: Path) -> None:
         """--dry-run reports but does not actually write files."""

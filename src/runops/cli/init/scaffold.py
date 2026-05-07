@@ -108,6 +108,30 @@ def _create_materials_skeleton(project_dir: Path, created: list[str]) -> None:
         created.append("materials/index.toml")
 
 
+def _create_research_skeleton(project_dir: Path, created: list[str]) -> None:
+    """Create the high-level research decision skeleton."""
+    research_dir = project_dir / "research"
+    if _mkdir_if_missing(research_dir):
+        created.append("research/")
+    for dirname in ("proposals", "reviews"):
+        if _mkdir_if_missing(research_dir / dirname):
+            created.append(f"research/{dirname}/")
+
+    from runops.templates import load_static
+
+    readme_path = research_dir / "README.md"
+    if _write_if_missing(readme_path, load_static("scaffold/research/README.md")):
+        created.append("research/README.md")
+    agenda_path = research_dir / "agenda.md"
+    if _write_if_missing(agenda_path, load_static("scaffold/research/agenda.md")):
+        created.append("research/agenda.md")
+    for dirname in ("proposals", "reviews"):
+        keep_path = research_dir / dirname / ".gitkeep"
+        template_path = f"scaffold/research/{dirname}/.gitkeep"
+        if _write_if_missing(keep_path, load_static(template_path)):
+            created.append(f"research/{dirname}/.gitkeep")
+
+
 def _get_data_path() -> Path:
     """Return the path to the package's bundled _data directory.
 

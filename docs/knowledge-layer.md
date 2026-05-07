@@ -18,9 +18,10 @@ runops の知識層は 4 つのドメインで構成される:
 
 - **lab notebook**: append-only な時系列ログ — `notes/YYYY-MM-DD.md` (日次ノート), `notes/reports/<topic>.md` (refined long-form)
 - **materials**: 人間が持ち込む source material — `materials/papers/`, `materials/manuals/`, `materials/figures/`, `materials/snippets/`
+- **research agenda**: 現在の高レベルな研究判断 — `research/agenda.md`
 - **advanced structured knowledge**: 機械的に再利用したい知見 — `.runops/insights/<name>.md`, `.runops/facts.toml`
 
-日常運用では `notes/` と `materials/` を人間/Agent の共有ワークスペースとする。
+日常運用では `notes/`, `materials/`, `research/` を人間/Agent の共有ワークスペースとする。
 `.runops/knowledge/` は `imports.md` などの生成済み Agent context であり、
 source of truth ではない。`.runops/insights/` と `.runops/facts.toml` は
 互換性を保つ advanced / structured store として残し、機械的に再利用したい
@@ -39,6 +40,11 @@ project/
     manuals/
     figures/
     snippets/
+  research/                      # 現在の研究判断 (mutable decision ledger)
+    README.md
+    agenda.md
+    proposals/                   # 高コスト・方向転換前の任意 proposal
+    reviews/                     # agenda checkpoint の snapshot
   refs/                          # シミュレータリファレンスリポジトリ
     MPIEMSES3D/
       cookbook/                   # simulator cookbook (入力例・設定カタログ)

@@ -58,20 +58,22 @@ runops プロジェクトにおける Agent の作業ガイド。
 - `runs/**/survey.toml` — パラメータサーベイ定義
 - `runs/**/Rxxxx/manifest.toml` — run メタデータ (自動生成、手動編集禁止)
 
-## notes / materials / generated context
+## notes / materials / research / generated context
 
-実験で残す情報は、見える作業場 (`notes/`, `materials/`) を中心に管理する。
+実験で残す情報は、見える作業場 (`notes/`, `materials/`, `research/`) を中心に管理する。
 Agent 自身の memory には保存しない。
 
 | 種類 | 性質 | 書き先 | コマンド |
 |---|---|---|---|
 | 再開可能な時系列の lab notebook (準備の意思決定, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `runo notes append` |
 | 長文 refined レポート | refined, 改稿可 | `notes/reports/<topic>.md` | (直接編集) |
+| 現在の高レベルな研究判断 | mutable decision ledger | `research/agenda.md` | `/research-agenda` / `$research-agenda` |
 | 論文・manual・図・snippet | visible source material | `materials/` | (直接編集) |
 | 整理済の名前付き知見 | advanced, durable, 上書き可 | `.runops/insights/<name>.md` | `runo knowledge save` |
 | 機械可読 atomic claim | advanced, atomic | `.runops/facts.toml` | `runo knowledge add-fact` |
 
 - 「結果をまとめて」「知見を記録して」等の整理済情報 → まず `notes/reports/` に
+- 「今の見立て」「active question」「paused/killed」「次に何をなぜやるか」 → `research/agenda.md` に
 - 「今やってる作業のメモ」「途中経過」「議論の流れ」「準備フェーズの意思決定」 → `runo notes append` で lab notebook に
 - 参照 PDF / manual / snippet → `materials/` に
 - 機械的に再利用したい atomic な知見だけ `.runops/insights/` / `facts.toml` に昇格

@@ -15,10 +15,11 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
    runops や関連パッケージは `.venv/` にインストール済み。activate しないと `runo` コマンドが使えない。
 1. `runo context --json` で project の現在地を把握する
 2. `campaign.toml` を読む
-3. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
-4. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
-5. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
-6. **定型作業は `{{ skill_prefix }}skill-name` で呼び出す** (下記「スキル」参照)
+3. `research/agenda.md` があれば読む
+4. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
+5. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
+6. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
+7. **定型作業は `{{ skill_prefix }}skill-name` で呼び出す** (下記「スキル」参照)
 
 ## スキル
 
@@ -37,6 +38,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | `{{ skill_prefix }}cleanup` | run のアーカイブ・整理 |
 | `{{ skill_prefix }}learn` | 知見を記録する (curated, 名前付き) |
 | `{{ skill_prefix }}note` | lab notebook に時系列エントリを追記する |
+| `{{ skill_prefix }}research-agenda` | `research/agenda.md` の現在判断を更新する |
 | `{{ skill_prefix }}feedback-runops` | runops 本体へのバグ報告・機能要望を issue 化 (引数なしで候補一覧) |
 | `{{ skill_prefix }}release` | プロジェクトのマイルストーンタグを作成 |
 | `{{ skill_prefix }}setup-env` | 環境セットアップ |
@@ -94,10 +96,13 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | 種類 | 性質 | 書き先 | スキル |
 |---|---|---|---|
 | 再開可能な時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md` | `{{ skill_prefix }}note` |
+| 現在の高レベルな研究判断 | mutable decision ledger | `research/agenda.md` | `{{ skill_prefix }}research-agenda` |
 | 論文・manual・図・snippet | visible source material | `materials/` | 直接編集 |
 | 機械的に再利用する知見 | advanced, structured | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |
 
 - 「結果をまとめて」「知見を記録して」等の整理済情報はまず **`notes/reports/` に**
+- 「今、どの問いを active にしているか」「何を pause / kill したか」
+  「次に何をなぜ行うか」は **`research/agenda.md` に**
 - 機械的に再利用したい atomic な知見だけ **`{{ skill_prefix }}learn` で advanced knowledge レイヤに**
 - 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`{{ skill_prefix }}note` で lab notebook に**。
   短くてよいが、`Context:` と `Evidence:` を残し、model 名だけ・figure path だけで
@@ -132,14 +137,15 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 `{{ skill_prefix }}note` と `materials/` は raw な原料、`{{ skill_prefix }}learn`
 は advanced / structured な最終産物。つまり **`{{ skill_prefix }}learn` を呼ぶときは、
-まず `notes/` と `materials/` を読んで素材を集める**:
+まず `notes/`, `materials/`, `research/` を読んで素材を集める**:
 
 1. `runo notes list` で最近の lab notebook の日付を確認
 2. 当該テーマに関連する `notes/YYYY-MM-DD.md` を `runo notes show` で読む
-3. 関連する `materials/index.toml` / `materials/` の資料を確認する
-4. 散らばっている観察・仮説・反例を一つの insight にまとめる
-5. 必要な場合だけ `runo knowledge save` / `add-fact` で永続化する
-6. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
+3. `research/agenda.md` で現在の見立てと active question を確認する
+4. 関連する `materials/index.toml` / `materials/` の資料を確認する
+5. 散らばっている観察・仮説・反例を一つの insight にまとめる
+6. 必要な場合だけ `runo knowledge save` / `add-fact` で永続化する
+7. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
 
 lab notebook の entry が積み上がってストーリーになったら、
 `notes/reports/<topic>.md` に refined version を書き起こし、必要なら

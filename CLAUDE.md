@@ -85,6 +85,7 @@ uv run runo --help                       # CLI 実行
 
 - **run ディレクトリが主単位**: すべての操作は run_id / run dir を基点とする
 - **manifest.toml が正本**: run の状態・由来・provenance はすべて manifest.toml に記録
+- **研究判断の隔離**: 生成 project の `research/agenda.md` は mutable な現在判断の台帳。本文は日本語
 - **Simulator Adapter パターン**: simulator 固有処理は Adapter に閉じ込める
 - **Launcher Profile パターン**: MPI 起動方式は Launcher に閉じ込める
 - **MPI に介入しない**: Python ツールは rank ごとのラッパにならない

@@ -154,6 +154,7 @@ def _assert_minimum_bootstrap_layout(project_dir: Path) -> None:
         project_dir / "campaign.toml",
         project_dir / "cases",
         project_dir / "runs",
+        project_dir / "research" / "agenda.md",
         project_dir / ".runops",
         project_dir / ".claude" / "settings.json",
         project_dir / ".claude" / "rules",

@@ -2,12 +2,13 @@
 
 `notes/` は **逐次的な実験ノートと長文レポート** を入れる、人間/Agent 共有の
 作業場です。論文 PDF、manual、図、snippet などの source material は隣の
-`materials/` に置きます。
+`materials/` に置きます。現在の高レベルな研究判断は `research/agenda.md` に
+置きます。
 
 `.runops/knowledge/` は `runo update-refs` や `runo knowledge source render` が
 生成する Agent context です。`.runops/insights/` と `.runops/facts.toml` は
 互換性のため残る advanced/structured knowledge store と考え、日常のメモや
-レポートはまず `notes/` と `materials/` に置くのを推奨します。
+レポートはまず `notes/`, `materials/`, `research/` に置くのを推奨します。
 
 ## どこに何を書くか
 
@@ -15,6 +16,7 @@
 | ---                           | ---                                      | ---                 |
 | **`notes/YYYY-MM-DD.md`**     | **日次の lab notebook (append-only)**    | **chronological**   |
 | **`notes/reports/<topic>.md`**| **長文レポート / 解析記事**              | **refined, 改稿可** |
+| **`research/agenda.md`**      | **現在の高レベルな研究判断**             | **mutable ledger**  |
 | **`materials/`**              | **論文・manual・図・snippet**            | **source material** |
 | `.runops/knowledge/`          | 生成済み Agent context                   | generated, internal |
 | `.runops/facts.toml`          | 機械可読 atomic claim                    | advanced, structured |
@@ -86,6 +88,7 @@ materials/                  ← source material (papers, manuals, snippets)
 notes/YYYY-MM-DD.md          ← 日次の observation / work log
         ↓ (ストーリーが固まる)
 notes/reports/<topic>.md     ← 整理済 long form report
+research/agenda.md           ← 現在の見立て / active question / 次の判断
         ↓ (機械的に再利用したい atomic な知見だけ抽出)
 .runops/insights/<name>.md   ← advanced: named insight
 .runops/facts.toml           ← advanced: machine-readable claim

@@ -59,6 +59,12 @@ class TestInit:
         assert (tmp_path / "materials" / "snippets").is_dir()
         assert (tmp_path / "materials" / "README.md").is_file()
         assert (tmp_path / "materials" / "index.toml").is_file()
+        # Research decision-layer scaffolding
+        assert (tmp_path / "research").is_dir()
+        assert (tmp_path / "research" / "README.md").is_file()
+        assert (tmp_path / "research" / "agenda.md").is_file()
+        assert (tmp_path / "research" / "proposals").is_dir()
+        assert (tmp_path / "research" / "reviews").is_dir()
 
     def test_init_notes_readme_content(self, tmp_path: Path) -> None:
         """notes/README.md describes the lab-notebook convention."""
@@ -85,6 +91,19 @@ class TestInit:
         assert "local by default" in readme
         assert "materials = []" in index
 
+    def test_init_research_scaffold_content(self, tmp_path: Path) -> None:
+        """research/ documents the mutable decision-ledger convention."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        readme = (tmp_path / "research" / "README.md").read_text(encoding="utf-8")
+        agenda = (tmp_path / "research" / "agenda.md").read_text(encoding="utf-8")
+
+        assert "研究判断の台帳" in readme
+        assert "TODO リストではなく" in readme
+        assert "本文は日本語" in readme
+        assert "mutable な現在の研究判断の台帳" in agenda
+        assert "What Would Change Our Mind" in agenda
+        assert "Human gate: yes/no" in agenda
+
     def test_init_creates_note_skill(self, tmp_path: Path) -> None:
         """The note skill is scaffolded next to the other skills."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
@@ -104,6 +123,23 @@ class TestInit:
         assert "Model name must not stand alone" in codex_content
         assert "Figures are first-class note content" in codex_content
         assert "Quality gate before append" in codex_content
+
+    def test_init_creates_research_agenda_skill(self, tmp_path: Path) -> None:
+        """The research-agenda skill is rendered for Claude and Codex."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        skill_md = tmp_path / ".claude" / "skills" / "research-agenda" / "SKILL.md"
+        codex_skill_md = (
+            tmp_path / ".agents" / "skills" / "research-agenda" / "SKILL.md"
+        )
+
+        assert skill_md.is_file()
+        assert codex_skill_md.is_file()
+        content = skill_md.read_text(encoding="utf-8")
+        codex_content = codex_skill_md.read_text(encoding="utf-8")
+        assert "name: research-agenda" in content
+        assert "research/agenda.md" in content
+        assert "本文は日本語" in content
+        assert "判断の台帳" in codex_content
 
     def test_init_simproject_content(self, tmp_path: Path) -> None:
         """runops.toml has correct project name derived from dir name."""
