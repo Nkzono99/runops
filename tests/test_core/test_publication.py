@@ -11,8 +11,10 @@ import tomli_w
 
 from runops.core.publication import (
     PublicationSourceArtifact,
-    _materialize_export_files,
     export_publication_bundle,
+)
+from runops.core.publication.files import (
+    materialize_export_files as _materialize_export_files,
 )
 
 
@@ -150,7 +152,10 @@ def test_force_export_preserves_existing_bundle_on_failure(
     def fail_readme(*_args, **_kwargs):  # type: ignore[no-untyped-def]
         raise RuntimeError("boom")
 
-    monkeypatch.setattr("runops.core.publication._write_export_readme", fail_readme)
+    monkeypatch.setattr(
+        "runops.core.publication.workflow._write_export_readme",
+        fail_readme,
+    )
 
     with pytest.raises(RuntimeError, match="boom"):
         export_publication_bundle(

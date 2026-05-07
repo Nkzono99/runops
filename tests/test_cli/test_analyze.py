@@ -16,6 +16,7 @@ from runops.core.analysis import ResolvedSurveyPlotRecipe, SurveyPlotRecipe
 
 runner = CliRunner()
 
+ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
 _PROJECT_TOML: dict[str, Any] = {"project": {"name": "test-project"}}
 
 
@@ -63,7 +64,7 @@ class TestSummarize:
 
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         assert result.exit_code == 0
@@ -80,7 +81,7 @@ class TestSummarize:
         run_dir = _create_run(tmp_path, "R20260327-0001")
 
         with patch(
-            "runops.core.analysis.get_adapter",
+            ADAPTER_PATCH,
             side_effect=KeyError("not found"),
         ):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
@@ -144,7 +145,7 @@ class TestSummarize:
         mock_adapter.summarize.return_value = {"energy": 42.0}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         assert result.exit_code == 0
@@ -178,7 +179,7 @@ class TestSummarize:
         mock_adapter.summarize.return_value = {"steps": 100}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         assert result.exit_code == 0
@@ -227,7 +228,7 @@ class TestSummarize:
         mock_adapter.summarize.return_value = {}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         assert result.exit_code == 0
@@ -257,7 +258,7 @@ class TestSummarize:
         mock_adapter.summarize.return_value = {"ok": True}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         # Should succeed with adapter summary (script failure is warning)
@@ -307,7 +308,7 @@ class TestSummarize:
         mock_adapter.summarize.return_value = {}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         assert result.exit_code == 0
@@ -347,7 +348,7 @@ class TestSummarize:
         mock_adapter.summarize.return_value = {}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
 
         assert result.exit_code == 0
@@ -416,7 +417,7 @@ class TestCollect:
         mock_adapter.summarize.return_value = {"energy": 12.5}
         mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-        with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
             result = runner.invoke(app, ["analyze", "collect", str(tmp_path)])
 
         assert result.exit_code == 1

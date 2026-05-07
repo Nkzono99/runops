@@ -18,6 +18,8 @@ from runops.core.analysis import (
 )
 from runops.core.exceptions import SimctlError
 
+ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
+
 
 def _create_run(
     parent: Path,
@@ -138,7 +140,7 @@ def test_list_survey_plot_recipes_reads_adapter_recipes(tmp_path: Path) -> None:
         }
     }
 
-    with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+    with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
         recipes = list_survey_plot_recipes(tmp_path)
 
     assert len(recipes) == 1
@@ -176,7 +178,7 @@ def test_resolve_survey_plot_recipe_uses_first_available_candidates(
         }
     }
 
-    with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+    with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
         resolved = resolve_survey_plot_recipe(tmp_path, "energy-vs-u")
 
     assert resolved.x == "param.u"

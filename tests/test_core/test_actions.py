@@ -31,6 +31,8 @@ from runops.core.knowledge import list_insights, load_facts
 from runops.core.state import RunState
 from runops.slurm.query import JobStatus
 
+ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
+
 
 def _write_manifest(run_dir: Path, data: dict[str, Any]) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -192,7 +194,7 @@ def test_collect_survey_does_not_auto_summarize_completed_runs(tmp_path: Path) -
     mock_adapter.summarize.return_value = {"energy": 2.5}
     mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-    with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+    with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
         result = collect_survey(tmp_path)
 
     assert result.status is ActionStatus.ERROR
@@ -222,7 +224,7 @@ def test_summarize_run_writes_summary_json(tmp_path: Path) -> None:
     mock_adapter.summarize.return_value = {"energy": 42.0}
     mock_adapter_cls = MagicMock(return_value=mock_adapter)
 
-    with patch("runops.core.analysis.get_adapter", return_value=mock_adapter_cls):
+    with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
         result = summarize_run(run_dir)
 
     assert result.status is ActionStatus.SUCCESS
