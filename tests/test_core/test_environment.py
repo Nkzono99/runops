@@ -9,13 +9,15 @@ from typing import Any
 from runops.core.environment import (
     EnvironmentInfo,
     PartitionInfo,
+    detect_environment,
+    load_environment,
+    save_environment,
+)
+from runops.core.environment.runtime import (
     _command_exists,
     _detect_cluster_name,
     _parse_module_list_output,
     _parse_sinfo_output,
-    detect_environment,
-    load_environment,
-    save_environment,
 )
 
 
@@ -121,7 +123,7 @@ def test_detect_cluster_name_prefers_env_over_hostname(monkeypatch: Any) -> None
         return _CompletedProcess(stdout="ignored\n")
 
     monkeypatch.setenv("SLURM_CLUSTER_NAME", "camphor")
-    monkeypatch.setattr("runops.core.environment.subprocess.run", fake_run)
+    monkeypatch.setattr("runops.core.environment.runtime.subprocess.run", fake_run)
 
     assert _detect_cluster_name() == "camphor"
     assert calls == []
@@ -137,7 +139,7 @@ def test_detect_cluster_name_falls_back_to_hostname(
         return _CompletedProcess(stdout="camphor-node\n")
 
     monkeypatch.delenv("SLURM_CLUSTER_NAME", raising=False)
-    monkeypatch.setattr("runops.core.environment.subprocess.run", fake_run)
+    monkeypatch.setattr("runops.core.environment.runtime.subprocess.run", fake_run)
 
     assert _detect_cluster_name() == "camphor-node"
 
@@ -145,11 +147,14 @@ def test_detect_cluster_name_falls_back_to_hostname(
 def test_command_exists_uses_shutil_which(monkeypatch: Any) -> None:
     """Command detection delegates to shutil.which."""
     monkeypatch.setattr(
-        "runops.core.environment.shutil.which", lambda cmd: f"/bin/{cmd}"
+        "runops.core.environment.runtime.shutil.which", lambda cmd: f"/bin/{cmd}"
     )
     assert _command_exists("sinfo") is True
 
-    monkeypatch.setattr("runops.core.environment.shutil.which", lambda _cmd: None)
+    monkeypatch.setattr(
+        "runops.core.environment.runtime.shutil.which",
+        lambda _cmd: None,
+    )
     assert _command_exists("missing") is False
 
 
@@ -158,18 +163,18 @@ def test_detect_environment_collects_scheduler_modules_and_cluster_name(
 ) -> None:
     """Public detection wires together the helper probes."""
     monkeypatch.setattr(
-        "runops.core.environment._command_exists", lambda cmd: cmd == "sinfo"
+        "runops.core.environment.runtime._command_exists", lambda cmd: cmd == "sinfo"
     )
     monkeypatch.setattr(
-        "runops.core.environment._detect_slurm_partitions",
+        "runops.core.environment.runtime._detect_slurm_partitions",
         lambda: [PartitionInfo(name="debug", max_nodes=2, default=True)],
     )
     monkeypatch.setattr(
-        "runops.core.environment._detect_cluster_name",
+        "runops.core.environment.runtime._detect_cluster_name",
         lambda: "camphor",
     )
     monkeypatch.setattr(
-        "runops.core.environment._detect_modules",
+        "runops.core.environment.runtime._detect_modules",
         lambda: {"current": ["gcc/13.2"]},
     )
 

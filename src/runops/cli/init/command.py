@@ -188,7 +188,7 @@ def init(
 
     # site.toml — copy from bundled site profile
     if site_profile:
-        from runops.core.site import _load_site_toml
+        from runops.core.site.profile import _load_site_toml
 
         site_file = project_dir / "site.toml"
         if not site_file.exists():
