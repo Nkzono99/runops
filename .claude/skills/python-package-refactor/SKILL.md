@@ -5,12 +5,13 @@ description: Safely refactor Python packages and libraries with repository inspe
 
 # Python Package Refactor
 
-Refactor Python packages as a controlled engineering change, not a rewrite. Preserve behavior and public API by default, make changes in small reversible batches, and verify each batch with evidence from the repository.
+Refactor Python packages as a controlled engineering change, not a rewrite. Preserve behavior and the relevant user-facing contract by default, make changes in small reversible batches, and verify each batch with evidence from the repository.
 
 ## Operating principles
 
 - Start from repository evidence: package metadata, source layout, tests, imports, public exports, CI/tooling, and current failures.
 - Preserve the public contract unless the user explicitly requests a breaking change. Treat `__all__`, package `__init__.py`, documented imports, tests, CLI entry points, and packaging metadata as API signals.
+- For CLI-first packages, prioritize CLI behavior, generated files, schemas, and documented imports over internal module/import compatibility. Private modules, accidental import re-exports, and implementation-only paths may be moved or removed when repository context or the user says internal compatibility is not important.
 - Prefer incremental, PR-sized changes over broad rewrites. Keep diffs readable and explain tradeoffs.
 - Do not change runtime dependencies, build backend, Python version support, import paths, serialization formats, or CLI behavior unless required by the requested refactor.
 - Never claim success without running the strongest feasible verification gates. If the environment cannot run a gate, record the exact reason and use narrower static or smoke checks.
@@ -59,7 +60,7 @@ Write a concise refactor plan before editing. Include:
 
 - Goal and non-goals.
 - Files to touch and why.
-- Expected API impact: `none`, `compatible`, or `intentional breaking`.
+- Expected contract impact: `none`, `compatible`, or `intentional breaking`; name whether the protected surface is CLI-facing, documented Python API, plugin API, serialization format, or internal-only code.
 - Verification gates to run.
 - Rollback strategy.
 
@@ -71,7 +72,7 @@ Use these patterns when applicable:
 
 - **Large module decomposition:** extract cohesive helpers into private modules first, then move public entry points only with re-export shims.
 - **Circular import cleanup:** move shared types/protocols to a neutral module, replace module-level imports with dependency injection, and use local imports only as a temporary containment measure.
-- **Public API preservation:** keep old import paths working via package-level re-exports or thin wrappers; add deprecation comments only when the user asks for migration behavior.
+- **Public API preservation:** keep old import paths working via package-level re-exports or thin wrappers when those imports are documented, exported, or externally relied on; for internal-only paths, prefer cleanup over compatibility shims.
 - **Packaging cleanup:** modernize `pyproject.toml` conservatively; do not switch build backends or package managers without a clear benefit and user intent.
 - **Typing cleanup:** add annotations where they reduce ambiguity; avoid large type-only rewrites that obscure behavior-preserving diffs.
 - **Testability refactor:** add characterization tests around current behavior before changing internals, especially for parsers, serializers, CLI paths, data models, and error handling.

@@ -2,6 +2,8 @@
 
 Refactoring a package is successful only if callers can continue to use the same public contract, unless a breaking change is explicitly requested.
 
+For CLI-first packages, the public contract is often the command behavior, generated files, schemas, configuration keys, and documented import examples. Internal module paths, private helpers, and accidental re-exported imports do not need compatibility shims unless repository evidence shows external reliance.
+
 ## Public API signals
 
 Treat these as public unless repository evidence says otherwise:
@@ -12,6 +14,8 @@ Treat these as public unless repository evidence says otherwise:
 - Documented examples and README imports.
 - Test imports outside the module being changed.
 - Public classes, functions, constants, and modules without a leading underscore.
+
+For application-style or CLI-only packages, downgrade the last item when there is no documented Python API and the user explicitly permits internal breakage. In that case, use the snapshot to review drift, not to block internal cleanup.
 
 ## Static API snapshot process
 
