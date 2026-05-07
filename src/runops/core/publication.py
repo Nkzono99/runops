@@ -2,18 +2,20 @@
 
 from __future__ import annotations
 
+import dataclasses as _dataclasses
 import hashlib
 import json
 import mimetypes
 import os
 import shutil
 import uuid
-from dataclasses import dataclass, replace
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from runops import __version__
+from runops.core import _publication_models
 from runops.core.analysis import (
     SurveyCollectionResult,
     collect_survey_summaries,
@@ -31,46 +33,11 @@ from runops.core.state import RunState
 _EXPORT_MODES = {"copy", "symlink"}
 _PAPER_STATUSES = {"accepted", "placeholder", "retry_planned", "excluded", "superseded"}
 
-
-@dataclass(frozen=True)
-class PublicationSourceArtifact:
-    """One source artifact collected before export materialization."""
-
-    role: str
-    source_path: Path
-    run_id: str = ""
-    caption: str = ""
-
-
-@dataclass(frozen=True)
-class PublicationExportFile:
-    """One exported artifact inside a publication bundle."""
-
-    role: str
-    source_path: Path
-    export_path: Path
-    size_bytes: int
-    sha256: str
-    media_type: str = ""
-    run_id: str = ""
-    caption: str = ""
-
-
-@dataclass(frozen=True)
-class PublicationExportResult:
-    """Result of exporting project artifacts for a paper/manuscript."""
-
-    paper_id: str
-    export_name: str
-    target_kind: str
-    target_path: Path
-    export_dir: Path
-    manifest_path: Path
-    readme_path: Path
-    mode: str
-    source_run_ids: tuple[str, ...]
-    files: tuple[PublicationExportFile, ...]
-    warnings: tuple[str, ...] = ()
+# Keep historical module attributes available for import compatibility.
+dataclass = _dataclasses.dataclass
+PublicationExportFile = _publication_models.PublicationExportFile
+PublicationExportResult = _publication_models.PublicationExportResult
+PublicationSourceArtifact = _publication_models.PublicationSourceArtifact
 
 
 def _slugify(value: str) -> str:

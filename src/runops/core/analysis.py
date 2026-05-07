@@ -6,16 +6,18 @@ action registry so analysis behavior stays consistent.
 
 from __future__ import annotations
 
+import dataclasses as _dataclasses
 import importlib.util
 import json
 import math
 import sys
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from runops.adapters.registry import get as get_adapter
+from runops.core import _analysis_models
+from runops.core._analysis_report import write_survey_report
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
@@ -25,109 +27,16 @@ from runops.core.readiness import evaluate_run_readiness
 _FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
 _PLOT_KINDS = {"auto", "line", "scatter", "bar"}
 
-
-@dataclass(frozen=True)
-class RunSummaryResult:
-    """Result of generating one run summary."""
-
-    run_dir: Path
-    run_id: str
-    summary: dict[str, Any]
-    summary_path: Path
-    script_path: Path | None = None
-    warnings: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class SurveyCollectionResult:
-    """Artifacts generated from survey-level summary collection."""
-
-    survey_dir: Path
-    total_runs: int
-    summaries_collected: int
-    generated_summaries: int
-    missing_summaries: int
-    readiness_counts: dict[str, int]
-    readiness_issues: tuple[dict[str, Any], ...]
-    state_counts: dict[str, int]
-    csv_path: Path
-    json_path: Path
-    figures_path: Path
-    report_path: Path
-    figures: tuple[dict[str, str], ...] = ()
-    warnings: tuple[str, ...] = ()
-
-
-@dataclass(frozen=True)
-class SurveyTableResult:
-    """Flattened survey table for downstream plotting or inspection."""
-
-    survey_dir: Path
-    collection: SurveyCollectionResult
-    rows: tuple[dict[str, Any], ...]
-    columns: tuple[str, ...]
-
-
-@dataclass(frozen=True)
-class SurveyPlotSeries:
-    """One plotted data series."""
-
-    label: str
-    points: tuple[tuple[Any, float, str], ...]
-
-
-@dataclass(frozen=True)
-class SurveyPlotDataResult:
-    """Prepared survey data ready for rendering."""
-
-    survey_dir: Path
-    x: str
-    y: str
-    kind: str
-    group_by: str
-    columns: tuple[str, ...]
-    series: tuple[SurveyPlotSeries, ...]
-    rows_considered: int
-    points_plotted: int
-    generated_summaries: int
-
-
-@dataclass(frozen=True)
-class SurveyPlotResult:
-    """Saved survey plot artifact."""
-
-    survey_dir: Path
-    output_path: Path
-    x: str
-    y: str
-    kind: str
-    group_by: str
-    points_plotted: int
-    generated_summaries: int
-
-
-@dataclass(frozen=True)
-class SurveyPlotRecipe:
-    """Adapter-aware survey plot recipe definition."""
-
-    name: str
-    adapter: str
-    description: str
-    x_candidates: tuple[str, ...]
-    y_candidates: tuple[str, ...]
-    kind: str = "auto"
-    group_by_candidates: tuple[str, ...] = ()
-    title: str = ""
-
-
-@dataclass(frozen=True)
-class ResolvedSurveyPlotRecipe:
-    """Concrete plot settings after resolving recipe column fallbacks."""
-
-    recipe: SurveyPlotRecipe
-    x: str
-    y: str
-    group_by: str
+# Keep historical module attributes available for import compatibility.
+dataclass = _dataclasses.dataclass
+ResolvedSurveyPlotRecipe = _analysis_models.ResolvedSurveyPlotRecipe
+RunSummaryResult = _analysis_models.RunSummaryResult
+SurveyCollectionResult = _analysis_models.SurveyCollectionResult
+SurveyPlotDataResult = _analysis_models.SurveyPlotDataResult
+SurveyPlotRecipe = _analysis_models.SurveyPlotRecipe
+SurveyPlotResult = _analysis_models.SurveyPlotResult
+SurveyPlotSeries = _analysis_models.SurveyPlotSeries
+SurveyTableResult = _analysis_models.SurveyTableResult
 
 
 def _resolve_adapter_name(manifest: ManifestData) -> str:
@@ -548,99 +457,6 @@ def extract_run_figures(
     """
 
     return tuple(_extract_figures(run_dir, summary))
-
-
-def _format_float(value: float) -> str:
-    if (
-        math.isfinite(value)
-        and value != 0.0
-        and (abs(value) >= 1e4 or abs(value) < 1e-3)
-    ):
-        return f"{value:.6e}"
-    return f"{value:.6f}".rstrip("0").rstrip(".")
-
-
-def _write_survey_report(
-    report_path: Path,
-    *,
-    survey_dir: Path,
-    total_runs: int,
-    summaries_collected: int,
-    generated_summaries: int,
-    missing_summaries: int,
-    readiness_counts: dict[str, int],
-    readiness_issues: list[dict[str, Any]],
-    state_counts: dict[str, int],
-    numeric_stats: dict[str, dict[str, float]],
-    figures: list[dict[str, str]],
-    warnings: list[str],
-) -> None:
-    lines: list[str] = [
-        "# Survey Summary",
-        "",
-        f"- Survey directory: `{survey_dir}`",
-        f"- Generated at: `{datetime.now(timezone.utc).isoformat(timespec='seconds')}`",
-        f"- Total runs: {total_runs}",
-        f"- Summaries collected: {summaries_collected}",
-        f"- Summaries auto-generated by collect: {generated_summaries}",
-        f"- Runs missing summary.json: {missing_summaries}",
-        "",
-        "## State Counts",
-        "",
-    ]
-
-    if state_counts:
-        for state, count in sorted(state_counts.items()):
-            lines.append(f"- `{state}`: {count}")
-    else:
-        lines.append("- No manifest states found.")
-
-    lines.extend(["", "## Analysis Readiness", ""])
-    if readiness_counts:
-        for status, count in sorted(readiness_counts.items()):
-            lines.append(f"- `{status}`: {count}")
-    else:
-        lines.append("- No readiness diagnostics were available.")
-
-    if readiness_issues:
-        lines.extend(["", "### Runs Requiring Attention", ""])
-        for issue in readiness_issues:
-            missing = issue.get("missing_required_artifacts", [])
-            missing_text = ", ".join(missing) if missing else "none"
-            warnings_text = "; ".join(issue.get("warnings", [])) or "not ready"
-            lines.append(
-                f"- `{issue.get('run_id', '')}`: "
-                f"{issue.get('analysis_status', 'unknown')} "
-                f"(missing: {missing_text}) - {warnings_text}"
-            )
-
-    lines.extend(["", "## Numeric Metrics", ""])
-    if numeric_stats:
-        lines.append("| metric | count | min | max | mean |")
-        lines.append("| --- | ---: | ---: | ---: | ---: |")
-        for metric, stats in sorted(numeric_stats.items()):
-            lines.append(
-                "| "
-                f"{metric} | {int(stats['count'])} | {_format_float(stats['min'])}"
-                f" | {_format_float(stats['max'])} | {_format_float(stats['mean'])} |"
-            )
-    else:
-        lines.append("No numeric scalar metrics were found across collected summaries.")
-
-    lines.extend(["", "## Figures", ""])
-    if figures:
-        for fig in figures:
-            caption = f" - {fig['caption']}" if fig["caption"] else ""
-            lines.append(f"- `{fig['run_id']}`: `{fig['path']}`{caption}")
-    else:
-        lines.append("No figure artifacts were indexed.")
-
-    if warnings:
-        lines.extend(["", "## Warnings", ""])
-        for warning in warnings:
-            lines.append(f"- {warning}")
-
-    report_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
 def _ordered_columns(rows: list[dict[str, Any]]) -> list[str]:
@@ -1177,7 +993,7 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         json.dump({"figures": figure_rows}, f, indent=2)
         f.write("\n")
 
-    _write_survey_report(
+    write_survey_report(
         report_path,
         survey_dir=survey_dir,
         total_runs=len(run_dirs),
