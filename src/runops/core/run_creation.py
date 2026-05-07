@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import shlex
 import shutil
-from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,10 +12,10 @@ from uuid import uuid4
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.registry import AdapterImportError, load_from_config
+from runops.core import _run_creation_manifest as run_creation_manifest
+from runops.core import _run_creation_merge as run_creation_merge
 from runops.core.case import (
     CaseData,
-    ClassificationData,
-    JobData,
     load_case,
     resolve_case,
 )
@@ -27,7 +26,7 @@ from runops.core.exceptions import (
     ProjectConfigError,
     SimctlError,
 )
-from runops.core.manifest import ManifestData, write_manifest
+from runops.core.manifest import write_manifest
 from runops.core.models import run_creation as run_creation_models
 from runops.core.project import ProjectConfig, find_project_root, load_project
 from runops.core.run import RunInfo, create_run_directory, next_run_id
@@ -45,6 +44,16 @@ _RUN_ID_ALLOCATION_ATTEMPTS = 10_000
 CreatedRunResult = run_creation_models.CreatedRunResult
 RegenerateResult = run_creation_models.RegenerateResult
 SurveyExpansionPlan = run_creation_models.SurveyExpansionPlan
+
+_build_job_config = run_creation_manifest.build_job_config
+_build_manifest = run_creation_manifest.build_manifest
+_build_manifest_job = run_creation_manifest.build_manifest_job
+_get_simulator_config = run_creation_manifest.get_simulator_config
+_is_rsc_site = run_creation_manifest.is_rsc_site
+_merge_classification = run_creation_merge.merge_classification
+_merge_job = run_creation_merge.merge_job
+_merge_site_modules = run_creation_manifest.merge_site_modules
+_rewrite_staging_paths = run_creation_manifest.rewrite_staging_paths
 
 
 class _RunIdCollisionError(Exception):
@@ -113,226 +122,6 @@ def validate_case_references(project: ProjectConfig, case_data: CaseData) -> Non
         )
 
 
-def _get_simulator_config(
-    project: ProjectConfig,
-    simulator_name: str,
-) -> dict[str, Any]:
-    return dict(project.simulators.get(simulator_name, {}))
-
-
-def _is_rsc_site(site: SiteProfile | None) -> bool:
-    """Return True when the active site emits ``--rsc`` directives."""
-    return site is not None and site.resource_style == "rsc"
-
-
-def _build_job_config(
-    job: JobData,
-    site: SiteProfile | None,
-) -> dict[str, Any]:
-    """Translate JobData into the dict consumed by ``_render_script``.
-
-    The renderer reads ``ntasks`` / ``threads_per_process`` / ``cores_per_thread``
-    in RSC mode and ``nodes`` / ``ntasks`` in standard mode.  This helper
-    bridges the user-facing ``processes`` / ``threads`` / ``cores`` field names
-    in ``case.toml`` to those internal names based on the active site profile.
-    """
-    config: dict[str, Any] = {
-        "partition": job.partition,
-        "walltime": job.walltime,
-    }
-    if job.qos:
-        config["qos"] = job.qos
-    if _is_rsc_site(site):
-        config["ntasks"] = job.processes
-        config["threads_per_process"] = job.threads
-        config["cores_per_thread"] = job.cores
-        if job.memory:
-            config["memory"] = job.memory
-        if job.gpus:
-            config["gpus"] = job.gpus
-    else:
-        config["nodes"] = job.nodes
-        config["ntasks"] = job.ntasks
-    if job.modules:
-        config["modules"] = list(job.modules)
-    if job.pre_commands:
-        config["pre_commands"] = list(job.pre_commands)
-    if job.post_commands:
-        config["post_commands"] = list(job.post_commands)
-    return config
-
-
-def _build_manifest_job(
-    job: JobData,
-    site: SiteProfile | None,
-) -> dict[str, Any]:
-    """Build the [job] section recorded in ``manifest.toml``.
-
-    The manifest snapshot uses the user-facing field names from ``case.toml``
-    (``processes`` / ``threads`` / ``cores`` for RSC sites, ``nodes`` /
-    ``ntasks`` for standard Slurm sites) so that humans can read it directly.
-    """
-    result: dict[str, Any] = {
-        "scheduler": "slurm",
-        "job_id": "",
-        "partition": job.partition,
-        "walltime": job.walltime,
-        "submitted_at": "",
-    }
-    if _is_rsc_site(site):
-        result["processes"] = job.processes
-        result["threads"] = job.threads
-        result["cores"] = job.cores
-        if job.memory:
-            result["memory"] = job.memory
-        if job.gpus:
-            result["gpus"] = job.gpus
-    else:
-        result["nodes"] = job.nodes
-        result["ntasks"] = job.ntasks
-    return result
-
-
-_CLASSIFICATION_OVERRIDE_FIELDS = frozenset({"model", "submodel", "tags"})
-_JOB_OVERRIDE_FIELDS = frozenset(
-    {
-        "partition",
-        "nodes",
-        "ntasks",
-        "walltime",
-        "processes",
-        "threads",
-        "cores",
-        "memory",
-        "gpus",
-        "qos",
-        "modules",
-        "pre_commands",
-        "post_commands",
-    }
-)
-_JOB_LIST_OVERRIDE_FIELDS = frozenset({"modules", "pre_commands", "post_commands"})
-
-
-def _is_empty_scalar_override(value: Any) -> bool:
-    return isinstance(value, str) and value == ""
-
-
-def _present_override_fields(
-    raw_section: object,
-    allowed_fields: frozenset[str],
-) -> set[str]:
-    if not isinstance(raw_section, dict):
-        return set()
-    return {
-        str(key)
-        for key in raw_section
-        if isinstance(key, str) and key in allowed_fields
-    }
-
-
-def _merge_classification(
-    base: ClassificationData,
-    override: ClassificationData,
-    raw_override: object,
-) -> ClassificationData:
-    """Apply survey classification keys as a partial overlay."""
-    fields = _present_override_fields(raw_override, _CLASSIFICATION_OVERRIDE_FIELDS)
-    updates: dict[str, Any] = {}
-    if "model" in fields and not _is_empty_scalar_override(override.model):
-        updates["model"] = override.model
-    if "submodel" in fields and not _is_empty_scalar_override(override.submodel):
-        updates["submodel"] = override.submodel
-    if "tags" in fields:
-        updates["tags"] = list(override.tags)
-    if not updates:
-        return base
-    return replace(base, **updates)
-
-
-def _merge_job(
-    base: JobData,
-    override: JobData,
-    raw_override: object,
-) -> JobData:
-    """Apply survey job keys as a partial overlay.
-
-    ``load_survey`` fills omitted job keys with defaults, so raw TOML keys are
-    the only reliable way to distinguish absent values from explicit empty or
-    zero values. List fields replace the base list when the key is present.
-    """
-    fields = _present_override_fields(raw_override, _JOB_OVERRIDE_FIELDS)
-    updates: dict[str, Any] = {}
-    for field in fields:
-        value = getattr(override, field)
-        if field in _JOB_LIST_OVERRIDE_FIELDS and isinstance(value, list):
-            value = list(value)
-        elif _is_empty_scalar_override(value):
-            continue
-        updates[field] = value
-    if not updates:
-        return base
-    return replace(base, **updates)
-
-
-def _build_manifest(
-    run_info: RunInfo,
-    case_data: CaseData,
-    project: ProjectConfig,
-    runtime_info: dict[str, Any],
-    adapter: SimulatorAdapter,
-    site: SiteProfile | None,
-    *,
-    survey_id: str = "",
-    variation_keys: list[str] | None = None,
-) -> ManifestData:
-    sim_config = _get_simulator_config(project, case_data.simulator)
-    provenance = adapter.collect_provenance(runtime_info)
-
-    return ManifestData(
-        run={
-            "id": run_info.run_id,
-            "display_name": run_info.display_name,
-            "status": "created",
-            "created_at": run_info.created_at,
-        },
-        path={
-            "run_dir": str(run_info.run_dir),
-        },
-        origin={
-            "case": case_data.name,
-            "survey": survey_id,
-            "parent_run": "",
-        },
-        classification={
-            "model": case_data.classification.model,
-            "submodel": case_data.classification.submodel,
-            "tags": list(case_data.classification.tags),
-        },
-        simulator={
-            "name": case_data.simulator,
-            "adapter": sim_config.get("adapter", ""),
-            "resolver_mode": sim_config.get("resolver_mode", "package"),
-        },
-        launcher={
-            "name": case_data.launcher,
-        },
-        simulator_source=provenance,
-        job=_build_manifest_job(case_data.job, site),
-        variation={
-            "changed_keys": list(variation_keys) if variation_keys else [],
-        },
-        params_snapshot=dict(run_info.params),
-        files={
-            "input_dir": "input",
-            "submit_dir": "submit",
-            "work_dir": "work",
-            "analysis_dir": "analysis",
-            "status_dir": "status",
-        },
-    )
-
-
 def _copy_case_files(case_dir: Path, input_dir: Path) -> list[str]:
     src_dir = case_dir / "input"
     if not src_dir.is_dir():
@@ -348,44 +137,6 @@ def _copy_case_files(case_dir: Path, input_dir: Path) -> list[str]:
         shutil.copy2(src, dest)
         created.append(str(Path("input") / rel))
     return created
-
-
-def _merge_site_modules(
-    site: SiteProfile,
-    simulator_name: str,
-    sim_config: dict[str, Any],
-) -> SiteProfile:
-    sim_extra_modules = list(sim_config.get("modules", []))
-    if not sim_extra_modules:
-        return site
-
-    merged_sim_modules = dict(site.simulator_modules)
-    existing = list(merged_sim_modules.get(simulator_name, []))
-    for module in sim_extra_modules:
-        if module not in existing:
-            existing.append(module)
-    merged_sim_modules[simulator_name] = existing
-    return SiteProfile(
-        name=site.name,
-        resource_style=site.resource_style,
-        modules=list(site.modules),
-        simulator_modules=merged_sim_modules,
-        stdout_format=site.stdout_format,
-        stderr_format=site.stderr_format,
-        extra_sbatch=list(site.extra_sbatch),
-        env=dict(site.env),
-        setup_commands=list(site.setup_commands),
-    )
-
-
-def _rewrite_staging_paths(
-    values: list[str],
-    staging_run_dir: Path,
-    final_run_dir: Path,
-) -> list[str]:
-    staging = str(staging_run_dir)
-    final = str(final_run_dir)
-    return [value.replace(staging, final) for value in values]
 
 
 def _next_available_run_target(
