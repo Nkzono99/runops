@@ -18,14 +18,10 @@ try:
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
 
-from runops.core._knowledge_paths import (
-    CANDIDATE_FACTS_DIR,
-    FACTS_FILE,
-    KNOWLEDGE_DIR,
-    RUNOPS_DIR,
-)
 from runops.core.event_log import emit_artifact_event
 from runops.core.models import knowledge as knowledge_records
+
+from .paths import CANDIDATE_FACTS_DIR, FACTS_FILE, KNOWLEDGE_DIR, RUNOPS_DIR
 
 Fact = knowledge_records.Fact
 

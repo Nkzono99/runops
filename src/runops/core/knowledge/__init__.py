@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
-from runops.core import _knowledge_facts as knowledge_facts
-from runops.core import _knowledge_insights as knowledge_insights
-from runops.core import _knowledge_paths as knowledge_paths
 from runops.core.models import knowledge as knowledge_records
+
+from . import facts as knowledge_facts
+from . import insights as knowledge_insights
+from . import paths as knowledge_paths
 
 Insight = knowledge_records.Insight
 Fact = knowledge_records.Fact

@@ -13,13 +13,14 @@ from pathlib import Path
 from typing import Any
 
 from runops.adapters.registry import get as get_adapter
-from runops.core import _analysis_collection as analysis_collection
-from runops.core import _analysis_plotting as analysis_plotting
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.models import analysis as analysis_models
 from runops.core.project import find_project_root
+
+from . import collection as analysis_collection
+from . import plotting as analysis_plotting
 
 ResolvedSurveyPlotRecipe = analysis_models.ResolvedSurveyPlotRecipe
 RunSummaryResult = analysis_models.RunSummaryResult

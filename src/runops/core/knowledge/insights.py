@@ -6,9 +6,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from runops.core._knowledge_paths import INSIGHTS_DIR, RUNOPS_DIR
 from runops.core.event_log import emit_artifact_event
 from runops.core.models import knowledge as knowledge_records
+
+from .paths import INSIGHTS_DIR, RUNOPS_DIR
 
 Insight = knowledge_records.Insight
 

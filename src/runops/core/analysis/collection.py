@@ -9,12 +9,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from runops.core._analysis_report import write_survey_report
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.models import analysis as analysis_models
 from runops.core.readiness import evaluate_run_readiness
+
+from .report import write_survey_report
 
 SurveyCollectionResult = analysis_models.SurveyCollectionResult
 SurveyTableResult = analysis_models.SurveyTableResult

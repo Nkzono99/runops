@@ -6,9 +6,10 @@ import math
 from pathlib import Path
 from typing import Any
 
-from runops.core._analysis_collection import load_survey_plot_table
 from runops.core.exceptions import SimctlError
 from runops.core.models import analysis as analysis_models
+
+from .collection import load_survey_plot_table
 
 SurveyPlotDataResult = analysis_models.SurveyPlotDataResult
 SurveyPlotResult = analysis_models.SurveyPlotResult

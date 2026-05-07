@@ -8,14 +8,15 @@ from pathlib import Path
 from typing import Any
 
 from runops import __version__
-from runops.core import _publication_files as publication_files
-from runops.core import _publication_sources as publication_sources
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import ProvenanceError, SimctlError
 from runops.core.manifest import read_manifest
 from runops.core.models import publication as publication_models
 from runops.core.project import find_project_root, load_project
 from runops.core.provenance import collect_git_provenance
+
+from . import files as publication_files
+from . import sources as publication_sources
 
 _EXPORT_MODES = publication_files.EXPORT_MODES
 _PAPER_STATUSES = publication_sources.PAPER_STATUSES
