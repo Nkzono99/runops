@@ -356,7 +356,7 @@ def test_sync_source_git_clone(tmp_path: Path) -> None:
         mount="refs/knowledge/git-kb",
     )
 
-    with patch("runops.core.knowledge_source.subprocess.run") as mock_run:
+    with patch("runops.core.knowledge_source.sync.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         status = sync_source(project, source)
 
@@ -382,7 +382,7 @@ def test_sync_source_git_pull(tmp_path: Path) -> None:
         mount="refs/knowledge/git-kb",
     )
 
-    with patch("runops.core.knowledge_source.subprocess.run") as mock_run:
+    with patch("runops.core.knowledge_source.sync.subprocess.run") as mock_run:
         mock_run.return_value.returncode = 0
         status = sync_source(project, source)
 

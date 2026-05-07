@@ -11,12 +11,12 @@ else:
     import tomli as tomllib
 
 from runops.core.exceptions import KnowledgeSourceError
-from runops.core.knowledge_source import (
-    _ENTRYPOINTS_FILE,
-    _parse_import_directives,
-    _profile_markdown_path,
-    _resolve_import_target,
+from runops.core.knowledge_source.entrypoints import (
+    ENTRYPOINTS_FILE,
     load_entrypoints,
+    parse_import_directives,
+    profile_markdown_path,
+    resolve_import_target,
 )
 
 
@@ -29,7 +29,7 @@ def _validate_import_paths(
     issues: list[str] = []
     for rel_path in import_paths:
         try:
-            target = _resolve_import_target(source_path, rel_path)
+            target = resolve_import_target(source_path, rel_path)
         except KnowledgeSourceError as exc:
             issues.append(f"{context}: {exc}")
             continue
@@ -137,7 +137,7 @@ def validate_source_structure(source_path: Path) -> list[str]:
         issues.extend(
             _validate_import_paths(
                 source_path,
-                _parse_import_directives(content),
+                parse_import_directives(content),
                 context=profile_path.relative_to(source_path).as_posix(),
             )
         )
@@ -152,20 +152,20 @@ def validate_source_structure(source_path: Path) -> list[str]:
                 _validate_import_paths(
                     source_path,
                     list(manifest.imports),
-                    context=_ENTRYPOINTS_FILE,
+                    context=ENTRYPOINTS_FILE,
                 )
             )
             for profile_name, imports in manifest.profile_imports.items():
-                if not _profile_markdown_path(source_path, profile_name).is_file():
+                if not profile_markdown_path(source_path, profile_name).is_file():
                     issues.append(
-                        f"{_ENTRYPOINTS_FILE}: profile '{profile_name}' has no "
+                        f"{ENTRYPOINTS_FILE}: profile '{profile_name}' has no "
                         "matching profiles/<name>.md"
                     )
                 issues.extend(
                     _validate_import_paths(
                         source_path,
                         list(imports),
-                        context=f"{_ENTRYPOINTS_FILE}: profiles.{profile_name}",
+                        context=f"{ENTRYPOINTS_FILE}: profiles.{profile_name}",
                     )
                 )
 

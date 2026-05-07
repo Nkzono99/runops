@@ -5,13 +5,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from runops.core.exceptions import KnowledgeSourceError
-from runops.core.knowledge_source import (
+from runops.core.knowledge_source.entrypoints import (
+    dedupe_strings,
+    load_entrypoints,
+    resolve_import_target,
+)
+from runops.core.knowledge_source.paths import mount_path as resolve_mount_path
+from runops.core.models.knowledge_source import (
     KnowledgeConfig,
     KnowledgeSource,
-    _dedupe_strings,
-    _mount_path,
-    _resolve_import_target,
-    load_entrypoints,
 )
 
 
@@ -31,7 +33,7 @@ def _resolve_profile_imports(
     elif not imports and (source_path / "CLAUDE.md").is_file():
         imports.append("CLAUDE.md")
 
-    return _dedupe_strings(imports)
+    return dedupe_strings(imports)
 
 
 def render_imports(
@@ -55,7 +57,7 @@ def render_imports(
         if source.kind != "profiles":
             continue
 
-        mount_path = _mount_path(project_root, source)
+        mount_path = resolve_mount_path(project_root, source)
         if mount_path is None:
             lines.append(f"<!-- source {source.name}: mount not configured -->")
             continue
@@ -75,7 +77,7 @@ def render_imports(
 
         for rel_path in source_imports:
             try:
-                resolved = _resolve_import_target(mount_path, rel_path)
+                resolved = resolve_import_target(mount_path, rel_path)
             except KnowledgeSourceError as exc:
                 lines.append(f"<!-- source {source.name}: {exc} -->")
                 continue
