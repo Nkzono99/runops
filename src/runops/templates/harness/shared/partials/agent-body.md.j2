@@ -91,7 +91,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 ## 知見の保存と実験ノート
 
-実験で得た情報には **2 種類** あり、書き先を分ける:
+実験で得た情報は、性質ごとに書き先を分ける:
 
 | 種類 | 性質 | 書き先 | スキル |
 |---|---|---|---|
@@ -132,6 +132,9 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 設計フェーズの skill (`{{ skill_prefix }}setup-campaign`, `{{ skill_prefix }}new-case`,
 `{{ skill_prefix }}create-run`, `{{ skill_prefix }}survey-design`,
 `{{ skill_prefix }}run-all`) は **完了時に `{{ skill_prefix }}note` で経緯を残してから次に進む**。
+その作業によって active question、current decision、paused/killed、次の行動が
+変わった場合は、続けて `{{ skill_prefix }}research-agenda` で `research/agenda.md`
+も更新する。
 
 ### `{{ skill_prefix }}learn` は `{{ skill_prefix }}note` を素材として使う
 
