@@ -15,7 +15,6 @@ from pathlib import Path
 import pytest
 
 from runops.adapters.generic import GenericAdapter
-from runops.core import run_creation as run_creation_module
 from runops.core.case import CaseData, ClassificationData, JobData
 from runops.core.project import ProjectConfig
 from runops.core.run_creation import (
@@ -26,6 +25,7 @@ from runops.core.run_creation import (
     create_prepared_run,
     plan_survey_runs,
 )
+from runops.core.run_creation import workflow as run_creation_module
 from runops.core.site import SiteProfile
 from runops.jobgen.generator import generate_job_script
 from runops.launchers.srun import SrunLauncher
