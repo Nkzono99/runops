@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from runops.core.demo_import import discover_codex_session_log, import_codex_session_log
+from runops.core.demo import discover_codex_session_log, import_codex_session_log
 from runops.core.exceptions import SessionImportError
 
 

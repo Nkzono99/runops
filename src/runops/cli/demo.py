@@ -6,11 +6,11 @@ from pathlib import Path
 
 import typer
 
-from runops.core.demo_import import (
+from runops.core.demo import (
+    build_demo_replay_ui,
     discover_codex_session_log,
     import_codex_session_log,
 )
-from runops.core.demo_replay import build_demo_replay_ui
 from runops.core.exceptions import DemoReplayError, SessionImportError
 
 demo_app = typer.Typer(

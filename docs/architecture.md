@@ -65,7 +65,7 @@ launchers/
  +--> launchers/base  (抽象基底 + ファクトリ)
 ```
 
-重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions/` と `core/run_creation.py` が orchestration 層として `adapters/`、`launchers/`、`core/site.py`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
+重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions/` と `core/run_creation/` が orchestration 層として `adapters/`、`launchers/`、`core/site.py`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
 
 ---
 
@@ -160,7 +160,7 @@ expand_survey({"seed": [1, 2]}, [{"nx": [32, 64], "ny": [32, 64]}])
 1 回のシミュレーション実行を表す最小単位です。
 
 - **定義ファイル**: `runs/.../Rxxxx/manifest.toml`
-- **データクラス**: `RunInfo` (`core/run.py`)
+- **データクラス**: `RunInfo` (`core/run/`)
 - **ディレクトリ構造**: `input/`, `submit/`, `work/`, `analysis/`, `status/`
 
 ```python

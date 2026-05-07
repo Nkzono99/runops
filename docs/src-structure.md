@@ -46,7 +46,7 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 たとえば `case.toml` に `simulator = "emses"`、`launcher = "camphor"` と書かれているとき、
 実行時の解決は次の順で進みます。
 
-- `core/run_creation.py` が project、case、必要なら survey override を読みます。
+- `core/run_creation/` が project、case、必要なら survey override を読みます。
 - simulator entry は `project.simulators` から引かれます。
 - `load_adapter_for_simulator()` がその entry から adapter 名を取り出します。
 - `AdapterRegistry.load_from_config()` は `runops.adapters.contrib.<adapter>` を先に、次に `runops.adapters.<adapter>` を import しようとします。
@@ -65,7 +65,7 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 - `src/runops/cli/main.py`: 最上位のコマンド登録。
 - `src/runops/core/actions/`: CLI と agent が使う action 実行 facade と責務別実装。
 - `src/runops/core/actions/specs.py`: agent-facing action metadata と registry。
-- `src/runops/core/run_creation.py`: case -> adapter -> launcher -> site -> job.sh をつなぐ実行時の中心。
+- `src/runops/core/run_creation/`: case -> adapter -> launcher -> site -> job.sh をつなぐ実行時の中心。
 - `src/runops/core/site.py`: runtime の site 解決。site.toml、legacy launcher fallback、STANDARD_SITE を扱う。
 - `src/runops/adapters/registry.py`: simulator adapter の registry と import-by-name 解決。
 - `src/runops/launchers/base.py`: Launcher.from_config() による launcher factory と profile 読み込み。

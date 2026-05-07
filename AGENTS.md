@@ -96,15 +96,26 @@ runops/
         project.py
         case.py
         survey.py
-        run.py
+        run/             # RunInfo・run_id 採番・run directory 作成
+          __init__.py
         manifest.py
         state.py
         provenance.py
         discovery.py
-        knowledge_source.py
-        knowledge_source_render.py
-        knowledge_source_validation.py
-        publication.py
+        run_creation/    # case/survey から run を生成する orchestration
+          __init__.py
+          manifest.py
+          merge.py
+        knowledge_source/  # 外部知識ソース管理
+          __init__.py
+          config.py
+          render.py
+          validation.py
+        demo/            # session import / replay UI
+          __init__.py
+          importer.py
+          replay.py
+        publication/
         ...
       adapters/         # Simulator Adapter
         __init__.py

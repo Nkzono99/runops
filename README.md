@@ -418,7 +418,8 @@ runops/
         project.py         # Project 読込・検証
         case.py            # Case 読込・展開
         survey.py          # Survey 展開・parameter 直積
-        run.py             # Run 生成・run_id 採番
+        run/               # RunInfo・run_id 採番・run directory 作成
+        run_creation/      # case / survey から run を生成する orchestration
         manifest.py        # manifest.toml 読書き
         state.py           # 状態遷移管理
         provenance.py      # コード provenance 取得
@@ -427,8 +428,9 @@ runops/
         validation.py      # パラメータバリデーション
         campaign.py        # campaign.toml 読込
         environment.py     # 実行環境検出・記述
-        knowledge.py       # 知識層 (insights, facts)
-        knowledge_source.py  # 外部知識ソース管理
+        knowledge/         # 知識層 (insights, facts)
+        knowledge_source/  # 外部知識ソース管理
+        demo/              # session import / replay UI
       adapters/            # Simulator Adapter
         base.py            # SimulatorAdapter 抽象基底クラス
         registry.py        # Adapter 登録・lookup

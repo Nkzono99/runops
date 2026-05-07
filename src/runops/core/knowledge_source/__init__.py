@@ -25,9 +25,10 @@ try:
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
 
-from runops.core import _knowledge_source_config as knowledge_source_config
 from runops.core.exceptions import KnowledgeSourceError
 from runops.core.models import knowledge_source as knowledge_models
+
+from . import config as knowledge_source_config
 
 logger = logging.getLogger(__name__)
 
@@ -579,7 +580,7 @@ def import_external_facts(
 
 def validate_source_structure(source_path: Path) -> list[str]:
     """Validate that a knowledge source has the expected structure."""
-    from runops.core.knowledge_source_validation import (
+    from runops.core.knowledge_source.validation import (
         validate_source_structure as _validate_source_structure,
     )
 
@@ -588,7 +589,7 @@ def validate_source_structure(source_path: Path) -> list[str]:
 
 def discover_profiles(source_path: Path) -> list[str]:
     """List available profile names from a knowledge source."""
-    from runops.core.knowledge_source_validation import (
+    from runops.core.knowledge_source.validation import (
         discover_profiles as _discover_profiles,
     )
 
@@ -605,7 +606,7 @@ def render_imports(
     extra_imports: list[str] | None = None,
 ) -> Path:
     """Generate imports.md from enabled profiles."""
-    from runops.core.knowledge_source_render import (
+    from runops.core.knowledge_source.render import (
         render_imports as _render_imports,
     )
 

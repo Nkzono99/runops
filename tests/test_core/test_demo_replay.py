@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from runops.core.demo_replay import build_demo_replay_ui, load_demo_replay_bundle
+from runops.core.demo import build_demo_replay_ui, load_demo_replay_bundle
 from runops.core.exceptions import DemoReplayError
 
 

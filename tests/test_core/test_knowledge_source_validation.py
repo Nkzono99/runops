@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from runops.core.knowledge_source_validation import (
+from runops.core.knowledge_source.validation import (
     _validate_analysis_file,
     _validate_import_paths,
     validate_source_structure,

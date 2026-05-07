@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from runops.core.knowledge_source import KnowledgeConfig, KnowledgeSource
-from runops.core.knowledge_source_render import (
+from runops.core.knowledge_source.render import (
     _resolve_profile_imports,
     render_imports,
 )

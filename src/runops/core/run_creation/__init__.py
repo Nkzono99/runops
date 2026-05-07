@@ -12,8 +12,6 @@ from uuid import uuid4
 from runops.adapters import get as get_adapter
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.registry import AdapterImportError, load_from_config
-from runops.core import _run_creation_manifest as run_creation_manifest
-from runops.core import _run_creation_merge as run_creation_merge
 from runops.core.case import (
     CaseData,
     load_case,
@@ -38,6 +36,9 @@ from runops.core.survey import (
 )
 from runops.jobgen.generator import generate_job_script
 from runops.launchers.base import Launcher, load_launchers
+
+from . import manifest as run_creation_manifest
+from . import merge as run_creation_merge
 
 _RUN_ID_ALLOCATION_ATTEMPTS = 10_000
 
