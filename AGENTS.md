@@ -95,13 +95,16 @@ runops/
       core/             # ドメインロジック
         project.py
         case.py
-        survey.py
+        survey/          # Survey 展開・parameter 直積
         run/             # RunInfo・run_id 採番・run directory 作成
           __init__.py
         manifest.py
         state.py
         provenance.py
         discovery.py
+        site/            # HPC site profile 解決
+        environment/     # 実行環境検出・記述
+        validation/      # パラメータバリデーション
         run_creation/    # case/survey から run を生成する orchestration
           __init__.py
           manifest.py

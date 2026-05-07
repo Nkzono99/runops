@@ -7,14 +7,14 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 
 - `cli/` は人間や agent が直接叩く Typer ベースの入り口です。
 - `core/` は domain model だけでなく、project 設定から adapter / launcher / site / Slurm をつなぐ orchestration module も持っています。
-- `adapters/`、`launchers/`、`core/site.py` はそれぞれ別の可変軸です。
+- `adapters/`、`launchers/`、`core/site/` はそれぞれ別の可変軸です。
   simulator 固有差分、MPI 起動方式、cluster/site 固有差分を分離しています。
 
 いまの実装で特に混乱しやすいのは `site` まわりです。
 
 - `src/runops/sites/` は project の runtime site 設定そのものではありません。
 - ここは `runo init` が一度だけ読む bundled preset 集です。
-- 実行時に使われる site の本体は project root の `site.toml` で、解決ロジックは `src/runops/core/site.py` にあります。
+- 実行時に使われる site の本体は project root の `site.toml` で、解決ロジックは `src/runops/core/site/` にあります。
 
 ## top-level directory 一覧
 
@@ -66,7 +66,7 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 - `src/runops/core/actions/`: CLI と agent が使う action 実行 facade と責務別実装。
 - `src/runops/core/actions/specs.py`: agent-facing action metadata と registry。
 - `src/runops/core/run_creation/`: case -> adapter -> launcher -> site -> job.sh をつなぐ実行時の中心。
-- `src/runops/core/site.py`: runtime の site 解決。site.toml、legacy launcher fallback、STANDARD_SITE を扱う。
+- `src/runops/core/site/`: runtime の site 解決。site.toml、legacy launcher fallback、STANDARD_SITE を扱う。
 - `src/runops/adapters/registry.py`: simulator adapter の registry と import-by-name 解決。
 - `src/runops/launchers/base.py`: Launcher.from_config() による launcher factory と profile 読み込み。
 - `src/runops/jobgen/generator.py`: site 固有の module / directive を含む最終的な Slurm job script 生成。

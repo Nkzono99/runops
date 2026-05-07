@@ -417,7 +417,7 @@ runops/
       core/                # ドメインロジック
         project.py         # Project 読込・検証
         case.py            # Case 読込・展開
-        survey.py          # Survey 展開・parameter 直積
+        survey/            # Survey 展開・parameter 直積
         run/               # RunInfo・run_id 採番・run directory 作成
         run_creation/      # case / survey から run を生成する orchestration
         manifest.py        # manifest.toml 読書き
@@ -425,9 +425,10 @@ runops/
         provenance.py      # コード provenance 取得
         discovery.py       # runs/ 再帰探索・run_id 一意性検証
         exceptions.py      # ドメイン例外
-        validation.py      # パラメータバリデーション
+        site/              # HPC site profile 解決
+        validation/        # パラメータバリデーション
         campaign.py        # campaign.toml 読込
-        environment.py     # 実行環境検出・記述
+        environment/       # 実行環境検出・記述
         knowledge/         # 知識層 (insights, facts)
         knowledge_source/  # 外部知識ソース管理
         demo/              # session import / replay UI

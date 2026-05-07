@@ -65,7 +65,7 @@ launchers/
  +--> launchers/base  (抽象基底 + ファクトリ)
 ```
 
-重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions/` と `core/run_creation/` が orchestration 層として `adapters/`、`launchers/`、`core/site.py`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
+重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions/` と `core/run_creation/` が orchestration 層として `adapters/`、`launchers/`、`core/site/`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
 
 ---
 
@@ -121,7 +121,7 @@ Case 自体は直接実行しません。create コマンドまたは survey の
 パラメータサーベイの親単位です。
 
 - **定義ファイル**: `runs/.../survey.toml`
-- **データクラス**: `SurveyData` (`core/survey.py`)
+- **データクラス**: `SurveyData` (`core/survey/`)
 - **主な責務**: パラメータ軸の定義、直積展開、連動展開、display_name のテンプレート生成
 
 ```python
