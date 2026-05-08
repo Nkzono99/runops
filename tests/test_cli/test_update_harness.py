@@ -13,6 +13,7 @@ import typer
 from typer.testing import CliRunner
 
 import runops.cli.update_harness as update_harness_module
+import runops.cli.update_harness_tools as update_harness_tools
 from runops.cli.main import app
 from runops.harness.builder import (
     GITIGNORE_PATH,
@@ -105,7 +106,7 @@ class TestUpdateHarnessBasic:
                 )
             raise AssertionError(f"unexpected command: {cmd}")
 
-        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+        monkeypatch.setattr(update_harness_tools.subprocess, "run", fake_run)
 
         status = update_harness_module._pull_tools_repo(tmp_path)
 
@@ -134,7 +135,7 @@ class TestUpdateHarnessBasic:
                 )
             raise AssertionError(f"unexpected command: {cmd}")
 
-        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+        monkeypatch.setattr(update_harness_tools.subprocess, "run", fake_run)
 
         status = update_harness_module._pull_tools_repo(tmp_path)
 
@@ -175,7 +176,7 @@ class TestUpdateHarnessBasic:
                 return subprocess.CompletedProcess(cmd, 0, stdout="2\n", stderr="")
             raise AssertionError(f"unexpected command: {cmd}")
 
-        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+        monkeypatch.setattr(update_harness_tools.subprocess, "run", fake_run)
 
         status = update_harness_module._pull_tools_repo(tmp_path)
 
@@ -223,7 +224,7 @@ class TestUpdateHarnessBasic:
                 )
             raise AssertionError(f"unexpected command: {cmd}")
 
-        monkeypatch.setattr(update_harness_module.subprocess, "run", fake_run)
+        monkeypatch.setattr(update_harness_tools.subprocess, "run", fake_run)
 
         assert update_harness_module._pull_tools_repo(tmp_path) == "already up to date"
 
@@ -648,7 +649,7 @@ class TestUpdateHarnessReexec:
             lambda *_args, **_kwargs: "updated",
         )
         monkeypatch.setattr(
-            "runops.cli.update_harness.subprocess.run",
+            "runops.cli.update_harness_tools.subprocess.run",
             fake_run,
         )
         monkeypatch.setattr(
@@ -712,7 +713,7 @@ class TestUpdateHarnessReexec:
             "runops.cli.update_harness._pull_tools_repo",
             lambda *_args, **_kwargs: "already up to date",
         )
-        monkeypatch.setattr("runops.cli.update_harness.subprocess.run", fake_run)
+        monkeypatch.setattr("runops.cli.update_harness_tools.subprocess.run", fake_run)
         monkeypatch.setattr(
             "runops.cli.update_harness._restart_with_skip_pull",
             lambda: (_ for _ in ()).throw(typer.Exit(code=0)),
@@ -771,7 +772,7 @@ class TestUpdateHarnessReexec:
             "runops.cli.update_harness._pull_tools_repo",
             lambda *_args, **_kwargs: "already up to date",
         )
-        monkeypatch.setattr("runops.cli.update_harness.subprocess.run", fake_run)
+        monkeypatch.setattr("runops.cli.update_harness_tools.subprocess.run", fake_run)
         monkeypatch.setattr(
             "runops.cli.update_harness._restart_with_skip_pull",
             lambda: restarted.append(True),
