@@ -60,3 +60,9 @@ runo analyze export $ARGUMENTS --paper draft-a
 8. paper repo に渡す段階では `runo analyze export <run-or-survey> --paper <paper-id>` で `exports/papers/` に束ねる
 9. 結果の概要と注目すべき傾向を報告する
 10. 知見があれば `{{ skill_prefix }}learn` で保存する
+
+## custom summarize.py が必要な場合
+
+Adapter の summary だけでは足りない metric、2D colormap、slice 図、分布比較用の
+figure metadata が必要な場合は、先に `{{ skill_prefix }}summarize-script` で
+case-local な `cases/<simulator>/<case>/summarize.py` を作る。

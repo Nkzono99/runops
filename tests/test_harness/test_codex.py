@@ -97,6 +97,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".codex/rules/runops.rules" in bundle.files
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
+    assert ".agents/skills/summarize-script/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
     assert ".agents/skills/python-package-refactor/SKILL.md" in bundle.files
     assert (
@@ -114,6 +115,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     agents = bundle.files["AGENTS.md"]
     assert "性質ごとに書き先を分ける" in agents
     assert "$research-agenda" in agents
+    assert "$summarize-script" in agents
     assert "$patch-runops" in agents
     assert "$python-package-refactor" in agents
     assert "active question、current decision、paused/killed" in agents
@@ -140,6 +142,10 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".agents/skills/python-package-refactor/scripts/" in codex_refactor
     assert ".claude/skills/python-package-refactor/scripts/" in claude_refactor
     assert "{{ skills_dir }}" not in codex_refactor
+    codex_summarize = bundle.files[".agents/skills/summarize-script/SKILL.md"]
+    assert "`$note`" in codex_summarize
+    assert "cases/<simulator>/<case>/summarize.py" in codex_summarize
+    assert "{{ skill_prefix }}" not in codex_summarize
 
 
 def test_bundle_does_not_emit_project_local_codex_prompts() -> None:

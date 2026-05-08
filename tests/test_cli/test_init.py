@@ -378,8 +378,10 @@ class TestInit:
         assert (skills_dir / "survey-design" / "SKILL.md").exists()
         assert (skills_dir / "check-status" / "SKILL.md").exists()
         assert (skills_dir / "analyze" / "SKILL.md").exists()
+        assert (skills_dir / "summarize-script" / "SKILL.md").exists()
         assert (skills_dir / "runops-reference" / "SKILL.md").exists()
         assert (codex_skills_dir / "setup-env" / "SKILL.md").exists()
+        assert (codex_skills_dir / "summarize-script" / "SKILL.md").exists()
         assert (codex_skills_dir / "runops-reference" / "SKILL.md").exists()
         setup_content = (skills_dir / "setup-env" / "SKILL.md").read_text(
             encoding="utf-8"
@@ -391,6 +393,11 @@ class TestInit:
         assert "--list-recipes" in analyze_content
         assert "analysis/scratch/" in analyze_content
         assert "analysis/cross_run/" in analyze_content
+        summarize_content = (skills_dir / "summarize-script" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        assert "cases/<simulator>/<case>/summarize.py" in summarize_content
+        assert "figures[].path" in summarize_content
 
     def test_init_skills_with_packages(self, tmp_path: Path) -> None:
         """Setup-env skill includes pip packages when simulators specified."""

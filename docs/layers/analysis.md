@@ -1,7 +1,8 @@
 # Analysis Layer
 
 この文書は runops の解析・可視化レイヤの正本です。
-[docs/toml-reference.md](../toml-reference.md) は個別ファイル形式の参照、`$analyze` skill は実行手順の入口として扱い、
+[docs/toml-reference.md](../toml-reference.md) は個別ファイル形式の参照、`$analyze` skill は実行手順、
+`$summarize-script` skill は project `summarize.py` 作成の入口として扱い、
 置き場所・成果物・運用ルールで迷った場合はこの文書を優先します。
 
 ## 目的
@@ -66,6 +67,8 @@ project script の探索順:
 3. `scripts/summarize.py`
 
 新規 project では `cases/<simulator>/<case>/summarize.py` を推奨します。
+custom metric、2D colormap、slice 図、分布比較用の figure metadata が必要な場合は
+`$summarize-script` skill でこの hook を設計します。
 
 最小例:
 
