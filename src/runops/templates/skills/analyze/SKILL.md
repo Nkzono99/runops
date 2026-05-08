@@ -5,6 +5,9 @@ description: Analyze completed runs and collect survey results. Use after runs c
 
 # 完了した Run の結果を解析・集計する
 
+解析・可視化成果物の置き場所と運用ルールの正本は
+`tools/runops/docs/layers/analysis.md`。
+
 ## 個別 run の要約
 
 ```bash
@@ -53,7 +56,7 @@ runo analyze export $ARGUMENTS --paper draft-a
 4. まず `runo analyze plot <dir> --list-recipes` を試し、使える recipe があれば `--recipe` を優先する
 5. recipe が無い場合は `runo analyze plot <dir> --list-columns` で列を確認し、`--x/--y` を指定して図を生成する
 6. run-local な試行錯誤は `analysis/scratch/` に置き、複数 run / survey をまたぐ比較は `runo analyze new-comparison` で workspace を作る
-7. completed run に `analysis/summary.json` が無い場合、`collect` が自動 summarize することを前提に進めてよい
+7. completed run に `analysis/summary.json` が無い場合、先に対象 run で `runo analyze summarize` を実行する
 8. paper repo に渡す段階では `runo analyze export <run-or-survey> --paper <paper-id>` で `exports/papers/` に束ねる
 9. 結果の概要と注目すべき傾向を報告する
 10. 知見があれば `{{ skill_prefix }}learn` で保存する

@@ -618,7 +618,8 @@ R20260329-0001/
 ## analysis/summary.json
 
 `runo analyze summarize` が生成する run の要約ファイル。Adapter が基本メトリクスを出力し、プロジェクトスクリプトで拡張できる。
-`runo analyze collect` 実行時も、completed run に `analysis/summary.json` が無い場合はこの生成処理が自動で走る。
+解析・可視化レイヤ全体の運用ルールは [Analysis Layer](layers/analysis.md) を正本とする。
+`runo analyze collect` は既存の `analysis/summary.json` を集める。completed run に summary が無い場合は missing summary として記録し、自動では `summarize` しない。
 
 ### 基本構造
 
@@ -705,6 +706,7 @@ def summarize(run_dir: Path, base_summary: dict) -> dict:
 `runo analyze collect <survey_dir>` は survey 配下の run を走査し、`<survey_dir>/summary/` に集計成果物を生成する。
 `runo analyze plot <survey_dir> --x <column> --y <column>` はこの集計結果を使って図を生成する。
 adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも既定の診断図を呼び出せる。
+置き場所と運用ルールは [Analysis Layer](layers/analysis.md) を正本とする。
 
 ### 生成されるファイル
 
@@ -807,6 +809,7 @@ runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group pa
 
 複数 run / survey をまたぐ比較・可視化では、比較単位の成果物を
 `analysis/cross_run/<comparison_id>/` にまとめる。
+置き場所と運用ルールは [Analysis Layer](layers/analysis.md) を正本とする。
 
 ```bash
 runo analyze new-comparison "landau model comparison" --source runs/series_a

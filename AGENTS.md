@@ -299,7 +299,7 @@ completed → archived → purged
 ## 知識層 (Knowledge Layer)
 
 AI エージェントがシミュレーションを自律的に行うための知識管理。
-詳細は `docs/knowledge-layer.md` を参照。
+詳細は `docs/layers/knowledge.md` を参照。
 
 - **シミュレータ知識**: `refs/` + `.runops/knowledge/` (update-refs で更新)
 - **外部共有知識**: `runops.toml` の `[knowledge]` に基づき外部ソースを接続し、必要に応じて `refs/knowledge/` 配下へ同期 (`knowledge source attach/sync` で管理)

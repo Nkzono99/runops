@@ -510,7 +510,9 @@ uv run runo --help
 - [src 構成ガイド](docs/src-structure.md) -- `src/runops/` の層構造と adapter / launcher / site 解決の流れ
 - [アーキテクチャ](docs/architecture.md) -- システム設計とモジュール構成
 - [拡張ガイド](docs/extending.md) -- Adapter / Launcher の追加方法
-- [知識層](docs/knowledge-layer.md) -- AI エージェント向け知識管理アーキテクチャ
+- [解析層](docs/layers/analysis.md) -- 解析・可視化成果物の置き場所と運用ルール
+- [研究判断層](docs/layers/research.md) -- `research/agenda.md` による判断台帳
+- [知識層](docs/layers/knowledge.md) -- AI エージェント向け知識管理アーキテクチャ
 - [TOML リファレンス](docs/toml-reference.md) -- 全設定ファイルのフィールド定義
 - [SPEC.md](SPEC.md) -- 完全な仕様書
 

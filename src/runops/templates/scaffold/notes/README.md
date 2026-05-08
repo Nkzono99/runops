@@ -54,7 +54,7 @@
 Context: campaign=ion-angle; survey=runs/series_a; run=R20260408-0001..0003; model=flat_plate baseline (case: cases/flat_plate/case.toml); purpose=quick check before submitting Series B.
 
 Action: Collected 3 completed summaries and fit tan(alpha) against cs/vflow.
-Evidence: summary=runs/series_a/analysis/summary.csv; script=runs/series_a/analysis/fit_alpha.py.
+Evidence: summary=runs/series_a/summary/survey_summary.csv; script=runs/series_a/summary/fit_alpha.py.
 Observation: `tan α = 0.79 (cs/vflow) + 0.02`, R^2=0.9997; vti-only fit has R^2=0.991.
 Interpretation: cs/vflow is the stronger organizing variable for this subset.
 Caveat/Next: Only 3 points; confirm after Series B completes.
@@ -64,7 +64,7 @@ Caveat/Next: Only 3 points; confirm after Series B completes.
 
 - 1 トピック = 1 ファイル
 - 何度書き直してもよい (lab notebook と違って refined)
-- 図は `notes/reports/figures/` に置くか、`runs/_compare_*/` への相対 link
+- 図は `notes/reports/figures/` に置くか、`analysis/cross_run/<id>/figures/` への相対 link
 - 完成度が高くなってから `runo analyze export --paper <paper-id>` で
   `exports/papers/<paper-id>/` に束ね、paper repo に移送する
 

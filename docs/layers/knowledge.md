@@ -248,7 +248,7 @@ Agent の利用順序:
 制約チェックは runops Adapter の `validate_params()` が担当する。
 cookbook は「何をどう使うか」に集中する。
 
-詳細仕様は [simulator-kb-spec.md](./simulator-kb-spec.md) を参照。
+詳細仕様は [simulator-kb-spec.md](../simulator-kb-spec.md) を参照。
 
 ## 外部知識ソース (Knowledge Sources)
 

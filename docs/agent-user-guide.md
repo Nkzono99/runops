@@ -183,7 +183,9 @@ runo knowledge save <name> -t <type> -s <simulator> -m "<内容>"
 runo knowledge add-fact "<claim>" -t <type> -s <simulator> -c <confidence>
 ```
 
-詳細な仕様は [knowledge-layer.md](knowledge-layer.md) を参照。
+レイヤーごとの正本は [layers/analysis.md](layers/analysis.md),
+[layers/research.md](layers/research.md),
+[layers/knowledge.md](layers/knowledge.md) を参照。
 
 ## Simulator Adapter のガイド
 
