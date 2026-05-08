@@ -520,6 +520,7 @@ uv run runo --help
 - [知識層](docs/layers/knowledge.md) -- AI エージェント向け知識管理アーキテクチャ
 - [ハーネス層](docs/layers/harness.md) -- Agent instructions / skills / rules の責務分離
 - [Upstream 連携層](docs/layers/upstream.md) -- `tools/runops` local patch / feedback / PR の境界
+- [移行ガイド](docs/migrations/README.md) -- runops 更新時の project-state migration 手順
 - [TOML リファレンス](docs/toml-reference.md) -- 全設定ファイルのフィールド定義
 - [SPEC.md](SPEC.md) -- 完全な仕様書
 

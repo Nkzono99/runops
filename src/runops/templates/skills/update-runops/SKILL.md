@@ -35,7 +35,29 @@ runo update-harness
 - `notes/`, `materials/`, `research/` は不足している scaffold だけ補完される
 - `--dry-run` で事前確認、`--force` で全上書き
 
-## 3. シミュレータパッケージを更新
+## 3. migration guide を確認
+
+```bash
+sed -n '1,220p' tools/runops/docs/migrations/README.md
+sed -n '1,260p' tools/runops/docs/migrations/v0.md
+```
+
+runops v0 系では後方互換性を強く維持しない。project 側の状態に影響する変更は
+`docs/migrations/` に migration item として書かれている前提で扱う。
+
+確認すること:
+
+- target runops version に対応する `docs/migrations/v<major>.md` を読む
+- current project に該当する migration item があるか判定する
+- `compatible-generated` は scope を説明してから適用する
+- `manual-edit` / `breaking-manual` / `destructive-human-gate` は
+  `{{ skill_prefix }}migrate-runops` に渡す
+- guide にない破壊的変更や schema rewrite は推測で実行しない。
+  足りない場合は `{{ skill_prefix }}feedback-runops` 候補にする
+
+Migration を適用 / skip / defer した場合は、`notes/YYYY-MM-DD.md` に記録する。
+
+## 4. シミュレータパッケージを更新
 
 ```bash
 runo update
@@ -57,6 +79,7 @@ runo update-harness && runo update
 ```
 
 `update-harness` が内部で `tools/runops` の `git pull` も行うため、手順 1 を個別に実行する必要はない。
+ただし、一括実行後も migration guide の確認は省略しない。
 
 ## 注意
 
@@ -64,4 +87,5 @@ runo update-harness && runo update
 - local patch の正本は `tools/runops` 内の Git branch / commit とする。
   別枠の mutable patch 履歴はデフォルトでは作らない
 - `update-harness` で `.new` ファイルが生成されたら、差分を確認してから元ファイルに反映する
+- `docs/migrations/` に該当 item がある場合は `{{ skill_prefix }}migrate-runops` で扱う
 - 更新後は `runo doctor` で環境が正常か確認するとよい

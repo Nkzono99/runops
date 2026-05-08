@@ -104,8 +104,10 @@ completed → archived → purged
 
 ## 後方互換性
 
-**現在は private リポジトリ**のため、後方互換性は気にしなくてよい。
-コマンド名・引数・ファイル形式は自由に変更可能。エイリアスや互換レイヤーは不要。
+**現在は private / v0 系**のため、後方互換性は強く維持しなくてよい。
+コマンド名・引数・ファイル形式は自由に変更可能。エイリアスや互換レイヤーは原則不要。
+project-state に影響する breaking change は `docs/migrations/v0.md` に移行方法を残す。
+将来 v1 で public 化する際に CLI / project schema / manifest / analysis artifact schema を固める。
 
 ## 主要コマンド (抜粋)
 

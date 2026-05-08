@@ -144,6 +144,23 @@ class TestInit:
         assert "本文は日本語" in content
         assert "判断の台帳" in codex_content
 
+    def test_init_creates_migrate_runops_skill(self, tmp_path: Path) -> None:
+        """The migrate-runops skill is rendered for Claude and Codex."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        skill_md = tmp_path / ".claude" / "skills" / "migrate-runops" / "SKILL.md"
+        codex_skill_md = tmp_path / ".agents" / "skills" / "migrate-runops" / "SKILL.md"
+
+        assert skill_md.is_file()
+        assert codex_skill_md.is_file()
+        content = skill_md.read_text(encoding="utf-8")
+        codex_content = codex_skill_md.read_text(encoding="utf-8")
+        assert "name: migrate-runops" in content
+        assert "docs/migrations/" in content
+        assert "Human gate" in content
+        assert "`/update-runops`" in content
+        assert "`$update-runops`" in codex_content
+        assert "{{ skill_prefix }}" not in codex_content
+
     def test_init_creates_python_package_refactor_skill_resources(
         self,
         tmp_path: Path,

@@ -99,6 +99,8 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
     assert ".agents/skills/summarize-script/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
+    assert ".agents/skills/update-runops/SKILL.md" in bundle.files
+    assert ".agents/skills/migrate-runops/SKILL.md" in bundle.files
     assert ".agents/skills/python-package-refactor/SKILL.md" in bundle.files
     assert (
         ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
@@ -117,6 +119,8 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "$research-agenda" in agents
     assert "$summarize-script" in agents
     assert "$patch-runops" in agents
+    assert "$update-runops" in agents
+    assert "$migrate-runops" in agents
     assert "$python-package-refactor" in agents
     assert "active question、current decision、paused/killed" in agents
     # Skills share the same frontmatter, but use each agent's native
@@ -146,6 +150,11 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "`$note`" in codex_summarize
     assert "cases/<simulator>/<case>/summarize.py" in codex_summarize
     assert "{{ skill_prefix }}" not in codex_summarize
+    codex_migrate = bundle.files[".agents/skills/migrate-runops/SKILL.md"]
+    assert "`$update-runops`" in codex_migrate
+    assert "`$feedback-runops`" in codex_migrate
+    assert "docs/migrations/v<major>.md" in codex_migrate
+    assert "{{ skill_prefix }}" not in codex_migrate
 
 
 def test_bundle_does_not_emit_project_local_codex_prompts() -> None:

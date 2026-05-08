@@ -24,3 +24,7 @@ runops の project 側状態は複数の層に分かれます。
 `cli/`, `core/`, `adapters/`, `launchers/`, `slurm/` は runops 実装内部の
 architecture layer です。これらは [architecture.md](../architecture.md) や
 [src-structure.md](../src-structure.md) を正本とします。
+
+runops 更新で project 側状態を移行する手順は layer そのものではなく、
+Upstream Integration Layer に付随する運用です。
+詳細は [../migrations/README.md](../migrations/README.md) を参照してください。

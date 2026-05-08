@@ -16,12 +16,15 @@ Upstream Integration Layer は、生成 project と runops 本体をつなぐ境
 - current project で今すぐ必要な local patch
 - 汎用化できる runops upstream 改善
 - project 固有なので upstream に入れない変更
+- runops 更新時に project 側へ適用する migration
 
 ## 基本方針
 
 - local patch の正本は `tools/runops` 内の Git branch / commit とする。
 - 別枠の mutable patch 履歴はデフォルトでは作らない。stale になりやすい。
 - handoff や current project での確認結果は `notes/YYYY-MM-DD.md` に残す。
+- 互換性を切る変更は `docs/migrations/` に migration item として残す。
+  v0 系では後方互換 layer を長く維持せず、migration guide による移行を優先する。
 - 長期化して複数 patch が並ぶ場合だけ、`notes/reports/runops-local-patches.md`
   のような project-local index を作ってよい。
 - `update-runops` / `runo update-harness` は `tools/runops` の local changes を壊さない。
@@ -88,6 +91,24 @@ project 側の生成物や研究状態を、そのまま runops 本体に入れ�
 
 この場合は pull せず、local patch を `local-only`, `feedback-issue`, `draft-pr`,
 `ready-pr` のどれかに分類してから進めます。
+
+Pull / harness 更新が終わったら、`tools/runops/docs/migrations/README.md` と
+対象 major の `v<major>.md` を確認します。該当 item がある場合は
+`migrate-runops` skill に渡し、適用 / skip / defer を `notes/YYYY-MM-DD.md` に残します。
+
+Migration guide にない破壊的変更や schema rewrite を推測で実行しない。
+guide が不足している場合は `feedback-runops` で docs gap として扱います。
+
+## SemVer と migration
+
+runops が private / pre-public な v0 系である間は、古い CLI option、内部 API、
+project file format の互換 shim を長く維持しません。
+
+- `0.x`: breaking change は許容する。ただし project-state に影響するものは
+  `docs/migrations/v0.md` に移行方法を書く。
+- `1.x` 以降: CLI、project schema、manifest、analysis artifact schema を
+  public contract とみなし、breaking change は major version bump と migration guide を必要とする。
+- patch release: 原則として移行不要な bug fix に限定する。
 
 ## Issue / PR に入れる情報
 

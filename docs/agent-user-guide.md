@@ -99,6 +99,11 @@ skill で `tools/runops` を local patch して即利用できる。local patch 
 `feedback-runops` で issue 化する。詳細は
 [Upstream Integration Layer](layers/upstream.md) を参照。
 
+runops 自体を更新するときは `update-runops` skill を使う。更新後に project 側の
+file format、manifest、analysis artifact、harness scaffold などの移行が必要なら、
+`tools/runops/docs/migrations/` を読み、`migrate-runops` skill で適用 / skip / defer を
+`notes/YYYY-MM-DD.md` に記録する。
+
 Python package の構造整理、module 分割、循環 import 解消、packaging 整理などは
 `python-package-refactor` skill を使う。`scripts/` と `references/` 付きで
 project harness に展開され、API surface snapshot、import smoke、quality gate
