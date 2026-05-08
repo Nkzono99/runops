@@ -1,6 +1,6 @@
 ---
 name: release
-description: "Prepare and publish a new runops release. Bump version, sync __init__.py, generate changelog, create commit and tag, and push to trigger PyPI publish."
+description: "Prepare and publish a new runops release. Bump version, sync __init__.py, draft Japanese release notes, create commit/tag/GitHub Release, and push to trigger PyPI publish."
 ---
 
 # runops リリース
@@ -11,7 +11,8 @@ description: "Prepare and publish a new runops release. Bump version, sync __ini
 
 - リリースノートは**必ず日本語**で書く
 - コード、コマンド、commit prefix、識別子は英語のままでよい
-- annotated tag や GitHub Release 本文を書く場合も、日本語の要約と本文を使う
+- annotated tag と GitHub Release 本文の両方に、日本語の要約と本文を残す
+- tag を push しただけで終わらせない。GitHub Release が存在し、本文が空でないことまで確認する
 
 ## 使い方
 
@@ -96,7 +97,7 @@ git tag -a vX.Y.Z -m "<日本語のリリースノート要約>"
 `git commit` と `git tag` は**順に**実行する。並列に走らせない。
 tag が直前の commit ではなく 1 つ前を指すと publish が壊れる。
 
-### 6. push してリリース
+### 6. push して tag を公開する
 
 ユーザーの確認を得てから push する:
 
@@ -110,11 +111,37 @@ CI が自動で PyPI にパブリッシュする。
 
 `main` と tag の push も分けて順に実行する。
 
-### 7. 確認
+### 7. GitHub Release を作成する
+
+tag を push したら、同じ tag に対する GitHub Release を必ず作成する。
+annotated tag に日本語のリリースノートを入れている場合は、それをそのまま使う:
+
+```bash
+gh release create vX.Y.Z \
+  --verify-tag \
+  --title "runops X.Y.Z" \
+  --notes-from-tag
+```
+
+既に Release が存在するが本文が空、または古い場合は、下書き済みの本文で更新する:
+
+```bash
+gh release edit vX.Y.Z \
+  --title "runops X.Y.Z" \
+  --notes-file release-notes.md
+```
+
+古い tag の Release を後から作るときは、最新 release 扱いにならないよう必要に応じて
+`--latest=false` を付ける。最新の通常リリースだけを Latest にする。
+
+### 8. 確認
 
 ```bash
 gh run list --workflow=publish.yml --limit 1
+gh release view vX.Y.Z --json tagName,name,body,url
 ```
+
+`gh release view` の `body` が空ならリリース作業は未完了。
 
 ## 引数なしの場合
 
@@ -125,4 +152,4 @@ gh run list --workflow=publish.yml --limit 1
 2. bump レベルを自動判定
 3. 日本語のリリースノート草案を作る
 4. 変更サマリとバージョンをユーザーに提示して確認
-5. 確認が取れたら手順 4〜7 を順に実行 (バージョン更新 → コミット → タグ → push)
+5. 確認が取れたら手順 4〜8 を順に実行 (バージョン更新 → コミット → タグ → push → GitHub Release 作成)
