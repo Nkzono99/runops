@@ -156,6 +156,7 @@ def _echo_result(result: MigrationResult) -> None:
     _echo_paths("Planned", result.planned)
     _echo_paths("Created", result.created)
     _echo_paths("Updated", result.updated)
+    _echo_paths("Deleted", result.deleted)
     _echo_items("Skipped", result.skipped)
     _echo_items("Warnings", result.warnings, err=True)
 

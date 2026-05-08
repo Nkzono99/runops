@@ -159,7 +159,7 @@ run-level `summarize.py` は数値 metric だけでなく、2D カラーマッ�
 - overlay の意味
 
 run-level 図は atomic artifact にします。
-複数 run を並べた contact sheet や系列比較図は、`figures_index.json` を読んで
+複数 run を並べた contact sheet や系列比較図は、`summary/artifacts.toml` を読んで
 `<survey>/summary/plots/` または `analysis/cross_run/<id>/figures/` に生成します。
 
 ## Metric Schema Design
@@ -190,7 +190,6 @@ cross-series 比較のため、同じ geometry / survey family では同じ metr
 |------|------|
 | `summary/survey_summary.csv` | flat 化した run 一覧。CSV で比較しやすい表 |
 | `summary/survey_summary.json` | run ごとの summary 原本、状態数、readiness、numeric stats、warning |
-| `summary/figures_index.json` | 各 run の figure path / caption の索引 |
 | `summary/artifacts.toml` | survey summary 出力と run artifact の索引 |
 | `summary/survey_summary.md` | 人が読むための短い Markdown report |
 | `summary/plots/*.png` | `runo analyze plot` が生成する図 |
@@ -203,7 +202,7 @@ cross-series 比較のため、同じ geometry / survey family では同じ metr
 - Adapter の `required_outputs()` / `detect_status()` から `analysis_status = ready | incomplete | unknown` を付ける。
 - `summary.json` の `status` が `completed` 以外、または `partial = true` の場合は partial summary として扱う。
 - `summary.figures[]` と `analysis/figures/` 配下の画像を `artifacts.toml` に索引化する。
-- `figures_index.json` は figure-only の互換出力として維持する。
+- `figures_index.json` は生成しない。figure-only の旧互換出力は M0-0003 で削除する。
 
 ## Survey Plot
 
@@ -280,8 +279,8 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成し
 対象:
 
 - run export: `manifest.toml`, `analysis/summary.json`, `analysis/figures/**`
-- survey export: `summary/survey_summary.csv`, `survey_summary.json`, `figures_index.json`,
-  `artifacts.toml`, `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
+- survey export: `summary/survey_summary.csv`, `survey_summary.json`, `artifacts.toml`,
+  `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
 - `survey.toml` がある場合は survey export に同梱する。
 
 publication export は成果物の移送用です。解析の正本は run / survey / cross-run workspace 側に残します。

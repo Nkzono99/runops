@@ -172,13 +172,6 @@ def build_survey_artifacts(
                     "status": "draft",
                 },
                 {
-                    "kind": "data",
-                    "path": "figures_index.json",
-                    "title": "Legacy figure index",
-                    "description": "Figure-only compatibility index.",
-                    "status": "draft",
-                },
-                {
                     "kind": "report",
                     "path": "survey_summary.md",
                     "title": "Survey summary report",

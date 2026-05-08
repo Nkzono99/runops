@@ -125,3 +125,44 @@ def test_research_scaffold_migration_does_not_overwrite_agenda(tmp_path: Path) -
     run_migration("v0", "0002", project_root=tmp_path)
 
     assert agenda_path.read_text(encoding="utf-8") == "# Custom Agenda\n"
+
+
+def test_remove_legacy_figure_index_migration_deletes_json_and_updates_artifacts(
+    tmp_path: Path,
+) -> None:
+    summary_dir = tmp_path / "runs" / "angle_scan" / "summary"
+    summary_dir.mkdir(parents=True)
+    (summary_dir / "figures_index.json").write_text(
+        '{"figures": []}\n',
+        encoding="utf-8",
+    )
+    (summary_dir / "artifacts.toml").write_text(
+        """
+schema_version = 1
+scope = "survey"
+generated_by = "test"
+
+[[artifacts]]
+kind = "table"
+path = "survey_summary.csv"
+title = "Survey summary CSV"
+
+[[artifacts]]
+kind = "data"
+path = "figures_index.json"
+title = "Legacy figure index"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = run_migration("v0", "0003", project_root=tmp_path)
+
+    assert result.status == "applied"
+    assert Path("runs/angle_scan/summary/figures_index.json") in result.deleted
+    assert Path("runs/angle_scan/summary/artifacts.toml") in result.updated
+    assert not (summary_dir / "figures_index.json").exists()
+
+    with open(summary_dir / "artifacts.toml", "rb") as f:
+        artifact_index = tomllib.load(f)
+    paths = [item["path"] for item in artifact_index["artifacts"]]
+    assert paths == ["survey_summary.csv"]

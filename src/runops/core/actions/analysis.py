@@ -125,7 +125,6 @@ def collect_survey(survey_dir: Path) -> ActionResult:
             "state_counts": {k: v for k, v in summary.items() if v > 0},
             "csv_path": str(result.csv_path),
             "json_path": str(result.json_path),
-            "figures_path": str(result.figures_path),
             "artifacts_path": str(result.artifacts_path),
             "report_path": str(result.report_path),
             "generated_summaries": result.generated_summaries,

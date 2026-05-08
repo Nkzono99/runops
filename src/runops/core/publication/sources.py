@@ -242,10 +242,6 @@ def collect_survey_export_sources(
             source_path=collection.json_path,
         ),
         PublicationSourceArtifact(
-            role="survey_figures_index",
-            source_path=collection.figures_path,
-        ),
-        PublicationSourceArtifact(
             role="survey_artifacts",
             source_path=collection.artifacts_path,
         ),
@@ -282,7 +278,7 @@ def collect_survey_export_sources(
             path = survey_dir / figure["path"]
             if not path.is_file():
                 warnings.append(
-                    f"missing figure indexed in figures_index.json: {figure['path']}"
+                    f"missing figure indexed in survey artifacts: {figure['path']}"
                 )
                 continue
             files.append(

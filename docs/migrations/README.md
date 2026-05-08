@@ -79,6 +79,7 @@ project 側の手作業や Agent 作業が必要な変更は、次の情報を�
 
 - `compatible-generated`: 既存 project は壊れないが、再生成や index 作成で新仕様を使える。
 - `manual-edit`: 小さな手編集が必要。削除や不可逆操作は含まない。
+- `breaking-generated`: 旧互換の生成物をやめる。対象は再生成可能な file や index に限定する。
 - `breaking-manual`: 旧仕様のままでは新しい runops が正しく扱えない。migration が必要。
 - `destructive-human-gate`: 削除、purge、archive、schema rewrite など不可逆に近い操作。
   必ず人間の確認を挟む。

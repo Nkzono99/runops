@@ -29,6 +29,7 @@ def test_migrate_list_outputs_registered_migrations() -> None:
     assert "M0-0001" in result.output
     assert "Analysis artifact indexes" in result.output
     assert "M0-0002" in result.output
+    assert "M0-0003" in result.output
 
 
 def test_migrate_requires_subcommand() -> None:

@@ -439,7 +439,6 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
     summary_dir.mkdir(parents=True, exist_ok=True)
     csv_path = summary_dir / "survey_summary.csv"
     json_path = summary_dir / "survey_summary.json"
-    figures_path = summary_dir / "figures_index.json"
     artifacts_path = summary_dir / "artifacts.toml"
     report_path = summary_dir / "survey_summary.md"
 
@@ -472,10 +471,6 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
     }
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(aggregate, f, indent=2)
-        f.write("\n")
-
-    with open(figures_path, "w", encoding="utf-8") as f:
-        json.dump({"figures": figure_rows}, f, indent=2)
         f.write("\n")
 
     survey_artifacts = build_survey_artifacts(
@@ -515,7 +510,6 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         state_counts=state_counts,
         csv_path=csv_path,
         json_path=json_path,
-        figures_path=figures_path,
         artifacts_path=artifacts_path,
         report_path=report_path,
         artifacts=tuple(survey_artifacts),

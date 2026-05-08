@@ -34,7 +34,6 @@ class SurveyCollectionResult:
     state_counts: dict[str, int]
     csv_path: Path
     json_path: Path
-    figures_path: Path
     artifacts_path: Path
     report_path: Path
     artifacts: tuple[dict[str, Any], ...] = ()

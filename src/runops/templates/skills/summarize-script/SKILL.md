@@ -96,7 +96,7 @@ summary["figures"].append(
 6. `analysis/summary.json` を読み、metric と `figures` metadata を確認する。
 7. `analysis/artifacts.toml` を読み、figure path / title / description / script / data を確認する。
 8. survey がある場合は `runo analyze collect <survey>` を実行し、
-   `summary/survey_summary.csv`, `summary/artifacts.toml`, `summary/figures_index.json` を確認する。
+   `summary/survey_summary.csv`, `summary/survey_summary.json`, `summary/artifacts.toml` を確認する。
 9. 必要なら `runo analyze plot <survey> --list-columns` で plot 可能な列を確認する。
 10. 結果と evidence path を `{{ skill_prefix }}note` に残す。
 11. 研究判断が変わる場合だけ `{{ skill_prefix }}research-agenda` も更新する。

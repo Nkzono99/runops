@@ -52,7 +52,7 @@ runo analyze export $ARGUMENTS --paper draft-a
 
 1. `runo analyze summarize` で各 run の要約を生成する
 2. survey の場合は `runo analyze collect <dir>` を実行する
-3. `collect` が生成した `summary/survey_summary.csv`, `summary/survey_summary.json`, `summary/figures_index.json`, `summary/survey_summary.md` を確認する
+3. `collect` が生成した `summary/survey_summary.csv`, `summary/survey_summary.json`, `summary/artifacts.toml`, `summary/survey_summary.md` を確認する
 4. まず `runo analyze plot <dir> --list-recipes` を試し、使える recipe があれば `--recipe` を優先する
 5. recipe が無い場合は `runo analyze plot <dir> --list-columns` で列を確認し、`--x/--y` を指定して図を生成する
 6. run-local な試行錯誤は `analysis/scratch/` に置き、複数 run / survey をまたぐ比較は `runo analyze new-comparison` で workspace を作る

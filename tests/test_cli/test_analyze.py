@@ -462,11 +462,10 @@ class TestCollect:
 
         csv_path = tmp_path / "summary" / "survey_summary.csv"
         json_path = tmp_path / "summary" / "survey_summary.json"
-        figures_path = tmp_path / "summary" / "figures_index.json"
         report_path = tmp_path / "summary" / "survey_summary.md"
         assert csv_path.exists()
         assert json_path.exists()
-        assert figures_path.exists()
+        assert not (tmp_path / "summary" / "figures_index.json").exists()
         assert report_path.exists()
         content = csv_path.read_text()
         assert "run_id" in content
@@ -544,11 +543,13 @@ class TestCollect:
         )
         assert "output_counts.logs" in csv_content
 
-        figures_index = json.loads(
-            (tmp_path / "summary" / "figures_index.json").read_text(encoding="utf-8")
+        survey_summary = json.loads(
+            (tmp_path / "summary" / "survey_summary.json").read_text(encoding="utf-8")
         )
-        assert figures_index["figures"][0]["path"].endswith("figures/plot.png")
-        assert figures_index["figures"][0]["caption"] == "Test plot"
+        figure_rows = survey_summary["runs"][0]["figures"]
+        assert figure_rows[0]["path"].endswith("figures/plot.png")
+        assert figure_rows[0]["caption"] == "Test plot"
+        assert not (tmp_path / "summary" / "figures_index.json").exists()
 
         with open(tmp_path / "summary" / "artifacts.toml", "rb") as f:
             artifacts = tomllib.load(f)

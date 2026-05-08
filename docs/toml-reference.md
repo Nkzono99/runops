@@ -743,7 +743,6 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
 |------|-------------|
 | `summary/survey_summary.csv` | ネストをフラット化した run 一覧。list/dict は JSON 文字列として保持。`origin.*`, `classification.*`, `variation.*`, `param.*`, `analysis_status`, `missing_required_artifacts` なども含む |
 | `summary/survey_summary.json` | run ごとの summary 原本、状態数、analysis readiness、数値統計、warning を含む集計 JSON |
-| `summary/figures_index.json` | `analysis/figures/` と `summary.figures[]` を run ごとに引いた索引 |
 | `summary/artifacts.toml` | survey summary 出力と run artifact の索引。`path` は `summary/` からの相対 path |
 | `summary/survey_summary.md` | すぐ読める Markdown レポート |
 | `summary/plots/*.png` | `runo analyze plot` が生成する survey 可視化 |
@@ -759,7 +758,7 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
   の場合は partial summary として `analysis_status = incomplete` にする
 - `summary/artifacts.toml` は各 run の `analysis/artifacts.toml` を集約する。
   run 側 index が無い場合は `summary.figures[]` と `analysis/figures/` から fallback 生成する
-- `summary/figures_index.json` は当面、figure-only の互換出力として維持する
+- `summary/figures_index.json` は生成しない。旧互換出力は M0-0003 で削除する
 
 ### survey_summary.json の概要
 
@@ -910,7 +909,7 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成す
 ### export 対象
 
 - run export: `manifest.toml`, `analysis/summary.json`, `analysis/artifacts.toml`, `analysis/figures/**`
-- survey export: `summary/survey_summary.csv`, `survey_summary.json`, `figures_index.json`, `artifacts.toml`, `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
+- survey export: `summary/survey_summary.csv`, `survey_summary.json`, `artifacts.toml`, `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
 - `survey.toml` がある場合は survey export に同梱される
 
 ### `manifest.json` の要点

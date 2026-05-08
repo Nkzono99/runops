@@ -9,6 +9,7 @@ from typing import Any
 from runops.core.analysis.artifacts import (
     build_survey_artifacts,
     collect_run_artifacts,
+    read_artifacts_index,
     write_artifacts_index,
 )
 from runops.core.discovery import discover_runs
@@ -46,6 +47,19 @@ def registered_migrations() -> tuple[Migration, ...]:
             impact=("research",),
             human_gate=False,
             handler=apply_research_agenda_scaffold,
+        ),
+        Migration(
+            version="v0",
+            number="0003",
+            title="Remove legacy survey figure index",
+            description=(
+                "Delete summary/figures_index.json and remove its artifacts.toml "
+                "entry after figures moved to artifacts.toml."
+            ),
+            migration_type="breaking-generated",
+            impact=("analysis-artifact",),
+            human_gate=False,
+            handler=apply_remove_legacy_figure_index,
         ),
     )
 
@@ -209,6 +223,76 @@ def apply_research_agenda_scaffold(context: MigrationContext) -> MigrationResult
     )
 
 
+def apply_remove_legacy_figure_index(context: MigrationContext) -> MigrationResult:
+    """Remove legacy survey ``figures_index.json`` files and artifact entries."""
+    project_root = context.project_root
+    runs_dir = project_root / "runs"
+    deleted: list[Path] = []
+    updated: list[Path] = []
+    planned: list[Path] = []
+    skipped: list[str] = []
+    warnings: list[str] = []
+
+    for summary_dir in _iter_summary_dirs(runs_dir):
+        legacy_path = summary_dir / "figures_index.json"
+        artifacts_path = summary_dir / "artifacts.toml"
+
+        if legacy_path.is_file():
+            if context.dry_run:
+                planned.append(legacy_path)
+            else:
+                try:
+                    legacy_path.unlink()
+                    deleted.append(legacy_path)
+                except OSError as exc:
+                    legacy_display = _display_path(legacy_path, project_root)
+                    warnings.append(f"{legacy_display}: {exc}")
+        else:
+            skipped.append(_display_path(legacy_path, project_root) + " missing")
+
+        if not artifacts_path.is_file():
+            continue
+
+        try:
+            artifacts = read_artifacts_index(artifacts_path)
+        except OSError as exc:
+            warnings.append(f"{_display_path(artifacts_path, project_root)}: {exc}")
+            continue
+
+        filtered = [
+            artifact
+            for artifact in artifacts
+            if str(artifact.get("path", "")).strip() != "figures_index.json"
+        ]
+        if len(filtered) == len(artifacts):
+            continue
+        if context.dry_run:
+            planned.append(artifacts_path)
+            continue
+
+        write_artifacts_index(
+            artifacts_path,
+            scope="survey",
+            generated_by="runo migrate apply M0-0003",
+            artifacts=filtered,
+        )
+        updated.append(artifacts_path)
+
+    status = _result_status(context, [], updated, planned, deleted=deleted)
+    summary = _summary_for_legacy_figure_index(updated, deleted, planned, skipped)
+    return MigrationResult(
+        migration_id="M0-0003",
+        title="Remove legacy survey figure index",
+        status=status,
+        summary=summary,
+        updated=tuple(_relative_paths(updated, project_root)),
+        deleted=tuple(_relative_paths(deleted, project_root)),
+        planned=tuple(_relative_paths(planned, project_root)),
+        skipped=tuple(skipped),
+        warnings=tuple(warnings),
+    )
+
+
 class _ScaffoldTarget:
     def __init__(
         self,
@@ -261,10 +345,12 @@ def _result_status(
     created: list[Path],
     updated: list[Path],
     planned: list[Path],
+    *,
+    deleted: list[Path] | None = None,
 ) -> str:
     if context.dry_run and planned:
         return "planned"
-    if created or updated:
+    if created or updated or deleted:
         return "applied"
     return "skipped"
 
@@ -283,3 +369,19 @@ def _summary_for_artifact_indexes(
     if skipped:
         return "Artifact indexes are already present."
     return "No existing analysis outputs needed artifact indexes."
+
+
+def _summary_for_legacy_figure_index(
+    updated: list[Path],
+    deleted: list[Path],
+    planned: list[Path],
+    skipped: list[str],
+) -> str:
+    if planned:
+        return f"Would remove or update {len(planned)} legacy figure index item(s)."
+    changed = len(updated) + len(deleted)
+    if changed:
+        return f"Removed or updated {changed} legacy figure index item(s)."
+    if skipped:
+        return "No legacy figures_index.json files were present."
+    return "No survey summary directories needed legacy figure index migration."

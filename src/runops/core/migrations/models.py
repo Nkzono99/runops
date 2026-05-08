@@ -42,6 +42,7 @@ class MigrationResult:
     summary: str
     created: tuple[Path, ...] = ()
     updated: tuple[Path, ...] = ()
+    deleted: tuple[Path, ...] = ()
     planned: tuple[Path, ...] = ()
     skipped: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
@@ -49,7 +50,7 @@ class MigrationResult:
     @property
     def changed(self) -> bool:
         """Return whether the migration wrote project files."""
-        return bool(self.created or self.updated)
+        return bool(self.created or self.updated or self.deleted)
 
 
 MigrationHandler = Callable[[MigrationContext], MigrationResult]
