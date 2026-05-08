@@ -3,6 +3,10 @@
 AI エージェントと一緒にシミュレーションプロジェクトを立ち上げるためのガイドです。
 TOML ファイルを最初から手で書く必要はありません。研究内容をエージェントに伝えれば、campaign・case・survey の設計から run 管理まで支援してもらえます。
 
+このガイドの前提は、**人間が runops CLI を順番に叩いて研究を進めるのではない**
+ということです。CLI は Agent と harness が安全に project state を操作するための
+interface です。人間は研究意図、制約、確認、解釈に集中します。
+
 ## あなたが用意するもの
 
 エージェントに渡す前に、主に次の 2 点を決めておいてください。
@@ -16,6 +20,7 @@ TOML ファイルを最初から手で書く必要はありません。研究内
 一方で、まだベースを決めていない場合でも、Agent は `refs/` 以下の simulator docs や `cookbook/` を探索して、入力例や推奨パラメータをもとに case の叩き台を作れます。
 
 あとはエージェントが campaign 設計、case 作成、survey 展開、run 生成・投入・解析・知見整理を進めます。
+人間が CLI の全体を覚える必要はありません。
 
 ## プロジェクトを用意する
 
@@ -36,8 +41,9 @@ source .venv/bin/activate
 runo doctor
 ```
 
-`runo init` がディレクトリ構造と初期ファイルを作ります（詳細は [README.md](../README.md) を参照）。
-初期セットアップを細かく確認するより、すぐにエージェントへ研究内容を渡して構成を整えてもらう方が早いです。
+`runo init` がディレクトリ構造と初期ファイルを作ります。
+この bootstrap だけは人間が直接実行して構いません。その後は CLI を順番に叩くより、
+すぐにエージェントへ研究内容を渡して構成を整えてもらう方が早いです。
 あわせて Claude Code 向けのガードも生成され、`manifest.toml`、`input/`、`submit/job.sh`、
 `SITE.md` などの生成物は直接編集しない前提になります。
 
@@ -48,6 +54,7 @@ Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴�
 ## 最初の依頼の出し方
 
 何を調べたいかと、ベース入力をどうしたいかをまとめて伝えるのが効果的です。
+依頼には「CLI コマンドを列挙する」のではなく、研究目的と制約を書きます。
 
 ```text
 このプロジェクトでは、月面平面に太陽風プラズマが入射し、
@@ -105,7 +112,7 @@ campaign 設計用の SKILL を使って campaign.toml を整理して。
 エージェント中心で進めても、以下の操作だけは確認を挟んでください。
 
 - **コストが高い操作** — 新しい survey の初回 bulk submit、walltime / memory / node 数を増やす retry
-- **破壊的な操作** — `archive`、`purge-work`
+- **破壊的な操作** — `cancel`、`archive`、`purge-work`、`delete`
 - **研究の意味が変わる操作** — 仮説の方向性が変わる `campaign.toml` の編集
 
 それ以外はエージェントに任せて大丈夫です。
@@ -143,6 +150,7 @@ issue のタイトルと本文案を作ります。
 
 - [README.md](../README.md) — 生成される構造と全体像
 - [project-flow.md](project-flow.md) — `runo init` 後の project を Agent とどう運用するかの概念図
-- [layers/README.md](layers/README.md) — experiment / execution / analysis / research / knowledge / harness / upstream の責務分離
+- [layers/README.md](layers/README.md) — interface / experiment / execution / analysis / research / knowledge / harness / upstream の責務分離
+- [layers/interface.md](layers/interface.md) — CLI / action surface / human gate の境界
 - [agent-user-guide.md](agent-user-guide.md) — Agent が守る基本ルール
 - [toml-reference.md](toml-reference.md) — TOML フィールドを手で確認したいとき

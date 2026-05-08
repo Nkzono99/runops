@@ -13,6 +13,7 @@ runops の project 側状態は複数の層に分かれます。
 
 | Layer | Canonical Doc | 役割 |
 |-------|---------------|------|
+| Interface Layer | [interface.md](interface.md) | Agent / harness / operator が project state に触る command surface と gate |
 | Experiment Layer | [experiment.md](experiment.md) | `campaign.toml` → `case.toml` → `survey.toml` の実験設計正本 |
 | Execution Kernel | [execution-kernel.md](execution-kernel.md) | run / submit / sync / manifest / provenance の実行状態正本 |
 | Analysis Layer | [analysis.md](analysis.md) | 解析・可視化成果物、summary、survey 集計、cross-run 比較 |
@@ -21,8 +22,9 @@ runops の project 側状態は複数の層に分かれます。
 | Harness Layer | [harness.md](harness.md) | Agent の手順、権限、skills、rules、project-local harness |
 | Upstream Integration Layer | [upstream.md](upstream.md) | `tools/runops` local patch、feedback issue、PR、update conflict の境界 |
 
+`src/runops/cli/` は Interface Layer の実装の一部ですが、module 構成としての
 `cli/`, `core/`, `adapters/`, `launchers/`, `slurm/` は runops 実装内部の
-architecture layer です。これらは [architecture.md](../architecture.md) や
+architecture layer です。実装構造は [architecture.md](../architecture.md) や
 [src-structure.md](../src-structure.md) を正本とします。
 
 runops 更新で project 側状態を移行する手順は layer そのものではなく、
