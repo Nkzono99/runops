@@ -90,6 +90,7 @@ guide にない補完が必要なら、migration を止めて `{{ skill_prefix }
 ```bash
 runo doctor
 runo context --json
+runo lint
 ```
 
 加えて item の `Validation` に書かれた command / file check を実行する。
@@ -109,6 +110,7 @@ Skipped:
 Validation:
 - runo doctor: pass/fail
 - runo context --json: pass/fail
+- runo lint: pass/fail/warnings
 Follow-up:
 - <feedback-runops issue candidate or none>
 EOF

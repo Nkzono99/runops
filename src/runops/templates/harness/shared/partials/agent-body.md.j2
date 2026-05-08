@@ -14,12 +14,13 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 0. **venv を activate する** — `source .venv/bin/activate` (Linux/Mac) / `.venv\Scripts\activate` (Windows)
    runops や関連パッケージは `.venv/` にインストール済み。activate しないと `runo` コマンドが使えない。
 1. `runo context --json` で project の現在地を把握する
-2. `campaign.toml` を読む
-3. `research/agenda.md` があれば読む
-4. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
-5. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
-6. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
-7. **定型作業は `{{ skill_prefix }}skill-name` で呼び出す** (下記「スキル」参照)
+2. 必要なら `runo lint --scope structure,analysis,knowledge` で読み入口と成果物索引を確認する
+3. `campaign.toml` を読む
+4. `research/agenda.md` があれば読む
+5. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
+6. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
+7. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
+8. **定型作業は `{{ skill_prefix }}skill-name` で呼び出す** (下記「スキル」参照)
 
 ## スキル
 

@@ -17,6 +17,7 @@ runops プロジェクトにおける Agent の作業ガイド。
 |------|---------|
 | version 確認 | `runo --version` |
 | プロジェクト状況把握 | `runo context --json` (`research_agenda` / latest note を含む) |
+| project health check | `runo lint --scope structure,analysis,knowledge` |
 | case テンプレート生成 | `runo case new <name>` |
 | 最小 case テンプレート生成 | `runo case new <name> --minimal` |
 | survey 付き case 生成 | `runo case new <name> --survey` |
@@ -105,6 +106,7 @@ file format、manifest、analysis artifact、harness scaffold などの移行が
 `runo migrate apply M0-0001 --dry-run` → `runo migrate apply M0-0001` で適用する。
 CLI 未対応または判断が必要なものは `migrate-runops` skill で扱い、適用 / skip / defer を
 `notes/YYYY-MM-DD.md` に記録する。
+更新後や大きな handoff 前は `runo lint` で project state の読みやすさを確認する。
 
 Python package の構造整理、module 分割、循環 import 解消、packaging 整理などは
 `python-package-refactor` skill を使う。`scripts/` と `references/` 付きで

@@ -12,6 +12,8 @@ user-invocable: false
 
 ```bash
 runo context --json      # project / campaign / runs / failures の概要
+runo lint                # project state の health check
+runo lint --scope structure,analysis,knowledge
 runo runs list           # run 一覧
 runo runs list runs/a runs/b  # 複数 PATH 指定
 runo runs jobs           # submitted/running のジョブ一覧
@@ -217,6 +219,7 @@ fragment は `[merge]` と `[compatibility]` を確認してから使う。
 
 ```bash
 runo doctor             # 環境検査
+runo lint               # project state / Agent context の health check
 runo update-refs        # refs/ 更新 + cookbook/ナレッジ再生成
 runo config show        # 設定表示
 ```

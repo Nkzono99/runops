@@ -10,6 +10,7 @@
 | `runops setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
 | `runops doctor` | 環境検査 |
 | `runops context --json` | Agent 向け project context を JSON で取得 |
+| `runops lint [PATH] [--scope ...]` | project state の health check |
 | `runops migrate list/show/apply` | project-state migration の確認・適用 |
 | `runops config show` | 設定表示 |
 | `runops config add-simulator` | シミュレータ追加 (対話型) |

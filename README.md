@@ -290,6 +290,7 @@ runo runs list runs/cavity/scan
 | `runo setup [URL]` | 既存 runops project のセットアップ |
 | `runo doctor [PATH]` | 環境検査 (設定・sbatch・run_id 一意性・環境検出) |
 | `runo context [DIR]` | Agent 向け project context の要約を表示 (`research/agenda.md` と latest note の入口を含む) |
+| `runo lint [PATH] [--scope ...] [--json]` | project state の health check (structure / runs / provenance / analysis / knowledge) |
 | `runo migrate list/show/apply` | `docs/migrations/` に登録された project-state migration を確認・適用 |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |

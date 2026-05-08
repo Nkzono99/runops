@@ -28,3 +28,6 @@ architecture layer です。これらは [architecture.md](../architecture.md) �
 runops 更新で project 側状態を移行する手順は layer そのものではなく、
 Upstream Integration Layer に付随する運用です。
 詳細は [../migrations/README.md](../migrations/README.md) を参照してください。
+
+各 layer が Agent から読める状態に保たれているかは cross-layer の health check として
+[../project-health.md](../project-health.md) と `runo lint` を使います。

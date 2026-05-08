@@ -114,7 +114,7 @@ CLI-backed migration は、同じ project に複数回実行しても壊れな�
    で確認し、定型適用できるものは `runo migrate apply <id>` で実行する。
    CLI 未対応または判断が必要なものは `migrate-runops` を使う。
 4. migration の適用 / skip / 保留を `notes/YYYY-MM-DD.md` に残す。
-5. `runo doctor` と item ごとの validation を実行する。
+5. `runo doctor`, `runo context --json`, `runo lint` と item ごとの validation を実行する。
 
 Migration guide にない破壊的変更を推測で実行してはいけません。
 guide が足りない場合は、まず `feedback-runops` で docs gap として扱います。

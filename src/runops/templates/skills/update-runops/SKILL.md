@@ -90,4 +90,4 @@ runo update-harness && runo update
   別枠の mutable patch 履歴はデフォルトでは作らない
 - `update-harness` で `.new` ファイルが生成されたら、差分を確認してから元ファイルに反映する
 - `docs/migrations/` に該当 item がある場合は `{{ skill_prefix }}migrate-runops` で扱う
-- 更新後は `runo doctor` で環境が正常か確認するとよい
+- 更新後は `runo doctor` と `runo lint` で環境と project state を確認するとよい
