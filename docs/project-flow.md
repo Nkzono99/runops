@@ -7,16 +7,17 @@
 概念図としてまとめたものです。
 
 ポイントは、runops の project を単なる directory 群ではなく、
-`研究意図`、`再利用テンプレート`、`実行記録`、`学習結果` を持つ運用系として捉えることです。
+`研究意図`、`再利用テンプレート`、`実行状態`、`学習結果` を持つ運用系として捉えることです。
 
 ## 概念の対応表
 
 | 層 / file | 概念上の役割 | Agent から見た意味 |
 |---|---|---|
-| [Experiment Layer](layers/experiment.md) | 実験設計と実行記録 | campaign / case / survey / run manifest の関係を決める。 |
+| [Experiment Layer](layers/experiment.md) | 実験設計 | campaign / case / survey の関係を決める。 |
 | `campaign.toml` | 研究意図の正本 | 何を明らかにしたいか、どの変数を動かし、何を観測するかを Agent に渡す。 |
 | `cases/**/case.toml` | 再利用可能な実験テンプレート | 共通の job 設定、ベース入力、固定パラメータを保持する。 |
 | `runs/**/survey.toml` | サーベイ設計 | どの軸をどう振るか、命名や job override をどうするかを定義する。 |
+| [Execution Kernel](layers/execution-kernel.md) | 実行状態の正本 | run 生成、submit、sync、manifest、provenance を扱う。 |
 | `runs/**/Rxxxx/manifest.toml` | run の正本 | 各実行の state、origin、provenance、job 情報を記録する。 |
 | [Analysis Layer](layers/analysis.md) | 解析・可視化成果物 | run summary、survey 集計、cross-run 比較を置く場所を決める。 |
 | [Research Layer](layers/research.md) | 現在判断の台帳 | `research/agenda.md` に active question と current decision を残す。 |
@@ -46,6 +47,7 @@
 - `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。
 - レイヤーごとの正本は [docs/layers/README.md](layers/README.md) から辿れます。
 - `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。
+- Execution Kernel は run 生成、submit、sync、manifest、provenance の実行状態正本です。
 - `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。
 - `research/agenda.md` は現在の高レベルな研究判断の台帳です。TODO ではなく、
   active question、current decision、paused/killed、次に何をなぜ行うかを残します。

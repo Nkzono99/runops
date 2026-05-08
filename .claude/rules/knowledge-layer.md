@@ -1,7 +1,7 @@
 # 知識層 (Knowledge Layer)
 
 AI エージェントがシミュレーションを自律的に行うための知識管理。
-詳細は `docs/knowledge-layer.md` を参照。
+詳細は `docs/layers/knowledge.md` を参照。
 
 ## 知識の種類
 

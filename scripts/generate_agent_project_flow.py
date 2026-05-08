@@ -33,8 +33,8 @@ DOC_PATH = DOCS_ROOT / "project-flow.md"
 CONCEPT_ROWS: tuple[tuple[str, str, str], ...] = (
     (
         "[Experiment Layer](layers/experiment.md)",
-        "実験設計と実行記録",
-        "campaign / case / survey / run manifest の関係を決める。",
+        "実験設計",
+        "campaign / case / survey の関係を決める。",
     ),
     (
         "`campaign.toml`",
@@ -50,6 +50,11 @@ CONCEPT_ROWS: tuple[tuple[str, str, str], ...] = (
         "`runs/**/survey.toml`",
         "サーベイ設計",
         "どの軸をどう振るか、命名や job override をどうするかを定義する。",
+    ),
+    (
+        "[Execution Kernel](layers/execution-kernel.md)",
+        "実行状態の正本",
+        "run 生成、submit、sync、manifest、provenance を扱う。",
     ),
     (
         "`runs/**/Rxxxx/manifest.toml`",
@@ -168,7 +173,7 @@ def _build_init_world(figure_dir: str) -> str:
         config >> Edge(label="実行環境の制約") >> agent
         campaign >> Edge(label="研究意図") >> agent
         cases >> Edge(label="ベース設定") >> agent
-        runs >> Edge(label="実行記録") >> agent
+        runs >> Edge(label="実行状態") >> agent
         refs >> Edge(label="simulator 知識") >> agent
         memory >> Edge(label="過去の知見") >> agent
         agent_boot >> Edge(label="作業ルール") >> agent
@@ -284,7 +289,7 @@ def _build_document() -> str:
         "概念図としてまとめたものです。",
         "",
         "ポイントは、runops の project を単なる directory 群ではなく、",
-        "`研究意図`、`再利用テンプレート`、`実行記録`、`学習結果` を持つ運用系として捉えることです。",
+        "`研究意図`、`再利用テンプレート`、`実行状態`、`学習結果` を持つ運用系として捉えることです。",
         "",
         "## 概念の対応表",
         "",
@@ -307,6 +312,7 @@ def _build_document() -> str:
         "- `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。",
         "- レイヤーごとの正本は [docs/layers/README.md](layers/README.md) から辿れます。",
         "- `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。",
+        "- Execution Kernel は run 生成、submit、sync、manifest、provenance の実行状態正本です。",
         "- `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。",
         "- `research/agenda.md` は現在の高レベルな研究判断の台帳です。TODO ではなく、",
         "  active question、current decision、paused/killed、次に何をなぜ行うかを残します。",

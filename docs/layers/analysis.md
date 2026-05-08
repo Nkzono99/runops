@@ -31,6 +31,8 @@ run / survey / cross-run comparison の由来を後から復元できるよう�
 
 使い分けの原則:
 
+- run の状態、job 履歴、provenance は [Execution Kernel](execution-kernel.md) の
+  `manifest.toml` に残し、Analysis Layer では成果物から参照する。
 - run に閉じるものは `runs/<run>/analysis/` に置く。
 - 1 survey に閉じる集計は `<survey>/summary/` に置く。
 - 複数 survey / 複数系列 / 手作業の比較 script を束ねるものは project root の `analysis/cross_run/` に置く。

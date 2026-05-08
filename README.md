@@ -511,7 +511,8 @@ uv run runo --help
 - [アーキテクチャ](docs/architecture.md) -- システム設計とモジュール構成
 - [拡張ガイド](docs/extending.md) -- Adapter / Launcher の追加方法
 - [レイヤー一覧](docs/layers/README.md) -- project 側状態と運用境界の正本
-- [実験層](docs/layers/experiment.md) -- campaign / case / survey / run manifest の関係
+- [実験層](docs/layers/experiment.md) -- campaign / case / survey の設計正本
+- [Execution Kernel](docs/layers/execution-kernel.md) -- run / submit / sync / manifest / provenance の実行状態正本
 - [解析層](docs/layers/analysis.md) -- 解析・可視化成果物の置き場所と運用ルール
 - [研究判断層](docs/layers/research.md) -- `research/agenda.md` による判断台帳
 - [知識層](docs/layers/knowledge.md) -- AI エージェント向け知識管理アーキテクチャ

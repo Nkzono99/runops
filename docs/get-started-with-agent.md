@@ -42,7 +42,8 @@ runo doctor
 `SITE.md` などの生成物は直接編集しない前提になります。
 
 運用全体を俯瞰したい場合は [AI Agent 運用概念図](project-flow.md) を先に見ると、
-`campaign.toml`・`case.toml`・`survey.toml`・`manifest.toml` がそれぞれ何の役割を持つか掴みやすくなります。
+Experiment Layer の `campaign.toml`・`case.toml`・`survey.toml` と、
+Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴みやすくなります。
 
 ## 最初の依頼の出し方
 
@@ -142,6 +143,6 @@ issue のタイトルと本文案を作ります。
 
 - [README.md](../README.md) — 生成される構造と全体像
 - [project-flow.md](project-flow.md) — `runo init` 後の project を Agent とどう運用するかの概念図
-- [layers/README.md](layers/README.md) — experiment / analysis / research / knowledge / harness / upstream の責務分離
+- [layers/README.md](layers/README.md) — experiment / execution / analysis / research / knowledge / harness / upstream の責務分離
 - [agent-user-guide.md](agent-user-guide.md) — Agent が守る基本ルール
 - [toml-reference.md](toml-reference.md) — TOML フィールドを手で確認したいとき

@@ -55,6 +55,7 @@ Harness Layer に置くもの:
 置かないもの:
 
 - 研究判断の正本。これは `research/agenda.md`。
+- run の状態、job 履歴、provenance。これは Execution Kernel の `manifest.toml`。
 - 実験ログ。これは `notes/YYYY-MM-DD.md`。
 - simulator output。これは `runs/**/work/`。
 - 解析成果物。これは `runs/**/analysis/`, `<survey>/summary/`, `analysis/cross_run/`。
@@ -79,6 +80,6 @@ Harness Layer に置くもの:
 
 ## 他レイヤとの関係
 
-- Experiment / Analysis / Research / Knowledge Layer は project 状態の正本を持つ。
+- Experiment / Execution Kernel / Analysis / Research / Knowledge Layer は project 状態の正本を持つ。
 - Harness Layer はそれらを安全に操作するための手順を持つ。
 - Upstream Integration Layer は、harness の不満や改善を runops template に戻す境界を持つ。

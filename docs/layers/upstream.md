@@ -106,5 +106,5 @@ project 側の生成物や研究状態を、そのまま runops 本体に入れ�
 ## 他レイヤとの関係
 
 - Harness Layer の改善は template に戻す。
-- Experiment / Analysis / Research / Knowledge Layer の project 状態は upstream に直接入れない。
+- Experiment / Execution Kernel / Analysis / Research / Knowledge Layer の project 状態は upstream に直接入れない。
 - upstream 化した改善は、次回 `runo update-harness` / `update-runops` で project 側に戻る。
