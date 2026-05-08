@@ -127,6 +127,45 @@ class TestSummarize:
             data = json.load(f)
         assert data["energy"] == 42.0
         assert data["steps"] == 1000
+        assert (run_dir / "analysis" / "artifacts.toml").exists()
+
+    def test_summarize_writes_artifact_index(self, tmp_path: Path) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0001")
+        mock_adapter = MagicMock()
+        mock_adapter.summarize.return_value = {
+            "energy": 42.0,
+            "figures": [
+                {
+                    "path": "figures/density_xz.png",
+                    "title": "Density XZ slice",
+                    "caption": "Final density on the XZ plane.",
+                    "kind": "colormap",
+                    "quantity": "density",
+                    "plane": "xz",
+                    "frame": "final",
+                    "data": ["work/*.h5"],
+                }
+            ],
+        }
+        mock_adapter_cls = MagicMock(return_value=mock_adapter)
+
+        with patch(ADAPTER_PATCH, return_value=mock_adapter_cls):
+            result = runner.invoke(app, ["analyze", "summarize", str(run_dir)])
+
+        assert result.exit_code == 0, result.output
+        assert "Artifacts:" in result.output
+        with open(run_dir / "analysis" / "artifacts.toml", "rb") as f:
+            artifacts = tomllib.load(f)
+        assert artifacts["scope"] == "run"
+        assert artifacts["generated_by"] == "runo analyze summarize"
+        artifact = artifacts["artifacts"][0]
+        assert artifact["kind"] == "colormap"
+        assert artifact["path"] == "figures/density_xz.png"
+        assert artifact["title"] == "Density XZ slice"
+        assert artifact["description"] == "Final density on the XZ plane."
+        assert artifact["quantity"] == "density"
+        assert artifact["plane"] == "xz"
+        assert artifact["data"] == ["work/*.h5"]
 
     def test_summarize_no_adapter(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001")
@@ -511,6 +550,22 @@ class TestCollect:
         assert figures_index["figures"][0]["path"].endswith("figures/plot.png")
         assert figures_index["figures"][0]["caption"] == "Test plot"
 
+        with open(tmp_path / "summary" / "artifacts.toml", "rb") as f:
+            artifacts = tomllib.load(f)
+        assert artifacts["scope"] == "survey"
+        artifact_paths = [artifact["path"] for artifact in artifacts["artifacts"]]
+        assert "survey_summary.csv" in artifact_paths
+        assert "../R20260327-0001/analysis/figures/plot.png" in artifact_paths
+        figure_artifact = next(
+            artifact
+            for artifact in artifacts["artifacts"]
+            if artifact.get("kind") == "figure"
+        )
+        assert figure_artifact["source_path"].endswith("figures/plot.png")
+        assert figure_artifact["run_id"] == "R20260327-0001"
+        assert figure_artifact["description"] == "Test plot"
+        assert (run_dir / "analysis" / "artifacts.toml").exists()
+
     def test_collect_includes_manifest_context_columns(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001")
         manifest: dict[str, Any] = {
@@ -780,11 +835,20 @@ class TestExport:
             / "figures"
             / "phi.png"
         )
+        exported_artifacts = (
+            export_dir
+            / "files"
+            / "runs"
+            / "R20260327-0001"
+            / "analysis"
+            / "artifacts.toml"
+        )
         assert result.exit_code == 0
         assert "Export written" in result.output
         assert (export_dir / "manifest.json").exists()
         assert (export_dir / "README.md").exists()
         assert exported_summary.exists()
+        assert exported_artifacts.exists()
         assert exported_figure.exists()
 
         with open(export_dir / "manifest.json", encoding="utf-8") as f:
@@ -850,6 +914,9 @@ class TestExport:
             / "angle_scan"
             / "summary"
             / "survey_summary.json"
+        ).exists()
+        assert (
+            export_dir / "files" / "runs" / "angle_scan" / "summary" / "artifacts.toml"
         ).exists()
         assert (
             export_dir

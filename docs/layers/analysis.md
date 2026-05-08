@@ -19,9 +19,11 @@ run / survey / cross-run comparison の由来を後から復元できるよう�
 |------|----------|------|
 | run 単体の解析 | `runs/<path>/R*/analysis/` | その run に閉じた curated output |
 | run 単体の要約 | `runs/<path>/R*/analysis/summary.json` | `runo analyze summarize` が生成する key metrics |
+| run artifact index | `runs/<path>/R*/analysis/artifacts.toml` | run-local figure / data / report / script の索引 |
 | run 単体の図 | `runs/<path>/R*/analysis/figures/` | `summary.json` から参照できる run-local figure |
 | run 単体の試行錯誤 | `runs/<path>/R*/analysis/scratch/` | 一時解析。Git 管理しない |
 | survey 集計 | `runs/<survey>/summary/` | 1 survey 配下の run 群の集計 |
+| survey artifact index | `runs/<survey>/summary/artifacts.toml` | survey summary と run artifact の索引 |
 | survey plot | `runs/<survey>/summary/plots/` | `runo analyze plot` が生成する survey-local plot |
 | cross-run 比較 | `analysis/cross_run/<comparison_id>/` | 複数 survey / 複数 run / 手書き script をまたぐ比較 workspace |
 | 比較専用 script | `analysis/cross_run/<comparison_id>/scripts/` | その比較だけに閉じる script |
@@ -58,7 +60,9 @@ completed run に summary が無い場合は missing summary として記録し�
 
 `runo analyze summarize` は Adapter の `summarize()` を実行し、
 必要に応じて project script の `summarize(run_dir, base_summary)` で拡張した結果を
-`analysis/summary.json` に保存します。
+`analysis/summary.json` に保存します。あわせて `analysis/artifacts.toml` を生成し、
+`summary["figures"]` と `analysis/figures/` 配下の画像を run-local artifact として
+索引化します。
 
 project script の探索順:
 
@@ -109,6 +113,36 @@ def summarize(run_dir: Path, base_summary: dict) -> dict:
 
 `kind` 以降は optional metadata ですが、2D colormap や分布比較を後で集めたい場合は
 できるだけ入れてください。
+`figures` の metadata は `analysis/artifacts.toml` にも反映されます。
+
+## Artifact Index
+
+`artifacts.toml` は解析成果物を Agent / report / export が後から拾うための軽い索引です。
+schema は薄く保ち、未知 field は許容します。最小 field:
+
+```toml
+schema_version = 1
+scope = "run"
+generated_by = "runo analyze summarize"
+
+[[artifacts]]
+kind = "figure"
+path = "figures/density_xz_final.png"
+title = "Final density XZ slice"
+description = "Final-frame log10 density on the y-center XZ plane."
+status = "draft"
+script = "cases/emses/vertical_hole/summarize.py"
+data = ["work/*.h5"]
+run_id = "R20260424-0007"
+quantity = "density"
+plane = "xz"
+frame = "final"
+```
+
+run 側の `path` は `analysis/` からの相対 path、survey 側の `path` は
+`summary/` からの相対 path とします。`runo analyze collect` は各 run の
+`analysis/artifacts.toml` を読み、無い場合は `summary.json` から fallback して
+`summary/artifacts.toml` を生成します。
 
 ## Figure Design
 
@@ -157,6 +191,7 @@ cross-series 比較のため、同じ geometry / survey family では同じ metr
 | `summary/survey_summary.csv` | flat 化した run 一覧。CSV で比較しやすい表 |
 | `summary/survey_summary.json` | run ごとの summary 原本、状態数、readiness、numeric stats、warning |
 | `summary/figures_index.json` | 各 run の figure path / caption の索引 |
+| `summary/artifacts.toml` | survey summary 出力と run artifact の索引 |
 | `summary/survey_summary.md` | 人が読むための短い Markdown report |
 | `summary/plots/*.png` | `runo analyze plot` が生成する図 |
 
@@ -167,7 +202,8 @@ cross-series 比較のため、同じ geometry / survey family では同じ metr
 - completed 以外の run は state count には含めるが、summary が無ければ集計対象外。
 - Adapter の `required_outputs()` / `detect_status()` から `analysis_status = ready | incomplete | unknown` を付ける。
 - `summary.json` の `status` が `completed` 以外、または `partial = true` の場合は partial summary として扱う。
-- `summary.figures[]` と `analysis/figures/` 配下の画像を `figures_index.json` に索引化する。
+- `summary.figures[]` と `analysis/figures/` 配下の画像を `artifacts.toml` に索引化する。
+- `figures_index.json` は figure-only の互換出力として維持する。
 
 ## Survey Plot
 
@@ -245,7 +281,7 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成し
 
 - run export: `manifest.toml`, `analysis/summary.json`, `analysis/figures/**`
 - survey export: `summary/survey_summary.csv`, `survey_summary.json`, `figures_index.json`,
-  `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
+  `artifacts.toml`, `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
 - `survey.toml` がある場合は survey export に同梱する。
 
 publication export は成果物の移送用です。解析の正本は run / survey / cross-run workspace 側に残します。

@@ -15,6 +15,7 @@ class RunSummaryResult:
     run_id: str
     summary: dict[str, Any]
     summary_path: Path
+    artifacts_path: Path | None = None
     script_path: Path | None = None
     warnings: tuple[str, ...] = ()
 
@@ -34,7 +35,9 @@ class SurveyCollectionResult:
     csv_path: Path
     json_path: Path
     figures_path: Path
+    artifacts_path: Path
     report_path: Path
+    artifacts: tuple[dict[str, Any], ...] = ()
     figures: tuple[dict[str, str], ...] = ()
     warnings: tuple[str, ...] = ()
 

@@ -15,12 +15,18 @@ from runops.core.manifest import ManifestData, read_manifest
 from runops.core.models import analysis as analysis_models
 from runops.core.readiness import evaluate_run_readiness
 
+from .artifacts import (
+    artifact_path_relative_to_summary,
+    build_survey_artifacts,
+    collect_run_artifacts,
+    figures_from_artifacts,
+    read_artifacts_index,
+    write_artifacts_index,
+)
 from .report import write_survey_report
 
 SurveyCollectionResult = analysis_models.SurveyCollectionResult
 SurveyTableResult = analysis_models.SurveyTableResult
-
-_FIGURE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".pdf"}
 
 
 def _flatten_summary(summary: dict[str, Any], prefix: str = "") -> dict[str, Any]:
@@ -86,36 +92,8 @@ def _collect_numeric_stats(rows: list[dict[str, Any]]) -> dict[str, dict[str, fl
 
 
 def _extract_figures(run_dir: Path, summary: dict[str, Any]) -> list[dict[str, str]]:
-    figures: list[dict[str, str]] = []
-    seen_paths: set[str] = set()
-
-    raw_figures = summary.get("figures", [])
-    if isinstance(raw_figures, list):
-        for item in raw_figures:
-            rel_path = ""
-            caption = ""
-            if isinstance(item, dict):
-                rel_path = str(item.get("path", "")).strip()
-                caption = str(item.get("caption", "")).strip()
-            elif isinstance(item, str):
-                rel_path = item.strip()
-            if not rel_path:
-                continue
-            seen_paths.add(rel_path)
-            figures.append({"path": rel_path, "caption": caption})
-
-    auto_fig_dir = run_dir / "analysis" / "figures"
-    if auto_fig_dir.is_dir():
-        for path in sorted(auto_fig_dir.rglob("*")):
-            if not path.is_file() or path.suffix.lower() not in _FIGURE_EXTENSIONS:
-                continue
-            rel_path = str(path.relative_to(run_dir / "analysis")).replace("\\", "/")
-            if rel_path in seen_paths:
-                continue
-            seen_paths.add(rel_path)
-            figures.append({"path": rel_path, "caption": ""})
-
-    return figures
+    artifacts = collect_run_artifacts(run_dir, summary)
+    return figures_from_artifacts(artifacts)
 
 
 def extract_run_figures(
@@ -182,6 +160,59 @@ def _flatten_aggregate_run_row(run: dict[str, Any]) -> dict[str, Any]:
     return row
 
 
+def _load_or_create_run_artifacts(
+    run_dir: Path,
+    summary: dict[str, Any],
+    *,
+    run_id: str,
+    display_name: str,
+) -> list[dict[str, Any]]:
+    artifacts_path = run_dir / "analysis" / "artifacts.toml"
+    if artifacts_path.is_file():
+        return read_artifacts_index(artifacts_path)
+
+    artifacts = collect_run_artifacts(
+        run_dir,
+        summary,
+        run_id=run_id,
+        display_name=display_name,
+    )
+    write_artifacts_index(
+        artifacts_path,
+        scope="run",
+        generated_by="runo analyze collect",
+        artifacts=artifacts,
+    )
+    return artifacts
+
+
+def _survey_artifact_from_run_artifact(
+    artifact: dict[str, Any],
+    *,
+    run_dir: Path,
+    survey_dir: Path,
+    summary_dir: Path,
+    run_id: str,
+    display_name: str,
+) -> dict[str, Any]:
+    survey_artifact = dict(artifact)
+    artifact_path = str(artifact.get("path", "")).strip()
+    if artifact_path:
+        survey_rel_path = (
+            (run_dir / "analysis" / artifact_path).relative_to(survey_dir).as_posix()
+        )
+        survey_artifact["path"] = artifact_path_relative_to_summary(
+            survey_dir,
+            summary_dir,
+            survey_rel_path,
+        )
+        survey_artifact["source_path"] = survey_rel_path
+    survey_artifact.setdefault("run_id", run_id)
+    if display_name:
+        survey_artifact.setdefault("display_name", display_name)
+    return survey_artifact
+
+
 def load_survey_plot_table(survey_dir: Path) -> SurveyTableResult:
     """Collect survey summaries and expose a flat table for plotting."""
     collection = collect_survey_summaries(survey_dir)
@@ -213,12 +244,14 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
     run_rows: list[dict[str, Any]] = []
     csv_rows: list[dict[str, Any]] = []
     figure_rows: list[dict[str, str]] = []
+    artifact_rows: list[dict[str, Any]] = []
     state_counts: dict[str, int] = {}
     readiness_counts: dict[str, int] = {}
     readiness_issues: list[dict[str, Any]] = []
     generated_count = 0
     missing_count = 0
     warnings: list[str] = []
+    summary_dir = survey_dir / "summary"
 
     for run_dir in run_dirs:
         run_id = run_dir.name
@@ -336,7 +369,13 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         csv_row.update(flat_summary)
         csv_rows.append(csv_row)
 
-        figures = _extract_figures(run_dir, summary)
+        run_artifacts = _load_or_create_run_artifacts(
+            run_dir,
+            summary,
+            run_id=run_id,
+            display_name=display_name,
+        )
+        figures = figures_from_artifacts(run_artifacts)
         for figure in figures:
             figure_path = (run_dir / "analysis" / figure["path"]).relative_to(
                 survey_dir
@@ -348,6 +387,17 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                     "path": str(figure_path).replace("\\", "/"),
                     "caption": figure["caption"],
                 }
+            )
+        for artifact in run_artifacts:
+            artifact_rows.append(
+                _survey_artifact_from_run_artifact(
+                    artifact,
+                    run_dir=run_dir,
+                    survey_dir=survey_dir,
+                    summary_dir=summary_dir,
+                    run_id=run_id,
+                    display_name=display_name,
+                )
             )
 
         row["summary"] = summary
@@ -386,11 +436,11 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
 
     ordered_columns = _ordered_columns(csv_rows)
 
-    summary_dir = survey_dir / "summary"
     summary_dir.mkdir(parents=True, exist_ok=True)
     csv_path = summary_dir / "survey_summary.csv"
     json_path = summary_dir / "survey_summary.json"
     figures_path = summary_dir / "figures_index.json"
+    artifacts_path = summary_dir / "artifacts.toml"
     report_path = summary_dir / "survey_summary.md"
 
     csv_output_rows: list[dict[str, object]] = []
@@ -428,6 +478,17 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         json.dump({"figures": figure_rows}, f, indent=2)
         f.write("\n")
 
+    survey_artifacts = build_survey_artifacts(
+        summary_dir=summary_dir,
+        run_artifacts=artifact_rows,
+    )
+    write_artifacts_index(
+        artifacts_path,
+        scope="survey",
+        generated_by="runo analyze collect",
+        artifacts=survey_artifacts,
+    )
+
     write_survey_report(
         report_path,
         survey_dir=survey_dir,
@@ -455,7 +516,9 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         csv_path=csv_path,
         json_path=json_path,
         figures_path=figures_path,
+        artifacts_path=artifacts_path,
         report_path=report_path,
+        artifacts=tuple(survey_artifacts),
         figures=tuple(figure_rows),
         warnings=tuple(warnings),
     )

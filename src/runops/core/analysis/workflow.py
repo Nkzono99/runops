@@ -21,6 +21,7 @@ from runops.core.project import find_project_root
 
 from . import collection as analysis_collection
 from . import plotting as analysis_plotting
+from .artifacts import collect_run_artifacts, write_artifacts_index
 
 ResolvedSurveyPlotRecipe = analysis_models.ResolvedSurveyPlotRecipe
 RunSummaryResult = analysis_models.RunSummaryResult
@@ -336,17 +337,37 @@ def generate_run_summary(run_dir: Path) -> RunSummaryResult:
     analysis_dir = run_dir / "analysis"
     analysis_dir.mkdir(parents=True, exist_ok=True)
     summary_path = analysis_dir / "summary.json"
+    artifacts_path = analysis_dir / "artifacts.toml"
 
     with open(summary_path, "w", encoding="utf-8") as f:
         json.dump(summary, f, indent=2)
         f.write("\n")
 
     run_id = str(manifest.run.get("id", run_dir.name))
+    try:
+        project_root = find_project_root(run_dir)
+    except SimctlError:
+        project_root = None
+    artifacts = collect_run_artifacts(
+        run_dir,
+        summary,
+        run_id=run_id,
+        display_name=str(manifest.run.get("display_name", "")),
+        script_path=script_path,
+        project_root=project_root,
+    )
+    write_artifacts_index(
+        artifacts_path,
+        scope="run",
+        generated_by="runo analyze summarize",
+        artifacts=artifacts,
+    )
     return RunSummaryResult(
         run_dir=run_dir,
         run_id=run_id,
         summary=summary,
         summary_path=summary_path,
+        artifacts_path=artifacts_path,
         script_path=script_path,
         warnings=tuple(warnings),
     )

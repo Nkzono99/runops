@@ -67,6 +67,9 @@ def summarize_run(run_dir: Path) -> ActionResult:
             "run_id": result.run_id,
             "summary": result.summary,
             "summary_path": str(result.summary_path),
+            "artifacts_path": (
+                str(result.artifacts_path) if result.artifacts_path else ""
+            ),
             "script_path": str(result.script_path) if result.script_path else "",
             "warnings": list(result.warnings),
         },
@@ -123,12 +126,14 @@ def collect_survey(survey_dir: Path) -> ActionResult:
             "csv_path": str(result.csv_path),
             "json_path": str(result.json_path),
             "figures_path": str(result.figures_path),
+            "artifacts_path": str(result.artifacts_path),
             "report_path": str(result.report_path),
             "generated_summaries": result.generated_summaries,
             "missing_summaries": result.missing_summaries,
             "readiness_counts": result.readiness_counts,
             "readiness_issues": list(result.readiness_issues),
             "figure_count": len(result.figures),
+            "artifact_count": len(result.artifacts),
             "warnings": list(result.warnings),
         },
     )

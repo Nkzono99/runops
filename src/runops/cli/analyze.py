@@ -87,6 +87,7 @@ def summarize(
     summary = result.data.get("summary", {})
     run_id = result.data.get("run_id", "???")
     typer.echo(f"Summary written: {result.data.get('summary_path', '')}")
+    typer.echo(f"  Artifacts: {result.data.get('artifacts_path', '')}")
     typer.echo(f"  Run: {run_id}")
     typer.echo(f"  Keys: {', '.join(sorted(summary.keys()))}")
 
@@ -115,6 +116,7 @@ def collect(
     typer.echo(f"  CSV: {result.data.get('csv_path', '')}")
     typer.echo(f"  JSON: {result.data.get('json_path', '')}")
     typer.echo(f"  Figures: {result.data.get('figures_path', '')}")
+    typer.echo(f"  Artifacts: {result.data.get('artifacts_path', '')}")
     typer.echo(f"  Report: {result.data.get('report_path', '')}")
     generated_summaries = int(result.data.get("generated_summaries", 0))
     if generated_summaries > 0:

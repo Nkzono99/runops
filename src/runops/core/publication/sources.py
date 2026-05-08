@@ -12,6 +12,7 @@ from runops.core.analysis import (
     extract_run_figures,
     generate_run_summary,
 )
+from runops.core.analysis.artifacts import collect_run_artifacts, write_artifacts_index
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.models import publication as publication_models
@@ -171,6 +172,21 @@ def collect_run_export_sources(
         summary_path = generated.summary_path
         warnings.extend(generated.warnings)
 
+    artifacts_path = run_dir / "analysis" / "artifacts.toml"
+    if not artifacts_path.is_file():
+        summary = _load_json_summary(summary_path)
+        write_artifacts_index(
+            artifacts_path,
+            scope="run",
+            generated_by="runo analyze export",
+            artifacts=collect_run_artifacts(
+                run_dir,
+                summary,
+                run_id=run_id,
+                display_name=str(manifest.run.get("display_name", "")),
+            ),
+        )
+
     files: list[PublicationSourceArtifact] = [
         PublicationSourceArtifact(
             role="run_manifest",
@@ -180,6 +196,11 @@ def collect_run_export_sources(
         PublicationSourceArtifact(
             role="run_summary",
             source_path=summary_path,
+            run_id=run_id,
+        ),
+        PublicationSourceArtifact(
+            role="run_artifacts",
+            source_path=artifacts_path,
             run_id=run_id,
         ),
     ]
@@ -223,6 +244,10 @@ def collect_survey_export_sources(
         PublicationSourceArtifact(
             role="survey_figures_index",
             source_path=collection.figures_path,
+        ),
+        PublicationSourceArtifact(
+            role="survey_artifacts",
+            source_path=collection.artifacts_path,
         ),
         PublicationSourceArtifact(
             role="survey_report",

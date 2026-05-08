@@ -620,6 +620,7 @@ R20260329-0001/
 `runo analyze summarize` が生成する run の要約ファイル。Adapter が基本メトリクスを出力し、プロジェクトスクリプトで拡張できる。
 解析・可視化レイヤ全体の運用ルールは [Analysis Layer](layers/analysis.md) を正本とする。
 `runo analyze collect` は既存の `analysis/summary.json` を集める。completed run に summary が無い場合は missing summary として記録し、自動では `summarize` しない。
+`runo analyze summarize` は同時に `analysis/artifacts.toml` も生成する。
 
 ### 基本構造
 
@@ -686,6 +687,34 @@ def summarize(run_dir: Path, base_summary: dict) -> dict:
 
 スクリプトが例外を投げた場合は Warning を出力し、Adapter の summary のみで続行する。
 
+## analysis/artifacts.toml
+
+run-local な解析成果物の索引。`path` は `analysis/` からの相対 path。
+`summary.json` は metric の正本、`artifacts.toml` は figure / table / report / script
+などの成果物の正本として扱う。
+
+```toml
+schema_version = 1
+scope = "run"
+generated_by = "runo analyze summarize"
+
+[[artifacts]]
+kind = "figure"
+path = "figures/density_xz_final.png"
+title = "Final density XZ slice"
+description = "Final-frame log10 density on the y-center XZ plane."
+status = "draft"
+script = "cases/emses/vertical_hole/summarize.py"
+data = ["work/*.h5"]
+run_id = "R20260424-0007"
+quantity = "density"
+plane = "xz"
+frame = "final"
+```
+
+最初は厳密 schema にしない。最低限、`kind`, `path`, `title`, `description`,
+`status`, `script`, `data` を揃える。未知 field は許容する。
+
 ### Metrics schema の安定性 (cross-series 比較のために)
 
 `analyze collect` は survey 配下の run の `summary.json` を平坦化して CSV / JSON に集計する。
@@ -715,6 +744,7 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
 | `summary/survey_summary.csv` | ネストをフラット化した run 一覧。list/dict は JSON 文字列として保持。`origin.*`, `classification.*`, `variation.*`, `param.*`, `analysis_status`, `missing_required_artifacts` なども含む |
 | `summary/survey_summary.json` | run ごとの summary 原本、状態数、analysis readiness、数値統計、warning を含む集計 JSON |
 | `summary/figures_index.json` | `analysis/figures/` と `summary.figures[]` を run ごとに引いた索引 |
+| `summary/artifacts.toml` | survey summary 出力と run artifact の索引。`path` は `summary/` からの相対 path |
 | `summary/survey_summary.md` | すぐ読める Markdown レポート |
 | `summary/plots/*.png` | `runo analyze plot` が生成する survey 可視化 |
 
@@ -727,6 +757,9 @@ adapter が `default_plot_recipes()` を持つ場合は `--recipe <name>` でも
   `analysis_status = ready | incomplete | unknown` を診断する
 - `analysis/summary.json` の `status` が `completed` 以外、または `partial = true`
   の場合は partial summary として `analysis_status = incomplete` にする
+- `summary/artifacts.toml` は各 run の `analysis/artifacts.toml` を集約する。
+  run 側 index が無い場合は `summary.figures[]` と `analysis/figures/` から fallback 生成する
+- `summary/figures_index.json` は当面、figure-only の互換出力として維持する
 
 ### survey_summary.json の概要
 
@@ -876,8 +909,8 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成す
 
 ### export 対象
 
-- run export: `manifest.toml`, `analysis/summary.json`, `analysis/figures/**`
-- survey export: `summary/survey_summary.csv`, `survey_summary.json`, `figures_index.json`, `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
+- run export: `manifest.toml`, `analysis/summary.json`, `analysis/artifacts.toml`, `analysis/figures/**`
+- survey export: `summary/survey_summary.csv`, `survey_summary.json`, `figures_index.json`, `artifacts.toml`, `survey_summary.md`, `summary/plots/**`, 参照された run figure 群
 - `survey.toml` がある場合は survey export に同梱される
 
 ### `manifest.json` の要点
