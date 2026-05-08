@@ -296,6 +296,7 @@ runo runs list runs/cavity/scan
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
 | `runo update` | シミュレータパッケージのアップグレード |
+| `runo update-harness` | project 側 Agent harness / managed scaffold を再生成 |
 | `runo update-refs [SIMS...]` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
 
 ### Run 作成・投入
@@ -309,6 +310,8 @@ runo runs list runs/cavity/scan
 | `runo runs submit --all [DIR]` | created な run を一括投入 |
 | `runo runs clone` | run 複製・派生 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
+| `runo runs retry [RUN] [--plan]` | failed / cancelled run の retry 準備 |
+| `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
 
 ### 状態管理・モニタリング
 
@@ -329,6 +332,8 @@ runo runs list runs/cavity/scan
 | `runo analyze summarize [RUN]` | Adapter による run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 内の全 run から集計データ生成 |
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 (`--recipe` / `--list-recipes` 対応) |
+| `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を `exports/papers/` に作成 |
+| `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で安全に停止 |
 | `runo runs archive [RUN]` | run のアーカイブ (completed のみ) |
 | `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
@@ -341,6 +346,7 @@ runo runs list runs/cavity/scan
 | `runo notes append TITLE [BODY]` | 今日の `notes/YYYY-MM-DD.md` に timestamped エントリを追記 (`-` または省略で stdin から本文を読む) |
 | `runo notes list [-n N]` | 最近の lab notebook 日付一覧 (新しい順) |
 | `runo notes show [DATE\|today\|latest]` | 指定日 (省略時は today) の lab notebook を表示 |
+| `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
 
 `notes/` は append-only な実験ノートと、改稿可能な `notes/reports/` を置く
 人間/Agent 共有の知識層です。準備フェーズの意思決定、観察、仮説、TODO を
@@ -399,7 +405,9 @@ runops/
     runops/
       cli/                 # CLI エントリポイント (typer)
         main.py            # コマンド登録
-        init.py            # init / setup / doctor
+        init/              # init / doctor / scaffold / bootstrap
+        setup.py           # setup (clone + bootstrap)
+        lint.py            # project state health check
         new.py             # case new (`--minimal`, EMSES `emu generate -u`)
         create.py          # runs create / runs sweep (`--dry-run`)
         submit.py          # runs submit (`-qn`, `--afterok`)
@@ -411,31 +419,47 @@ runops/
         list.py            # runs list (複数 PATH 対応)
         clone.py           # runs clone
         extend.py          # runs extend
-        analyze.py         # analyze summarize / collect / plot
-        notes.py           # notes append / list / show (lab notebook)
+        retry.py           # runs retry
+        regenerate.py      # runs regenerate
+        analyze.py         # analyze summarize / collect / plot / export / new-comparison
+        notes.py           # notes append / list / show / archive
         manage.py          # runs archive / purge-work / cancel / delete
+        migrate.py         # project-state migrations
+        demo.py            # demo import / replay UI
+        run_lookup.py      # run_id / run directory 解決 helper
         update.py          # update (パッケージ更新)
+        update_harness.py  # project harness 再生成
+        update_harness_tools.py  # tools/runops pull / editable reinstall helper
         update_refs.py     # update-refs (refs/ 更新 + ナレッジ)
-        knowledge.py       # knowledge / knowledge source
+        knowledge/         # knowledge / knowledge source / profile
         config.py          # config (設定管理)
       core/                # ドメインロジック
+        actions/           # CLI / Agent action facade と registry
+        analysis/          # summary / collect / plot / export / comparison
         project.py         # Project 読込・検証
         case.py            # Case 読込・展開
+        campaign.py        # campaign.toml 読込
         survey/            # Survey 展開・parameter 直積
         run/               # RunInfo・run_id 採番・run directory 作成
         run_creation/      # case / survey から run を生成する orchestration
         manifest.py        # manifest.toml 読書き
         state.py           # 状態遷移管理
+        retry.py           # retry assessment / planning
+        readiness.py       # analysis readiness 判定
         provenance.py      # コード provenance 取得
         discovery.py       # runs/ 再帰探索・run_id 一意性検証
         exceptions.py      # ドメイン例外
         site/              # HPC site profile 解決
         validation/        # パラメータバリデーション
-        campaign.py        # campaign.toml 読込
         environment/       # 実行環境検出・記述
         knowledge/         # 知識層 (insights, facts)
         knowledge_source/  # 外部知識ソース管理
+        lint/              # project health check
+        migrations/        # project-state migration registry
+        publication/       # paper-facing export bundle
+        research/          # research/agenda.md summary
         demo/              # session import / replay UI
+        models/            # shared dataclass / record helpers
       adapters/            # Simulator Adapter
         base.py            # SimulatorAdapter 抽象基底クラス
         registry.py        # Adapter 登録・lookup
@@ -522,6 +546,7 @@ uv run runo --help
 - [知識層](docs/layers/knowledge.md) -- AI エージェント向け知識管理アーキテクチャ
 - [ハーネス層](docs/layers/harness.md) -- Agent instructions / skills / rules の責務分離
 - [Upstream 連携層](docs/layers/upstream.md) -- `tools/runops` local patch / feedback / PR の境界
+- [Project health check](docs/project-health.md) -- `runo lint` による project state 検査
 - [移行ガイド](docs/migrations/README.md) -- runops 更新時の project-state migration 手順
 - [TOML リファレンス](docs/toml-reference.md) -- 全設定ファイルのフィールド定義
 - [SPEC.md](SPEC.md) -- 完全な仕様書

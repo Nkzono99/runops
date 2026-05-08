@@ -90,9 +90,16 @@ runops/
         submit.py       # runo runs submit
         status.py       # runo runs status / sync
         manage.py       # runo runs archive / purge-work / cancel / delete
+        retry.py        # runo runs retry
+        regenerate.py   # runo runs regenerate
+        lint.py         # runo lint
+        migrate.py      # runo migrate
         update_harness.py
+        update_harness_tools.py
         ...
       core/             # ドメインロジック
+        actions/         # CLI / Agent action facade と registry
+        analysis/        # summary / collect / plot / export / comparison
         project.py
         case.py
         survey/          # Survey 展開・parameter 直積
@@ -105,6 +112,9 @@ runops/
         site/            # HPC site profile 解決
         environment/     # 実行環境検出・記述
         validation/      # パラメータバリデーション
+        lint/            # project health check
+        migrations/      # project-state migration registry
+        research/        # research/agenda.md summary
         run_creation/    # case/survey から run を生成する orchestration
           __init__.py
           manifest.py
@@ -118,7 +128,7 @@ runops/
           __init__.py
           importer.py
           replay.py
-        publication/
+        publication/     # paper-facing export bundle
         ...
       adapters/         # Simulator Adapter
         __init__.py
@@ -185,8 +195,11 @@ runops/
 | `runo runs clone` | run 複製・派生 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備。`--plan` では状態を戻さず partial output と retry intent を記録 |
+| `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
+| `runo analyze plot [DIR]` | survey 集計結果を可視化 |
+| `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runo notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
 | `runo notes list` | active / history の lab notebook 日付一覧 |
@@ -199,6 +212,8 @@ runops/
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
+| `runo update` | シミュレータパッケージのアップグレード |
+| `runo update-harness` | project 側 Agent harness / managed scaffold を再生成 |
 | `runo update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
 | `runo knowledge save` | 知見を .runops/insights/ に保存 |
 | `runo knowledge add-fact` | 構造化 fact を .runops/facts.toml に追加 |
@@ -211,6 +226,7 @@ runops/
 | `runo knowledge source sync` | 知識ソース同期 + 外部知見取り込み |
 | `runo knowledge source render` | 有効な profile から imports.md を生成 |
 | `runo knowledge source status` | 知識統合の状態表示 |
+| `runo knowledge profile enable/disable` | source profile の有効 / 無効化 |
 
 全コマンドは引数省略時にカレントディレクトリをデフォルトとする。
 

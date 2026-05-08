@@ -120,7 +120,7 @@ project-state に影響する breaking change は `docs/migrations/v0.md` に移
 | `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
 | `runo runs submit [--all] [-qn] [--qos]` | ジョブ投入 |
 | `runo runs status` / `sync` / `log` / `dashboard` | モニタリング |
-| `runo analyze summarize` / `collect` / `new-comparison` | 解析 |
+| `runo analyze summarize` / `collect` / `plot` / `export` / `new-comparison` | 解析 |
 | `runo notes append` / `notes archive` / `knowledge save` | 知見管理 |
 | `runo runs archive` / `purge-work` / `cancel` / `delete` | ライフサイクル |
 

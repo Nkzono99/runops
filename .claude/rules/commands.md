@@ -15,6 +15,7 @@
 | `runops config show` | 設定表示 |
 | `runops config add-simulator` | シミュレータ追加 (対話型) |
 | `runops config add-launcher` | ランチャー追加 (対話型) |
+| `runops update` | シミュレータパッケージのアップグレード |
 | `runops update-harness` | ハーネスファイル再生成 |
 | `runops update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
 
@@ -29,6 +30,8 @@
 | `runops runs submit --all [DIR]` | created な run を一括投入 |
 | `runops runs clone` | run 複製・派生 |
 | `runops runs extend` | スナップショットから継続 run 生成 |
+| `runops runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備 (`--plan` は状態を戻さず記録のみ) |
+| `runops runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
 
 ## モニタリング
 
@@ -48,6 +51,8 @@
 |---------|------|
 | `runops analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runops analyze collect [DIR]` | survey 集計 |
+| `runops analyze plot [DIR]` | survey 集計結果の可視化 |
+| `runops analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runops analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runops notes append TITLE [BODY]` | lab notebook に追記 |
 | `runops notes list` | active/history の lab notebook 日付一覧 |

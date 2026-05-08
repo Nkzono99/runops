@@ -16,6 +16,7 @@
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
+| `runo update` | シミュレータパッケージのアップグレード |
 | `runo update-harness` | ハーネスファイル再生成 |
 | `runo update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
 
@@ -31,6 +32,7 @@
 | `runo runs clone` | run 複製・派生 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備 (`--plan` は状態を戻さず記録のみ) |
+| `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
 
 ## モニタリング
 
@@ -50,6 +52,8 @@
 |---------|------|
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
+| `runo analyze plot [DIR]` | survey 集計結果の可視化 |
+| `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runo notes append TITLE [BODY]` | lab notebook に追記 |
 | `runo notes list` | active/history の lab notebook 日付一覧 |

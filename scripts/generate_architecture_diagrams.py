@@ -1,4 +1,5 @@
 """Generate the src/runops structure guide using Python Diagrams."""
+# ruff: noqa: E501
 
 from __future__ import annotations
 
@@ -20,14 +21,13 @@ except ModuleNotFoundError as exc:
 
 from diagram_utils import (
     DOCS_ROOT,
-    markdown_image,
     make_diagram,
+    markdown_image,
     node_attrs,
     png_path,
     prepare_figure_dir,
     require_graphviz,
 )
-
 
 SRC_ROOT = Path(__file__).resolve().parent.parent / "src" / "runops"
 DOC_PATH = DOCS_ROOT / "src-structure.md"
@@ -45,13 +45,13 @@ DIRECTORY_LABELS: dict[str, str] = {
 
 KEY_FILES: tuple[tuple[str, str], ...] = (
     ("src/runops/cli/main.py", "最上位のコマンド登録。"),
-    ("src/runops/core/actions.py", "CLI と agent が使う薄い action facade。"),
+    ("src/runops/core/actions/", "CLI と agent が使う action facade と registry。"),
     (
-        "src/runops/core/run_creation.py",
+        "src/runops/core/run_creation/",
         "case -> adapter -> launcher -> site -> job.sh をつなぐ実行時の中心。",
     ),
     (
-        "src/runops/core/site.py",
+        "src/runops/core/site/",
         "runtime の site 解決。site.toml、legacy launcher fallback、STANDARD_SITE を扱う。",
     ),
     (
@@ -71,9 +71,14 @@ KEY_FILES: tuple[tuple[str, str], ...] = (
         "Slurm state の問い合わせと runops RunState への写像。",
     ),
     (
-        "src/runops/cli/init.py",
-        "init 時に src/runops/sites/*.toml を読み、project 側の site.toml を書く。",
+        "src/runops/cli/init/command.py",
+        "init 時の対話 UX、project scaffold、site preset 書き出し。",
     ),
+    (
+        "src/runops/cli/init/bootstrap.py",
+        "init 後の `.venv`、`tools/runops`、editable install bootstrap。",
+    ),
+    ("src/runops/cli/init/scaffold.py", "init/setup で共有する scaffold helper。"),
 )
 
 
@@ -84,7 +89,9 @@ def _count_directory_entries(path: Path) -> str:
         return f"{toml_count} 個の preset TOML、{md_count} 個の companion doc"
 
     if path.name == "templates":
-        file_count = len([p for p in path.rglob("*") if p.is_file()])
+        file_count = len(
+            [p for p in path.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
+        )
         return f"{file_count} 個の template asset"
 
     file_count = len([p for p in path.rglob("*.py") if "__pycache__" not in p.parts])
@@ -128,7 +135,9 @@ def _build_overview(figure_dir: str) -> str:
         )
 
         with Cluster("src/runops"):
-            cli = User("cli/\nTyper command \nと command grouping", **node_attrs("human"))
+            cli = User(
+                "cli/\nTyper command \nと command grouping", **node_attrs("human")
+            )
             core = Python(
                 "core/\nProject / Case / Survey / Run /\nActions / State / Knowledge",
                 **node_attrs("agent"),
@@ -141,9 +150,13 @@ def _build_overview(figure_dir: str) -> str:
                 "launchers/\nsrun / mpirun / mpiexec factory",
                 **node_attrs("runtime"),
             )
-            site_core = Rack("core/site.py\nruntime site abstraction", **node_attrs("config"))
+            site_core = Rack(
+                "core/site/\nruntime site abstraction", **node_attrs("config")
+            )
             jobgen = Rack("jobgen/\nsubmit/job.sh 生成", **node_attrs("artifact"))
-            slurm = Rack("slurm/\nsbatch / squeue / sacct wrapper", **node_attrs("artifact"))
+            slurm = Rack(
+                "slurm/\nsbatch / squeue / sacct wrapper", **node_attrs("artifact")
+            )
             templates = Storage(
                 "templates/\ncase / survey / \n scaffold / agent asset",
                 **node_attrs("config"),
@@ -255,7 +268,7 @@ def _build_site_resolution(figure_dir: str) -> str:
             "bundled preset\nsrc/runops/sites/*.toml\n+ *.md",
             **node_attrs("config"),
         )
-        init_cli = User("runops init\ncli/init.py", **node_attrs("human"))
+        init_cli = User("runops init\ncli/init/", **node_attrs("human"))
         project_site = Storage(
             "project site.toml\nruntime source of truth",
             **node_attrs("config"),
@@ -268,7 +281,7 @@ def _build_site_resolution(figure_dir: str) -> str:
             "runops case new\nresource_style を参照",
             **node_attrs("human"),
         )
-        runtime = Python("core/site.py\nload_site_profile()", **node_attrs("agent"))
+        runtime = Python("core/site/\nload_site_profile()", **node_attrs("agent"))
         standard = Rack("STANDARD_SITE", **node_attrs("artifact"))
         jobgen = Rack("jobgen\ngenerate_job_script()", **node_attrs("artifact"))
         job_sh = Rack(
@@ -285,7 +298,9 @@ def _build_site_resolution(figure_dir: str) -> str:
         project_site >> case_new
         runtime >> jobgen >> job_sh
 
-    return markdown_image(DOC_PATH, png_path(base), "site の init 時 preset と runtime 解決")
+    return markdown_image(
+        DOC_PATH, png_path(base), "site の init 時 preset と runtime 解決"
+    )
 
 
 def _build_document() -> str:
@@ -305,14 +320,14 @@ def _build_document() -> str:
         "",
         "- `cli/` は人間や agent が直接叩く Typer ベースの入り口です。",
         "- `core/` は domain model だけでなく、project 設定から adapter / launcher / site / Slurm をつなぐ orchestration module も持っています。",
-        "- `adapters/`、`launchers/`、`core/site.py` はそれぞれ別の可変軸です。",
+        "- `adapters/`、`launchers/`、`core/site/` はそれぞれ別の可変軸です。",
         "  simulator 固有差分、MPI 起動方式、cluster/site 固有差分を分離しています。",
         "",
         "いまの実装で特に混乱しやすいのは `site` まわりです。",
         "",
         "- `src/runops/sites/` は project の runtime site 設定そのものではありません。",
         "- ここは `runops init` が一度だけ読む bundled preset 集です。",
-        "- 実行時に使われる site の本体は project root の `site.toml` で、解決ロジックは `src/runops/core/site.py` にあります。",
+        "- 実行時に使われる site の本体は project root の `site.toml` で、解決ロジックは `src/runops/core/site/` にあります。",
         "",
         "## top-level directory 一覧",
         "",
@@ -332,10 +347,10 @@ def _build_document() -> str:
         "",
         "## adapter / launcher 解決の要点",
         "",
-        "たとえば `case.toml` に `simulator = \"emses\"`、`launcher = \"camphor\"` と書かれているとき、",
+        'たとえば `case.toml` に `simulator = "emses"`、`launcher = "camphor"` と書かれているとき、',
         "実行時の解決は次の順で進みます。",
         "",
-        "- `core/run_creation.py` が project、case、必要なら survey override を読みます。",
+        "- `core/run_creation/` が project、case、必要なら survey override を読みます。",
         "- simulator entry は `project.simulators` から引かれます。",
         "- `load_adapter_for_simulator()` がその entry から adapter 名を取り出します。",
         "- `AdapterRegistry.load_from_config()` は `runops.adapters.contrib.<adapter>` を先に、次に `runops.adapters.<adapter>` を import しようとします。",

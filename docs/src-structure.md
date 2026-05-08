@@ -20,14 +20,14 @@ runops の `src/` は、まず次の 3 つを分けて考えると読みやす�
 
 | Directory | 役割 | 現在の規模 |
 |---|---|---|
-| `cli/` | Typer ベースの CLI エントリポイントと対話 UX | 25 個の Python module |
-| `core/` | ドメインモデル、実行オーケストレーション、manifest、state、knowledge | 22 個の Python module |
-| `adapters/` | シミュレータ固有処理と adapter registry | 9 個の Python module |
+| `cli/` | Typer ベースの CLI エントリポイントと対話 UX | 40 個の Python module |
+| `core/` | ドメインモデル、実行オーケストレーション、manifest、state、knowledge | 87 個の Python module |
+| `adapters/` | シミュレータ固有処理と adapter registry | 16 個の Python module |
 | `launchers/` | MPI 起動ラッパーと launcher factory | 5 個の Python module |
 | `jobgen/` | job、launcher、site から job.sh を組み立てる層 | 2 個の Python module |
 | `slurm/` | sbatch / squeue / sacct の薄いラッパー | 3 個の Python module |
 | `sites/` | runo init だけが読む bundled site preset | 1 個の preset TOML、1 個の companion doc |
-| `templates/` | project / case / survey にコピーされる静的テンプレート | 37 個の template asset |
+| `templates/` | project / case / survey にコピーされる静的テンプレート | 71 個の template asset |
 
 ## 全体構造
 
