@@ -264,6 +264,8 @@ runo runs submit
 # survey 内の全 run を一括投入
 cd runs/cavity/scan
 runo runs submit --all
+# 対話確認を省略する場合
+runo runs submit --all --yes
 ```
 
 ### 8. 状態の確認
@@ -306,9 +308,9 @@ runo runs list runs/cavity/scan
 | `runo case new CASE [--minimal] [--survey]` | 新規 case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレートを使用、EMSES では `emu generate -u` を best-effort で自動実行し `[meta.physical]` を埋める) |
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 一括生成 (`--dry-run` で件数・パラメータ組合せ・概算 core-hour のみ表示) |
-| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn` でキュー上書き、`--afterok` で依存ジョブ指定) |
-| `runo runs submit --all [DIR]` | created な run を一括投入 |
-| `runo runs clone` | run 複製・派生 |
+| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
+| `runo runs submit --all [DIR] [--yes]` | created な run を確認付きで一括投入 (`--yes` で確認省略) |
+| `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed / cancelled run の retry 準備 |
 | `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |

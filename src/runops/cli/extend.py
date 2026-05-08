@@ -13,7 +13,7 @@ from runops.core.discovery import collect_existing_run_ids
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest, write_manifest
 from runops.core.project import find_project_root, load_project
-from runops.core.run import create_run
+from runops.core.run import create_run, rewrite_job_script_references
 
 
 def extend(
@@ -143,7 +143,15 @@ def extend(
     new_submit.mkdir(parents=True, exist_ok=True)
     source_job = source_submit / "job.sh"
     if source_job.is_file():
-        shutil.copy2(source_job, new_submit / "job.sh")
+        new_job = new_submit / "job.sh"
+        shutil.copy2(source_job, new_job)
+        rewrite_job_script_references(
+            new_job,
+            source_dir=source_dir,
+            target_dir=new_dir,
+            source_run_id=source_id,
+            target_run_id=run_info.run_id,
+        )
 
     # Create work directory
     (new_dir / "work").mkdir(exist_ok=True)

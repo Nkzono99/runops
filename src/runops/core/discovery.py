@@ -141,6 +141,7 @@ def resolve_run(identifier: str, runs_dir: Path) -> Path:
 
     Raises:
         RunNotFoundError: If the run cannot be found.
+        DuplicateRunIdError: If the run_id matches multiple manifests.
     """
     # Check if identifier is a path
     try:
@@ -157,14 +158,20 @@ def resolve_run(identifier: str, runs_dir: Path) -> Path:
         raise RunNotFoundError(f"Invalid run path {identifier!r}: {e}") from None
 
     # Search by run_id
+    matches: list[Path] = []
     run_dirs = discover_runs(runs_dir)
     for run_dir in run_dirs:
         try:
             run_id = _read_run_id(run_dir)
             if run_id == identifier:
-                return run_dir
+                matches.append(run_dir)
         except (ManifestNotFoundError, Exception):
             continue
+
+    if len(matches) > 1:
+        raise DuplicateRunIdError(identifier, [str(path) for path in matches])
+    if len(matches) == 1:
+        return matches[0]
 
     raise RunNotFoundError(f"Run not found for identifier: {identifier!r}")
 

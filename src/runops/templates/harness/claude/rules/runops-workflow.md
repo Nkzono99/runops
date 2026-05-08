@@ -48,6 +48,7 @@ permissions では allow し、Agent 側の workflow rule として以下を守�
 - 実行前に **投入内容 (コマンド・対象 run・queue・QOS・資源量) をユーザーに提示**
   してから submit を呼ぶ
 - partition override: `-qn <name>`, QOS override: `--qos <name>`
+- `runo runs submit --all` は CLI 側でも確認する。会話上で明示確認済みの場合だけ `--yes` を使う
 - `--dry-run` と `--help` は確認用なのでそのまま実行してよい
 - 承認なしに実ジョブ投入を繰り返し試行しない
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。

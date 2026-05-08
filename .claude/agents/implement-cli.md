@@ -41,11 +41,11 @@ src/runops/cli/
 | `runops create CASE --dest DIR` | Generate single run from Case |
 | `runops sweep DIR` | Batch generate all runs from survey.toml |
 | `runops submit RUN` | Submit job via sbatch |
-| `runops submit --all DIR` | Submit all runs in survey |
+| `runops submit --all DIR [--yes]` | Submit all runs in survey (confirmation unless `--yes`) |
 | `runops status RUN` | Check run status |
 | `runops sync RUN` | Sync Slurm state to manifest |
 | `runops list [PATH]` | List runs |
-| `runops clone RUN --dest DIR` | Clone/derive run |
+| `runops clone RUN --dest DIR [--set key=value]` | Clone/derive run (`--set` regenerates input/job from source case) |
 | `runops summarize RUN` | Generate run analysis summary |
 | `runops collect DIR` | Aggregate survey results |
 | `runops archive RUN` | Archive run |

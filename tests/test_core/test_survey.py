@@ -106,6 +106,16 @@ class TestLoadSurvey:
         with pytest.raises(SurveyConfigError, match="appear in both"):
             load_survey(tmp_path)
 
+    def test_linked_duplicate_across_groups(self, tmp_path: Path) -> None:
+        (tmp_path / "survey.toml").write_text(
+            '[survey]\nid = "S1"\nname = "t"\nbase_case = "c"\n'
+            'simulator = "s"\nlauncher = "l"\n\n'
+            "[[linked]]\nnx = [32, 64]\nny = [32, 64]\n\n"
+            "[[linked]]\nnx = [128, 256]\ndt = [0.1, 0.01]\n"
+        )
+        with pytest.raises(SurveyConfigError, match="multiple"):
+            load_survey(tmp_path)
+
     def test_linked_single_table_error(self, tmp_path: Path) -> None:
         """[linked] (single table) should be rejected; must use [[linked]]."""
         (tmp_path / "survey.toml").write_text(

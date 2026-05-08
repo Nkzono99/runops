@@ -140,6 +140,7 @@ def load_survey(survey_dir: Path) -> SurveyData:
     # Parse linked parameter groups
     linked_section = raw.get("linked", [])
     linked: list[dict[str, list[Any]]] = []
+    seen_linked_keys: set[str] = set()
     if isinstance(linked_section, list):
         for i, group in enumerate(linked_section):
             if not isinstance(group, dict):
@@ -149,6 +150,11 @@ def load_survey(survey_dir: Path) -> SurveyData:
             parsed_group: dict[str, list[Any]] = {}
             lengths: set[int] = set()
             for key, values in group.items():
+                if key in seen_linked_keys:
+                    raise SurveyConfigError(
+                        f"Linked parameter '{key}' appears in multiple [[linked]]"
+                        f" groups in {survey_file}"
+                    )
                 if not isinstance(values, list):
                     raise SurveyConfigError(
                         f"Linked parameter '{key}' in group {i} must be a list"
@@ -168,6 +174,7 @@ def load_survey(survey_dir: Path) -> SurveyData:
                 )
             if parsed_group:
                 linked.append(parsed_group)
+                seen_linked_keys.update(parsed_group)
     elif isinstance(linked_section, dict):
         raise SurveyConfigError(
             f"[linked] must be an array of tables ([[linked]]), not a single"

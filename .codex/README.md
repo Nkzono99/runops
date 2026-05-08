@@ -103,6 +103,8 @@ codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   runo runs submit --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
+  runo runs submit --all runs/survey --yes
+codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   runo runs submit R20260419-0001
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   rm -rf runs/R20260419-0001

@@ -90,6 +90,7 @@ runo runs submit --dry-run          # 確認のみ
 cd runs/sheath/angle_scan
 runo runs submit --all
 runo runs submit --all -qn compute
+runo runs submit --all --yes       # 会話上で確認済みの場合のみ
 ```
 
 ## 状態確認と同期
@@ -117,7 +118,7 @@ runo runs log -f         # follow (tail -f 相当)
 ```bash
 # clone
 runo runs clone --dest runs/test/variant
-runo runs clone --set dt=0.5e-8 --set nx=128
+runo runs clone --set dt=0.5e-8 --set nx=128  # source case から再生成
 
 # 完了 run から continuation
 runo runs extend

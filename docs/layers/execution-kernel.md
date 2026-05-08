@@ -102,7 +102,7 @@ Human gate が必要な典型例:
 
 - production sweep の一括投入
 - 高コストな rerun / retry
-- `runo runs submit --all`
+- `runo runs submit --all` (`--yes` は会話上で明示確認済みの場合のみ)
 - `runo runs cancel`
 - `runo runs delete`
 - `runo runs purge-work`

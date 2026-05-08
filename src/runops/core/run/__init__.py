@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from .derivation import (
+    rewrite_job_script_references,
+    sanitize_derived_manifest,
+)
 from .records import (
     RunInfo,
     create_run,
@@ -16,4 +20,6 @@ __all__ = [
     "create_run_directory",
     "generate_run_id",
     "next_run_id",
+    "rewrite_job_script_references",
+    "sanitize_derived_manifest",
 ]

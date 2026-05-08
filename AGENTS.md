@@ -183,8 +183,8 @@ runops/
 | `runo case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレート、EMSES では `emu generate -u` を自動実行) |
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 (`--dry-run` で件数・パラメータ・概算 core-hour を表示するだけ) |
-| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--afterok` 対応) |
-| `runo runs submit --all [DIR]` | created な run を一括投入 |
+| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
+| `runo runs submit --all [DIR] [--yes]` | created な run を確認付きで一括投入 (`--yes` で確認省略) |
 | `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
 | `runo runs status [RUNS...]` | run 状態確認 (run_id・run dir・survey dir を複数渡してまとめて表示可) |
 | `runo runs sync [RUNS...]` | Slurm 状態を manifest に反映 (bulk 対応: survey 配下の created run + terminal state な run は silent skip) |
@@ -192,7 +192,7 @@ runops/
 | `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗 (state, step/N, %, last Slurm state) を 1 つの表で表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
 | `runo runs list [PATHS...]` | run 一覧表示 (複数 PATH 指定可) |
-| `runo runs clone` | run 複製・派生 |
+| `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備。`--plan` では状態を戻さず partial output と retry intent を記録 |
 | `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |

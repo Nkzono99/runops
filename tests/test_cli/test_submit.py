@@ -173,13 +173,38 @@ def test_submit_all(tmp_path: Path) -> None:
             side_effect=["22222", "33333"],
         ),
     ):
-        result = runner.invoke(app, ["runs", "submit", "--all", str(survey_dir)])
+        result = runner.invoke(
+            app,
+            ["runs", "submit", "--all", "--yes", str(survey_dir)],
+        )
 
     assert result.exit_code == 0
     assert "22222" in result.output
     assert "33333" in result.output
     assert "2 submitted" in result.output
     assert "1 skipped" in result.output
+
+
+def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
+    """--all should ask for confirmation before submitting created runs."""
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    survey_dir = tmp_path / "runs" / "survey1"
+    _create_run(survey_dir / "R20260327-0001", run_id="R20260327-0001")
+
+    with (
+        patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
+        patch("runops.slurm.submit.sbatch_submit") as mock_submit,
+    ):
+        result = runner.invoke(
+            app,
+            ["runs", "submit", "--all", str(survey_dir)],
+            input="n\n",
+        )
+
+    assert result.exit_code == 0
+    assert "About to submit 1 created run" in result.output
+    assert "Cancelled." in result.output
+    mock_submit.assert_not_called()
 
 
 def test_submit_all_dry_run(tmp_path: Path) -> None:

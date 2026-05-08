@@ -123,6 +123,13 @@ class TestResolveRun:
         with pytest.raises(RunNotFoundError):
             resolve_run("R20260327-9999", runs_dir)
 
+    def test_duplicate_run_id_is_ambiguous(self, tmp_path: Path) -> None:
+        runs_dir = tmp_path / "runs"
+        _make_run(runs_dir, "a", "R1", run_id="R20260327-0001")
+        _make_run(runs_dir, "b", "R2", run_id="R20260327-0001")
+        with pytest.raises(DuplicateRunIdError, match="R20260327-0001"):
+            resolve_run("R20260327-0001", runs_dir)
+
     def test_not_found_by_path(self, tmp_path: Path) -> None:
         runs_dir = tmp_path / "runs"
         runs_dir.mkdir()

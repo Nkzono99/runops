@@ -998,7 +998,7 @@ production tag を持つ run では、以下を推奨または要求する。
 ## 18.3 job 実行
 
 * `runops submit <run_dir or run_id>`
-* `runops submit --all <survey_dir>`
+* `runops submit --all <survey_dir>` — created run を一括投入する。通常は確認を要求し、明示済みの自動実行では `--yes` で省略できる。
 
 ---
 
@@ -1029,7 +1029,7 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 ## 18.6 複製・派生
 
 * `runops clone <run_dir or run_id> --dest <survey_dir>`
-* `runops clone <run_id> --set key=value`
+* `runops clone <run_id> --set key=value` — `origin.case` と `params_snapshot` から input/job を再生成し、manifest だけの差し替えで派生 run を作らない。
 
 ---
 

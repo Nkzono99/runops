@@ -184,26 +184,40 @@ def submit_run(
     now = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
     attempt = get_attempt_count(manifest.job) + 1
     existing_attempts: list[dict[str, str]] = list(manifest.job.get("attempts", []))
-    existing_attempts.append(
-        {
-            "job_id": job_id,
-            "submitted_at": now,
-            "attempt": str(attempt),
-        }
-    )
+    attempt_record = {
+        "job_id": job_id,
+        "submitted_at": now,
+        "attempt": str(attempt),
+    }
+    if queue_name:
+        attempt_record["partition"] = queue_name
+        attempt_record["queue"] = queue_name
+    if qos:
+        attempt_record["qos"] = qos
+    if afterok:
+        attempt_record["afterok"] = afterok
+    existing_attempts.append(attempt_record)
+    job_updates: dict[str, Any] = {
+        "job_id": job_id,
+        "submitted_at": now,
+        "attempt": attempt,
+        "attempts": existing_attempts,
+        "queue": queue_name or manifest.job.get("queue", ""),
+    }
+    if queue_name:
+        job_updates["partition"] = queue_name
+    if qos:
+        job_updates["qos"] = qos
+    if afterok:
+        job_updates["afterok"] = afterok
+
     update_manifest(
         run_dir,
         {
             "run": {
                 "last_slurm_state": "",
             },
-            "job": {
-                "job_id": job_id,
-                "submitted_at": now,
-                "attempt": attempt,
-                "attempts": existing_attempts,
-                "queue": queue_name or manifest.job.get("queue", ""),
-            },
+            "job": job_updates,
         },
     )
     try:

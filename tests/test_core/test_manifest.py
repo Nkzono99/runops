@@ -38,6 +38,8 @@ class TestManifestData:
         d = data.to_dict()
         assert "run" in d
         assert "origin" not in d  # empty dict omitted
+        assert "params_snapshot" in d  # empty snapshot is still a frozen baseline
+        assert d["params_snapshot"] == {}
 
     def test_from_dict_missing_keys(self) -> None:
         data = ManifestData.from_dict({})

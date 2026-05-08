@@ -25,7 +25,7 @@ runops プロジェクトにおける Agent の作業ガイド。
 | survey 全 run 生成 | `runo runs sweep <survey>` |
 | sweep 内容を確認だけ | `runo runs sweep <survey> --dry-run` |
 | job 投入 | `runo runs submit` |
-| 全 run 一括投入 | `runo runs submit --all` |
+| 全 run 一括投入 | `runo runs submit --all` (`--yes` で確認省略) |
 | キュー上書き / QOS / 依存ジョブ | `runo runs submit -qn <queue>` / `--qos <qos>` / `--afterok <job_id>` |
 | 状態確認 (単一/複数/survey 一括) | `runo runs status [RUNS...]` |
 | Slurm 同期 (単一/複数/survey 一括) | `runo runs sync [RUNS...]` (bulk: created + terminal state は silent skip) |
@@ -143,7 +143,8 @@ Claude Code 向けに project 内の保護ルールを設定する。
 - `notes/YYYY-MM-DD.md` は `runo notes append` 経由で append-only に追記する (既存 entry を書き換えない)
 - `runo notes archive` は古い日次 notebook だけを `notes/history/YYYY/` に移し、`notes/reports/` には触れない
 - `runo runs submit` は破壊的操作ではないが、HPC 資源・queue・quota に影響する。
-  Agent には許可するが、実行前に dry-run 結果、対象 run、queue、資源量を提示する
+  Agent には許可するが、実行前に dry-run 結果、対象 run、queue、資源量を提示する。
+  `--all` は CLI 側でも確認し、会話上で明示確認済みの場合だけ `--yes` を使う
 - `runo runs cancel` は harness 上 allow 扱いだが、実行前に対象 run と理由は報告する
 
 ## 状態遷移

@@ -570,6 +570,7 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
             "submit_run",
             run_dir=run_dir,
             queue_name="compute",
+            qos="debugqos",
             afterok="67890",
         )
 
@@ -578,7 +579,10 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
     mock_submit.assert_called_once()
     assert mock_submit.call_args.args[0] == run_dir / "submit" / "job.sh"
     assert mock_submit.call_args.args[1] == run_dir / "work"
-    assert mock_submit.call_args.kwargs["extra_args"] == ["--partition=compute"]
+    assert mock_submit.call_args.kwargs["extra_args"] == [
+        "--partition=compute",
+        "--qos=debugqos",
+    ]
     assert mock_submit.call_args.kwargs["afterok"] == "67890"
 
     from runops.core.manifest import read_manifest
@@ -587,6 +591,12 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
     assert updated.run["status"] == "submitted"
     assert updated.job["job_id"] == "12345"
     assert updated.job["queue"] == "compute"
+    assert updated.job["partition"] == "compute"
+    assert updated.job["qos"] == "debugqos"
+    assert updated.job["afterok"] == "67890"
+    assert updated.job["attempts"][0]["partition"] == "compute"
+    assert updated.job["attempts"][0]["qos"] == "debugqos"
+    assert updated.job["attempts"][0]["afterok"] == "67890"
     assert (run_dir / "status" / "state.json").exists()
 
 

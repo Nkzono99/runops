@@ -70,7 +70,10 @@ def _create_source_run(
     )
     (source_dir / "input" / "mesh.dat").write_text("mesh", encoding="utf-8")
     (source_dir / "submit" / "job.sh").write_text(
-        "#!/bin/bash\n#SBATCH --job-name=baseline\n",
+        "#!/bin/bash\n"
+        "#SBATCH --job-name=R20260409-0001\n"
+        f"#SBATCH --output={source_dir}/work/%j.out\n"
+        f"cd {source_dir}\n",
         encoding="utf-8",
     )
     return source_dir
@@ -130,6 +133,11 @@ def test_extend_creates_continuation_run_and_copies_artifacts(tmp_path: Path) ->
         encoding="utf-8"
     ) == "snapshot"
     assert (new_dir / "submit" / "job.sh").exists()
+    new_job = (new_dir / "submit" / "job.sh").read_text(encoding="utf-8")
+    assert str(source_dir) not in new_job
+    assert "R20260409-0001" not in new_job
+    assert str(new_dir) in new_job
+    assert "R20260409-0002" in new_job
     assert (new_dir / "work").is_dir()
 
     with open(new_dir / "manifest.toml", "rb") as f:

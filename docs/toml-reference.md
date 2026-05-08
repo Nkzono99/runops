@@ -132,7 +132,7 @@ MPI launcher profiles. Defines how simulators are launched (srun, mpirun, mpiexe
 
 ```toml
 [launchers.srun]
-type = "srun"
+kind = "srun"
 use_slurm_ntasks = true
 ```
 
@@ -140,7 +140,7 @@ use_slurm_ntasks = true
 
 ```toml
 [launchers.camphor]
-type = "srun"
+kind = "srun"
 use_slurm_ntasks = true
 resource_style = "rsc"
 modules = [
@@ -157,7 +157,7 @@ stderr = "stderr.%J.log"
 
 ```toml
 [launchers.openmpi]
-type = "mpirun"
+kind = "mpirun"
 command = "mpirun"
 args = "--bind-to core"
 modules = ["openmpi/4.1"]
@@ -167,8 +167,8 @@ modules = ["openmpi/4.1"]
 
 | Field | Type | Required | Default | Description |
 |-------|------|----------|---------|-------------|
-| `type` | string | Yes | — | Launcher type: `srun`, `mpirun`, `mpiexec` |
-| `command` | string | No | same as `type` | Launcher executable command |
+| `kind` | string | Yes | — | Launcher kind: `srun`, `mpirun`, `mpiexec` |
+| `command` | string | No | same as `kind` | Launcher executable command |
 | `use_slurm_ntasks` | bool | No | `false` | Rely on `SLURM_NTASKS` env var instead of explicit `--ntasks` flag |
 | `args` | string | No | `""` | Extra launcher arguments (space-separated string) |
 | `extra_options` | string[] | No | `[]` | Extra launcher options (list form, alternative to `args`) |

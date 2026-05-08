@@ -20,6 +20,8 @@ cd $ARGUMENTS
 runo runs submit --dry-run --all -qn <queue>
 # → run 数、skip、queue、資源量を報告してから投入
 runo runs submit --all -qn <queue>
+# 会話上で明示確認済みなら CLI prompt を省略
+runo runs submit --all --yes -qn <queue>
 ```
 
 ## 注意

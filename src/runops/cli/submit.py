@@ -111,6 +111,10 @@ def run_cmd(
             help="Start job only after the given job ID completes successfully.",
         ),
     ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Submit all created runs without prompting."),
+    ] = False,
 ) -> None:
     """Submit a run or all runs via sbatch.
 
@@ -129,6 +133,7 @@ def run_cmd(
             queue_name=queue_name or "",
             qos=qos or "",
             afterok=afterok_id,
+            yes=yes,
         )
     elif run is None:
         _submit_single_cwd(
@@ -195,6 +200,7 @@ def _submit_all_cwd(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    yes: bool = False,
 ) -> None:
     """Submit all runs in the given directory or cwd."""
     target_dir = (target or Path.cwd()).resolve()
@@ -205,6 +211,7 @@ def _submit_all_cwd(
         queue_name=queue_name,
         qos=qos,
         afterok=afterok,
+        yes=yes,
     )
 
 
@@ -245,6 +252,7 @@ def _submit_all(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    yes: bool = False,
 ) -> None:
     """Handle batch submission of all runs in a directory.
 
@@ -286,9 +294,8 @@ def _submit_all(
             typer.echo(f"  {run_id} ({status}){marker}")
         return
 
-    submitted = 0
+    created_runs: list[tuple[Path, str]] = []
     skipped = 0
-    failed = 0
 
     for rd in run_dirs:
         try:
@@ -302,11 +309,31 @@ def _submit_all(
             skipped += 1
             continue
 
+        created_runs.append((rd, str(manifest.run.get("id", rd.name))))
+
+    if not created_runs:
+        typer.echo(
+            f"Summary: 0 submitted, {skipped} skipped, 0 failed "
+            f"(total: {len(run_dirs)} runs)"
+        )
+        return
+
+    if not yes:
+        typer.echo(
+            f"About to submit {len(created_runs)} created run(s) under {target_dir}."
+        )
+        if not typer.confirm("Continue?"):
+            typer.echo("Cancelled.")
+            return
+
+    submitted = 0
+    failed = 0
+
+    for rd, run_id in created_runs:
         job_id = _submit_single_run(
             rd, quiet=True, queue_name=queue_name, qos=qos, afterok=afterok
         )
         if job_id is not None:
-            run_id = manifest.run.get("id", rd.name)
             typer.echo(f"  Submitted {run_id}: job_id={job_id}")
             submitted += 1
         else:

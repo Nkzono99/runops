@@ -82,8 +82,7 @@ class ManifestData:
             result["job"] = dict(self.job)
         if self.variation:
             result["variation"] = dict(self.variation)
-        if self.params_snapshot:
-            result["params_snapshot"] = dict(self.params_snapshot)
+        result["params_snapshot"] = dict(self.params_snapshot)
         if self.files:
             result["files"] = dict(self.files)
         return result

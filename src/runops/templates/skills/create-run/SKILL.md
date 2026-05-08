@@ -105,6 +105,8 @@ runo runs submit -qn <partition>
 # survey 全体を投入 ({{ skill_prefix }}run-all スキル推奨)
 cd runs/sheath/angle_scan
 runo runs submit --all -qn <partition>
+# 明示確認済みの場合のみ --yes で CLI prompt を省略
+runo runs submit --all --yes -qn <partition>
 ```
 
 ## 注意

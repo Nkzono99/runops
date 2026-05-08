@@ -118,7 +118,7 @@ project-state に影響する breaking change は `docs/migrations/v0.md` に移
 | `runo context --json` / `runo lint` | project context と health check |
 | `runo migrate list/show/apply` | project-state migration |
 | `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
-| `runo runs submit [--all] [-qn] [--qos]` | ジョブ投入 |
+| `runo runs submit [--all] [-qn] [--qos] [--afterok] [--yes]` | ジョブ投入 (`--all` は確認付き、`--yes` で省略) |
 | `runo runs status` / `sync` / `log` / `dashboard` | モニタリング |
 | `runo analyze summarize` / `collect` / `plot` / `export` / `new-comparison` | 解析 |
 | `runo notes append` / `notes archive` / `knowledge save` | 知見管理 |
