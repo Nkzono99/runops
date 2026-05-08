@@ -11,6 +11,7 @@
 | `runo setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
 | `runo doctor` | 環境検査 |
 | `runo context --json` | Agent 向け project context を JSON で取得 |
+| `runo migrate list/show/apply` | project-state migration の確認・適用 |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |

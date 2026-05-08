@@ -24,6 +24,18 @@ runo runs history        # 投入履歴 (最新20件)
 runo runs history -n 0   # 全件
 ```
 
+## runops 更新後の移行
+
+```bash
+runo migrate list
+runo migrate show M0-0001
+runo migrate apply M0-0001 --dry-run
+runo migrate apply M0-0001
+```
+
+Migration guide は `tools/runops/docs/migrations/` を参照する。
+CLI で扱えるのは定型 migration だけ。判断が必要なものは `migrate-runops` skill で扱う。
+
 ## Case を作る
 
 ```bash

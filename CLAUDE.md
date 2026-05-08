@@ -115,6 +115,7 @@ project-state に影響する breaking change は `docs/migrations/v0.md` に移
 |---------|------|
 | `runo --version` | version 確認 |
 | `runo init` / `setup` / `doctor` | プロジェクト管理 |
+| `runo migrate list/show/apply` | project-state migration |
 | `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
 | `runo runs submit [--all] [-qn] [--qos]` | ジョブ投入 |
 | `runo runs status` / `sync` / `log` / `dashboard` | モニタリング |

@@ -94,6 +94,8 @@ project 側の生成物や研究状態を、そのまま runops 本体に入れ�
 
 Pull / harness 更新が終わったら、`tools/runops/docs/migrations/README.md` と
 対象 major の `v<major>.md` を確認します。該当 item がある場合は
+定型 migration なら `runo migrate apply <id> --dry-run` で確認してから
+`runo migrate apply <id>` で適用します。CLI 未対応または判断が必要なものは
 `migrate-runops` skill に渡し、適用 / skip / defer を `notes/YYYY-MM-DD.md` に残します。
 
 Migration guide にない破壊的変更や schema rewrite を推測で実行しない。

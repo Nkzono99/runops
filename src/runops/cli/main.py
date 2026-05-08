@@ -24,6 +24,7 @@ from runops.cli.knowledge import knowledge_app
 from runops.cli.list import list_runs
 from runops.cli.log import log
 from runops.cli.manage import archive, cancel, delete, purge_work
+from runops.cli.migrate import migrate_app
 from runops.cli.new import new
 from runops.cli.notes import append as notes_append
 from runops.cli.notes import archive as notes_archive
@@ -169,6 +170,7 @@ def _build_app(name: str) -> typer.Typer:
     cli_app.add_typer(analyze_app, name="analyze")
     cli_app.add_typer(demo_app, name="demo")
     cli_app.add_typer(notes_app, name="notes")
+    cli_app.add_typer(migrate_app, name="migrate")
     cli_app.command("update")(update)
     cli_app.command("update-harness")(update_harness)
     cli_app.command("update-refs")(update_refs)

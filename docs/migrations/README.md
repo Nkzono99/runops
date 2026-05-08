@@ -6,6 +6,27 @@
 `update-runops` は runops 本体と harness を更新する入口、`migrate-runops` はこの
 guide に従って project 側の migration を適用する入口です。
 
+定型 migration は CLI でも適用できます。基本形は次です。
+
+```bash
+# 登録済み migration を確認
+runo migrate list
+runo migrate list --version v0
+runo migrate show M0-0001
+
+# 事前確認
+runo migrate apply M0-0001 --dry-run
+
+# 適用
+runo migrate apply M0-0001
+```
+
+Migration の正本 ID は `M0-0001` の形式です。
+`apply` / `show` は `runo migrate apply v0 0001` のように version と number を
+分けても指定できます。`VERSION` は `v0`, `0`, `0.7.0` のような major を
+特定できる値を受け付けます。`NUMBER` は `1`, `0001`, `M0-0001` のいずれでも指定できます。
+不可逆または human gate 付きの migration は、guide を読んだうえで `--yes` を付けて実行します。
+
 ## Version policy
 
 runops は現在 private / pre-public な CLI として開発しているため、v0 系では内部 API、
@@ -62,11 +83,35 @@ project 側の手作業や Agent 作業が必要な変更は、次の情報を�
 - `destructive-human-gate`: 削除、purge、archive、schema rewrite など不可逆に近い操作。
   必ず人間の確認を挟む。
 
+## Adding CLI-backed migrations
+
+定型化できる migration は `src/runops/core/migrations/` に実装します。
+
+```text
+src/runops/core/migrations/
+  models.py      # Migration / MigrationContext / MigrationResult
+  registry.py    # id 解決と実行
+  v0.py          # v0 の migration handlers
+  v1.py          # v1 以降は必要になったら追加
+```
+
+新しい item を CLI で実行可能にする手順:
+
+1. `docs/migrations/v<major>.md` に migration item を追加する。
+2. `src/runops/core/migrations/v<major>.py` に idempotent な handler を追加する。
+3. `registered_migrations()` に `Migration(version="v0", number="0003", ...)` を登録する。
+4. `tests/test_core/test_migrations.py` と `tests/test_cli/test_migrate.py` に dry-run / apply のテストを追加する。
+
+CLI-backed migration は、同じ project に複数回実行しても壊れないことを前提にします。
+判断が必要な migration は CLI handler にせず、guide と `migrate-runops` skill で扱います。
+
 ## Update workflow
 
 1. `update-runops` で `tools/runops` と harness を更新する。
 2. `tools/runops/docs/migrations/README.md` と対象 major の guide を読む。
-3. current project に該当する item があれば `migrate-runops` を使う。
+3. current project に該当する item があれば `runo migrate apply <id> --dry-run`
+   で確認し、定型適用できるものは `runo migrate apply <id>` で実行する。
+   CLI 未対応または判断が必要なものは `migrate-runops` を使う。
 4. migration の適用 / skip / 保留を `notes/YYYY-MM-DD.md` に残す。
 5. `runo doctor` と item ごとの validation を実行する。
 

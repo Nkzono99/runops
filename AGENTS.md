@@ -168,6 +168,7 @@ runops/
 | `runo setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
 | `runo doctor` | 環境検査 |
 | `runo context --json` | Agent 向け project context を JSON で取得 |
+| `runo migrate list/show/apply` | project-state migration の確認・適用 |
 | `runo case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレート、EMSES では `emu generate -u` を自動実行) |
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 (`--dry-run` で件数・パラメータ・概算 core-hour を表示するだけ) |

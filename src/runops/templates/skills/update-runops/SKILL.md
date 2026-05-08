@@ -49,6 +49,8 @@ runops v0 系では後方互換性を強く維持しない。project 側の状�
 
 - target runops version に対応する `docs/migrations/v<major>.md` を読む
 - current project に該当する migration item があるか判定する
+- 登録済みの定型 migration は `runo migrate apply <id> --dry-run` で確認し、
+  問題なければ `runo migrate apply <id>` で適用する
 - `compatible-generated` は scope を説明してから適用する
 - `manual-edit` / `breaking-manual` / `destructive-human-gate` は
   `{{ skill_prefix }}migrate-runops` に渡す

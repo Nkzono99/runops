@@ -101,7 +101,9 @@ skill で `tools/runops` を local patch して即利用できる。local patch 
 
 runops 自体を更新するときは `update-runops` skill を使う。更新後に project 側の
 file format、manifest、analysis artifact、harness scaffold などの移行が必要なら、
-`tools/runops/docs/migrations/` を読み、`migrate-runops` skill で適用 / skip / defer を
+`tools/runops/docs/migrations/` を読み、定型 migration は
+`runo migrate apply M0-0001 --dry-run` → `runo migrate apply M0-0001` で適用する。
+CLI 未対応または判断が必要なものは `migrate-runops` skill で扱い、適用 / skip / defer を
 `notes/YYYY-MM-DD.md` に記録する。
 
 Python package の構造整理、module 分割、循環 import 解消、packaging 整理などは

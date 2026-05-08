@@ -54,6 +54,21 @@ sed -n '1,260p' tools/runops/docs/migrations/v0.md
 
 `unknown` は勝手に適用しない。必要な file を追加で確認する。
 
+### 2.5. CLI で定型適用できるか確認する
+
+登録済み migration は CLI で確認・適用できる:
+
+```bash
+runo migrate list
+runo migrate show M0-0001
+runo migrate apply M0-0001 --dry-run
+runo migrate apply M0-0001
+```
+
+CLI で扱えるのは、定型化された idempotent な migration だけ。
+CLI 未対応、判断が必要、または destructive-human-gate の item は、この skill で
+guide を読みながら扱う。
+
 ### 3. Type ごとに扱う
 
 - `compatible-generated`: 既存 project を壊さない生成・index 作成。scope を説明してから適用する。
