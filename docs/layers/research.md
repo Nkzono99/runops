@@ -34,6 +34,16 @@ research/
 `runo init` はこの構成を作ります。既存 project では `runo update-harness` が、
 不足している `research/` scaffold だけを補完します。
 
+## context 入口
+
+`runo context --json` は、Agent が最初に読む project context に
+`research_agenda` を含めます。agenda 全文ではなく、存在、path、template 判定、
+現在判断の preview、active question 数、next action 数、paused/killed 数だけを
+返します。
+
+初期 template の空欄は count しません。Agent は `research_agenda.exists` が true
+なら、next action を提案する前に `research/agenda.md` を直接読みます。
+
 ## レイヤー分離
 
 | 場所 | 役割 | 更新方針 |

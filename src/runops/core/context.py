@@ -8,6 +8,7 @@ that agents read as their entry point.
 from __future__ import annotations
 
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -57,6 +58,14 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
     # -- Campaign --
     ctx["campaign"] = _load_campaign_info(project_root, diagnostics, section_status)
 
+    # -- Research agenda --
+    ctx["research_agenda"] = _collect_research_agenda(
+        project_root, diagnostics, section_status
+    )
+
+    # -- Notes --
+    ctx["notes"] = _collect_notes_summary(project_root, diagnostics, section_status)
+
     # -- Simulators & Launchers --
     ctx["simulators"] = _load_simulator_names(project_root, diagnostics, section_status)
     ctx["launchers"] = _load_launcher_names(project_root, diagnostics, section_status)
@@ -98,6 +107,8 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
         for section in (
             "project",
             "campaign",
+            "research_agenda",
+            "notes",
             "simulators",
             "launchers",
             "runs",
@@ -173,6 +184,68 @@ def _load_campaign_info(
             message=f"Failed to load campaign metadata: {exc}",
         )
         return {}
+
+
+def _collect_research_agenda(
+    root: Path,
+    diagnostics: list[dict[str, str]],
+    section_status: dict[str, str],
+) -> dict[str, Any]:
+    try:
+        from runops.core.research import summarize_research_agenda
+
+        return summarize_research_agenda(root)
+    except Exception as exc:
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="research_agenda",
+            message=f"Failed to summarize research agenda: {exc}",
+            level="warning",
+        )
+        return {"exists": False, "path": "research/agenda.md"}
+
+
+def _collect_notes_summary(
+    root: Path,
+    diagnostics: list[dict[str, str]],
+    section_status: dict[str, str],
+) -> dict[str, Any]:
+    notes_dir = root / "notes"
+    if not notes_dir.is_dir():
+        return {"exists": False}
+
+    try:
+        daily_notes = sorted(
+            path
+            for path in notes_dir.glob("*.md")
+            if path.name != "README.md" and _is_daily_note(path.name)
+        )
+        result: dict[str, Any] = {
+            "exists": True,
+            "path": "notes",
+            "daily_count": len(daily_notes),
+        }
+        if daily_notes:
+            latest = daily_notes[-1]
+            result["latest_path"] = latest.relative_to(root).as_posix()
+        reports_dir = notes_dir / "reports"
+        if reports_dir.is_dir():
+            result["reports_path"] = reports_dir.relative_to(root).as_posix()
+        return result
+    except Exception as exc:
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="notes",
+            message=f"Failed to summarize notes: {exc}",
+            level="warning",
+        )
+        return {"exists": False}
+
+
+def _is_daily_note(filename: str) -> bool:
+    return re.match(r"^\d{4}-\d{2}-\d{2}\.md$", filename) is not None
 
 
 def _load_simulator_names(

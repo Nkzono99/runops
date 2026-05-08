@@ -16,7 +16,7 @@ runops プロジェクトにおける Agent の作業ガイド。
 | 操作 | コマンド |
 |------|---------|
 | version 確認 | `runo --version` |
-| プロジェクト状況把握 | `runo context --json` |
+| プロジェクト状況把握 | `runo context --json` (`research_agenda` / latest note を含む) |
 | case テンプレート生成 | `runo case new <name>` |
 | 最小 case テンプレート生成 | `runo case new <name> --minimal` |
 | survey 付き case 生成 | `runo case new <name> --survey` |
@@ -77,6 +77,8 @@ Agent 自身の memory には保存しない。
 
 - 「結果をまとめて」「知見を記録して」等の整理済情報 → まず `notes/reports/` に
 - 「今の見立て」「active question」「paused/killed」「次に何をなぜやるか」 → `research/agenda.md` に
+- `runo context --json` の `research_agenda` は agenda の存在、現在判断の preview、
+  next action 数を返す。詳しい判断は `research/agenda.md` を直接読む
 - 「今やってる作業のメモ」「途中経過」「議論の流れ」「準備フェーズの意思決定」 → `runo notes append` で lab notebook に
 - 参照 PDF / manual / snippet → `materials/` に
 - 機械的に再利用したい atomic な知見だけ `.runops/insights/` / `facts.toml` に昇格

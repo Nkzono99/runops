@@ -289,7 +289,7 @@ runo runs list runs/cavity/scan
 | `runo init [SIMS...] [-y]` | プロジェクトの初期化 (対話型がデフォルト) |
 | `runo setup [URL]` | 既存 runops project のセットアップ |
 | `runo doctor [PATH]` | 環境検査 (設定・sbatch・run_id 一意性・環境検出) |
-| `runo context [DIR]` | Agent 向け project context の要約を表示 |
+| `runo context [DIR]` | Agent 向け project context の要約を表示 (`research/agenda.md` と latest note の入口を含む) |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
@@ -345,6 +345,8 @@ runo runs list runs/cavity/scan
 その場で残し、価値が出てきたら `notes/reports/` の long-form レポートに
 整理します。`research/agenda.md` は TODO ではなく、現在の見立て、active
 question、paused/killed、次に何をなぜ行うかを残す mutable な判断の台帳です。
+`runo context --json` は `research_agenda` と `notes.latest_path` を返すため、
+Agent は最初の入口から agenda の存在と現在判断の有無を把握できます。
 `materials/` には論文 PDF、manual、図、snippet などの source material を置きます。
 
 `.runops/knowledge/enabled/imports.md` は source knowledge から生成される

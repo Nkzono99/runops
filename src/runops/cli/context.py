@@ -40,6 +40,25 @@ def context(
         if camp.get("hypothesis"):
             typer.echo(f"Hypothesis: {camp['hypothesis']}")
 
+        agenda = ctx.get("research_agenda", {})
+        if agenda.get("exists"):
+            status = "template" if agenda.get("is_template") else "ready"
+            typer.echo(
+                "Research agenda: "
+                f"{agenda.get('path', 'research/agenda.md')} "
+                f"({status}, next_actions={agenda.get('next_actions_count', 0)})"
+            )
+            if agenda.get("current_decision"):
+                typer.echo(f"Current decision: {agenda['current_decision']}")
+        elif agenda:
+            typer.echo(
+                f"Research agenda: missing ({agenda.get('path', 'research/agenda.md')})"
+            )
+
+        notes = ctx.get("notes", {})
+        if notes.get("latest_path"):
+            typer.echo(f"Latest note: {notes['latest_path']}")
+
         sims = ctx.get("simulators", [])
         if sims:
             typer.echo(f"Simulators: {', '.join(sims)}")
