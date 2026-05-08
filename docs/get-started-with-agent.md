@@ -142,5 +142,6 @@ issue のタイトルと本文案を作ります。
 
 - [README.md](../README.md) — 生成される構造と全体像
 - [project-flow.md](project-flow.md) — `runo init` 後の project を Agent とどう運用するかの概念図
+- [layers/README.md](layers/README.md) — experiment / analysis / research / knowledge / harness / upstream の責務分離
 - [agent-user-guide.md](agent-user-guide.md) — Agent が守る基本ルール
 - [toml-reference.md](toml-reference.md) — TOML フィールドを手で確認したいとき

@@ -1,5 +1,7 @@
 """Generate the AI-agent project flow guide using Python Diagrams."""
 
+# ruff: noqa: E501
+
 from __future__ import annotations
 
 try:
@@ -18,18 +20,22 @@ except ModuleNotFoundError as exc:
 
 from diagram_utils import (
     DOCS_ROOT,
-    markdown_image,
     make_diagram,
+    markdown_image,
     node_attrs,
     png_path,
     prepare_figure_dir,
     require_graphviz,
 )
 
-
 DOC_PATH = DOCS_ROOT / "project-flow.md"
 
 CONCEPT_ROWS: tuple[tuple[str, str, str], ...] = (
+    (
+        "[Experiment Layer](layers/experiment.md)",
+        "実験設計と実行記録",
+        "campaign / case / survey / run manifest の関係を決める。",
+    ),
     (
         "`campaign.toml`",
         "研究意図の正本",
@@ -51,14 +57,54 @@ CONCEPT_ROWS: tuple[tuple[str, str, str], ...] = (
         "各実行の state、origin、provenance、job 情報を記録する。",
     ),
     (
+        "[Analysis Layer](layers/analysis.md)",
+        "解析・可視化成果物",
+        "run summary、survey 集計、cross-run 比較を置く場所を決める。",
+    ),
+    (
+        "[Research Layer](layers/research.md)",
+        "現在判断の台帳",
+        "`research/agenda.md` に active question と current decision を残す。",
+    ),
+    (
         "`refs/`",
         "外部知識と simulator docs",
         "Agent が simulator 固有知識や cookbook を参照する入口。",
     ),
     (
+        "`materials/`",
+        "人間提供の source material",
+        "論文、manual、図、snippet を Agent と人間が見える場所に置く。",
+    ),
+    (
+        "`notes/**`",
+        "作業ログとレポート",
+        "日次 notebook と refined report を残す human/agent shared workspace。",
+    ),
+    (
+        "`.runops/knowledge/`",
+        "生成済み Agent context",
+        "`imports.md` や candidate fact transport などの派生物。正本として手編集しない。",
+    ),
+    (
         "`.runops/insights/` と `facts.toml`",
-        "学習結果の蓄積",
-        "解析後に得られた知見を次の設計へ戻すための project memory。",
+        "advanced structured memory",
+        "機械的に再利用したい整理済み知見だけを保存する互換/上級者向け層。",
+    ),
+    (
+        "[Knowledge Layer](layers/knowledge.md)",
+        "再利用可能な知識",
+        "refs、materials、notes、insights、facts の責務を分ける。",
+    ),
+    (
+        "[Harness Layer](layers/harness.md)",
+        "Agent 手順・権限・skills",
+        "`.claude/`, `.agents/`, `.codex/`, AGENTS/CLAUDE の責務を分ける。",
+    ),
+    (
+        "[Upstream Integration Layer](layers/upstream.md)",
+        "runops 本体への戻し口",
+        "`tools/runops` local patch、feedback issue、PR、update conflict を扱う。",
     ),
 )
 
@@ -76,7 +122,7 @@ def _concept_table() -> str:
 def _build_init_world(figure_dir: str) -> str:
     base = prepare_figure_dir(figure_dir) / "init-world"
     with make_diagram(
-        name="runops init 後の project と Agent の見る世界",
+        name="runo init 後の project と Agent の見る世界",
         filename=base,
         direction="LR",
         graph_attr={"nodesep": "0.8", "ranksep": "1.0"},
@@ -85,9 +131,13 @@ def _build_init_world(figure_dir: str) -> str:
             "研究者 / user\n研究テーマ・仮説\n・ベース入力の方針",
             **node_attrs("human"),
         )
-        init = Rack("runops init / runops setup", **node_attrs("runtime"))
-        context = Python("runops context --json\nAgent の最初の入口", **node_attrs("agent"))
-        agent = Python("AI Agent\n設計、実行、解析、\n学習を支援", **node_attrs("agent"))
+        init = Rack("runo init / runo setup", **node_attrs("runtime"))
+        context = Python(
+            "runops context --json\nAgent の最初の入口", **node_attrs("agent")
+        )
+        agent = Python(
+            "AI Agent\n設計、実行、解析、\n学習を支援", **node_attrs("agent")
+        )
 
         with Cluster("生成された project root"):
             config = Storage(
@@ -95,7 +145,9 @@ def _build_init_world(figure_dir: str) -> str:
                 **node_attrs("config"),
             )
             campaign = Storage("campaign.toml\n研究意図", **node_attrs("config"))
-            cases = Storage("cases/<sim>/...\n再利用テンプレート", **node_attrs("config"))
+            cases = Storage(
+                "cases/<sim>/...\n再利用テンプレート", **node_attrs("config")
+            )
             runs = Rack("runs/...\nsurvey と run の置き場", **node_attrs("artifact"))
             refs = Git(
                 "refs/<repo>/...\nsimulator docs / shared knowledge",
@@ -116,12 +168,15 @@ def _build_init_world(figure_dir: str) -> str:
         config >> Edge(label="実行環境の制約") >> agent
         campaign >> Edge(label="研究意図") >> agent
         cases >> Edge(label="ベース設定") >> agent
+        runs >> Edge(label="実行記録") >> agent
         refs >> Edge(label="simulator 知識") >> agent
         memory >> Edge(label="過去の知見") >> agent
         agent_boot >> Edge(label="作業ルール") >> agent
         context >> Edge(label="最初の俯瞰") >> agent
 
-    return markdown_image(DOC_PATH, png_path(base), "runops init 後の project と Agent の見る世界")
+    return markdown_image(
+        DOC_PATH, png_path(base), "runo init 後の project と Agent の見る世界"
+    )
 
 
 def _build_operation_loop(figure_dir: str) -> str:
@@ -141,7 +196,9 @@ def _build_operation_loop(figure_dir: str) -> str:
             "3. 実験設計\ncase.toml / survey.toml を整備",
             **node_attrs("agent"),
         )
-        create = Rack("4. run 生成\nrunops runs create / sweep", **node_attrs("runtime"))
+        create = Rack(
+            "4. run 生成\nrunops runs create / sweep", **node_attrs("runtime")
+        )
         submit = Rack(
             "5. 実行\nrunops runs submit / submit --all",
             **node_attrs("runtime"),
@@ -223,7 +280,7 @@ def _build_document() -> str:
         "> このファイルは `python scripts/generate_agent_project_flow.py` で生成しています。",
         "> 標準の再生成手順は `python scripts/render_diagrams_in_docker.py` です。",
         "",
-        "このガイドは、`runops init` で生成された project を人間と AI Agent がどう運用していくかを",
+        "このガイドは、`runo init` で生成された project を人間と AI Agent がどう運用していくかを",
         "概念図としてまとめたものです。",
         "",
         "ポイントは、runops の project を単なる directory 群ではなく、",
@@ -233,7 +290,7 @@ def _build_document() -> str:
         "",
         _concept_table(),
         "",
-        "## `runops init` 後の project と Agent の見る世界",
+        "## `runo init` 後の project と Agent の見る世界",
         "",
         init_world,
         "",
@@ -247,10 +304,13 @@ def _build_document() -> str:
         "",
         "## 読み方の要点",
         "",
-        "- `runops init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。",
+        "- `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。",
+        "- レイヤーごとの正本は [docs/layers/README.md](layers/README.md) から辿れます。",
         "- `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。",
         "- `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。",
-        "- 解析後の結果は `insight` や `fact` として `.runops/` に戻すことで、次の設計に再利用できます。",
+        "- `research/agenda.md` は現在の高レベルな研究判断の台帳です。TODO ではなく、",
+        "  active question、current decision、paused/killed、次に何をなぜ行うかを残します。",
+        "- 解析後の観察はまず `notes/` や `notes/reports/` に残し、機械的に再利用したいものだけ `insight` や `fact` として `.runops/` に戻します。",
         "- つまり日常運用は `設計 -> 実行 -> 観測 -> 解析 -> 学習 -> 設計` のループです。",
         "",
         "## 実務上のおすすめ",
@@ -258,7 +318,9 @@ def _build_document() -> str:
         "- 最初の依頼では、研究テーマ、仮説、独立変数、観測量、使いたいベース入力だけを Agent に渡す。",
         "- run ごとの場当たり的な修正は避け、再利用価値がある変更は `campaign.toml`、`case.toml`、`survey.toml` に戻す。",
         "- 毎回いきなり大量投入せず、Agent に `context` と `plan` を見せてもらってから初回 bulk submit に進む。",
-        "- 解析が終わったら `knowledge save` や `add-fact` まで含めて 1 セットで閉じると、次の実験設計が速くなります。",
+        "- 解析が終わったら `notes/` に観察を残し、必要なら `research/agenda.md` の",
+        "  current decision を更新する。機械的に再利用したい知見だけ `knowledge save`",
+        "  や `add-fact` で `.runops/` に昇格します。",
         "",
     ]
     return "\n".join(lines) + "\n"

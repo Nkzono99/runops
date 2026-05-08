@@ -690,9 +690,7 @@ research/reviews/           ← agenda checkpoint の snapshot
 paused/killed、次に何をなぜ行うかを残す判断の台帳。本文は日本語で書き、
 コード・コマンド・ファイルパス・run_id は実際の表記のまま残す。
 
-レイヤーごとの詳細は [Analysis Layer](layers/analysis.md),
-[Research Layer](layers/research.md),
-[Knowledge Layer](layers/knowledge.md) を参照。
+project 運用レイヤーの詳細は [Layer Docs](layers/README.md) を参照。
 
 ## テスタビリティ
 

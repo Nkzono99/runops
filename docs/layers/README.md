@@ -3,8 +3,23 @@
 runops の project 側状態は複数の層に分かれます。
 層ごとの責務で迷った場合は、以下の文書を正本として参照してください。
 
+ここでいう Layer は、単なる runops 実装内部の module ではなく、project 運用上の
+正本・生成物・更新ルールが分かれる面です。Layer として扱う目安は次の通りです。
+
+- project 側に永続的な状態、生成物、または正本がある
+- 人間と Agent の両方が読み書き・参照する
+- 他の層と混ぜると再現性、判断、handoff、upstream 化が壊れる
+- 置き場所、更新方法、昇格/同期ルールを明文化する価値がある
+
 | Layer | Canonical Doc | 役割 |
 |-------|---------------|------|
+| Experiment Layer | [experiment.md](experiment.md) | `campaign.toml` → `case.toml` → `survey.toml` → `manifest.toml` の設計・実行正本 |
 | Analysis Layer | [analysis.md](analysis.md) | 解析・可視化成果物、summary、survey 集計、cross-run 比較 |
 | Research Layer | [research.md](research.md) | `research/agenda.md` による現在判断の台帳 |
 | Knowledge Layer | [knowledge.md](knowledge.md) | Agent が再利用する知識、notes、materials、`.runops/insights/` |
+| Harness Layer | [harness.md](harness.md) | Agent の手順、権限、skills、rules、project-local harness |
+| Upstream Integration Layer | [upstream.md](upstream.md) | `tools/runops` local patch、feedback issue、PR、update conflict の境界 |
+
+`cli/`, `core/`, `adapters/`, `launchers/`, `slurm/` は runops 実装内部の
+architecture layer です。これらは [architecture.md](../architecture.md) や
+[src-structure.md](../src-structure.md) を正本とします。

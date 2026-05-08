@@ -95,7 +95,7 @@ current project で runops 本体の修正が今すぐ必要な場合は、`patc
 skill で `tools/runops` を local patch して即利用できる。local patch の正本は
 `tools/runops` 内の Git branch / commit とし、設計が必要な upstream 候補は
 `feedback-runops` で issue 化する。詳細は
-[Local runops Patches](local-runops-patches.md) を参照。
+[Upstream Integration Layer](layers/upstream.md) を参照。
 
 Python package の構造整理、module 分割、循環 import 解消、packaging 整理などは
 `python-package-refactor` skill を使う。`scripts/` と `references/` 付きで
@@ -183,9 +183,7 @@ runo knowledge save <name> -t <type> -s <simulator> -m "<内容>"
 runo knowledge add-fact "<claim>" -t <type> -s <simulator> -c <confidence>
 ```
 
-レイヤーごとの正本は [layers/analysis.md](layers/analysis.md),
-[layers/research.md](layers/research.md),
-[layers/knowledge.md](layers/knowledge.md) を参照。
+レイヤーごとの正本は [layers/README.md](layers/README.md) から参照する。
 
 ## Simulator Adapter のガイド
 

@@ -13,15 +13,21 @@
 
 | 層 / file | 概念上の役割 | Agent から見た意味 |
 |---|---|---|
+| [Experiment Layer](layers/experiment.md) | 実験設計と実行記録 | campaign / case / survey / run manifest の関係を決める。 |
 | `campaign.toml` | 研究意図の正本 | 何を明らかにしたいか、どの変数を動かし、何を観測するかを Agent に渡す。 |
 | `cases/**/case.toml` | 再利用可能な実験テンプレート | 共通の job 設定、ベース入力、固定パラメータを保持する。 |
 | `runs/**/survey.toml` | サーベイ設計 | どの軸をどう振るか、命名や job override をどうするかを定義する。 |
 | `runs/**/Rxxxx/manifest.toml` | run の正本 | 各実行の state、origin、provenance、job 情報を記録する。 |
+| [Analysis Layer](layers/analysis.md) | 解析・可視化成果物 | run summary、survey 集計、cross-run 比較を置く場所を決める。 |
+| [Research Layer](layers/research.md) | 現在判断の台帳 | `research/agenda.md` に active question と current decision を残す。 |
 | `refs/` | 外部知識と simulator docs | Agent が simulator 固有知識や cookbook を参照する入口。 |
 | `materials/` | 人間提供の source material | 論文、manual、図、snippet を Agent と人間が見える場所に置く。 |
 | `notes/**` | 作業ログとレポート | 日次 notebook と refined report を残す human/agent shared workspace。 |
 | `.runops/knowledge/` | 生成済み Agent context | `imports.md` や candidate fact transport などの派生物。正本として手編集しない。 |
 | `.runops/insights/` と `facts.toml` | advanced structured memory | 機械的に再利用したい整理済み知見だけを保存する互換/上級者向け層。 |
+| [Knowledge Layer](layers/knowledge.md) | 再利用可能な知識 | refs、materials、notes、insights、facts の責務を分ける。 |
+| [Harness Layer](layers/harness.md) | Agent 手順・権限・skills | `.claude/`, `.agents/`, `.codex/`, AGENTS/CLAUDE の責務を分ける。 |
+| [Upstream Integration Layer](layers/upstream.md) | runops 本体への戻し口 | `tools/runops` local patch、feedback issue、PR、update conflict を扱う。 |
 
 ## `runo init` 後の project と Agent の見る世界
 
@@ -38,6 +44,7 @@
 ## 読み方の要点
 
 - `runo init` 後の project は、Agent にとっての作業場であると同時に memory でもあります。
+- レイヤーごとの正本は [docs/layers/README.md](layers/README.md) から辿れます。
 - `campaign.toml` は研究意図、`case.toml` は再利用可能な基底条件、`survey.toml` は探索計画です。
 - `manifest.toml` は各 run の正本で、ここに state と provenance が残ります。
 - `research/agenda.md` は現在の高レベルな研究判断の台帳です。TODO ではなく、

@@ -510,9 +510,13 @@ uv run runo --help
 - [src 構成ガイド](docs/src-structure.md) -- `src/runops/` の層構造と adapter / launcher / site 解決の流れ
 - [アーキテクチャ](docs/architecture.md) -- システム設計とモジュール構成
 - [拡張ガイド](docs/extending.md) -- Adapter / Launcher の追加方法
+- [レイヤー一覧](docs/layers/README.md) -- project 側状態と運用境界の正本
+- [実験層](docs/layers/experiment.md) -- campaign / case / survey / run manifest の関係
 - [解析層](docs/layers/analysis.md) -- 解析・可視化成果物の置き場所と運用ルール
 - [研究判断層](docs/layers/research.md) -- `research/agenda.md` による判断台帳
 - [知識層](docs/layers/knowledge.md) -- AI エージェント向け知識管理アーキテクチャ
+- [ハーネス層](docs/layers/harness.md) -- Agent instructions / skills / rules の責務分離
+- [Upstream 連携層](docs/layers/upstream.md) -- `tools/runops` local patch / feedback / PR の境界
 - [TOML リファレンス](docs/toml-reference.md) -- 全設定ファイルのフィールド定義
 - [SPEC.md](SPEC.md) -- 完全な仕様書
 
