@@ -30,6 +30,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | スキル | 用途 |
 |---|---|
 | `{{ skill_prefix }}new-case` | ケースを作成・編集する |
+| `{{ skill_prefix }}setup-runops` | project の初期セットアップと最初の聞き取り |
 | `{{ skill_prefix }}create-run` | Run / Survey を生成する |
 | `{{ skill_prefix }}survey-design` | パラメータサーベイを設計する |
 | `{{ skill_prefix }}run-all` | survey の全 run を生成して投入する |
@@ -135,8 +136,8 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 `Artifacts:` (figure / script / data path) を添える。大量の図は contact sheet
 または代表図だけを埋め込み、全 figure path は `Artifacts:` に列挙する。
 
-設計フェーズの skill (`{{ skill_prefix }}setup-campaign`, `{{ skill_prefix }}new-case`,
-`{{ skill_prefix }}create-run`, `{{ skill_prefix }}survey-design`,
+設計フェーズの skill (`{{ skill_prefix }}setup-runops`, `{{ skill_prefix }}setup-campaign`,
+`{{ skill_prefix }}new-case`, `{{ skill_prefix }}create-run`, `{{ skill_prefix }}survey-design`,
 `{{ skill_prefix }}run-all`) は **完了時に `{{ skill_prefix }}note` で経緯を残してから次に進む**。
 その作業によって active question、current decision、paused/killed、次の行動が
 変わった場合は、続けて `{{ skill_prefix }}research-agenda` で `research/agenda.md`

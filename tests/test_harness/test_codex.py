@@ -96,6 +96,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".codex/README.md" in bundle.files
     assert ".codex/rules/runops.rules" in bundle.files
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
+    assert ".agents/skills/setup-runops/SKILL.md" in bundle.files
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
     assert ".agents/skills/summarize-script/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
@@ -122,6 +123,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "$update-runops" in agents
     assert "$migrate-runops" in agents
     assert "$python-package-refactor" in agents
+    assert "$setup-runops" in agents
     assert "active question、current decision、paused/killed" in agents
     # Skills share the same frontmatter, but use each agent's native
     # invocation syntax in the body.
@@ -155,6 +157,12 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "`$feedback-runops`" in codex_migrate
     assert "docs/migrations/v<major>.md" in codex_migrate
     assert "{{ skill_prefix }}" not in codex_migrate
+    codex_setup = bundle.files[".agents/skills/setup-runops/SKILL.md"]
+    claude_setup = bundle.files[".claude/skills/setup-runops/SKILL.md"]
+    assert "`$setup-env`" in codex_setup
+    assert "`$setup-campaign`" in codex_setup
+    assert "`/setup-env`" in claude_setup
+    assert "{{ skill_prefix }}" not in codex_setup
 
 
 def test_bundle_does_not_emit_project_local_codex_prompts() -> None:

@@ -392,18 +392,26 @@ class TestInit:
         skills_dir = tmp_path / ".claude" / "skills"
         codex_skills_dir = tmp_path / ".agents" / "skills"
         assert (skills_dir / "setup-env" / "SKILL.md").exists()
+        assert (skills_dir / "setup-runops" / "SKILL.md").exists()
         assert (skills_dir / "survey-design" / "SKILL.md").exists()
         assert (skills_dir / "check-status" / "SKILL.md").exists()
         assert (skills_dir / "analyze" / "SKILL.md").exists()
         assert (skills_dir / "summarize-script" / "SKILL.md").exists()
         assert (skills_dir / "runops-reference" / "SKILL.md").exists()
         assert (codex_skills_dir / "setup-env" / "SKILL.md").exists()
+        assert (codex_skills_dir / "setup-runops" / "SKILL.md").exists()
         assert (codex_skills_dir / "summarize-script" / "SKILL.md").exists()
         assert (codex_skills_dir / "runops-reference" / "SKILL.md").exists()
         setup_content = (skills_dir / "setup-env" / "SKILL.md").read_text(
             encoding="utf-8"
         )
         assert "uv venv" in setup_content
+        setup_runops_content = (
+            codex_skills_dir / "setup-runops" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        assert "$setup-env" in setup_runops_content
+        assert "$setup-campaign" in setup_runops_content
+        assert "{{ skill_prefix }}" not in setup_runops_content
         analyze_content = (skills_dir / "analyze" / "SKILL.md").read_text(
             encoding="utf-8"
         )

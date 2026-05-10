@@ -53,8 +53,32 @@ Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴�
 
 ## 最初の依頼の出し方
 
-何を調べたいかと、ベース入力をどうしたいかをまとめて伝えるのが効果的です。
-依頼には「CLI コマンドを列挙する」のではなく、研究目的と制約を書きます。
+`setup-runops` は、**`runo init` / `runo setup` が終わった後**に使う
+開始時の聞き取り用 SKILL です。最初のプロンプトでは、細かい TOML や CLI
+コマンドを書かずに、生成済み project の中でこれだけ入力してください。
+
+Codex の場合:
+
+```text
+$setup-runops
+```
+
+Claude Code の場合は `/setup-runops` と入力します。
+
+Agent が `runo doctor` や project context を確認し、セットアップに必要なことを
+順番に聞きます。研究テーマ、使いたい simulator、base input、最初にどこまで
+進めたいかなど、聞かれたことに答えていけば十分です。情報が揃ったら、
+campaign / case / survey / run 生成のどこまで進めるべきかを Agent が案内します。
+
+初回はそれ以上のプロンプトを用意する必要はありません。以後は Agent の質問に
+答えていく形で進めます。
+
+<details>
+<summary>最初からまとめて指示したい場合</summary>
+
+Agent との聞き取りを短くしたい場合は、研究目的と制約をまとめて直接伝えても
+構いません。その場合も、CLI コマンドを列挙するより、研究内容・base input・
+最初の到達点を書きます。
 
 ```text
 このプロジェクトでは、月面平面に太陽風プラズマが入射し、
@@ -63,7 +87,7 @@ Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴�
 照射角を主な独立変数として調べたい。
 
 まず project を確認して、plan を示したうえで campaign.toml と case 定義を整えて。
-必要なら survey の雛形まで作って。
+必要なら survey の雛形まで作って。submit はまだしないで。
 ```
 
 ベース入力が未定なら、次のように頼めます。
@@ -74,10 +98,10 @@ Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴�
 照射角を主な独立変数として調べたい。
 
 まず project を確認して、plan を示したうえで campaign.toml と case 定義を整えて。
-必要なら survey の雛形まで作って。
+必要なら survey の雛形まで作って。submit はまだしないで。
 ```
 
-SKILL 名を明示する必要はありません。依頼内容に応じて必要な SKILL は自動選択されます。
+</details>
 
 ## よくある依頼パターン
 
@@ -92,6 +116,7 @@ SKILL 名を明示する必要はありません。依頼内容に応じて必�
 | 投入前にレビューする | `submit 前に plan と対象 run を確認して。初回 bulk submit なので確認を挟んで。` |
 | 失敗 run を診断する | `failed run を確認して。log を読んで failure_reason を整理し、retry 方針を提案して。` |
 | 解析・知見を整理する | `completed run を summarize / collect して、insight と fact の候補を分けてまとめて。` |
+| runops にフィードバックする | `$feedback-runops` (`/feedback-runops`) で候補一覧、`$feedback-runops 不満点・改善案` で issue 案作成 |
 
 ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
 
