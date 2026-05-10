@@ -181,8 +181,10 @@ runo runs cancel             # submitted/running の run を停止
 runo runs cancel --yes       # 確認スキップ
 
 # completed → archived → purged の通常フロー
-runo runs archive            # completed run をアーカイブ
+runo runs archive            # completed run を archived にし、既定で runs/_archive/ へ移動
 runo runs archive --yes      # 確認スキップ
+runo runs archive --keep-in-place  # 移動せず状態だけ archived にする
+runo runs archive --move-to runs/_archive_2026  # custom archive root
 runo runs purge-work         # work/ の不要ファイル削除 (archived のみ)
 runo runs purge-work --yes
 

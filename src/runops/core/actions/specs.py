@@ -175,8 +175,9 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     ),
     "archive_run": ActionSpec(
         name="archive_run",
-        description="Mark a completed run as archived.",
+        description="Mark a completed run as archived, optionally relocating it.",
         required_params=("run_dir",),
+        optional_params=("move_to",),
         preconditions=("run state == completed",),
         state_change="completed -> archived",
         destructive=True,
@@ -184,7 +185,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         cost_class="low",
         requires_confirmation=True,
         confirmation_reason=(
-            "Archiving changes lifecycle state and is treated as a review gate."
+            "Archiving changes lifecycle state and may move run directories."
         ),
     ),
     "purge_work": ActionSpec(

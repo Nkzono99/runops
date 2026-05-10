@@ -532,6 +532,15 @@ git_dirty = false
 | `case` | string | Source case name |
 | `parent_run_id` | string | Parent run ID (for cloned/extended runs) |
 
+### `[path]`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `run_dir` | string | Current physical run directory. Updated when `runo runs archive` relocates a run. |
+| `created_at_path` | string | Original run directory before archive relocation, when known. |
+| `archived_from` | string | Source directory used for the latest archive relocation. |
+| `archived_at` | datetime string | ISO 8601 timestamp for the latest archive relocation. |
+
 ### State Machine
 
 ```

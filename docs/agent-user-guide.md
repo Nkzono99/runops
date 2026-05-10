@@ -158,6 +158,8 @@ completed → archived → purged
 
 `runo runs cancel` は `submitted` / `running` の run に対して `scancel` と
 `runo runs sync` をまとめて実行し、`cancelled` 状態に遷移させる安全な経路。
+`runo runs archive` は `completed` run を `archived` にし、既定で
+`runs/_archive/` に移動する。パスを保ちたい場合は `--keep-in-place` を使う。
 `runo runs delete` はライフサイクル外の操作で、`created` / `cancelled` / `failed`
 の run ディレクトリを直接削除する (`completed` / `archived` の run には使えないので
 `archive` → `purge-work` を使うこと)。

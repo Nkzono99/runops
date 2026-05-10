@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,11 @@ import tomli_w
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 runner = CliRunner()
 
@@ -41,30 +47,72 @@ def _create_run(
     return run_dir
 
 
+def _read_manifest(path: Path) -> dict[str, Any]:
+    with open(path / "manifest.toml", "rb") as f:
+        return tomllib.load(f)
+
+
 class TestArchive:
     def test_archive_completed_run(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
+        archived_dir = tmp_path / "_archive" / "R20260327-0001"
 
         result = runner.invoke(app, ["runs", "archive", "--yes", str(run_dir)])
         assert result.exit_code == 0
         assert "Archived run R20260327-0001" in result.output
+        assert "Moved:" in result.output
+        assert not run_dir.exists()
+        assert archived_dir.exists()
 
     def test_archive_verifies_manifest_state(self, tmp_path: Path) -> None:
         """After archive, manifest should show 'archived' status."""
-        import sys
-
-        if sys.version_info >= (3, 11):
-            import tomllib
-        else:
-            import tomli as tomllib
-
         run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
+        archived_dir = tmp_path / "_archive" / "R20260327-0001"
 
         result = runner.invoke(app, ["runs", "archive", "--yes", str(run_dir)])
         assert result.exit_code == 0
 
-        with open(run_dir / "manifest.toml", "rb") as f:
-            data = tomllib.load(f)
+        data = _read_manifest(archived_dir)
+        assert data["run"]["status"] == "archived"
+        assert data["path"]["run_dir"] == str(archived_dir.resolve())
+        assert data["path"]["archived_from"] == str(run_dir.resolve())
+
+    def test_archive_keep_in_place(self, tmp_path: Path) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
+
+        result = runner.invoke(
+            app,
+            ["runs", "archive", "--yes", "--keep-in-place", str(run_dir)],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Path:" in result.output
+        assert "Moved:" not in result.output
+        assert run_dir.exists()
+        data = _read_manifest(run_dir)
+        assert data["run"]["status"] == "archived"
+
+    def test_archive_move_to_custom_root(self, tmp_path: Path) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
+        archive_root = tmp_path / "runs" / "_archive_2026"
+        archived_dir = archive_root / "R20260327-0001"
+
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "archive",
+                "--yes",
+                "--move-to",
+                str(archive_root),
+                str(run_dir),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert not run_dir.exists()
+        assert archived_dir.exists()
+        data = _read_manifest(archived_dir)
         assert data["run"]["status"] == "archived"
 
     def test_archive_cancelled_without_confirmation(self, tmp_path: Path) -> None:
@@ -96,6 +144,49 @@ class TestArchive:
         result = runner.invoke(app, ["runs", "archive", "/nonexistent/run"])
         assert result.exit_code == 1
         assert "Error" in result.output
+
+    def test_archive_preserves_project_relative_path_and_run_id_lookup(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Default relocation keeps the path below runs/_archive discoverable."""
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            "R20260327-0001",
+            status="completed",
+        )
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / "R20260327-0001"
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["runs", "archive", "--yes", "R20260327-0001"])
+
+        assert result.exit_code == 0, result.output
+        assert not run_dir.exists()
+        assert archived_dir.exists()
+
+        status = runner.invoke(app, ["runs", "status", "R20260327-0001"])
+        assert status.exit_code == 0, status.output
+        assert "archived" in status.output
+
+    def test_archive_directory_archives_completed_runs_and_skips_others(
+        self, tmp_path: Path
+    ) -> None:
+        survey_dir = tmp_path / "runs" / "scan"
+        completed = _create_run(
+            survey_dir,
+            "R20260327-0001",
+            status="completed",
+        )
+        created = _create_run(survey_dir, "R20260327-0002", status="created")
+
+        result = runner.invoke(app, ["runs", "archive", "--yes", str(survey_dir)])
+
+        archived = survey_dir / "_archive" / "R20260327-0001"
+        assert result.exit_code == 0, result.output
+        assert not completed.exists()
+        assert archived.exists()
+        assert created.exists()
+        assert "Skipped 1 run(s)" in result.output
 
 
 class TestPurgeWork:

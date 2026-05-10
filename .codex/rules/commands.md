@@ -68,7 +68,7 @@
 
 | コマンド | 説明 |
 |---------|------|
-| `runo runs archive [RUN]` | run アーカイブ (completed のみ) |
+| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
 | `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
 | `runo runs cancel [RUN]` | scancel + sync (submitted/running を停止) |
 | `runo runs delete [RUN]` | run ディレクトリ削除 (created/cancelled/failed のみ) |

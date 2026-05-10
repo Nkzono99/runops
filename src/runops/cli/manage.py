@@ -8,7 +8,7 @@ from typing import Annotated, Optional
 import typer
 
 from runops.cli.run_lookup import resolve_run_or_cwd, resolve_run_targets
-from runops.core.actions import ActionStatus
+from runops.core.actions import ActionStatus, default_archive_destination
 from runops.core.actions import archive_run as archive_run_action
 from runops.core.actions import cancel_run as cancel_run_action
 from runops.core.actions import delete_run as delete_run_action
@@ -40,41 +40,161 @@ def _format_size(size_bytes: int) -> str:
 
 
 def archive(
-    run: str = typer.Argument(None, help="Run directory or run_id (defaults to cwd)."),
-    yes: bool = typer.Option(False, "--yes", help="Skip confirmation prompt."),
+    runs: Annotated[
+        Optional[list[str]],
+        typer.Argument(
+            help=(
+                "Run identifiers or directories. Each item may be a run_id, "
+                "a run directory, or a directory containing runs. Defaults to cwd."
+            )
+        ),
+    ] = None,
+    yes: Annotated[
+        bool,
+        typer.Option("--yes", "-y", help="Skip confirmation prompt."),
+    ] = False,
+    all_runs: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help="Archive completed runs discovered under the target directory.",
+        ),
+    ] = False,
+    keep_in_place: Annotated[
+        bool,
+        typer.Option(
+            "--keep-in-place",
+            "--no-move",
+            help="Only change lifecycle state; do not move the run directory.",
+        ),
+    ] = False,
+    move_to: Annotated[
+        Optional[Path],
+        typer.Option(
+            "--move-to",
+            help="Archive root to use instead of the default runs/_archive.",
+        ),
+    ] = None,
 ) -> None:
-    """Archive a completed run."""
-    run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
-
-    try:
-        manifest = read_manifest(run_dir)
-    except SimctlError as e:
-        typer.echo(f"Error reading manifest: {e}", err=True)
-        raise typer.Exit(code=1) from None
-
-    current_status = manifest.run.get("status", "")
-    if current_status != RunState.COMPLETED.value:
-        typer.echo(
-            f"Error: can only archive 'completed' runs, but run is '{current_status}'.",
-            err=True,
-        )
+    """Archive completed runs and move them under ``runs/_archive`` by default."""
+    if keep_in_place and move_to is not None:
+        typer.echo("Error: --move-to cannot be used with --keep-in-place.", err=True)
         raise typer.Exit(code=1)
 
-    run_id = manifest.run.get("id", "???")
-    if not yes and not typer.confirm(
-        f"Archive run {run_id}? This changes the lifecycle state.",
-        default=False,
-    ):
+    targets = _resolve_archive_targets(runs, all_runs=all_runs)
+    archive_root = move_to.expanduser().resolve() if move_to is not None else None
+
+    plans: list[tuple[Path, str, Path | None]] = []
+    skipped: list[tuple[str, str]] = []
+    for run_dir in targets:
+        try:
+            manifest = read_manifest(run_dir)
+        except SimctlError as e:
+            skipped.append((run_dir.name, f"error reading manifest: {e}"))
+            continue
+
+        run_id = str(manifest.run.get("id", run_dir.name))
+        current_status = str(manifest.run.get("status", ""))
+        if current_status != RunState.COMPLETED.value:
+            skipped.append((run_id, f"state is '{current_status}'"))
+            continue
+
+        destination = (
+            None
+            if keep_in_place
+            else default_archive_destination(run_dir, archive_root=archive_root)
+        )
+        plans.append((run_dir, run_id, destination))
+
+    if len(targets) == 1 and not plans and skipped:
+        _, reason = skipped[0]
+        if reason.startswith("state is"):
+            state = reason.split("'")[1] if "'" in reason else "?"
+            typer.echo(
+                f"Error: can only archive 'completed' runs, but run is '{state}'.",
+                err=True,
+            )
+        else:
+            typer.echo(f"Error: cannot archive {targets[0]}: {reason}", err=True)
+        raise typer.Exit(code=1)
+
+    if not plans:
+        typer.echo("No completed runs found.")
+        for run_id, reason in skipped:
+            typer.echo(f"  {run_id}: {reason}")
+        return
+
+    if not yes and not _confirm_archive(plans, keep_in_place=keep_in_place):
         typer.echo("Cancelled.")
         raise typer.Exit()
 
-    result = archive_run_action(run_dir)
-    if result.status is not ActionStatus.SUCCESS:
-        typer.echo(f"Error: {result.message}", err=True)
+    failures = 0
+    moved_any = False
+    for run_dir, run_id, destination in plans:
+        result = archive_run_action(run_dir, move_to=destination)
+        if result.status is not ActionStatus.SUCCESS:
+            typer.echo(f"{run_id}: error — {result.message}", err=True)
+            failures += 1
+            continue
+
+        moved = bool(result.data.get("moved"))
+        moved_any = moved_any or moved
+        source_path = str(result.data.get("source_path", run_dir))
+        archive_path = str(result.data.get("archive_path", run_dir))
+        typer.echo(f"Archived run {run_id}.")
+        if moved:
+            typer.echo(f"  Moved: {source_path} -> {archive_path}")
+        else:
+            typer.echo(f"  Path: {archive_path}")
+
+    if skipped:
+        typer.echo(f"\nSkipped {len(skipped)} run(s):")
+        for run_id, reason in skipped:
+            typer.echo(f"  {run_id}: {reason}")
+
+    if moved_any:
+        typer.echo(
+            "\nNote: existing notes, reports, and scripts may still reference "
+            "the old run path."
+        )
+
+    if failures:
         raise typer.Exit(code=1)
 
-    typer.echo(f"Archived run {run_id}.")
-    typer.echo(f"  Path: {run_dir}")
+
+def _resolve_archive_targets(
+    args: list[str] | None,
+    *,
+    all_runs: bool,
+) -> list[Path]:
+    """Resolve archive arguments while keeping no-arg archive conservative."""
+    cwd = Path.cwd()
+    if args or all_runs:
+        return resolve_run_targets(args, search_dir=cwd)
+    return [resolve_run_or_cwd(None, search_dir=cwd)]
+
+
+def _confirm_archive(
+    plans: list[tuple[Path, str, Path | None]],
+    *,
+    keep_in_place: bool,
+) -> bool:
+    if len(plans) == 1:
+        _, run_id, destination = plans[0]
+        if keep_in_place or destination is None:
+            prompt = f"Archive run {run_id}? This changes the lifecycle state."
+        else:
+            prompt = f"Archive run {run_id} and move it to {destination}?"
+        return typer.confirm(prompt, default=False)
+
+    preview = ", ".join(run_id for _, run_id, _ in plans[:5])
+    if len(plans) > 5:
+        preview += f", ... (+{len(plans) - 5} more)"
+    if keep_in_place:
+        prompt = f"Archive {len(plans)} completed runs in place? [{preview}]"
+    else:
+        prompt = f"Archive and move {len(plans)} completed runs? [{preview}]"
+    return typer.confirm(prompt, default=False)
 
 
 def purge_work(

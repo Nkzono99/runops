@@ -13,6 +13,9 @@ from runops.core.actions.admin import (
     cancel_run as cancel_run,
 )
 from runops.core.actions.admin import (
+    default_archive_destination as default_archive_destination,
+)
+from runops.core.actions.admin import (
     delete_run as delete_run,
 )
 from runops.core.actions.admin import (
@@ -89,6 +92,7 @@ __all__ = [
     "collect_survey",
     "create_run",
     "create_survey",
+    "default_archive_destination",
     "delete_run",
     "execute_action",
     "export_publication",

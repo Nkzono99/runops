@@ -65,7 +65,7 @@ git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~30)..HEAD --on
 ### 3. 完了 run をアーカイブする (任意)
 
 ```bash
-# completed な run をアーカイブ
+# completed な run を archived にし、既定で runs/_archive/ へ移動
 runo runs archive --all .
 ```
 

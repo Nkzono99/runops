@@ -12,6 +12,7 @@ import tomli_w
 from runops.core.actions import (
     ActionStatus,
     add_fact,
+    archive_run,
     collect_survey,
     create_survey,
     execute_action,
@@ -476,6 +477,71 @@ def test_purge_work_removes_work_artifacts_and_updates_state(tmp_path: Path) -> 
     assert result.data["bytes_removed"] == 384
     assert not (run_dir / "work" / "outputs").exists()
     assert (run_dir / "status" / "state.json").exists()
+
+
+def test_archive_run_moves_directory_and_updates_manifest_path(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "scan" / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260330-0001",
+                "status": "completed",
+            },
+            "path": {
+                "run_dir": str(run_dir),
+            },
+        },
+    )
+    destination = tmp_path / "runs" / "_archive" / "scan" / "R20260330-0001"
+
+    result = archive_run(run_dir, move_to=destination)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_before == "completed"
+    assert result.state_after == "archived"
+    assert result.data["moved"] is True
+    assert result.data["source_path"] == str(run_dir.resolve())
+    assert result.data["archive_path"] == str(destination.resolve())
+    assert not run_dir.exists()
+    assert (destination / "manifest.toml").exists()
+
+    from runops.core.manifest import read_manifest
+
+    manifest = read_manifest(destination)
+    assert manifest.run["status"] == "archived"
+    assert manifest.path["created_at_path"] == str(run_dir)
+    assert manifest.path["run_dir"] == str(destination.resolve())
+    assert manifest.path["archived_from"] == str(run_dir.resolve())
+    assert "archived_at" in manifest.path
+
+
+def test_archive_run_rejects_existing_destination_before_state_change(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "runs" / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260330-0001",
+                "status": "completed",
+            },
+        },
+    )
+    destination = tmp_path / "runs" / "_archive" / "R20260330-0001"
+    destination.mkdir(parents=True)
+
+    result = archive_run(run_dir, move_to=destination)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "already exists" in result.message
+    assert run_dir.exists()
+
+    from runops.core.manifest import read_manifest
+
+    manifest = read_manifest(run_dir)
+    assert manifest.run["status"] == "completed"
 
 
 def test_submit_run_updates_manifest_and_state_file(tmp_path: Path) -> None:

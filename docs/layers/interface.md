@@ -141,7 +141,7 @@ bulk sync では created run と terminal state の run は silent skip され�
 | `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace を作成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
-| `runo runs archive [RUN]` | completed run のアーカイブ |
+| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | completed run を archived にし、既定で `runs/_archive/` へ移動 |
 | `runo runs purge-work [RUN]` | archived run の `work/` 内不要ファイル削除 |
 | `runo runs delete [RUN]` | created / cancelled / failed run を削除 |
 

@@ -1042,7 +1042,9 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 ## 18.8 整理
 
-* `runops runs archive <run_dir or run_id>` — completed → archived
+* `runops runs archive <run_dir or run_id>` — completed → archived。既定では `runs/_archive/<元の runs/ 相対パス>` へ移動する
+* `runops runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
+* `runops runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
 * `runops runs purge-work <run_dir or run_id>` — archived → purged
 * `runops runs cancel <run_dir or run_id>` — submitted/running → cancelled (`scancel` と `sync` をまとめて実行する安全経路)
 * `runops runs delete <run_dir or run_id>` — created / cancelled / failed の run ディレクトリをハード削除 (ライフサイクル外、completed/archived には不可)

@@ -205,7 +205,7 @@ runops/
 | `runo notes list` | active / history の lab notebook 日付一覧 |
 | `runo notes show [DATE\|today\|latest]` | active / history から指定日の lab notebook を表示 |
 | `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
-| `runo runs archive [RUN]` | run アーカイブ (completed のみ) |
+| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
 | `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
 | `runo runs cancel [RUN]` | scancel + sync を同時実行し、submitted/running な run を停止 |
 | `runo runs delete [RUN]` | created/cancelled/failed な run ディレクトリをハード削除 (completed/archived は archive→purge-work を使う) |

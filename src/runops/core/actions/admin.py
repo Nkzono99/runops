@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 from runops.core.actions.helpers import (
@@ -12,35 +13,166 @@ from runops.core.actions.helpers import (
     _require_state,
 )
 from runops.core.actions.result import ActionResult, ActionStatus
-from runops.core.event_log import logged_action
-from runops.core.exceptions import SimctlError
+from runops.core.event_log import emit_event, logged_action
+from runops.core.exceptions import ProjectNotFoundError, SimctlError
+from runops.core.project import find_project_root
 from runops.core.state import RunState
+
+_ARCHIVE_DIR_NAME = "_archive"
+
+
+def default_archive_destination(
+    run_dir: Path,
+    *,
+    archive_root: Path | None = None,
+) -> Path:
+    """Return the default archive destination for a run directory.
+
+    When ``run_dir`` belongs to a runops project, the destination preserves
+    the run's path relative to ``runs/`` under ``runs/_archive/`` or a custom
+    ``archive_root``.  Standalone run directories fall back to a sibling
+    ``_archive`` directory.
+
+    Args:
+        run_dir: Run directory to archive.
+        archive_root: Optional archive root overriding ``runs/_archive``.
+
+    Returns:
+        Absolute destination directory for the archived run.
+    """
+    source = run_dir.resolve()
+    project_root = _find_project_root_or_none(source)
+    if archive_root is None:
+        root = (
+            project_root / "runs" / _ARCHIVE_DIR_NAME
+            if project_root is not None
+            else source.parent / _ARCHIVE_DIR_NAME
+        )
+    else:
+        root = archive_root.resolve()
+
+    return (root / _archive_relative_path(source, project_root)).resolve()
+
+
+def _find_project_root_or_none(path: Path) -> Path | None:
+    try:
+        return find_project_root(path)
+    except ProjectNotFoundError:
+        return None
+
+
+def _archive_relative_path(run_dir: Path, project_root: Path | None) -> Path:
+    if project_root is None:
+        return Path(run_dir.name)
+
+    runs_dir = (project_root / "runs").resolve()
+    try:
+        relative = run_dir.relative_to(runs_dir)
+    except ValueError:
+        return Path(run_dir.name)
+
+    if relative.parts and relative.parts[0] == _ARCHIVE_DIR_NAME:
+        remainder = relative.parts[1:]
+        return Path(*remainder) if remainder else Path(run_dir.name)
+    return relative
 
 
 @logged_action("archive_run")
-def archive_run(run_dir: Path) -> ActionResult:
-    """Archive a completed run."""
-    from runops.core.manifest import read_manifest
+def archive_run(run_dir: Path, *, move_to: Path | None = None) -> ActionResult:
+    """Archive a completed run, optionally relocating its directory.
+
+    Args:
+        run_dir: Run directory to archive.
+        move_to: Optional final run directory to move the archived run into.
+
+    Returns:
+        Structured action result with source and archive paths.
+    """
+    from runops.core.manifest import read_manifest, write_manifest
     from runops.core.state import update_state
 
-    state_str, err = _require_state(run_dir, RunState.COMPLETED)
+    source = run_dir.resolve()
+    state_str, err = _require_state(source, RunState.COMPLETED)
     if err:
         return _precondition_fail("archive_run", err)
 
-    run_id = read_manifest(run_dir).run.get("id", run_dir.name)
+    run_id = read_manifest(source).run.get("id", source.name)
+    destination = move_to.resolve() if move_to is not None else None
+    if destination is not None:
+        collision_error = _validate_archive_destination(source, destination)
+        if collision_error:
+            return _precondition_fail("archive_run", collision_error)
+        if destination == source:
+            destination = None
 
     try:
-        update_state(run_dir, RunState.ARCHIVED)
+        update_state(source, RunState.ARCHIVED)
     except SimctlError as e:
         return _error("archive_run", str(e))
+
+    final_dir = source
+    moved = False
+    if destination is not None:
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(destination))
+        except (OSError, shutil.Error) as e:
+            return _error(
+                "archive_run", f"Failed to move {source} to {destination}: {e}"
+            )
+
+        final_dir = destination
+        moved = True
+        try:
+            manifest = read_manifest(final_dir)
+            if "created_at_path" not in manifest.path:
+                manifest.path["created_at_path"] = str(source)
+            manifest.path["run_dir"] = str(final_dir)
+            manifest.path["archived_from"] = str(source)
+            manifest.path["archived_at"] = datetime.now(tz=timezone.utc).isoformat()
+            write_manifest(final_dir, manifest)
+        except SimctlError as e:
+            return _error("archive_run", str(e))
+
+        emit_event(
+            "artifact_move",
+            action="archive_run",
+            summary=f"Move archived run {run_id}",
+            path=final_dir,
+            data={
+                "run_id": run_id,
+                "source_path": str(source),
+                "archive_path": str(final_dir),
+            },
+            requires_verbose=True,
+        )
 
     return ActionResult(
         action="archive_run",
         status=ActionStatus.SUCCESS,
         message="Run archived",
-        data={"run_id": run_id},
+        data={
+            "run_id": run_id,
+            "moved": moved,
+            "source_path": str(source),
+            "archive_path": str(final_dir),
+        },
         state_before=state_str,
         state_after=RunState.ARCHIVED.value,
+    )
+
+
+def _validate_archive_destination(source: Path, destination: Path) -> str | None:
+    if destination == source:
+        return None
+    if destination.exists():
+        return f"Archive destination already exists: {destination}"
+    try:
+        destination.relative_to(source)
+    except ValueError:
+        return None
+    return (
+        f"Archive destination cannot be inside the source run directory: {destination}"
     )
 
 

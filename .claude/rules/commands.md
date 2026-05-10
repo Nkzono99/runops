@@ -67,7 +67,7 @@
 
 | コマンド | 説明 |
 |---------|------|
-| `runops runs archive [RUN]` | run アーカイブ (completed のみ) |
+| `runops runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
 | `runops runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
 | `runops runs cancel [RUN]` | scancel + sync (submitted/running を停止) |
 | `runops runs delete [RUN]` | run ディレクトリ削除 (created/cancelled/failed のみ) |
