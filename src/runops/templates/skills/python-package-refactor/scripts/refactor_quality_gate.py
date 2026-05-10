@@ -10,11 +10,11 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import os
+import shutil
 import subprocess
 import sys
 import time
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -53,6 +53,7 @@ class Gate:
     default_run: bool = True
     heavy: bool = False
     requires_module: str | None = None
+    requires_executable: str | None = None
     timeout_seconds: float | None = None
 
 
@@ -208,9 +209,9 @@ def detect_gates(root: Path) -> list[Gate]:
         gates.append(
             Gate(
                 name="ruff-check",
-                command=[sys.executable, "-m", "ruff", "check", "."],
+                command=["ruff", "check", "."],
                 reason="Run configured Ruff lint checks.",
-                requires_module="ruff",
+                requires_executable="ruff",
                 timeout_seconds=180,
             )
         )
@@ -220,9 +221,9 @@ def detect_gates(root: Path) -> list[Gate]:
         gates.append(
             Gate(
                 name="mypy",
-                command=[sys.executable, "-m", "mypy", *targets],
+                command=["mypy", *targets],
                 reason="Run configured mypy type checks on discovered top-level modules.",
-                requires_module="mypy",
+                requires_executable="mypy",
                 timeout_seconds=300,
             )
         )
@@ -231,9 +232,9 @@ def detect_gates(root: Path) -> list[Gate]:
         gates.append(
             Gate(
                 name="pyright",
-                command=[sys.executable, "-m", "pyright"],
+                command=["pyright"],
                 reason="Run configured pyright checks if the Python pyright wrapper is installed.",
-                requires_module="pyright",
+                requires_executable="pyright",
                 timeout_seconds=300,
             )
         )
@@ -313,6 +314,13 @@ def render_plan(gates: list[Gate], include_heavy: bool = False) -> str:
 
 
 def run_gate(root: Path, gate: Gate, timeout_override: float | None = None) -> dict[str, Any]:
+    if gate.requires_executable and shutil.which(gate.requires_executable) is None:
+        return {
+            "name": gate.name,
+            "status": "skipped",
+            "reason": f"Executable '{gate.requires_executable}' is not available in PATH.",
+            "command": command_text(gate.command),
+        }
     if gate.requires_module and not module_available(gate.requires_module):
         return {
             "name": gate.name,
@@ -323,16 +331,9 @@ def run_gate(root: Path, gate: Gate, timeout_override: float | None = None) -> d
     timeout = timeout_override if timeout_override is not None else gate.timeout_seconds
     started = time.monotonic()
     try:
-        env = os.environ.copy()
-        pythonpath_items = [str(root / "src"), str(root)]
-        existing = env.get("PYTHONPATH")
-        if existing:
-            pythonpath_items.append(existing)
-        env["PYTHONPATH"] = os.pathsep.join(pythonpath_items)
         proc = subprocess.run(
             gate.command,
             cwd=str(root),
-            env=env,
             text=True,
             capture_output=True,
             timeout=timeout,
