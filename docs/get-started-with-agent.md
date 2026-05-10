@@ -149,22 +149,32 @@ campaign 設計用の SKILL を使って campaign.toml を整理して。
 プロジェクト側ハーネスには `feedback-runops` SKILL が含まれており、現在の研究タスクを
 止めずに upstream へフィードバックできます。
 
-例えば次のように依頼できます。
+候補を見たいだけなら、引数なしで呼びます。Codex では:
 
 ```text
-今の作業で runops への不満点や改善点があれば、feedback-runops SKILL を使って
-issue 候補を整理して。起票する前にタイトルと本文を見せて確認して。
+$feedback-runops
 ```
+
+Claude Code では:
 
 ```text
-runo runs submit の挙動がわかりにくかったので、改善要望として issue を作って。
-再現手順、期待する挙動、今回の workaround も本文に入れて。
+/feedback-runops
 ```
 
-SKILL 名を直接指定する場合、Claude Code では `/feedback-runops`、Codex では
-`$feedback-runops` のように呼びます。引数なしなら、そのセッション中に見つかった
-候補を一覧します。具体的な内容を渡すと、重複 issue を確認し、環境情報を集め、
-issue のタイトルと本文案を作ります。
+具体的な不満点や改善案がある場合は、続けて本文を書きます。Codex では:
+
+```text
+$feedback-runops runo runs submit の挙動がわかりにくかったので、改善してほしい
+```
+
+Claude Code では:
+
+```text
+/feedback-runops runo runs submit の挙動がわかりにくかったので、改善してほしい
+```
+
+引数なしなら、そのセッション中に見つかった候補を一覧します。具体的な内容を
+渡すと、重複 issue を確認し、環境情報を集め、issue のタイトルと本文案を作ります。
 
 この SKILL は安全のため、ユーザー確認なしに GitHub issue を作りません。
 起票前に必ず内容を表示させ、private なデータパス・クラスタ固有の秘密・未公開の
