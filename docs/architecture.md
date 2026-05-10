@@ -65,7 +65,19 @@ launchers/
  +--> launchers/base  (抽象基底 + ファクトリ)
 ```
 
-重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では `core/actions/` と `core/run_creation/` が orchestration 層として `adapters/`、`launchers/`、`core/site/`、`jobgen/`、`slurm/` を接続しています。詳細な流れは [src 構成ガイド](src-structure.md) を参照してください。
+重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では
+`core/actions/` と `core/run_creation/` が orchestration 層として
+`adapters/`、`launchers/`、`core/site/`、`jobgen/`、`slurm/` を接続しています。
+
+特に run 生成時は `core/run_creation/` が project、case、survey override を読み、
+simulator entry から Adapter を解決し、launcher profile と site profile を組み合わせて
+`jobgen.generate_job_script()` に渡します。つまり Adapter は「何を実行するか」と
+「入出力がどう見えるか」、Launcher は「program command を MPI でどう包むか」、
+Site は「cluster が job script に何を要求するか」を担当します。
+
+`src/runops/sites/` は runtime site 設定そのものではなく、`runo init` が一度だけ読む
+bundled preset 集です。実行時に使われる site の本体は project root の `site.toml` で、
+解決ロジックは `src/runops/core/site/` にあります。
 
 ---
 

@@ -47,7 +47,7 @@ runo doctor
 あわせて Claude Code 向けのガードも生成され、`manifest.toml`、`input/`、`submit/job.sh`、
 `SITE.md` などの生成物は直接編集しない前提になります。
 
-運用全体を俯瞰したい場合は [AI Agent 運用概念図](project-flow.md) を先に見ると、
+運用全体を俯瞰したい場合は [layers/README.md](layers/README.md) を先に見ると、
 Experiment Layer の `campaign.toml`・`case.toml`・`survey.toml` と、
 Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴みやすくなります。
 
@@ -149,7 +149,6 @@ issue のタイトルと本文案を作ります。
 ## 次に読む
 
 - [README.md](../README.md) — 生成される構造と全体像
-- [project-flow.md](project-flow.md) — `runo init` 後の project を Agent とどう運用するかの概念図
 - [layers/README.md](layers/README.md) — interface / experiment / execution / analysis / research / knowledge / harness / upstream の責務分離
 - [layers/interface.md](layers/interface.md) — CLI / action surface / human gate の境界
 - [agent-user-guide.md](agent-user-guide.md) — Agent が守る基本ルール

@@ -37,7 +37,7 @@ runops はこの問題を、単なる CLI ではなく **Agent が扱える研�
 
 このループの具体的な始め方は
 [docs/get-started-with-agent.md](docs/get-started-with-agent.md) を見てください。
-全体像は [docs/project-flow.md](docs/project-flow.md) に図でまとめています。
+project state の全体像は [docs/layers/README.md](docs/layers/README.md) にまとめています。
 
 ## 人間と Agent の分担
 
@@ -163,7 +163,6 @@ uv run mypy src/
 ## ドキュメント
 
 - [AI エージェントではじめる](docs/get-started-with-agent.md) — 最初の実用導線
-- [AI Agent 運用概念図](docs/project-flow.md) — project と Agent の見る世界
 - [Agent ユーザーガイド](docs/agent-user-guide.md) — Agent が守る基本ルール
 - [Interface Layer](docs/layers/interface.md) — CLI / action surface / human gate の境界
 - [レイヤー一覧](docs/layers/README.md) — project state の責務分離
