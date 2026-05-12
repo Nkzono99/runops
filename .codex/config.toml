@@ -8,14 +8,17 @@
 #
 # See .codex/README.md for the full wiring guide.
 
-# Keep this file to repo-stable defaults. Runtime-sensitive options
-# such as approval and network policy belong in the Codex runtime or
-# user-local config; see .codex/README.md for the responsibility split.
-
-# Workspace-write is the intended default for day-to-day development. It allows
-# edits in this repository while protecting unrelated paths.
-sandbox_mode = "workspace-write"
+# Local automations for this repository intentionally run unattended maintenance
+# such as `git pull`, issue triage, web lookup, fixes, tests, commits, and push.
+# Use full access by default so those runs do not get stuck behind the
+# workspace-write sandbox or blocked network access.
+sandbox_mode = "danger-full-access"
+approval_policy = "never"
+web_search = "live"
 
 # AGENTS.md is intentionally substantial because it doubles as the project
 # onboarding document for Codex.
 project_doc_max_bytes = 65536
+
+[tools]
+web_search = { context_size = "medium" }
