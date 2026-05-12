@@ -18,6 +18,9 @@ Claude Code 用の `.claude/` と同じ運用思想を共有しますが、Codex
   — sandbox 外実行に escalation するときの command policy。
 - `.codex/rules/*.md`
   — Claude 版 `.claude/rules/*.md` から移した設計・運用リファレンス。
+- `.codex/automation-prompts/*.md`
+  — Codex Automation 登録から参照する長い handoff prompt。
+  Automation 側には短い参照文だけを置き、実行手順は Git 管理する。
 
 `.codex/config.toml` は **project を trusted に登録しないと読まれません**。
 Codex を初めてこのディレクトリで起動したときに trust プロンプトで yes を
@@ -113,6 +116,14 @@ codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
 ```
 
 submit 系は `allow`、`rm -rf` は `forbidden` になっていることを確認してください。
+
+## Automation prompts
+
+Local Automation の登録本文は短く保ち、詳細な実行手順は
+`.codex/automation-prompts/` に置きます。たとえば
+`runops-issue-triage-and-run` は
+`.codex/automation-prompts/runops-issue-triage-and-run.md` を読むだけにします。
+これにより prompt の改善は通常の Git diff / review / commit で管理できます。
 
 ## Hooks
 
