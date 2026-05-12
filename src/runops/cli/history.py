@@ -69,7 +69,7 @@ def history(
         submitted_at = manifest.job.get("submitted_at", "")
         rel_path = str(run_dir)
         with contextlib.suppress(ValueError):
-            rel_path = str(run_dir.relative_to(search_dir.parent))
+            rel_path = run_dir.relative_to(search_dir.parent).as_posix()
 
         entries.append((submitted_at, job_id, run_id, status, rel_path))
 

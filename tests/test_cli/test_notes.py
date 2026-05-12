@@ -257,7 +257,10 @@ def test_list_shows_recent_days_with_entry_count(tmp_path: Path) -> None:
     project = _make_project(tmp_path)
     notes_dir = project / "notes"
     notes_dir.mkdir()
-    (notes_dir / "README.md").write_text("readme — should be filtered\n")
+    (notes_dir / "README.md").write_text(
+        "readme — should be filtered\n",
+        encoding="utf-8",
+    )
     (notes_dir / "2026-04-06.md").write_text(
         "# 2026-04-06 — lab notebook\n\n## 10:00 a\n\nx\n\n## 11:00 b\n\ny\n\n",
         encoding="utf-8",

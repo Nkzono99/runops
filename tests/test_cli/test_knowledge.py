@@ -505,7 +505,7 @@ name = "test-kb"
 type = "path"
 kind = "profiles"
 path = "/some/path"
-mount = "{outside_dir}"
+mount = "{outside_dir.as_posix()}"
 """
     project_root = _create_project(tmp_path, toml)
 

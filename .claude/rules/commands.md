@@ -12,6 +12,10 @@
 | `runops context --json` | Agent 向け project context を JSON で取得 |
 | `runops lint [PATH] [--scope ...]` | project state の health check |
 | `runops migrate list/show/apply` | project-state migration の確認・適用 |
+| `runops mcp serve --transport stdio` | MCP provider を stdio で起動 |
+| `runops mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |
+| `runops mcp check` | MCP registry / safety contract の軽量検査 |
+| `runops mcp tools --json` | MCP tool metadata を JSON で表示 |
 | `runops config show` | 設定表示 |
 | `runops config add-simulator` | シミュレータ追加 (対話型) |
 | `runops config add-launcher` | ランチャー追加 (対話型) |

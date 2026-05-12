@@ -165,6 +165,7 @@ uv run mypy src/
 - [AI エージェントではじめる](docs/get-started-with-agent.md) — 最初の実用導線
 - [Agent ユーザーガイド](docs/agent-user-guide.md) — Agent が守る基本ルール
 - [Interface Layer](docs/layers/interface.md) — CLI / action surface / human gate の境界
+- [MCP Provider](docs/mcp.md) — MCP server / tool registry / safety contract
 - [レイヤー一覧](docs/layers/README.md) — project state の責務分離
 - [実験層](docs/layers/experiment.md) — campaign / case / survey の設計正本
 - [Execution Kernel](docs/layers/execution-kernel.md) — run / submit / sync / manifest

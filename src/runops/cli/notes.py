@@ -222,7 +222,7 @@ def append(
         display = path.relative_to(Path.cwd())
     except ValueError:
         display = path
-    typer.echo(f"Appended to {display}")
+    typer.echo(f"Appended to {display.as_posix()}")
 
 
 def list_notes(
@@ -269,9 +269,9 @@ def list_notes(
             continue
         n_entries = sum(1 for line in text.splitlines() if line.startswith("## "))
         try:
-            rel = str(path.relative_to(Path.cwd()))
+            rel = path.relative_to(Path.cwd()).as_posix()
         except ValueError:
-            rel = str(path)
+            rel = path.as_posix()
         rows.append((path.stem, str(n_entries), rel))
 
     widths = [len(h) for h in headers]
@@ -401,20 +401,22 @@ def archive(
             dest_display = dest.relative_to(Path.cwd())
         except ValueError:
             dest_display = dest
+        source_text = source_display.as_posix()
+        dest_text = dest_display.as_posix()
 
         if dest.exists():
             skipped += 1
-            typer.echo(f"Skipped {source_display}: destination exists ({dest_display})")
+            typer.echo(f"Skipped {source_text}: destination exists ({dest_text})")
             continue
 
         if dry_run:
-            typer.echo(f"Would archive {source_display} -> {dest_display}")
+            typer.echo(f"Would archive {source_text} -> {dest_text}")
             moved += 1
             continue
 
         dest.parent.mkdir(parents=True, exist_ok=True)
         source.rename(dest)
-        typer.echo(f"Archived {source_display} -> {dest_display}")
+        typer.echo(f"Archived {source_text} -> {dest_text}")
         moved += 1
 
     action = "would be archived" if dry_run else "archived"

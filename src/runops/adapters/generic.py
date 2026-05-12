@@ -100,7 +100,7 @@ class GenericAdapter(SimulatorAdapter):
         if params is not None:
             params_file = input_dir / "params.json"
             params_file.write_text(json.dumps(params, indent=2))
-            created.append(str(params_file.relative_to(run_dir)))
+            created.append(params_file.relative_to(run_dir).as_posix())
 
         # Copy explicit input files
         source_files: list[str] = case_section.get("input_files", [])
@@ -111,7 +111,7 @@ class GenericAdapter(SimulatorAdapter):
                 continue
             dest = input_dir / src.name
             shutil.copy2(src, dest)
-            created.append(str(dest.relative_to(run_dir)))
+            created.append(dest.relative_to(run_dir).as_posix())
 
         return created
 
@@ -234,18 +234,18 @@ class GenericAdapter(SimulatorAdapter):
         stderr = work_dir / STDERR_FILE
 
         if stdout.exists():
-            outputs["stdout"] = str(stdout.relative_to(run_dir))
+            outputs["stdout"] = stdout.relative_to(run_dir).as_posix()
         if stderr.exists():
-            outputs["stderr"] = str(stderr.relative_to(run_dir))
+            outputs["stderr"] = stderr.relative_to(run_dir).as_posix()
 
         # Collect remaining files (excluding status markers)
         for path in sorted(work_dir.iterdir()):
             if path.name in {STDOUT_FILE, STDERR_FILE, EXIT_CODE_FILE}:
                 continue
             if path.is_file():
-                outputs[path.stem] = str(path.relative_to(run_dir))
+                outputs[path.stem] = path.relative_to(run_dir).as_posix()
             elif path.is_dir():
-                outputs[path.name] = str(path.relative_to(run_dir))
+                outputs[path.name] = path.relative_to(run_dir).as_posix()
 
         return outputs
 

@@ -93,6 +93,7 @@ runops/
         retry.py        # runo runs retry
         regenerate.py   # runo runs regenerate
         lint.py         # runo lint
+        mcp.py          # runo mcp serve / check / tools
         migrate.py      # runo migrate
         update_harness.py
         update_harness_tools.py
@@ -147,6 +148,12 @@ runops/
         __init__.py
         submit.py
         query.py
+      mcp/              # Ops MCP provider (FastMCP / envelope / registry)
+        server.py
+        tools.py
+        schemas.py
+        safety.py
+        registry.py
       sites/            # bundled site preset (runo init で読込)
         __init__.py
         camphor.toml
@@ -180,6 +187,10 @@ runops/
 | `runo context --json` | Agent 向け project context を JSON で取得 |
 | `runo lint [PATH] [--scope ...]` | project state の health check |
 | `runo migrate list/show/apply` | project-state migration の確認・適用 |
+| `runo mcp serve --transport stdio` | MCP provider を stdio で起動 |
+| `runo mcp serve --transport streamable-http --host 127.0.0.1 --port 18765` | MCP provider を Streamable HTTP で起動 |
+| `runo mcp check` | MCP registry / safety contract の軽量検査 |
+| `runo mcp tools --json` | MCP tool metadata を JSON で表示 |
 | `runo case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレート、EMSES では `emu generate -u` を自動実行) |
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 (`--dry-run` で件数・パラメータ・概算 core-hour を表示するだけ) |

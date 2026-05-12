@@ -132,13 +132,13 @@ def _create_git_remote(
     worktree = base_dir / f"{repo_name}-worktree"
     worktree.mkdir(parents=True, exist_ok=True)
     _run_git(["init"], worktree)
-    _run_git(["branch", "-M", "main"], worktree)
     _run_git(["config", "user.name", "Simctl Tests"], worktree)
     _run_git(["config", "user.email", "runops-tests@example.com"], worktree)
 
     _write_profile_knowledge_repo(worktree, profiles)
     _run_git(["add", "."], worktree)
     _run_git(["commit", "-m", "Seed knowledge"], worktree)
+    _run_git(["branch", "-M", "main"], worktree)
 
     remote = base_dir / f"{repo_name}.git"
     _run_git(["clone", "--bare", str(worktree), str(remote)], base_dir)

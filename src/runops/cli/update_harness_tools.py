@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 from urllib.parse import unquote, urlparse
+from urllib.request import url2pathname
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -26,9 +27,14 @@ def _find_uv() -> str:
 def _venv_python(project_dir: Path) -> Path | None:
     """Return the venv python path if it exists."""
     venv_dir = project_dir / ".venv"
-    python_rel = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
-    python_path = venv_dir / python_rel
-    return python_path if python_path.exists() else None
+    preferred = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+    alternates = ("bin/python", "Scripts/python.exe")
+    rel_candidates = [preferred, *(rel for rel in alternates if rel != preferred)]
+    for python_rel in rel_candidates:
+        python_path = venv_dir / python_rel
+        if python_path.exists():
+            return python_path
+    return None
 
 
 def _read_runops_version(pyproject_path: Path) -> str | None:
@@ -55,7 +61,7 @@ def _direct_url_to_path(url: str) -> Path | None:
     if parsed.scheme != "file":
         return None
 
-    raw_path = unquote(parsed.path)
+    raw_path = url2pathname(unquote(parsed.path))
     if parsed.netloc and parsed.netloc != "localhost":
         raw_path = f"//{parsed.netloc}{raw_path}"
 

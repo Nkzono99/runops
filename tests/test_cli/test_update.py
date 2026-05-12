@@ -8,6 +8,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from runops.cli.main import app
@@ -77,7 +78,10 @@ def test_find_venv_python_resolves_symlinked_venv(tmp_path: Path) -> None:
     python_path.write_text("", encoding="utf-8")
 
     link_dir = tmp_path / "link"
-    link_dir.symlink_to(real_project)
+    try:
+        link_dir.symlink_to(real_project, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
 
     with (
         patch("runops.cli.update.Path.cwd", return_value=link_dir),

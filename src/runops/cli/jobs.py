@@ -96,7 +96,7 @@ def _print_jobs_once(search_dir: Path, *, all_states: bool) -> None:
 
         rel_path = str(run_dir)
         with contextlib.suppress(ValueError):
-            rel_path = str(run_dir.relative_to(search_dir.parent))
+            rel_path = run_dir.relative_to(search_dir.parent).as_posix()
 
         rows.append((job_id or "-", run_id, status, submitted_at, rel_path))
 

@@ -56,11 +56,13 @@ src/runops/
   cli/           # CLI エントリポイント (typer) — 薄い層
     init/        # runo init / doctor / scaffold / bootstrap
     knowledge/   # runo knowledge / knowledge source
+    mcp.py       # runo mcp serve / check / tools
   core/          # ドメインロジック (CLI / Slurm に依存しない)
   adapters/      # Simulator Adapter (抽象基底 + registry)
   launchers/     # Launcher Profile (srun / mpirun / mpiexec)
   jobgen/        # job.sh 生成
   slurm/         # Slurm 連携 (sbatch / squeue / sacct)
+  mcp/           # Ops MCP provider (FastMCP / envelope / registry)
   sites/         # bundled site preset
   harness/       # project 側 harness 生成 / 更新 (builder / claude / codex)
   templates/     # project / case / survey 用 静的テンプレート
@@ -116,6 +118,7 @@ project-state に影響する breaking change は `docs/migrations/v0.md` に移
 | `runo --version` | version 確認 |
 | `runo init` / `setup` / `doctor` | プロジェクト管理 |
 | `runo context --json` / `runo lint` | project context と health check |
+| `runo mcp serve` / `mcp check` / `mcp tools --json` | MCP provider の起動・検査 |
 | `runo migrate list/show/apply` | project-state migration |
 | `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
 | `runo runs submit [--all] [-qn] [--qos] [--afterok] [--yes]` | ジョブ投入 (`--all` は確認付き、`--yes` で省略) |

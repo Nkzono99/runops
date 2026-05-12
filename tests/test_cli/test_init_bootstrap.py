@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from runops.cli.init.bootstrap import _bootstrap_environment
+from runops.cli.init.bootstrap import _bootstrap_environment, _python_in_venv
 
 
 @dataclass
@@ -51,6 +51,7 @@ def test_bootstrap_creates_venv_runops_and_sim_packages(
         "pip install (1 packages)",
     ]
     assert skipped == []
+    expected_python = str(_python_in_venv(tmp_path / ".venv"))
     assert calls == [
         ["/usr/bin/uv", "venv", str(tmp_path / ".venv")],
         [
@@ -66,7 +67,7 @@ def test_bootstrap_creates_venv_runops_and_sim_packages(
             "-e",
             str(tmp_path / "tools" / "runops"),
             "--python",
-            str(tmp_path / ".venv" / "bin" / "python"),
+            expected_python,
         ],
         [
             "/usr/bin/uv",
@@ -74,7 +75,7 @@ def test_bootstrap_creates_venv_runops_and_sim_packages(
             "install",
             "emu",
             "--python",
-            str(tmp_path / ".venv" / "bin" / "python"),
+            expected_python,
         ],
     ]
 
@@ -185,6 +186,7 @@ def test_bootstrap_skips_existing_layout_and_surfaces_install_failures(
 
     assert created == []
     assert skipped == [".venv", "tools/runops"]
+    expected_python = str(_python_in_venv(tmp_path / ".venv"))
     assert calls == [
         [
             "uv",
@@ -193,7 +195,7 @@ def test_bootstrap_skips_existing_layout_and_surfaces_install_failures(
             "-e",
             str(tmp_path / "tools" / "runops"),
             "--python",
-            str(tmp_path / ".venv" / "bin" / "python"),
+            expected_python,
         ],
         [
             "uv",
@@ -201,7 +203,7 @@ def test_bootstrap_skips_existing_layout_and_surfaces_install_failures(
             "install",
             "beach-extra",
             "--python",
-            str(tmp_path / ".venv" / "bin" / "python"),
+            expected_python,
         ],
     ]
 

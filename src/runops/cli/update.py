@@ -57,18 +57,22 @@ def _distribution_name_from_package_spec(package_spec: str) -> str | None:
 
 def _venv_python_from_dir(venv_dir: Path) -> Path | None:
     """Return the venv's Python interpreter, handling Windows layout and symlinks."""
-    python_rel = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
-    python_path = venv_dir / python_rel
-    if python_path.exists():
-        return python_path
+    preferred = "Scripts/python.exe" if sys.platform == "win32" else "bin/python"
+    alternates = ("bin/python", "Scripts/python.exe")
+    rel_candidates = [preferred, *(rel for rel in alternates if rel != preferred)]
+    for python_rel in rel_candidates:
+        python_path = venv_dir / python_rel
+        if python_path.exists():
+            return python_path
     try:
         resolved = venv_dir.resolve()
     except OSError:
         return None
     if resolved != venv_dir:
-        python_path = resolved / python_rel
-        if python_path.exists():
-            return python_path
+        for python_rel in rel_candidates:
+            python_path = resolved / python_rel
+            if python_path.exists():
+                return python_path
     return None
 
 

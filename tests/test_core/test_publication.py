@@ -80,12 +80,15 @@ def test_export_publication_bundle_supports_symlink_mode(tmp_path: Path) -> None
     _create_project(tmp_path)
     run_dir = _create_completed_run(tmp_path / "runs", "R20260424-0001")
 
-    result = export_publication_bundle(
-        run_dir,
-        paper_id="draft-a",
-        name="baseline",
-        mode="symlink",
-    )
+    try:
+        result = export_publication_bundle(
+            run_dir,
+            paper_id="draft-a",
+            name="baseline",
+            mode="symlink",
+        )
+    except OSError as exc:
+        pytest.skip(f"symlink creation is unavailable: {exc}")
 
     assert result.export_dir == tmp_path / "exports" / "papers" / "draft-a" / "baseline"
     exported_summary = (

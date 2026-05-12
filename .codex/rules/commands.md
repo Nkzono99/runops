@@ -13,6 +13,10 @@
 | `runo context --json` | Agent 向け project context を JSON で取得 |
 | `runo lint [PATH] [--scope ...]` | project state の health check |
 | `runo migrate list/show/apply` | project-state migration の確認・適用 |
+| `runo mcp serve --transport stdio` | MCP provider を stdio で起動 |
+| `runo mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |
+| `runo mcp check` | MCP registry / safety contract の軽量検査 |
+| `runo mcp tools --json` | MCP tool metadata を JSON で表示 |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |

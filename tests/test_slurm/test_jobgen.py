@@ -140,7 +140,7 @@ class TestGenerateJobScript:
     def test_cd_to_run_dir(self, run_dir: Path, job_config: dict[str, object]) -> None:
         path = generate_job_script(run_dir, job_config, "srun ./solver")
         content = path.read_text()
-        assert f"cd {run_dir}" in content
+        assert f"cd {shlex.quote(str(run_dir))}" in content
 
     def test_shell_fragments_are_quoted(self, tmp_path: Path) -> None:
         """Generated shell fragments quote values that may contain spaces."""

@@ -98,6 +98,13 @@ runo doctor
 | `runo update` | シミュレータパッケージのアップグレード |
 | `runo update-harness` | project 側 Agent harness / managed scaffold を再生成 |
 | `runo update-refs [SIMS...]` | refs/ リポジトリ更新 + knowledge index 再生成 |
+| `runo mcp serve --transport stdio` | local MCP provider を stdio で起動 |
+| `runo mcp serve --transport streamable-http` | local MCP provider を HTTP で起動 |
+| `runo mcp check` | MCP tool registry / safety contract の軽量検査 |
+
+MCP provider は Agent / host 向けの edge interface です。read / inspect / plan tool
+だけを初期公開し、submit / cancel / delete などの external / destructive tool は
+デフォルトで公開しません。詳細は [../mcp.md](../mcp.md) を参照してください。
 
 ### Run Creation / Submission
 

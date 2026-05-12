@@ -9,6 +9,7 @@ consumed by ``runops.jobgen.generator._render_script``
 
 from __future__ import annotations
 
+import shlex
 from datetime import date
 from pathlib import Path
 
@@ -407,7 +408,7 @@ class TestTransactionalRunCreation:
         assert run_dir.name.startswith("R")
         assert not any(path.name.startswith(".tmp-") for path in parent_dir.iterdir())
         job_sh = (run_dir / "submit" / "job.sh").read_text()
-        assert f"cd {run_dir}" in job_sh
+        assert f"cd {shlex.quote(str(run_dir))}" in job_sh
         assert str(run_dir / "input" / "params.json") in job_sh
         assert ".tmp-" not in job_sh
 

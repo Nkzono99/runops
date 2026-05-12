@@ -25,6 +25,7 @@ from runops.cli.lint import lint
 from runops.cli.list import list_runs
 from runops.cli.log import log
 from runops.cli.manage import archive, cancel, delete, purge_work
+from runops.cli.mcp import mcp_app
 from runops.cli.migrate import migrate_app
 from runops.cli.new import new
 from runops.cli.notes import append as notes_append
@@ -165,6 +166,7 @@ def _build_app(name: str) -> typer.Typer:
     cli_app.command("doctor")(doctor)
     cli_app.add_typer(config_app, name="config")
     cli_app.add_typer(knowledge_app, name="knowledge")
+    cli_app.add_typer(mcp_app, name="mcp")
     cli_app.command("context")(context)
     cli_app.command("lint")(lint)
     cli_app.add_typer(case_app, name="case")

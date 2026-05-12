@@ -115,7 +115,7 @@ def _collect_knowledge_files(
     for pattern in patterns:
         for match in sorted(repo_path.glob(pattern)):
             if match.is_file():
-                rel = str(match.relative_to(repo_path))
+                rel = match.relative_to(repo_path).as_posix()
                 if rel not in seen:
                     seen.add(rel)
                     files.append(rel)
