@@ -124,6 +124,8 @@ Local Automation の登録本文は短く保ち、詳細な実行手順は
 `runops-issue-triage-and-run` は
 `.codex/automation-prompts/runops-issue-triage-and-run.md` を読むだけにします。
 これにより prompt の改善は通常の Git diff / review / commit で管理できます。
+この prompt には HarnessOps scaffold の取り込みも含め、`hops update-harness
+--agent-bridge --codex` を定期的に通します。
 
 ## Hooks
 
