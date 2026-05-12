@@ -81,7 +81,7 @@ guide を読みながら扱う。
 
 guide の `Migration` に書かれた command / file edit だけを実行する。
 guide にない補完が必要なら、migration を止めて `{{ skill_prefix }}feedback-runops`
-候補として docs gap を残す。
+候補として HarnessOps record / docs gap 下書きを残す。
 
 ### 5. 検証する
 
@@ -112,7 +112,7 @@ Validation:
 - runo context --json: pass/fail
 - runo lint: pass/fail/warnings
 Follow-up:
-- <feedback-runops issue candidate or none>
+- <feedback-runops HarnessOps feedback candidate or none>
 EOF
 ```
 

@@ -116,7 +116,7 @@ Agent との聞き取りを短くしたい場合は、研究目的と制約を�
 | 投入前にレビューする | `submit 前に plan と対象 run を確認して。初回 bulk submit なので確認を挟んで。` |
 | 失敗 run を診断する | `failed run を確認して。log を読んで failure_reason を整理し、retry 方針を提案して。` |
 | 解析・知見を整理する | `completed run を summarize / collect して、insight と fact の候補を分けてまとめて。` |
-| runops にフィードバックする | `$feedback-runops` (`/feedback-runops`) で候補一覧、`$feedback-runops 不満点・改善案` で issue 案作成 |
+| runops にフィードバックする | `$feedback-runops` (`/feedback-runops`) で候補一覧、`$feedback-runops 不満点・改善案` で HarnessOps record と issue 下書きを作成 |
 
 ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
 
@@ -142,12 +142,13 @@ campaign 設計用の SKILL を使って campaign.toml を整理して。
 
 それ以外はエージェントに任せて大丈夫です。
 
-## runops へのフィードバックを issue にする
+## runops へのフィードバックを HarnessOps 経由で issue 下書きにする
 
 プロジェクトを運用していて runops 本体への不満点・改善点・バグらしき挙動に
-気づいたら、その場でエージェントに issue 起票を頼んでください。runops が生成する
+気づいたら、その場でエージェントに feedback 記録を頼んでください。runops が生成する
 プロジェクト側ハーネスには `feedback-runops` SKILL が含まれており、現在の研究タスクを
-止めずに upstream へフィードバックできます。
+止めずに HarnessOps の `harness-feedback/` へ記録し、サニタイズ済み bundle から
+upstream issue 下書きへ進められます。
 
 候補を見たいだけなら、引数なしで呼びます。Codex では:
 
@@ -174,12 +175,19 @@ Claude Code では:
 ```
 
 引数なしなら、そのセッション中に見つかった候補を一覧します。具体的な内容を
-渡すと、重複 issue を確認し、環境情報を集め、issue のタイトルと本文案を作ります。
+渡すと、`hops add-failure` / `hops route` / `hops add-feedback` /
+`hops feedback export --sanitize --format github-issue` で record と下書きを作り、
+重複 issue を確認し、環境情報を集め、issue のタイトルと本文案を作ります。
 
 この SKILL は安全のため、ユーザー確認なしに GitHub issue を作りません。
 起票前に必ず内容を表示させ、private なデータパス・クラスタ固有の秘密・未公開の
 研究情報が本文に入っていないことを確認してください。作成後は issue URL を
 `notes/YYYY-MM-DD.md` に記録しておくと、後で「あのときの改善要望」を辿りやすくなります。
+
+`hops` CLI が利用できる環境では、`runo init` / `runo setup` が
+`hops init --profile runops-project` を連鎖して呼び、`runo update-harness` が
+`hops update-harness` を連鎖して呼びます。HarnessOps を使わない環境では
+`--no-harnessops` でこの連携を無効化できます。
 
 ## 次に読む
 

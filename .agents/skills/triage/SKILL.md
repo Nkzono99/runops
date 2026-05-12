@@ -6,7 +6,19 @@ description: "Triage open GitHub issues: review new issues, assess priority, fil
 # Issue トリアージ
 
 `$triage` は runops リポジトリの GitHub issue を一括レビューし、
-対応方針を提案するスキル。
+対応方針を提案するスキル。GitHub issue の取得・close などのリモート操作は
+`gh` に任せるが、継続的に扱う改善候補は HarnessOps の `harness-lab/` に
+import し、評価ケース・仮説・判断へ進める。
+
+## 事前確認
+
+```bash
+hops doctor --check-overlay --check-records
+hops migrate --check
+```
+
+`hops` が使えない場合は、GitHub issue の読み取りだけ行い、HarnessOps import は
+未実施として報告する。`.harnessops/` や `harness-lab/records/` を手で編集しない。
 
 ## 手順
 
@@ -28,7 +40,27 @@ issue ごとに以下の観点で評価する:
 | **難易度** | 修正の複雑さ (軽微 / 中 / 大) |
 | **重複** | 既存の issue や実装済み機能と重複していないか |
 
-### 3. 悪意ある issue のフィルタリング
+### 3. HarnessOps に import する
+
+正当な改善候補、設計議論、再発しそうなハーネス摩擦は、GitHub issue を入力として
+`harness-lab/` に取り込む:
+
+```bash
+hops feedback import --issue <NUMBER> --repo Nkzono99/runops
+```
+
+import された `FB` レコードのうち、実装候補として扱うものは評価ケース化する:
+
+```bash
+hops lab new-eval-case --from FB0001
+hops propose --from E0001
+```
+
+`hops feedback import --issue` が取り込む本文が不足する場合は、`gh issue view` で
+本文・コメント・ラベルを読み、トリアージ報告に補足する。未サニタイズ情報を
+issue コメントや公開文書へ戻さない。
+
+### 4. 悪意ある issue のフィルタリング
 
 以下に該当する issue は close を提案する:
 
@@ -41,7 +73,7 @@ issue ごとに以下の観点で評価する:
 gh issue close <NUMBER> --comment "Closed: <理由>"
 ```
 
-### 4. 優先度付けと対応方針の提案
+### 5. 優先度付けと対応方針の提案
 
 ユーザーに以下の形式で報告する:
 
@@ -49,10 +81,10 @@ gh issue close <NUMBER> --comment "Closed: <理由>"
 ## トリアージ結果
 
 ### 対応推奨 (高)
-- #N: <タイトル> — <理由・工数見積>
+- #N: <タイトル> — <理由・工数見積> / HarnessOps: <FB/E/H id or 未import>
 
 ### 対応推奨 (中)
-- #N: <タイトル> — <理由・工数見積>
+- #N: <タイトル> — <理由・工数見積> / HarnessOps: <FB/E/H id or 未import>
 
 ### 保留 / 要議論
 - #N: <タイトル> — <保留理由>
@@ -61,7 +93,7 @@ gh issue close <NUMBER> --comment "Closed: <理由>"
 - #N: <タイトル> — <close 理由>
 ```
 
-### 5. ユーザー判断を仰ぐ
+### 6. ユーザー判断を仰ぐ
 
 トリアージ結果を提示した後、ユーザーに以下を確認する:
 
@@ -104,3 +136,5 @@ gh issue close <NUMBER> --comment "Won't fix: <理由>"
 - ユーザーの確認なしに issue を close しない (スパム除く)
 - close 時は必ずコメントで理由を残す
 - 対応済み issue は対応コミットのハッシュを記載する
+- `harness-lab/records/` は `hops` 以外で直接書き換えない
+- 採用判断は評価ケース、証拠、回帰リスク、ガードパスが揃ってから作る

@@ -157,6 +157,9 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "`$feedback-runops`" in codex_migrate
     assert "docs/migrations/v<major>.md" in codex_migrate
     assert "{{ skill_prefix }}" not in codex_migrate
+    codex_feedback = bundle.files[".agents/skills/feedback-runops/SKILL.md"]
+    assert "hops add-failure" in codex_feedback
+    assert "hops feedback export --target runops --sanitize" in codex_feedback
     codex_setup = bundle.files[".agents/skills/setup-runops/SKILL.md"]
     claude_setup = bundle.files[".claude/skills/setup-runops/SKILL.md"]
     assert "`$setup-env`" in codex_setup

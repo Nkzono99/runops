@@ -3,17 +3,27 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from runops.cli.main import app
-
-if TYPE_CHECKING:
-    import pytest
+from runops.harness.harnessops import HarnessOpsResult
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _mock_harnessops(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep setup tests independent from the local hops installation."""
+    monkeypatch.setattr(
+        "runops.harness.harnessops.initialize_project_harnessops",
+        lambda *_args, **_kwargs: HarnessOpsResult(
+            "skipped",
+            "HarnessOps skipped (test)",
+        ),
+    )
 
 
 def _make_existing_project(project_dir: Path) -> None:
@@ -59,6 +69,41 @@ def test_setup_renders_imports_for_bootstrapped_tool_docs(
     assert imports_path.is_file()
     imports = imports_path.read_text(encoding="utf-8")
     assert "@tools/runops/docs/agent-user-guide.md" in imports
+
+
+def test_setup_invokes_harnessops(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setup delegates HarnessOps project overlay initialization to hops."""
+    project_dir = tmp_path / "setup-project"
+    _make_existing_project(project_dir)
+    calls: list[Path] = []
+
+    def _fake_bootstrap(
+        _root: Path,
+        _sim_names: list[str],
+        _runops_repo: str,
+        _created: list[str],
+        _skipped: list[str],
+    ) -> None:
+        return None
+
+    def _fake_harnessops(root: Path) -> HarnessOpsResult:
+        calls.append(root)
+        return HarnessOpsResult("created", "HarnessOps initialized")
+
+    monkeypatch.setattr("runops.cli.init._bootstrap_environment", _fake_bootstrap)
+    monkeypatch.setattr(
+        "runops.harness.harnessops.initialize_project_harnessops",
+        _fake_harnessops,
+    )
+
+    result = runner.invoke(app, ["setup", "--path", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert calls == [project_dir.resolve()]
+    assert "HarnessOps initialized" in result.output
 
 
 def test_setup_smoke_with_knowledge_attach_render_and_doctor(

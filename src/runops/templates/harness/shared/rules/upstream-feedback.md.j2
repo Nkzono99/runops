@@ -5,6 +5,8 @@
 (バグ・使いにくさ・不足している機能・分かりにくい docs / エラーメッセージ・
 抜けている adapter / launcher サポート 等) に気づいたら、upstream に
 フィードバックして runops を育てることもタスクに含める。
+フィードバックの記録、routing、sanitize、export は HarnessOps (`hops`) に委譲し、
+GitHub issue はサニタイズ済み bundle から作る外部共有チャンネルとして扱う。
 
 {{ rule_heading | default("#") }}# いつフィードバックするか
 
@@ -20,11 +22,42 @@
 
 {{ rule_heading | default("#") }}# フィードバック手順
 
-1. **まずユーザーに提案する** — issue を切る前に必ず「こういう点で
+1. **HarnessOps overlay を確認する** — `hops doctor --check-overlay` を実行する。
+   未初期化なら `hops detect` の結果を確認し、runops project では通常
+   `hops init --profile runops-project --with-agent-bridge` で初期化してから進める。
+   `.harnessops/` や `harness-feedback/` を手で組み替えない。
+2. **失敗/摩擦を記録する** — issue 本文をいきなり書かず、まず private な
+   HarnessOps record にする:
+
+   ```bash
+   hops add-failure --title "<短い題名>" --target runops \
+     --context "<文脈>" \
+     --what-happened "<起きたこと>" \
+     --why-matters "<重要性>" \
+     --desired-behavior "<望ましい挙動>" \
+     --local-workaround "<回避策>"
+   hops route --record F0001
+   ```
+
+3. **upstream bundle を作る** — route が `target-upstream-candidate` の場合だけ、
+   runops への下書きとして export する:
+
+   ```bash
+   hops add-feedback --from F0001 --target runops --summary "<要約>"
+   hops feedback export --target runops --sanitize --format github-issue
+   ```
+
+   export された `harness-feedback/views/exported-feedback/UF*.md` を読み、ローカルパス、
+   private term、project 固有の研究判断が残っていないか確認する。
+4. **まずユーザーに提案する** — issue を切る前に必ず「こういう点で
    runops に issue を立てようと思うがどうか」と相談する。勝手に issue を
    投げない。
-2. ユーザーが OK したら、`.venv` を activate した状態で `gh` を使って
-   issue を作成する:
+5. ユーザーが OK したら、`.venv` を activate した状態で重複 issue を検索し、
+   `gh` を使って issue を作成する:
+
+   ```bash
+   gh issue list --repo Nkzono99/runops --search "<キーワード>" --state all --limit 10
+   ```
 
    ```bash
    gh issue create \
@@ -56,7 +89,7 @@
    )"
    ```
 
-3. 投げた issue の URL を `notes/YYYY-MM-DD.md` (`runo notes append`) に
+6. 投げた issue の URL を `notes/YYYY-MM-DD.md` (`runo notes append`) に
    記録しておく。後から「あのとき投げた issue」で辿れるようにする。
 
 {{ rule_heading | default("#") }}# 軽微な修正は直接 PR でもよい
@@ -81,7 +114,7 @@ current project で今すぐ必要な修正は、`tools/runops` を local patch 
 | 判定 | 意味 | 次の動き |
 |------|------|----------|
 | `local-only` | project 固有 | project 側に残す |
-| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `feedback-runops` で issue |
+| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `feedback-runops` で HarnessOps record + issue 下書き |
 | `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
 | `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
 
@@ -100,6 +133,8 @@ template / command / docs に戻す:
 {{ rule_heading | default("#") }}# しないこと
 
 - ユーザーに相談せずに issue や PR を作らない
+- 未サニタイズの HarnessOps feedback を issue / PR / 公開文書に貼らない
+- `harness-feedback/records/` を手で作成・移動・書換えしない
 - 同じ内容の issue が既にあるか確認せずに重複 issue を切らない
   (`gh issue list --repo Nkzono99/runops --search "<keyword>"` で検索)
 - プロジェクト固有の private 情報 (実データパス, クラスタ固有の秘密など)

@@ -122,7 +122,8 @@ init 済み project が使える状態になったら、次の順で利用者を
 4. independent variables が見えているなら `{{ skill_prefix }}survey-design` で survey を作る
 5. run 生成や submit は、対象・資源・確認条件を示してから進める
 6. runops 自体の不満点や改善案が出たら、`{{ skill_prefix }}feedback-runops`
-   で候補一覧、`{{ skill_prefix }}feedback-runops 不満点・改善案` で issue 案を作る
+   で候補一覧、`{{ skill_prefix }}feedback-runops 不満点・改善案` で
+   HarnessOps record と issue 下書きを作る
 
 最後に、利用者が次に頼みやすい形で 2-4 個の依頼例を出す:
 

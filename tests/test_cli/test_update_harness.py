@@ -23,6 +23,7 @@ from runops.harness.builder import (
     load_harness_lock,
     save_harness_lock,
 )
+from runops.harness.harnessops import HarnessOpsResult
 
 runner = CliRunner()
 
@@ -33,6 +34,20 @@ def _mock_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "runops.harness.harnessops.initialize_project_harnessops",
+        lambda *_args, **_kwargs: HarnessOpsResult(
+            "skipped",
+            "HarnessOps skipped (test)",
+        ),
+    )
+    monkeypatch.setattr(
+        "runops.harness.harnessops.update_project_harnessops",
+        lambda *_args, **_kwargs: HarnessOpsResult(
+            "skipped",
+            "HarnessOps skipped (test)",
+        ),
     )
 
 
@@ -58,6 +73,63 @@ class TestUpdateHarnessBasic:
         result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
         assert result.exit_code == 0
         assert "up to date" in result.output
+
+    def test_update_harness_invokes_harnessops(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """update-harness delegates HarnessOps overlay refresh to hops."""
+        _init_project(tmp_path)
+        calls: list[tuple[Path, bool]] = []
+
+        def _fake_harnessops(root: Path, *, dry_run: bool = False) -> HarnessOpsResult:
+            calls.append((root, dry_run))
+            return HarnessOpsResult("updated", "HarnessOps updated")
+
+        monkeypatch.setattr(
+            "runops.harness.harnessops.update_project_harnessops",
+            _fake_harnessops,
+        )
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert calls == [(tmp_path.resolve(), False)]
+        assert "HarnessOps updated" in result.output
+
+    def test_update_harness_can_skip_harnessops(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--no-harnessops disables the hops update hook."""
+        _init_project(tmp_path)
+
+        def _fail_harnessops(
+            _root: Path,
+            *,
+            dry_run: bool = False,
+        ) -> HarnessOpsResult:
+            raise AssertionError("should not be called")
+
+        monkeypatch.setattr(
+            "runops.harness.harnessops.update_project_harnessops",
+            _fail_harnessops,
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--no-harnessops",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "HarnessOps skipped (disabled)" in result.output
 
     def test_creates_harness_lock(self, tmp_path: Path) -> None:
         """init creates .runops/harness.lock with template hashes."""

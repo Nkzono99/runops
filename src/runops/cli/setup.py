@@ -52,12 +52,21 @@ def setup(
             help="Git URL for runops repository.",
         ),
     ] = _DEFAULT_SIMCTL_REPO,
+    no_harnessops: Annotated[
+        bool,
+        typer.Option(
+            "--no-harnessops",
+            help="Do not initialize or verify the project-side HarnessOps overlay.",
+        ),
+    ] = False,
 ) -> None:
     """Set up a runops project from an existing Git repository.
 
     Clones the repository (if URL given), then bootstraps the
     development environment (.venv, tools/, refs/) without touching
-    existing configuration files (TOML, CLAUDE.md, etc.).
+    existing configuration files (TOML, CLAUDE.md, etc.). If HarnessOps
+    is available, setup also delegates project overlay initialization to
+    ``hops``.
 
     Bootstrap usage (no prior install needed):
       uvx --from runops runo setup https://github.com/user/my-project.git
@@ -126,6 +135,20 @@ def setup(
         sync_sources=sync_sources,
         validate_sources=sync_sources,
     )
+
+    # 7. HarnessOps overlay (optional external CLI, never edited directly)
+    if no_harnessops:
+        skipped.append("HarnessOps (disabled)")
+    else:
+        from runops.harness.harnessops import initialize_project_harnessops
+
+        harnessops_result = initialize_project_harnessops(project_dir)
+        if harnessops_result.status == "created":
+            created.append(harnessops_result.message)
+        else:
+            skipped.append(harnessops_result.message)
+            if harnessops_result.status == "failed":
+                typer.echo(f"  Warning: {harnessops_result.message}", err=True)
 
     # Print results
     typer.echo(f"\nProject '{project_dir.name}' is ready.")

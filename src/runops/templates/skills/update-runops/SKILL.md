@@ -19,7 +19,7 @@ cd tools/runops && git pull && cd -
 
 - local patch をこの project で使い続ける
 - `{{ skill_prefix }}patch-runops` で branch / commit / upstream disposition を整理する
-- 設計が必要なら `{{ skill_prefix }}feedback-runops` で issue 化する
+- 設計が必要なら `{{ skill_prefix }}feedback-runops` で HarnessOps record と issue 下書きにする
 - 実装案を見せたいなら draft PR にする
 - PR / rebase / stash / commit が終わってから改めて `update-runops`
 
@@ -34,6 +34,8 @@ runo update-harness
 - `.vscode/settings.json` もこの更新対象に含まれる
 - `notes/`, `materials/`, `research/` は不足している scaffold だけ補完される
 - `--dry-run` で事前確認、`--force` で全上書き
+- HarnessOps overlay がある場合は `hops update-harness` も連鎖し、
+  repo-local HarnessOps skills と overlay metadata を更新する
 
 ## 3. migration guide を確認
 
@@ -55,7 +57,7 @@ runops v0 系では後方互換性を強く維持しない。project 側の状�
 - `manual-edit` / `breaking-manual` / `destructive-human-gate` は
   `{{ skill_prefix }}migrate-runops` に渡す
 - guide にない破壊的変更や schema rewrite は推測で実行しない。
-  足りない場合は `{{ skill_prefix }}feedback-runops` 候補にする
+  足りない場合は `{{ skill_prefix }}feedback-runops` の HarnessOps feedback 候補にする
 
 Migration を適用 / skip / defer した場合は、`notes/YYYY-MM-DD.md` に記録する。
 

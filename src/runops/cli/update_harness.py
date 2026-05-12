@@ -169,12 +169,21 @@ def update_harness(
             ),
         ),
     ] = None,
+    no_harnessops: Annotated[
+        bool,
+        typer.Option(
+            "--no-harnessops",
+            help="Do not initialize or update the project-side HarnessOps overlay.",
+        ),
+    ] = False,
 ) -> None:
     """Re-render harness files from the current runops templates.
 
     Files that have not been manually edited since the last init/update
     are silently overwritten.  Files with user edits are written as
     ``<path>.new`` — review the diff and merge manually.
+    When the external ``hops`` CLI is available, this command also delegates
+    HarnessOps overlay/agent-bridge refresh to ``hops update-harness``.
 
     Use ``--force`` to overwrite all files regardless of user edits.
     Use ``--adopt`` to accept the current on-disk state into the lock
@@ -186,6 +195,7 @@ def update_harness(
       runo update-harness --force           # force-overwrite everything
       runo update-harness --adopt           # lock current state
       runo update-harness --only CLAUDE.md  # update a single file
+      runo update-harness --no-harnessops   # skip the hops lifecycle hook
     """
     project_dir = (path or Path.cwd()).resolve()
 
@@ -387,6 +397,19 @@ def update_harness(
     if not dry_run:
         save_harness_lock(project_dir, updated_lock)
 
+    harnessops_message: str | None = None
+    harnessops_failed = False
+    if no_harnessops:
+        harnessops_message = "HarnessOps skipped (disabled)"
+    elif only_prefixes is not None:
+        harnessops_message = "HarnessOps skipped (--only was used)"
+    else:
+        from runops.harness.harnessops import update_project_harnessops
+
+        harnessops_result = update_project_harnessops(project_dir, dry_run=dry_run)
+        harnessops_message = harnessops_result.message
+        harnessops_failed = harnessops_result.status == "failed"
+
     # Report
     prefix = "[dry-run] " if dry_run else ""
     if adopt and adopted:
@@ -427,5 +450,16 @@ def update_harness(
         typer.echo(f"{prefix}Backfilled {len(backfilled_workspace)} workspace item(s):")
         for p in backfilled_workspace:
             typer.echo(f"  {p}")
-    if not overwritten and not written_new and not adopted and not backfilled_workspace:
+    if harnessops_message is not None:
+        if harnessops_failed:
+            typer.echo(f"{prefix}Warning: {harnessops_message}", err=True)
+        else:
+            typer.echo(f"{prefix}{harnessops_message}.")
+    if (
+        not overwritten
+        and not written_new
+        and not adopted
+        and not backfilled_workspace
+        and not harnessops_failed
+    ):
         typer.echo(f"{prefix}All harness files are up to date.")

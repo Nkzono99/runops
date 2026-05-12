@@ -11,6 +11,7 @@ from typer.testing import CliRunner
 
 from runops.cli.main import app
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
+from runops.harness.harnessops import HarnessOpsResult
 
 runner = CliRunner()
 
@@ -21,6 +22,13 @@ def _mock_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "runops.harness.harnessops.initialize_project_harnessops",
+        lambda *_args, **_kwargs: HarnessOpsResult(
+            "skipped",
+            "HarnessOps skipped (test)",
+        ),
     )
 
 
@@ -38,6 +46,46 @@ class TestInit:
         assert (tmp_path / "cases").is_dir()
         assert (tmp_path / "runs").is_dir()
         assert (tmp_path / ".gitignore").exists()
+
+    def test_init_invokes_harnessops(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Init delegates project overlay creation to hops when enabled."""
+        calls: list[Path] = []
+
+        def _fake_harnessops(project_dir: Path) -> HarnessOpsResult:
+            calls.append(project_dir)
+            return HarnessOpsResult("created", "HarnessOps initialized")
+
+        monkeypatch.setattr(
+            "runops.harness.harnessops.initialize_project_harnessops",
+            _fake_harnessops,
+        )
+        result = runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert calls == [tmp_path.resolve()]
+        assert "HarnessOps initialized" in result.output
+
+    def test_init_can_skip_harnessops(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--no-harnessops disables the hops lifecycle hook."""
+
+        def _fail_harnessops(_project_dir: Path) -> HarnessOpsResult:
+            raise AssertionError("should not be called")
+
+        monkeypatch.setattr(
+            "runops.harness.harnessops.initialize_project_harnessops",
+            _fail_harnessops,
+        )
+        result = runner.invoke(
+            app,
+            ["init", "-y", "--no-harnessops", "--path", str(tmp_path)],
+        )
+
+        assert result.exit_code == 0
+        assert "HarnessOps (disabled)" in result.output
         assert (tmp_path / ".git").is_dir()
         assert (tmp_path / "CLAUDE.md").exists()
         assert (tmp_path / "AGENTS.md").exists()

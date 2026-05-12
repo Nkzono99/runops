@@ -92,6 +92,13 @@ def init(
             help="Do not include the upstream-feedback rule for the AI agent.",
         ),
     ] = False,
+    no_harnessops: Annotated[
+        bool,
+        typer.Option(
+            "--no-harnessops",
+            help="Do not initialize the project-side HarnessOps overlay.",
+        ),
+    ] = False,
     runops_repo: Annotated[
         str,
         typer.Option(
@@ -101,6 +108,10 @@ def init(
     ] = _DEFAULT_SIMCTL_REPO,
 ) -> None:
     """Initialize a new runops project (runops.toml etc.).
+
+    When the external ``hops`` CLI is available, ``runo init`` also delegates
+    project-side HarnessOps overlay creation to ``hops init --profile
+    runops-project``. Use ``--no-harnessops`` to skip that hook.
 
     By default, runs in interactive mode with guided prompts.
     Use --yes / -y to skip prompts and use defaults.
@@ -348,6 +359,21 @@ def init(
     lock_hashes = harness.hashes()
     lock_hashes[GITIGNORE_PATH] = hash_text(build_managed_gitignore_block())
     save_harness_lock(project_dir, lock_hashes)
+
+    # HarnessOps project overlay.  runops delegates all state changes to the
+    # external hops CLI and keeps init usable when HarnessOps is unavailable.
+    if no_harnessops:
+        skipped.append("HarnessOps (disabled)")
+    else:
+        from runops.harness.harnessops import initialize_project_harnessops
+
+        harnessops_result = initialize_project_harnessops(project_dir)
+        if harnessops_result.status == "created":
+            created.append(harnessops_result.message)
+        else:
+            skipped.append(harnessops_result.message)
+            if harnessops_result.status == "failed":
+                typer.echo(f"  Warning: {harnessops_result.message}", err=True)
 
     # git init
     fresh_git = False

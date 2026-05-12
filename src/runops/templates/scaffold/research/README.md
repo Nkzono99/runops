@@ -69,4 +69,5 @@
 
 研究上の未解決事項は `Feedback To runops` に入れません。そこには、
 runops 本体に戻すべき繰り返しの摩擦、missing command、docs gap、bug、
-改善案だけを書きます。Issue 化するときは `feedback-runops` skill を使います。
+改善案だけを書きます。共有するときは `feedback-runops` skill で HarnessOps に
+記録し、サニタイズ済み issue 下書きを作ります。

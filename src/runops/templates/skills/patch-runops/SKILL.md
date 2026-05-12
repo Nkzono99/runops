@@ -1,6 +1,6 @@
 ---
 name: patch-runops
-description: Locally patch tools/runops for the current project, use the editable install immediately, then decide whether the change stays local, becomes feedback-runops issue, draft PR, or ready PR.
+description: Locally patch tools/runops for the current project, use the editable install immediately, then decide whether the change stays local, becomes HarnessOps feedback, draft PR, or ready PR.
 ---
 
 # tools/runops を local patch する
@@ -31,7 +31,7 @@ runops 本体の bug / 不足機能 / harness 摩擦を、その場で修正し�
 | project 固有 harness override | project 側に残す |
 | 汎用 CLI / core / adapter / launcher 修正 | `tools/runops` で patch |
 | 汎用 scaffold / skill / harness 改善 | `tools/runops/src/runops/templates/` へ戻す |
-| 一部だけ汎用、または設計が必要 | local patch + `feedback-runops` issue |
+| 一部だけ汎用、または設計が必要 | local patch + `feedback-runops` HarnessOps record / issue 下書き |
 
 project 側の生成物をそのまま upstream に入れない:
 
@@ -132,7 +132,8 @@ project 固有。upstream しない。
 汎用価値はありそうだが、設計がまだ粗い / 影響範囲が大きい /
 一部だけ汎用 / draft PR には早い。
 
-この場合は `{{ skill_prefix }}feedback-runops` で issue 化する。issue には local branch / commit、
+この場合は `{{ skill_prefix }}feedback-runops` で HarnessOps に記録し、
+サニタイズ済み issue 下書きを作る。下書きには local branch / commit、
 current project で効いたこと、upstream にしたい部分、project 固有として
 除外すべき部分を書く。
 

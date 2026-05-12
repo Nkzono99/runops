@@ -98,7 +98,7 @@ survey 設計, run 生成, 投入の各タイミングで意思決定の理由�
 current project で runops 本体の修正が今すぐ必要な場合は、`patch-runops`
 skill で `tools/runops` を local patch して即利用できる。local patch の正本は
 `tools/runops` 内の Git branch / commit とし、設計が必要な upstream 候補は
-`feedback-runops` で issue 化する。詳細は
+`feedback-runops` で HarnessOps に記録し、サニタイズ済み issue 下書きにする。詳細は
 [Upstream Integration Layer](layers/upstream.md) を参照。
 
 runops 自体を更新するときは `update-runops` skill を使う。更新後に project 側の

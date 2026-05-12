@@ -63,7 +63,7 @@ runo migrate apply M0-0001
 ```
 
 CLI で修復できない finding は、手作業で直すか、汎用化できそうなら `feedback-runops`
-で upstream 候補にします。
+で HarnessOps record / upstream 下書きにします。
 
 ## Agent Workflow
 

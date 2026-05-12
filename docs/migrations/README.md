@@ -117,4 +117,4 @@ CLI-backed migration は、同じ project に複数回実行しても壊れな�
 5. `runo doctor`, `runo context --json`, `runo lint` と item ごとの validation を実行する。
 
 Migration guide にない破壊的変更を推測で実行してはいけません。
-guide が足りない場合は、まず `feedback-runops` で docs gap として扱います。
+guide が足りない場合は、まず `feedback-runops` で docs gap として HarnessOps に記録します。

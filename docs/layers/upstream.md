@@ -1,7 +1,7 @@
 # Upstream Integration Layer
 
 Upstream Integration Layer は、生成 project と runops 本体をつなぐ境界です。
-`tools/runops` の local patch、`feedback-runops` issue、PR、`update-runops` の競合処理で
+`tools/runops` の local patch、`feedback-runops` / HarnessOps feedback、PR、`update-runops` の競合処理で
 迷った場合はこの文書を正本とします。
 
 ## 目的
@@ -29,6 +29,10 @@ Upstream Integration Layer は、生成 project と runops 本体をつなぐ境
   のような project-local index を作ってよい。
 - `update-runops` / `runo update-harness` は `tools/runops` の local changes を壊さない。
   dirty tree、local branch、未 push commit があれば pull せず停止する。
+- HarnessOps が利用できる環境では、`runo init` / `runo setup` は project 側
+  `hops init --profile runops-project` を連鎖し、`runo update-harness` は
+  `hops update-harness` を連鎖する。HarnessOps 管理ファイルは runops が直接書かず、
+  すべて `hops` に委譲する。
 
 ## 標準フロー
 
@@ -38,19 +42,20 @@ Upstream Integration Layer は、生成 project と runops 本体をつなぐ境
 4. current project の `.venv` に editable install して即利用する。
 5. 結果を `notes/YYYY-MM-DD.md` に残す。
 6. upstream disposition を分類する。
-7. 必要なら `feedback-runops` issue、draft PR、ready PR に進める。
+7. 必要なら `feedback-runops` で HarnessOps record / issue 下書き、draft PR、ready PR に進める。
 
 ## Upstream Disposition
 
 | 判定 | 意味 | 次の動き |
 |------|------|----------|
 | `local-only` | project 固有 | project 側に残す |
-| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `feedback-runops` で issue |
+| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `feedback-runops` で HarnessOps record / issue 下書き |
 | `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
 | `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
 
 `feedback-runops` は PR の弱い代替ではありません。
-local patch や運用上の摩擦を upstream 設計に変換するための中間レイヤーです。
+local patch や運用上の摩擦を HarnessOps の record とサニタイズ済み upstream 設計下書きに
+変換するための中間レイヤーです。
 
 ## Upstream に入れないもの
 
@@ -99,7 +104,7 @@ Pull / harness 更新が終わったら、`tools/runops/docs/migrations/README.m
 `migrate-runops` skill に渡し、適用 / skip / defer を `notes/YYYY-MM-DD.md` に残します。
 
 Migration guide にない破壊的変更や schema rewrite を推測で実行しない。
-guide が不足している場合は `feedback-runops` で docs gap として扱います。
+guide が不足している場合は `feedback-runops` で docs gap として HarnessOps に記録します。
 
 ## SemVer と migration
 
@@ -114,7 +119,7 @@ project file format の互換 shim を長く維持しません。
 
 ## Issue / PR に入れる情報
 
-`feedback-runops` issue または PR には、必要に応じて次を含めます。
+`feedback-runops` の HarnessOps record / issue 下書き、または PR には、必要に応じて次を含めます。
 
 - 問題の短い説明
 - current project で困った workflow
