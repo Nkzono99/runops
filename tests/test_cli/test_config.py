@@ -140,7 +140,7 @@ class TestInteractiveInit:
 
     @pytest.fixture(autouse=True)
     def _mock_bootstrap(self, monkeypatch: pytest.MonkeyPatch) -> None:
-        """Skip the bootstrap step (uv/git clone) in interactive init tests."""
+        """Skip the bootstrap step (uv install) in interactive init tests."""
         monkeypatch.setattr(
             "runops.cli.init._bootstrap_environment",
             lambda *_args, **_kwargs: None,

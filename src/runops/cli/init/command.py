@@ -10,6 +10,7 @@ from typing import Annotated, Any, Optional
 
 import typer
 
+from runops import __version__
 from runops.cli.init.knowledge import _clone_doc_repos, _prepare_knowledge_imports
 from runops.cli.init.prompting import _BundledSiteProfile
 from runops.cli.init.scaffold import (
@@ -51,7 +52,7 @@ _RULES_DIR = ".claude/rules"
 _CLAUDE_SETTINGS = ".claude/settings.json"
 
 _SCHEMA_BASE_URL = "https://raw.githubusercontent.com/Nkzono99/runops/main/schemas"
-_DEFAULT_SIMCTL_REPO = "https://github.com/Nkzono99/runops.git"
+_DEFAULT_RUNOPS_PACKAGE = f"runops=={__version__}"
 
 
 def _safe_echo(message: str, *, err: bool = False) -> None:
@@ -99,13 +100,13 @@ def init(
             help="Do not initialize the project-side HarnessOps overlay.",
         ),
     ] = False,
-    runops_repo: Annotated[
+    runops_package: Annotated[
         str,
         typer.Option(
-            "--runops-repo",
-            help="Git URL for runops repository.",
+            "--runops-package",
+            help="Package spec used to install runops into the project .venv.",
         ),
-    ] = _DEFAULT_SIMCTL_REPO,
+    ] = _DEFAULT_RUNOPS_PACKAGE,
 ) -> None:
     """Initialize a new runops project (runops.toml etc.).
 
@@ -312,18 +313,18 @@ def init(
             for ks in knowledge_sources:
                 save_knowledge_source(project_dir, ks)
 
-    # Bootstrap: .venv + tools/runops + editable install
+    # Bootstrap: .venv + normal runops package install
     import runops.cli.init as init_facade
 
     init_facade._bootstrap_environment(
         project_dir,
         sim_names,
-        runops_repo,
+        runops_package,
         created,
         skipped,
     )
 
-    # Discover agent docs after bootstrap so tools/runops/docs/ can be imported.
+    # Materialize package-provided agent docs and external knowledge imports.
     knowledge_imports_path = _prepare_knowledge_imports(
         project_dir,
         sim_names,

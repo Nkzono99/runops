@@ -36,7 +36,7 @@ runo knowledge facts
 
 ```bash
 mkdir -p runs/<category>/<survey_name>
-# survey.toml を作成 (フォーマットは tools/runops/docs/toml-reference.md 参照)
+# survey.toml を作成 (フォーマットは runops-reference skill / CLI help 参照)
 runo runs sweep runs/<category>/<survey_name>
 runo runs list runs/<category>/<survey_name>
 ```
@@ -69,4 +69,4 @@ EOF
 
 ## TOML フォーマット
 
-詳細は `tools/runops/docs/toml-reference.md` の survey.toml セクションを参照。
+詳細は `runops-reference` skill、`runo runs sweep --help`、または schemas を参照。

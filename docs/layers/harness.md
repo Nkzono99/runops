@@ -49,7 +49,7 @@ Harness Layer に置くもの:
 - skill 手順
 - Agent が最初に読むべき順序
 - protected file の扱い
-- `tools/runops` local patch / feedback の手順
+- runops local patch / feedback の手順
 - project-specific override
 
 置かないもの:
@@ -75,8 +75,8 @@ Harness Layer に置くもの:
 2. directory-specific `AGENTS.md` / `CLAUDE.md`
 3. relevant skill
 4. relevant layer doc under `docs/layers/`
-5. `tools/runops/docs/` / `tools/runops/SPEC.md`
-6. `tools/runops/src/` は最後の手段
+5. `.runops/knowledge/enabled/imports.md` と `.runops/knowledge/runops/`
+6. installed package の場所 (`python -c "import runops; print(runops.__file__)"`) は最後の手段
 
 ## 他レイヤとの関係
 

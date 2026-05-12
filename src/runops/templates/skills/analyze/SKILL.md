@@ -6,7 +6,7 @@ description: Analyze completed runs and collect survey results. Use after runs c
 # 完了した Run の結果を解析・集計する
 
 解析・可視化成果物の置き場所と運用ルールの正本は
-`tools/runops/docs/layers/analysis.md`。
+`runops-reference` skill と `runo analyze --help`。
 
 ## 個別 run の要約
 

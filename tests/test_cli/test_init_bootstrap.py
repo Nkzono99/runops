@@ -15,7 +15,7 @@ class _CompletedProcess:
     stderr: str = ""
 
 
-def test_bootstrap_creates_venv_runops_and_sim_packages(
+def test_bootstrap_creates_venv_and_installs_packages(
     tmp_path: Path,
     monkeypatch: Any,
     capsys: Any,
@@ -39,15 +39,14 @@ def test_bootstrap_creates_venv_runops_and_sim_packages(
     _bootstrap_environment(
         tmp_path,
         ["emses"],
-        "https://example.com/runops.git",
+        "runops==1.2.3",
         created,
         skipped,
     )
 
     assert created == [
         ".venv",
-        "tools/runops",
-        "uv pip install -e tools/runops",
+        "uv pip install runops==1.2.3",
         "pip install (1 packages)",
     ]
     assert skipped == []
@@ -55,17 +54,10 @@ def test_bootstrap_creates_venv_runops_and_sim_packages(
     assert calls == [
         ["/usr/bin/uv", "venv", str(tmp_path / ".venv")],
         [
-            "git",
-            "clone",
-            "https://example.com/runops.git",
-            str(tmp_path / "tools" / "runops"),
-        ],
-        [
             "/usr/bin/uv",
             "pip",
             "install",
-            "-e",
-            str(tmp_path / "tools" / "runops"),
+            "runops==1.2.3",
             "--python",
             expected_python,
         ],
@@ -81,8 +73,7 @@ def test_bootstrap_creates_venv_runops_and_sim_packages(
 
     out = capsys.readouterr().out
     assert "Creating .venv" in out
-    assert "Cloning runops into tools/" in out
-    assert "Installing runops (editable)" in out
+    assert "Installing runops==1.2.3" in out
     assert "Installing: emu" in out
     assert "Then: runo doctor" in out
 
@@ -107,7 +98,7 @@ def test_bootstrap_returns_early_when_venv_creation_fails(
     _bootstrap_environment(
         tmp_path,
         [],
-        "https://example.com/runops.git",
+        "runops==1.2.3",
         created,
         skipped,
     )
@@ -118,18 +109,18 @@ def test_bootstrap_returns_early_when_venv_creation_fails(
     assert "Warning: uv venv failed: venv failed" in capsys.readouterr().out
 
 
-def test_bootstrap_returns_early_when_clone_fails(
+def test_bootstrap_surfaces_runops_install_failure(
     tmp_path: Path,
     monkeypatch: Any,
     capsys: Any,
 ) -> None:
-    """Bootstrap stops after cloning fails and preserves earlier progress."""
+    """Bootstrap reports runops install failures and continues to sim packages."""
 
     def fake_run(argv, **_kwargs):  # type: ignore[no-untyped-def]
         if argv[:2] == ["uv", "venv"]:
             return _CompletedProcess()
-        if argv[:2] == ["git", "clone"]:
-            return _CompletedProcess(returncode=1, stderr="clone failed")
+        if argv[:3] == ["uv", "pip", "install"]:
+            return _CompletedProcess(returncode=1, stderr="install failed")
         msg = f"unexpected call: {argv}"
         raise AssertionError(msg)
 
@@ -141,30 +132,27 @@ def test_bootstrap_returns_early_when_clone_fails(
     _bootstrap_environment(
         tmp_path,
         [],
-        "https://example.com/runops.git",
+        "runops==1.2.3",
         created,
         skipped,
     )
 
     assert created == [".venv"]
     assert skipped == []
-    assert "Warning: git clone failed: clone failed" in capsys.readouterr().out
+    assert "Warning: runops install failed:" in capsys.readouterr().out
 
 
-def test_bootstrap_skips_existing_layout_and_surfaces_install_failures(
+def test_bootstrap_skips_existing_venv_and_surfaces_package_failures(
     tmp_path: Path,
     monkeypatch: Any,
     capsys: Any,
 ) -> None:
-    """Existing .venv/tools are skipped while install failures are reported."""
+    """Existing .venv is skipped while package failures are reported."""
     (tmp_path / ".venv" / "bin").mkdir(parents=True)
-    (tmp_path / "tools" / "runops").mkdir(parents=True)
     calls: list[list[str]] = []
 
     def fake_run(argv, **_kwargs):  # type: ignore[no-untyped-def]
         calls.append(list(argv))
-        if "-e" in argv:
-            return _CompletedProcess(returncode=1, stderr="editable failed")
         return _CompletedProcess(returncode=1, stderr="package failed")
 
     monkeypatch.setattr("runops.cli.init.bootstrap._find_uv", lambda: "uv")
@@ -179,21 +167,20 @@ def test_bootstrap_skips_existing_layout_and_surfaces_install_failures(
     _bootstrap_environment(
         tmp_path,
         ["beach"],
-        "https://example.com/runops.git",
+        "runops==1.2.3",
         created,
         skipped,
     )
 
     assert created == []
-    assert skipped == [".venv", "tools/runops"]
+    assert skipped == [".venv"]
     expected_python = str(_python_in_venv(tmp_path / ".venv"))
     assert calls == [
         [
             "uv",
             "pip",
             "install",
-            "-e",
-            str(tmp_path / "tools" / "runops"),
+            "runops==1.2.3",
             "--python",
             expected_python,
         ],
@@ -208,7 +195,6 @@ def test_bootstrap_skips_existing_layout_and_surfaces_install_failures(
     ]
 
     out = capsys.readouterr().out
-    assert "Warning: editable install failed:" in out
-    assert "editable failed" in out
+    assert "Warning: runops install failed:" in out
     assert "Warning: pip install failed:" in out
     assert "package failed" in out

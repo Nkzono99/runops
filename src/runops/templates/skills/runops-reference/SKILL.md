@@ -6,7 +6,8 @@ user-invocable: false
 
 # runops コマンドリファレンス
 
-詳細なフィールド定義は `tools/runops/docs/toml-reference.md` を参照。
+詳細なフィールド定義は `runo <command> --help`、schemas、または installed
+runops package に同梱された generated guide を参照。
 
 ## 現在地を把握する
 
@@ -35,7 +36,8 @@ runo migrate apply M0-0001 --dry-run
 runo migrate apply M0-0001
 ```
 
-Migration guide は `tools/runops/docs/migrations/` を参照する。
+Migration guide は release note、`runo migrate list/show`、または別の runops
+source checkout の `docs/migrations/` を参照する。
 CLI で扱えるのは定型 migration だけ。判断が必要なものは `migrate-runops` skill で扱う。
 
 ## Case を作る

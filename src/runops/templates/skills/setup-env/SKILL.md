@@ -17,8 +17,7 @@ runo doctor
 
 ```bash
 uv venv .venv
-mkdir -p tools && git clone https://github.com/Nkzono99/runops.git tools/runops
-uv pip install -e ./tools/runops
+uv pip install runops --python .venv/bin/python
 {{ pip_install_line }}
 source .venv/bin/activate
 runo doctor
@@ -26,7 +25,7 @@ runo doctor
 
 ## 注意
 
-- `.venv/` と `tools/` は `.gitignore` に追加済み
+- `.venv/` は `.gitignore` に追加済み
 - HPC ノードでは login ノードで環境構築し、compute ノードでは同じ `.venv` を使う
 - `module load` が必要なモジュールは `simulators.toml` の `modules` に定義済み
-- runops 更新: `cd tools/runops && git pull`
+- runops 更新: `uv pip install --upgrade runops --python .venv/bin/python`

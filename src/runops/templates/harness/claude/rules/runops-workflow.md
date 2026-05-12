@@ -23,12 +23,13 @@
 - `refs/` 配下は外部リポジトリのミラーなので書き込まない
 - `runs/**/input/*` を緊急修正した場合は、同じ修正を上流の case へ戻す
 
-## tools/runops の編集
+## runops 本体の編集
 
-- `tools/runops/` は editable install されているので、必要なら
-  ソースを直接編集して即試せる (settings.json でも allow になっている)
-- 修正は基本 `runops` 本体側で先に行い、commit / push してから
-  プロジェクト側に反映する
+- 通常の project には `tools/runops/` がない前提で作業する
+- runops 本体を修正する必要がある場合は、project の研究作業とは別の
+  source checkout を用意し、修正・検証・PR 化を分けて扱う
+- project 側では installed package の version と
+  `.runops/knowledge/runops/` の生成済み guide を確認入口にする
 
 ## venv
 
@@ -72,7 +73,7 @@ permissions では allow し、Agent 側の workflow rule として以下を守�
 - campaign / case / survey の新規作成・大幅変更
 - `runo runs sweep` で新しい run を生成したとき
 - 解析結果・知見を保存したとき
-- `tools/runops/` を修正してテストが通ったとき
+- runops 本体の別 checkout で修正してテストが通ったとき
 - `runo runs submit` の前 (投入前のスナップショット)
 
 ## 知見の記録

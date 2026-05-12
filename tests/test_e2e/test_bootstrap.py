@@ -19,7 +19,7 @@ runner = CliRunner()
 def _fake_bootstrap_environment(
     project_dir: Path,
     _sim_names: list[str],
-    _runops_repo: str,
+    _runops_package: str,
     created: list[str],
     skipped: list[str],
 ) -> None:
@@ -30,22 +30,6 @@ def _fake_bootstrap_environment(
     else:
         (venv_dir / "Scripts").mkdir(parents=True, exist_ok=True)
         created.append(".venv")
-
-    runops_root = project_dir / "tools" / "runops"
-    if runops_root.exists():
-        skipped.append("tools/runops")
-    else:
-        docs_dir = runops_root / "docs"
-        docs_dir.mkdir(parents=True, exist_ok=True)
-        (runops_root / "entrypoints.toml").write_text(
-            'imports = ["docs/agent-user-guide.md"]\n',
-            encoding="utf-8",
-        )
-        (docs_dir / "agent-user-guide.md").write_text(
-            "# Agent guide\n",
-            encoding="utf-8",
-        )
-        created.append("tools/runops")
 
 
 def _init_project(
@@ -190,7 +174,7 @@ def test_e2e_init_minimal(
 
     imports_path = project_dir / ".runops" / "knowledge" / "enabled" / "imports.md"
     assert imports_path.is_file()
-    assert "@tools/runops/docs/agent-user-guide.md" in imports_path.read_text(
+    assert "@.runops/knowledge/runops/agent-user-guide.md" in imports_path.read_text(
         encoding="utf-8"
     )
 
@@ -205,7 +189,7 @@ def test_e2e_init_minimal(
     )
     assert "permissions" in settings
     assert "Edit(/campaign.toml)" in settings["permissions"]["allow"]
-    assert "Edit(/tools/runops/**)" in settings["permissions"]["allow"]
+    assert "Edit(/tools/runops/**)" not in settings["permissions"]["allow"]
     assert "Bash(runo runs submit*)" in settings["permissions"]["allow"]
     assert "Bash(runops runs submit*)" in settings["permissions"]["allow"]
     assert "Bash(runo runs submit*)" not in settings["permissions"]["ask"]
@@ -273,7 +257,7 @@ def test_e2e_setup_idempotent(
     assert "Skipped" in second.output
 
     assert (project_dir / ".venv").is_dir()
-    assert (project_dir / "tools" / "runops").is_dir()
+    assert not (project_dir / "tools" / "runops").exists()
     assert imports_path.is_file()
 
     assert (project_dir / "runops.toml").read_text(

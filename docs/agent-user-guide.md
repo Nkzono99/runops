@@ -1,7 +1,8 @@
 # runops Agent ユーザーガイド
 
 runops プロジェクトにおける Agent の作業ガイド。
-現時点の標準ハーネスは Claude Code で、プロジェクトの `CLAUDE.md` から `@docs/agent-user-guide.md` で参照される。
+project 側では `.runops/knowledge/runops/agent-user-guide.md` と
+`.runops/knowledge/enabled/imports.md` に package 同梱の guide が生成される。
 
 ## runops の基本原則
 
@@ -93,17 +94,17 @@ survey 設計, run 生成, 投入の各タイミングで意思決定の理由�
 図を生成したら原則 Markdown image として埋め込み、`Observation:` と
 `Interpretation:` を分ける。
 
-## tools/runops の local patch
+## runops 本体の local patch
 
 current project で runops 本体の修正が今すぐ必要な場合は、`patch-runops`
-skill で `tools/runops` を local patch して即利用できる。local patch の正本は
-`tools/runops` 内の Git branch / commit とし、設計が必要な upstream 候補は
+skill で project 外の runops source checkout を使う。local patch の正本は
+その checkout 内の Git branch / commit とし、設計が必要な upstream 候補は
 `feedback-runops` で HarnessOps に記録し、サニタイズ済み issue 下書きにする。詳細は
 [Upstream Integration Layer](layers/upstream.md) を参照。
 
 runops 自体を更新するときは `update-runops` skill を使う。更新後に project 側の
 file format、manifest、analysis artifact、harness scaffold などの移行が必要なら、
-`tools/runops/docs/migrations/` を読み、定型 migration は
+release note / migration guide を読み、定型 migration は
 `runo migrate apply M0-0001 --dry-run` → `runo migrate apply M0-0001` で適用する。
 CLI 未対応または判断が必要なものは `migrate-runops` skill で扱い、適用 / skip / defer を
 `notes/YYYY-MM-DD.md` に記録する。

@@ -47,15 +47,13 @@ def _activation_hint() -> str:
 def _bootstrap_environment(
     project_dir: Path,
     sim_names: list[str],
-    runops_repo: str,
+    runops_package: str,
     created: list[str],
     skipped: list[str],
 ) -> None:
-    """Bootstrap .venv, clone runops into tools/, and editable-install."""
+    """Bootstrap .venv and install runops plus simulator packages."""
     uv = _find_uv()
     venv_dir = project_dir / ".venv"
-    tools_dir = project_dir / "tools"
-    runops_dir = tools_dir / "runops"
     python_path = _python_in_venv(venv_dir)
 
     if venv_dir.exists():
@@ -79,36 +77,13 @@ def _bootstrap_environment(
             )
             return
 
-    if runops_dir.exists():
-        skipped.append("tools/runops")
-    else:
-        typer.echo("  Cloning runops into tools/ ...")
-        tools_dir.mkdir(exist_ok=True)
-        clone_result = subprocess.run(
-            ["git", "clone", runops_repo, str(runops_dir)],
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=False,
-        )
-        if clone_result.returncode == 0:
-            created.append("tools/runops")
-        else:
-            typer.echo(
-                f"  Warning: git clone failed: "
-                f"{(clone_result.stderr or '').strip()[:300]}"
-            )
-            return
-
-    typer.echo("  Installing runops (editable) ...")
+    typer.echo(f"  Installing {runops_package} ...")
     install_result = subprocess.run(
         [
             uv,
             "pip",
             "install",
-            "-e",
-            str(runops_dir),
+            runops_package,
             "--python",
             str(python_path),
         ],
@@ -120,10 +95,10 @@ def _bootstrap_environment(
         check=False,
     )
     if install_result.returncode == 0:
-        created.append("uv pip install -e tools/runops")
+        created.append(f"uv pip install {runops_package}")
     else:
         typer.echo(
-            f"  Warning: editable install failed:\n"
+            f"  Warning: runops install failed:\n"
             f"    {(install_result.stderr or '').strip()[:300]}"
         )
 

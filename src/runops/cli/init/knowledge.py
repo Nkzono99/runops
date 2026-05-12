@@ -12,6 +12,9 @@ from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 
 logger = logging.getLogger(__name__)
 
+_RUNOPS_AGENT_GUIDE_TEMPLATE = "knowledge/runops/agent-user-guide.md"
+_RUNOPS_AGENT_GUIDE_PATH = ".runops/knowledge/runops/agent-user-guide.md"
+
 
 def _clone_doc_repos(
     project_dir: Path,
@@ -55,7 +58,7 @@ def _discover_agent_docs(
     project_dir: Path,
     doc_repos: list[tuple[str, str]],
 ) -> list[str]:
-    """Discover manifest-declared agent doc imports from cloned repos."""
+    """Discover manifest-declared agent doc imports from cloned doc repos."""
     from runops.core.knowledge_source import discover_repo_imports
 
     refs_dir = project_dir / "refs"
@@ -66,12 +69,20 @@ def _discover_agent_docs(
             continue
         for rel_path in discover_repo_imports(repo_root):
             paths.append(f"refs/{dest}/{rel_path}".replace("\\", "/"))
-
-    runops_root = project_dir / "tools" / "runops"
-    if runops_root.is_dir():
-        for rel_path in discover_repo_imports(runops_root):
-            paths.append(f"tools/runops/{rel_path}".replace("\\", "/"))
     return paths
+
+
+def _materialize_runops_agent_docs(project_dir: Path) -> list[str]:
+    """Write package-provided runops agent docs into generated knowledge."""
+    from runops.templates import load_static
+
+    guide_path = project_dir / _RUNOPS_AGENT_GUIDE_PATH
+    guide_path.parent.mkdir(parents=True, exist_ok=True)
+    guide_path.write_text(
+        load_static(_RUNOPS_AGENT_GUIDE_TEMPLATE),
+        encoding="utf-8",
+    )
+    return [_RUNOPS_AGENT_GUIDE_PATH]
 
 
 def _prepare_knowledge_imports(
@@ -109,8 +120,12 @@ def _prepare_knowledge_imports(
                 for issue in issues:
                     typer.echo(f"  Warning ({source.name}): {issue}")
 
+    runops_doc_imports = _materialize_runops_agent_docs(project_dir)
     doc_repos = _collect_doc_repos(simulator_names) if simulator_names else []
-    agent_doc_imports = _discover_agent_docs(project_dir, doc_repos)
+    agent_doc_imports = [
+        *runops_doc_imports,
+        *_discover_agent_docs(project_dir, doc_repos),
+    ]
 
     render_config = config if config is not None else KnowledgeConfig()
     should_render = bool(agent_doc_imports or (config is not None and config.sources))

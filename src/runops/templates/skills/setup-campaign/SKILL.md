@@ -22,7 +22,7 @@ runo context --no-json
 cat CLAUDE.md   # agent_guide セクションにシミュレータ知識がある
 
 # campaign.toml のスキーマ
-cat tools/runops/schemas/campaign.json
+runo context --json
 
 # 既存のケースがあれば参照
 ls cases/

@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import logging
 import re
+from importlib import metadata
 from pathlib import Path
 from typing import Any
 
+import runops
 from runops.core.exceptions import SimctlError
 
 logger = logging.getLogger(__name__)
@@ -140,6 +142,8 @@ def _load_project_info(
             "name": proj.name,
             "description": proj.description,
             "root": str(root),
+            "runops_version": _installed_runops_version(),
+            "runops_module": str(Path(runops.__file__).resolve()),
         }
     except SimctlError as exc:
         _record_diagnostic(
@@ -149,6 +153,14 @@ def _load_project_info(
             message=f"Failed to load project metadata: {exc}",
         )
         return {"name": "", "root": str(root)}
+
+
+def _installed_runops_version() -> str:
+    """Return the installed runops distribution version."""
+    try:
+        return metadata.version("runops")
+    except metadata.PackageNotFoundError:
+        return runops.__version__
 
 
 def _load_campaign_info(

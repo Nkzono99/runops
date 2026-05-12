@@ -9,7 +9,7 @@ description: Record runops feedback through HarnessOps, export a sanitized upstr
 HarnessOps に記録し、サニタイズ済み bundle を作ってから issue 下書きまたは起票へ進める
 thin wrapper。records / routing / sanitize / export は必ず `hops` CLI に委譲する。
 
-`tools/runops` に local patch がある場合も、この skill を使ってよい。
+別 checkout の runops local patch がある場合も、この skill を使ってよい。
 特に、汎用価値はありそうだが設計がまだ粗い、一部だけ汎用、draft PR には早い、
 という場合は PR ではなく issue で upstream design discussion に回す。
 
@@ -44,8 +44,8 @@ hops doctor --check-overlay --check-records
 - workaround が必要だった箇所
 - ドキュメントやヘルプが不足していると感じた場面
 - 「こうなっていれば便利だった」と思った機能
-- `tools/runops/` のコードを読んで気づいたバグ・改善点
-- `tools/runops` local patch のうち、設計議論が必要な upstream 候補
+- runops package のコードや generated harness を読んで気づいたバグ・改善点
+- runops local patch のうち、設計議論が必要な upstream 候補
 
 出力フォーマット:
 

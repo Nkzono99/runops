@@ -15,7 +15,7 @@ GitHub issue はサニタイズ済み bundle から作る外部共有チャン�
 - 「もう一段抽象化してあれば手作業が減る」ワークフローが繰り返し出てきた
 - `CLAUDE.md` / skill / rule の記述と実装が食い違っている
 - 新しい simulator / launcher / site を足したくなった
-- `tools/runops/` のコードを読んでいて明らかなバグ・dead code を発見した
+- runops package のコードや generated harness を読んでいて明らかなバグ・dead code を発見した
 
 「この 1 回だけ回避できればよい」ではなく、**次に別のプロジェクトで同じ作業を
 する人 (自分含む) が困らないようにする** という視点で判断する。
@@ -94,12 +94,12 @@ GitHub issue はサニタイズ済み bundle から作る外部共有チャン�
 
 {{ rule_heading | default("#") }}# 軽微な修正は直接 PR でもよい
 
-`tools/runops/` は editable install されているので、typo 修正や
-small な挙動改善は以下の手順で直接 upstream に投げられる:
+typo 修正や small な挙動改善は、project とは別の runops source checkout で
+直接 upstream に投げられる:
 
-1. `cd tools/runops && git checkout -b fix/<short-name>`
+1. runops repository を別ディレクトリに clone し、`git checkout -b fix/<short-name>`
 2. 修正を入れて `uv run pytest` などでテストが通ることを確認
-3. プロジェクト側の再現環境で実挙動を確認
+3. 必要なら project 側の再現環境で実挙動を確認
 4. `git push origin fix/<short-name>` → `gh pr create --repo Nkzono99/runops`
 5. 作成した PR の URL をユーザーに共有し、承認を求める
 
@@ -108,8 +108,9 @@ small な挙動改善は以下の手順で直接 upstream に投げられる:
 
 {{ rule_heading | default("#") }}# local patch から upstream へ戻す判断
 
-current project で今すぐ必要な修正は、`tools/runops` を local patch して
-即利用してよい。その後、必ず upstream disposition を決める:
+current project で今すぐ必要な修正は、別の runops source checkout で検証し、
+必要なら project の `.venv` へ一時的に package install して確認してよい。
+その後、必ず upstream disposition を決める:
 
 | 判定 | 意味 | 次の動き |
 |------|------|----------|
@@ -118,7 +119,7 @@ current project で今すぐ必要な修正は、`tools/runops` を local patch 
 | `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
 | `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
 
-local patch の正本は `tools/runops` 内の Git branch / commit とする。
+local patch の正本は別 checkout 内の Git branch / commit とする。
 別枠の mutable patch 履歴はデフォルトでは作らない。必要な handoff は
 `notes/YYYY-MM-DD.md` に残し、長期化する場合だけ
 `notes/reports/runops-local-patches.md` のような project-local index を作る。
@@ -126,9 +127,9 @@ local patch の正本は `tools/runops` 内の Git branch / commit とする。
 project 側の生成物をそのまま upstream しない。汎用化する場合は source
 template / command / docs に戻す:
 
-- `.agents/skills/*` / `.claude/skills/*` → `tools/runops/src/runops/templates/skills/`
-- `AGENTS.md` / `CLAUDE.md` → `tools/runops/src/runops/templates/harness/`
-- `research/*` scaffold → `tools/runops/src/runops/templates/scaffold/research/`
+- `.agents/skills/*` / `.claude/skills/*` → runops source checkout の `src/runops/templates/skills/`
+- `AGENTS.md` / `CLAUDE.md` → runops source checkout の `src/runops/templates/harness/`
+- `research/*` scaffold → runops source checkout の `src/runops/templates/scaffold/research/`
 
 {{ rule_heading | default("#") }}# しないこと
 

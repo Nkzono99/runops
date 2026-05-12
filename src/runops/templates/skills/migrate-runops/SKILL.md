@@ -6,7 +6,7 @@ description: Apply runops project-state migrations from docs/migrations after up
 # runops project-state migration を適用する
 
 `{{ skill_prefix }}migrate-runops` は、runops 更新後に project 側の状態を
-`tools/runops/docs/migrations/` の手順へ合わせるための skill です。
+release note / migration guide の手順へ合わせるための skill です。
 
 `{{ skill_prefix }}update-runops` は runops 本体と harness を更新する入口。
 この skill は、そのあとに必要な project file / generated index / schema の移行だけを扱います。
@@ -24,9 +24,9 @@ description: Apply runops project-state migrations from docs/migrations after up
 必要な範囲で読む:
 
 - `runo context --json`
-- `tools/runops/pyproject.toml` または `runo --version`
-- `tools/runops/docs/migrations/README.md`
-- `tools/runops/docs/migrations/v<major>.md`
+- `runo --version`
+- `runo migrate list`
+- release note または migration guide
 - migration item が指定する project file
 - 最近の `notes/YYYY-MM-DD.md` と relevant `research/agenda.md`
 
@@ -36,11 +36,11 @@ description: Apply runops project-state migrations from docs/migrations after up
 
 ```bash
 runo --version
-sed -n '1,220p' tools/runops/docs/migrations/README.md
-sed -n '1,260p' tools/runops/docs/migrations/v0.md
+runo migrate list
 ```
 
-`tools/runops` が project にない場合は、current checkout の `docs/migrations/` を読む。
+project に runops source checkout があるとは限らない。必要な場合は release note、
+installed package の generated guide、または別 checkout の `docs/migrations/` を読む。
 
 ### 2. migration checklist を作る
 
@@ -124,8 +124,8 @@ EOF
 - migration guide にない破壊的変更を実行しない。
 - project 固有の `notes/`, `research/`, `campaign.toml`, `cases/`, `runs/` を
   runops upstream の source と混ぜない。
-- `tools/runops` に local patch がある場合は、先に `{{ skill_prefix }}patch-runops`
-  で整理する。
+- runops 本体に local patch がある場合は、先に `{{ skill_prefix }}patch-runops`
+  で別 checkout の branch / commit / upstream disposition を整理する。
 - validation できない migration は `defer` として記録し、理由を書く。
 - private path、unpublished result、site 秘密を issue / PR / upstream docs に載せない。
 

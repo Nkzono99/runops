@@ -388,14 +388,14 @@ runops 本体やハーネスファイルの更新は、ユーザーが Claude Co
 
 \begin{lstlisting}[language={},commentstyle={}]
 > /update-runops
-AI: tools/runops を pull して update-harness を実行します...
+AI: runops package を更新して update-harness を実行します...
     -> CLAUDE.md, skills/, rules/ が最新テンプレートで更新されました
     -> runo doctor で環境を確認 ... OK
 \end{lstlisting}
 
 実行内容:
 \begin{itemize}[nosep]
-  \item \textbf{tools/runops/} リポジトリを \texttt{git pull} で最新化
+  \item \textbf{runops package} を \texttt{uv pip install --upgrade runops} で最新化
   \item \textbf{runo update-harness} でハーネスファイル (CLAUDE.md, skills, rules, editor settings 等) を再生成
   \item \textbf{不足している visible workspace} として \texttt{notes/}, \texttt{materials/}, \texttt{research/} を補完
   \item \textbf{runo update} でシミュレータパッケージを更新
@@ -491,7 +491,7 @@ Step 1--6 が唯一ユーザーが直接コマンドを実行する部分です 
 \textbf{runops:}
 \begin{itemize}[nosep]
   \item GitHub: \url{https://github.com/Nkzono99/runops}
-  \item ドキュメント: \texttt{tools/runops/docs/} (プロジェクト内)
+  \item ドキュメント: \texttt{.runops/knowledge/runops/} (プロジェクト内)
 \end{itemize}
 
 \textbf{Claude Code:}

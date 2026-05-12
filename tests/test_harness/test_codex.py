@@ -155,7 +155,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     codex_migrate = bundle.files[".agents/skills/migrate-runops/SKILL.md"]
     assert "`$update-runops`" in codex_migrate
     assert "`$feedback-runops`" in codex_migrate
-    assert "docs/migrations/v<major>.md" in codex_migrate
+    assert "runo migrate list" in codex_migrate
     assert "{{ skill_prefix }}" not in codex_migrate
     codex_feedback = bundle.files[".agents/skills/feedback-runops/SKILL.md"]
     assert "hops add-failure" in codex_feedback

@@ -42,7 +42,7 @@ uvx --from runops runo setup https://github.com/user/my-project.git
 source my-project/.venv/bin/activate && runo doctor
 ```
 
-`runo init` が `.venv/` と `tools/runops/` を自動構築し、editable install する。
+`runo init` が `.venv/` を自動構築し、runops を通常 package install する。
 
 ## 技術スタック
 

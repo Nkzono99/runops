@@ -18,7 +18,7 @@ runner = CliRunner()
 
 @pytest.fixture(autouse=True)
 def _mock_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Skip the bootstrap step (uv/git clone) in all init tests."""
+    """Skip the bootstrap step (uv install) in all init tests."""
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
@@ -495,7 +495,7 @@ class TestInit:
         assert any("runo" in r for r in data["permissions"]["allow"])
         assert any("runops" in r for r in data["permissions"]["allow"])
         assert "Edit(/campaign.toml)" in data["permissions"]["allow"]
-        assert "Edit(/tools/runops/**)" in data["permissions"]["allow"]
+        assert "Edit(/tools/runops/**)" not in data["permissions"]["allow"]
         assert "Bash(runo runs submit*)" in data["permissions"]["allow"]
         assert "Bash(runops runs submit*)" in data["permissions"]["allow"]
         assert "Bash(runo runs submit*)" not in data["permissions"]["ask"]
@@ -553,7 +553,7 @@ class TestInit:
         # Behavioural rules that used to live in PreToolUse hooks must now be
         # documented in this rule file.
         assert "runo runs submit" in workflow
-        assert "tools/runops" in workflow
+        assert "通常の project には `tools/runops/` がない" in workflow
 
     def test_init_subdirectory_claude_md(self, tmp_path: Path) -> None:
         """Context-specific CLAUDE.md files are created in cases/ and runs/."""
@@ -621,11 +621,15 @@ class TestInit:
         assert "/schemas/runops.json" in runops_content
         assert "simproject.json" not in runops_content
 
-    def test_init_references_tools_dir(self, tmp_path: Path) -> None:
-        """CLAUDE.md references tools/runops/ for docs."""
+    def test_init_references_generated_runops_knowledge(self, tmp_path: Path) -> None:
+        """CLAUDE.md references generated runops knowledge for docs."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         content = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
-        assert "tools/runops/" in content
+        assert ".runops/knowledge/enabled/imports.md" in content
+        assert (
+            tmp_path / ".runops" / "knowledge" / "runops" / "agent-user-guide.md"
+        ).is_file()
+        assert not (tmp_path / "tools" / "runops").exists()
         # docs/ directory should NOT be generated
         assert not (tmp_path / "docs").exists()
 
@@ -666,24 +670,17 @@ class TestInit:
     def test_init_renders_imports_after_bootstrap(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
-        """Init discovers tool docs only after bootstrap and wires imports.md."""
+        """Init renders package-provided agent docs and wires imports.md."""
 
         def _fake_bootstrap(
             project_dir: Path,
             _sim_names: list[str],
-            _runops_repo: str,
+            _runops_package: str,
             created: list[str],
             _skipped: list[str],
         ) -> None:
-            (project_dir / "tools" / "runops").mkdir(parents=True, exist_ok=True)
-            (project_dir / "tools" / "runops" / "entrypoints.toml").write_text(
-                'imports = ["docs/agent-user-guide.md"]\n',
-                encoding="utf-8",
-            )
-            docs_dir = project_dir / "tools" / "runops" / "docs"
-            docs_dir.mkdir(parents=True, exist_ok=True)
-            (docs_dir / "agent-user-guide.md").write_text("# Agent guide\n")
-            created.append("tools/runops")
+            (project_dir / ".venv").mkdir(parents=True, exist_ok=True)
+            created.append(".venv")
 
         monkeypatch.setattr("runops.cli.init._bootstrap_environment", _fake_bootstrap)
 
@@ -693,7 +690,7 @@ class TestInit:
         imports_path = tmp_path / ".runops" / "knowledge" / "enabled" / "imports.md"
         assert imports_path.is_file()
         imports = imports_path.read_text(encoding="utf-8")
-        assert "@tools/runops/docs/agent-user-guide.md" in imports
+        assert "@.runops/knowledge/runops/agent-user-guide.md" in imports
         claude = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
         assert "@.runops/knowledge/enabled/imports.md" in claude
 

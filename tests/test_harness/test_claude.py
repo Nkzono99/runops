@@ -31,12 +31,11 @@ def test_build_claude_settings_exposes_expected_policy() -> None:
     assert data["permissions"]["disableBypassPermissionsMode"] == "disable"
 
 
-def test_settings_allow_tools_hpc_runops_writes() -> None:
-    """tools/runops/** must be allow-listed for in-place dev install."""
+def test_settings_do_not_allow_tools_runops_writes() -> None:
+    """tools/runops/** is not allow-listed by default."""
     data = json.loads(build_claude_settings())
-    assert "Edit(/tools/runops/**)" in data["permissions"]["allow"]
-    assert "Write(/tools/runops/**)" in data["permissions"]["allow"]
-    # And must NOT appear in ask (no per-edit confirmation).
+    assert "Edit(/tools/runops/**)" not in data["permissions"]["allow"]
+    assert "Write(/tools/runops/**)" not in data["permissions"]["allow"]
     assert "Edit(/tools/runops/**)" not in data["permissions"]["ask"]
     assert "Write(/tools/runops/**)" not in data["permissions"]["ask"]
 

@@ -43,8 +43,8 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | `{{ skill_prefix }}note` | lab notebook に時系列エントリを追記する |
 | `{{ skill_prefix }}research-agenda` | `research/agenda.md` の現在判断を更新する |
 | `{{ skill_prefix }}feedback-runops` | runops 本体へのバグ報告・機能要望を HarnessOps 経由で記録し、issue 下書きを作る |
-| `{{ skill_prefix }}patch-runops` | `tools/runops` を local 修正して即利用し、HarnessOps feedback/PR/local-only を判定 |
-| `{{ skill_prefix }}update-runops` | runops 本体・harness を更新し、migration guide を確認する |
+| `{{ skill_prefix }}patch-runops` | 必要時に別 checkout で runops 本体を修正し、HarnessOps feedback/PR/local-only を判定 |
+| `{{ skill_prefix }}update-runops` | installed runops package と project harness を更新し、migration guide を確認する |
 | `{{ skill_prefix }}migrate-runops` | `docs/migrations/` に従って project 側状態を移行する |
 | `{{ skill_prefix }}python-package-refactor` | Python package の構造リファクタリングを API 保持と検証付きで進める |
 | `{{ skill_prefix }}release` | プロジェクトのマイルストーンタグを作成 |
@@ -60,7 +60,6 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 ### Agent が進めてよいもの
 - campaign / case / survey の編集、run 生成・投入・監視・解析・知見整理
-- `tools/runops/` のソース修正 (editable install されているので即試せる)
 
 ### 確認が必要なもの
 - 初回の大規模 survey / `runo runs submit --all` / 資源増加を伴う retry
@@ -80,7 +79,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 - campaign.toml / case / survey を新規作成・大幅変更したとき
 - `runo runs sweep` で新しい run を生成したとき (run 設定が確定したとき)
 - 解析結果・知見を `.runops/insights/` や `.runops/facts.toml` に保存したとき
-- `tools/runops/` を修正してテストが通ったとき
+- runops 本体の別 checkout で修正してテストが通ったとき
 - `runo runs submit` の前 (投入前のスナップショットとして)
 - 1 つの作業フェーズが完了したとき (例: 新しい survey の設計が固まった、全 run の解析が終わった)
 
@@ -171,9 +170,9 @@ lab notebook の entry が積み上がってストーリーになったら、
 
 ## 情報源の優先順位
 
-1. `{{ skills_dir }}` → simulator docs / enabled knowledge → `tools/runops/docs/`
+1. `{{ skills_dir }}` → enabled knowledge (`.runops/knowledge/enabled/imports.md`) → simulator docs (`refs/`)
 2. `runo --help` / `runo <command> --help` (`runops` でも同じ)
-3. `tools/runops/src/` は最後の手段
+3. installed package の場所 (`python -c "import runops; print(runops.__file__)"`) は最後の手段
 {% if doc_repos %}
 
 ## リファレンスリポジトリ

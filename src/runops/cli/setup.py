@@ -9,11 +9,12 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops import __version__
 from runops.core.exceptions import ProjectConfigError
 from runops.core.project import ProjectConfig, load_project
 from runops.core.repository import repo_name_from_url
 
-_DEFAULT_SIMCTL_REPO = "https://github.com/Nkzono99/runops.git"
+_DEFAULT_RUNOPS_PACKAGE = f"runops=={__version__}"
 
 
 def _load_project_for_setup(project_dir: Path) -> ProjectConfig | None:
@@ -45,13 +46,13 @@ def setup(
             help="Destination directory (defaults to repo name or cwd).",
         ),
     ] = None,
-    runops_repo: Annotated[
+    runops_package: Annotated[
         str,
         typer.Option(
-            "--runops-repo",
-            help="Git URL for runops repository.",
+            "--runops-package",
+            help="Package spec used to install runops into the project .venv.",
         ),
-    ] = _DEFAULT_SIMCTL_REPO,
+    ] = _DEFAULT_RUNOPS_PACKAGE,
     no_harnessops: Annotated[
         bool,
         typer.Option(
@@ -63,7 +64,7 @@ def setup(
     """Set up a runops project from an existing Git repository.
 
     Clones the repository (if URL given), then bootstraps the
-    development environment (.venv, tools/, refs/) without touching
+    development environment (.venv, refs/) without touching
     existing configuration files (TOML, CLAUDE.md, etc.). If HarnessOps
     is available, setup also delegates project overlay initialization to
     ``hops``.
@@ -102,10 +103,10 @@ def setup(
     created: list[str] = []
     skipped: list[str] = []
 
-    # 3. Bootstrap .venv + tools/ + editable install
+    # 3. Bootstrap .venv + normal runops package install
     from runops.cli.init import _bootstrap_environment
 
-    _bootstrap_environment(project_dir, sim_names, runops_repo, created, skipped)
+    _bootstrap_environment(project_dir, sim_names, runops_package, created, skipped)
 
     # 4. Clone refs/ (doc repos)
     if sim_names:

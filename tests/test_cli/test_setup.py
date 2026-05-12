@@ -36,7 +36,7 @@ def _make_existing_project(project_dir: Path) -> None:
     (project_dir / "launchers.toml").write_text("[launchers]\n", encoding="utf-8")
 
 
-def test_setup_renders_imports_for_bootstrapped_tool_docs(
+def test_setup_renders_imports_for_builtin_agent_guide(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -46,19 +46,12 @@ def test_setup_renders_imports_for_bootstrapped_tool_docs(
     def _fake_bootstrap(
         root: Path,
         _sim_names: list[str],
-        _runops_repo: str,
+        _runops_package: str,
         created: list[str],
         _skipped: list[str],
     ) -> None:
-        (root / "tools" / "runops").mkdir(parents=True, exist_ok=True)
-        (root / "tools" / "runops" / "entrypoints.toml").write_text(
-            'imports = ["docs/agent-user-guide.md"]\n',
-            encoding="utf-8",
-        )
-        docs_dir = root / "tools" / "runops" / "docs"
-        docs_dir.mkdir(parents=True, exist_ok=True)
-        (docs_dir / "agent-user-guide.md").write_text("# Agent guide\n")
-        created.append("tools/runops")
+        (root / ".venv").mkdir(parents=True, exist_ok=True)
+        created.append(".venv")
 
     monkeypatch.setattr("runops.cli.init._bootstrap_environment", _fake_bootstrap)
 
@@ -68,7 +61,7 @@ def test_setup_renders_imports_for_bootstrapped_tool_docs(
     imports_path = project_dir / ".runops" / "knowledge" / "enabled" / "imports.md"
     assert imports_path.is_file()
     imports = imports_path.read_text(encoding="utf-8")
-    assert "@tools/runops/docs/agent-user-guide.md" in imports
+    assert "@.runops/knowledge/runops/agent-user-guide.md" in imports
 
 
 def test_setup_invokes_harnessops(
@@ -83,7 +76,7 @@ def test_setup_invokes_harnessops(
     def _fake_bootstrap(
         _root: Path,
         _sim_names: list[str],
-        _runops_repo: str,
+        _runops_package: str,
         _created: list[str],
         _skipped: list[str],
     ) -> None:
@@ -115,19 +108,12 @@ def test_setup_smoke_with_knowledge_attach_render_and_doctor(
     def _fake_bootstrap(
         root: Path,
         _sim_names: list[str],
-        _runops_repo: str,
+        _runops_package: str,
         created: list[str],
         _skipped: list[str],
     ) -> None:
-        (root / "tools" / "runops").mkdir(parents=True, exist_ok=True)
-        (root / "tools" / "runops" / "entrypoints.toml").write_text(
-            'imports = ["docs/agent-user-guide.md"]\n',
-            encoding="utf-8",
-        )
-        docs_dir = root / "tools" / "runops" / "docs"
-        docs_dir.mkdir(parents=True, exist_ok=True)
-        (docs_dir / "agent-user-guide.md").write_text("# Agent guide\n")
-        created.append("tools/runops")
+        (root / ".venv").mkdir(parents=True, exist_ok=True)
+        created.append(".venv")
 
     monkeypatch.setattr("runops.cli.init._bootstrap_environment", _fake_bootstrap)
 
@@ -172,7 +158,7 @@ def test_setup_smoke_with_knowledge_attach_render_and_doctor(
     imports = (
         project_dir / ".runops" / "knowledge" / "enabled" / "imports.md"
     ).read_text(encoding="utf-8")
-    assert "@tools/runops/docs/agent-user-guide.md" in imports
+    assert "@.runops/knowledge/runops/agent-user-guide.md" in imports
     assert "@refs/knowledge/shared-kb/profiles/common.md" in imports
 
 
@@ -189,7 +175,7 @@ def test_setup_warns_on_invalid_project_config_and_continues(
     def _fake_bootstrap(
         _root: Path,
         sim_names: list[str],
-        _runops_repo: str,
+        _runops_package: str,
         created: list[str],
         _skipped: list[str],
     ) -> None:

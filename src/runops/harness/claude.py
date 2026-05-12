@@ -122,8 +122,6 @@ _DENY_BASH: Final[tuple[str, ...]] = (
     "Bash(git reset --hard*)",
 )
 # Paths the agent may freely Edit/Write without confirmation.
-# tools/runops/** is included so projects that dev-install the runops
-# repo from tools/runops/ can iterate on it without per-edit prompts.
 # .claude/{rules,skills,commands}/** and .agents/skills/** are allowed because
 # they are documentation-style files.  Actual policy files
 # (.claude/settings.json, .claude/hooks/**, .codex/config.toml,
@@ -136,7 +134,6 @@ _ALLOW_EDIT_PATHS: Final[tuple[str, ...]] = (
     "/docs/**",
     "/notes/**",
     "/README.md",
-    "/tools/runops/**",
     "/.claude/rules/**",
     "/.claude/skills/**",
     "/.claude/commands/**",

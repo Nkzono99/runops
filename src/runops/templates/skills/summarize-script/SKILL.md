@@ -15,7 +15,7 @@ description: Design, create, or refactor project summarize.py hooks for runo ana
 
 必要な範囲で読む:
 
-1. `tools/runops/docs/layers/analysis.md`
+1. `runops-reference` skill と `runo analyze --help`
 2. `campaign.toml`
 3. 対象 case の `case.toml`
 4. 対象 survey の `survey.toml`

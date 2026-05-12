@@ -52,8 +52,8 @@ source .venv/bin/activate
 runo doctor
 ```
 
-`runo init` が `.venv/` と `tools/runops/` を自動構築し、editable install する。
-Agent は `tools/runops/docs/` や `tools/runops/SPEC.md` を直接参照できる。
+`runo init` が `.venv/` を自動構築し、runops を通常 package install する。
+Agent は `.runops/knowledge/runops/`、`runo context --json`、`runo --help` を確認入口にする。
 
 ```bash
 # 既存プロジェクトを clone + セットアップ
@@ -96,7 +96,6 @@ runops/
         mcp.py          # runo mcp serve / check / tools
         migrate.py      # runo migrate
         update_harness.py
-        update_harness_tools.py
         ...
       core/             # ドメインロジック
         actions/         # CLI / Agent action facade と registry

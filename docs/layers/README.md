@@ -33,7 +33,7 @@ Experiment / Execution / Analysis / Research / Knowledge の各 Layer にある�
 | Research Layer | [research.md](research.md) | `research/agenda.md` による現在判断の台帳 |
 | Knowledge Layer | [knowledge.md](knowledge.md) | Agent が再利用する知識、notes、materials、`.runops/insights/` |
 | Harness Layer | [harness.md](harness.md) | Agent の手順、権限、skills、rules、project-local harness |
-| Upstream Integration Layer | [upstream.md](upstream.md) | `tools/runops` local patch、feedback issue、PR、update conflict の境界 |
+| Upstream Integration Layer | [upstream.md](upstream.md) | runops local patch、feedback issue、PR、update / migration の境界 |
 
 `src/runops/cli/` は Interface Layer の実装の一部ですが、module 構成としての
 `cli/`, `core/`, `adapters/`, `launchers/`, `slurm/` は runops 実装内部の

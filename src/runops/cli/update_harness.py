@@ -15,23 +15,16 @@ the user can merge manually.
 
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
+from runops.cli.init.knowledge import _prepare_knowledge_imports
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
     _create_notes_skeleton,
     _create_research_skeleton,
-)
-from runops.cli.update_harness_tools import (
-    _REEXEC_ENV_VAR,
-    _editable_install_needs_refresh,
-    _pull_tools_repo,
-    _reinstall_editable,
-    _restart_with_skip_pull,
 )
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
@@ -48,14 +41,6 @@ from runops.harness.builder import (
     replace_managed_gitignore_block,
     save_harness_lock,
 )
-
-
-def _get_knowledge_imports_path(project_dir: Path) -> str:
-    """Return the knowledge imports relative path, if any."""
-    imports_file = project_dir / ".runops" / "knowledge" / "enabled" / "imports.md"
-    if imports_file.is_file():
-        return ".runops/knowledge/enabled/imports.md"
-    return ""
 
 
 def _workspace_target_requested(
@@ -156,7 +141,10 @@ def update_harness(
     ] = False,
     skip_pull: Annotated[
         bool,
-        typer.Option("--skip-pull", help="Skip 'git pull' on tools/runops."),
+        typer.Option(
+            "--skip-pull",
+            help="Deprecated no-op kept for older update scripts.",
+        ),
     ] = False,
     only: Annotated[
         Optional[str],
@@ -197,6 +185,8 @@ def update_harness(
       runo update-harness --only CLAUDE.md  # update a single file
       runo update-harness --no-harnessops   # skip the hops lifecycle hook
     """
+    del skip_pull
+
     project_dir = (path or Path.cwd()).resolve()
 
     # Locate project root
@@ -206,29 +196,6 @@ def update_harness(
         typer.echo("No runops.toml found. Are you inside a runops project?")
         raise typer.Exit(code=1) from None
 
-    # Pull tools/runops
-    if not skip_pull and not dry_run:
-        pull_status = _pull_tools_repo(project_dir)
-        if pull_status is not None:
-            typer.echo(f"tools/runops: {pull_status}")
-            if pull_status.startswith("blocked:"):
-                typer.echo(
-                    "Local tools/runops changes were preserved. Commit/stash "
-                    "them, use patch-runops to finish the local patch, or rerun "
-                    "with --skip-pull to refresh harness files from the current "
-                    "local tools/runops checkout.",
-                    err=True,
-                )
-                raise typer.Exit(code=1)
-            needs_refresh = pull_status == "updated"
-            if pull_status == "already up to date":
-                needs_refresh = _editable_install_needs_refresh(project_dir)
-            if needs_refresh and os.environ.get(_REEXEC_ENV_VAR) != "1":
-                install_status = _reinstall_editable(project_dir)
-                if install_status is not None:
-                    typer.echo(f"tools/runops: {install_status}")
-                _restart_with_skip_pull()
-
     # Load project info
     project = load_project(project_dir)
     project_name = project.name
@@ -237,7 +204,17 @@ def update_harness(
     # Read [harness] settings
     upstream_feedback = read_upstream_feedback_setting(project_dir)
 
-    knowledge_imports_path = _get_knowledge_imports_path(project_dir)
+    if dry_run:
+        imports_file = project_dir / ".runops" / "knowledge" / "enabled" / "imports.md"
+        knowledge_imports_path = (
+            ".runops/knowledge/enabled/imports.md" if imports_file.is_file() else ""
+        )
+    else:
+        knowledge_imports_path = _prepare_knowledge_imports(
+            project_dir,
+            simulator_names,
+            sync_sources=False,
+        )
 
     harness = build_harness_bundle(
         project_name,

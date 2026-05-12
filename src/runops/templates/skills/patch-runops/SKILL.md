@@ -1,25 +1,24 @@
 ---
 name: patch-runops
-description: Locally patch tools/runops for the current project, use the editable install immediately, then decide whether the change stays local, becomes HarnessOps feedback, draft PR, or ready PR.
+description: Patch runops itself in a separate source checkout, verify the fix, then decide whether it stays local, becomes HarnessOps feedback, draft PR, or ready PR.
 ---
 
-# tools/runops を local patch する
+# runops 本体を別 checkout で patch する
 
-`tools/runops/` は editable install されているため、current project で困った
-runops 本体の bug / 不足機能 / harness 摩擦を、その場で修正して即利用できる。
+通常の runops project には `tools/runops/` は作られない。runops 本体の bug /
+不足機能 / harness 摩擦を修正する必要がある場合は、研究 project とは別の
+source checkout を用意して作業する。
 
 この skill は **研究作業を止めないための local hotfix** と、
 **upstream に戻すかどうかの判定** を扱う。
 
 ## 基本方針
 
-- `update-runops` は local changes を壊さない。
-- local patch の正本は `tools/runops` 内の Git branch / commit とする。
-- 別枠の mutable patch 履歴はデフォルトでは作らない。stale になりやすい。
+- project 側の `campaign.toml`, `cases/`, `runs/`, `notes/` と runops 本体の変更を混ぜない。
+- local patch の正本は別 checkout 内の Git branch / commit とする。
+- current project で確認したいときだけ、一時的に `.venv` へ package install する。
 - 作業メモや handoff は `notes/YYYY-MM-DD.md` に残す。
 - 研究判断が変わる場合だけ `research/agenda.md` も更新する。
-- 長期化して複数 patch が並ぶ場合だけ、`notes/reports/runops-local-patches.md`
-  のような project-local index を作ってよい。
 
 ## まず分類する
 
@@ -29,9 +28,9 @@ runops 本体の bug / 不足機能 / harness 摩擦を、その場で修正し�
 |------|----------|
 | project 固有の研究判断・実データ・site 秘密 | project 側に残す |
 | project 固有 harness override | project 側に残す |
-| 汎用 CLI / core / adapter / launcher 修正 | `tools/runops` で patch |
-| 汎用 scaffold / skill / harness 改善 | `tools/runops/src/runops/templates/` へ戻す |
-| 一部だけ汎用、または設計が必要 | local patch + `feedback-runops` HarnessOps record / issue 下書き |
+| 汎用 CLI / core / adapter / launcher 修正 | runops source checkout |
+| 汎用 scaffold / skill / harness 改善 | runops source checkout の `src/runops/templates/` |
+| 一部だけ汎用、または設計が必要 | local patch + `{{ skill_prefix }}feedback-runops` HarnessOps record / issue 下書き |
 
 project 側の生成物をそのまま upstream に入れない:
 
@@ -45,21 +44,17 @@ project 側の生成物をそのまま upstream に入れない:
 - `cases/*`
 - `runs/*`
 
-汎用化する場合は source template 側へ移す:
-
-- project `.agents/skills/foo/SKILL.md` → `tools/runops/src/runops/templates/skills/foo/SKILL.md`
-- project `AGENTS.md` / `CLAUDE.md` 改善 → `tools/runops/src/runops/templates/harness/shared/partials/`
-- project `research/` scaffold 改善 → `tools/runops/src/runops/templates/scaffold/research/`
-
 ## 手順
 
-### 1. tools/runops の状態確認
+### 1. source checkout を用意する
+
+既に runops repository が開いているならそれを使う。なければ project の外に clone する。
 
 ```bash
-cd tools/runops
+git clone https://github.com/Nkzono99/runops.git ../runops-src
+cd ../runops-src
 git status --short
 git branch --show-current
-git log --oneline -5
 ```
 
 未コミット変更や作業 branch がある場合は、既存 patch を壊さない。
@@ -71,19 +66,25 @@ git log --oneline -5
 git checkout -b fix/<short-name>
 ```
 
-### 3. 修正して current project で即確認する
+### 3. 修正して current project で確認する
 
-通常は editable install のため、Python code / template 変更はそのまま効く。
-依存関係、entry point、package metadata を変えた場合だけ project root で
-install を更新する:
+runops checkout 内で実装する。project 側で確認が必要な場合だけ、project root から
+一時的に install する:
 
 ```bash
-uv pip install -e tools/runops --python .venv/bin/python
+uv pip install ../runops-src --python .venv/bin/python
+```
+
+editable install が必要なのは、同じ project で何度も本体変更を反映しながら
+debug する場合だけ:
+
+```bash
+uv pip install -e ../runops-src --python .venv/bin/python
 ```
 
 ### 4. 最小テストを実行する
 
-`tools/runops` 内で対象テストを走らせる:
+runops checkout 内で対象テストを走らせる:
 
 ```bash
 uv run pytest <target>
@@ -104,9 +105,8 @@ git commit -m "fix: <summary>"
 project 側の note に branch / commit / current project での確認結果を残す:
 
 ```bash
-cd ../..
 runo notes append "runops local patch" - <<'EOF'
-Context: tools/runops branch=fix/<short-name>, commit=<sha>.
+Context: runops source checkout branch=fix/<short-name>, commit=<sha>.
 Patch: <何を直したか>
 Current project check: <どの command/run で確認したか>
 Upstream disposition: local-only / feedback-issue / draft-pr / ready-pr
@@ -117,65 +117,11 @@ EOF
 
 local patch 後、必ず次のどれかに分類する。
 
-### local-only
+| 判定 | 意味 | 次の動き |
+|------|------|----------|
+| `local-only` | project 固有 | project 側に残し、runops 本体には戻さない |
+| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `{{ skill_prefix }}feedback-runops` で HarnessOps record + issue 下書き |
+| `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
+| `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
 
-project 固有。upstream しない。
-
-例:
-
-- 特定 campaign だけの temporary workaround
-- private path / cluster 秘密に依存する修正
-- 研究判断そのもの
-
-### feedback-issue
-
-汎用価値はありそうだが、設計がまだ粗い / 影響範囲が大きい /
-一部だけ汎用 / draft PR には早い。
-
-この場合は `{{ skill_prefix }}feedback-runops` で HarnessOps に記録し、
-サニタイズ済み issue 下書きを作る。下書きには local branch / commit、
-current project で効いたこと、upstream にしたい部分、project 固有として
-除外すべき部分を書く。
-
-### draft-pr
-
-実装案も見せたいが、設計レビューが必要。
-
-```bash
-git push origin fix/<short-name>
-gh pr create --repo Nkzono99/runops --draft
-```
-
-### ready-pr
-
-小さく汎用で、テストもある。
-
-```bash
-git push origin fix/<short-name>
-gh pr create --repo Nkzono99/runops
-```
-
-## 報告フォーマット
-
-最後に必ずこの形で報告する:
-
-```markdown
-## Local patch result
-
-- Branch:
-- Commit:
-- Current project check:
-- Tests:
-- Upstream disposition: local-only / feedback-issue / draft-pr / ready-pr
-- Project-specific parts:
-- Upstreamable parts:
-- Private info excluded:
-```
-
-## 注意
-
-- `git reset --hard` で local patch を消さない。
-- `update-runops` で pull が block されたら、この skill で patch を整理する。
-- PR / issue はユーザー確認なしに作らない。
-- current project の作業を止めない。まず local patch で進め、upstream は
-  side channel として扱う。
+PR に進む場合は、project 固有の path、研究判断、未サニタイズの実験情報を含めない。
