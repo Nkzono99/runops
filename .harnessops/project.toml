@@ -1,0 +1,29 @@
+schema_version = "0.1"
+layout_version = "0.1"
+
+[project]
+name = "runops"
+root = "."
+kind = "target-repository"
+
+[profile]
+id = "runops-upstream"
+version = "0.1.0"
+source = "builtin"
+adapter = "runops_upstream"
+
+[overlay]
+mode = "upstream-lab"
+path = "harness-lab"
+managed_by = "harnessops"
+
+[privacy]
+default_visibility = "private-until-sanitized"
+
+[agents]
+codex = true
+claude = true
+
+[target_harness]
+provider = "runops"
+manifest = ".harness/manifest.toml"

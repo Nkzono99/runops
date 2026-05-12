@@ -1,0 +1,16 @@
+schema_version = "0.1"
+
+[harness]
+provider = "runops"
+kind = "target-repository"
+version = "0.1.0"
+
+[commands]
+doctor = "runo doctor"
+update = "runo update-harness"
+migrate = "runo migrate"
+feedback = "runo feedback"
+version = "runo version"
+
+[harnessops]
+recommended_profile = "runops-upstream"
