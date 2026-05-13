@@ -2,6 +2,7 @@
 name: hops-issue-triage
 description: GitHub issue や外部issueを HarnessOps の feedback/lab ループに取り込み、評価ケース、仮説、判断へ進めるときに使う。
 ---
+Use `uvx --from harnessops hops <command>` for CLI invocations in target/project repos; do not rely on `hops` being on PATH.
 
 GitHub issue の取得やコメント確認は GitHub plugin または `gh` に任せます。この skill は issue を HarnessOps の正本レコードへ載せるために使います。
 

@@ -2,6 +2,7 @@
 name: hops-compact-lab-memory
 description: harness-lab が大きくなった時、または人間が依頼した時に、records/dossier から抽象的な mutable knowledge を更新する。
 ---
+Use `uvx --from harnessops hops <command>` for CLI invocations in target/project repos; do not rely on `hops` being on PATH.
 
 この skill は `hops lab compact` を置き換えるものではない。`hops lab compact` は deterministic knowledge snapshot、つまり source ID、score、guard、open question へ戻るための索引として扱う。抽象化、統合、反例整理、評価則への昇格はこの skill が行う。
 

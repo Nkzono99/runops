@@ -252,8 +252,8 @@ runops/
 ### 開発環境
 
 - このリポジトリでの作業は repo root の `.venv` を使う。Agent は原則として `uv run <command>` で実行し、直接 executable を呼ぶ必要がある場合だけ `.venv/Scripts/<cmd>.exe` (Windows) または `.venv/bin/<cmd>` (Unix) を使う。
-- HarnessOps CLI (`hops`) は `.venv` に PyPI package `harnessops` として通常インストールする。ローカル checkout からの editable install は使わない。
-- `hops` が PATH に見えない場合も、まず `uv run hops ...` か `.venv/Scripts/hops.exe` / `.venv/bin/hops` を使い、外部 `uvx` は `.venv` が壊れている場合の一時 fallback に留める。
+- HarnessOps CLI (`hops`) は project `.venv` に常駐 install せず、`uvx --from harnessops hops ...` で実行する。
+- HarnessOps overlay / agent bridge を最新化するときは、PyPI 最新を明示して `uvx --refresh-package harnessops --from harnessops hops update-harness ...` を使う。ローカル checkout からの editable install は使わない。
 
 ### 設計原則
 

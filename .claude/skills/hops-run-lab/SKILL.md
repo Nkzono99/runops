@@ -2,6 +2,7 @@
 name: hops-run-lab
 description: harness-lab で評価ケース、仮説、判断を扱うときに使う。
 ---
+Use `uvx --from harnessops hops <command>` for CLI invocations in target/project repos; do not rely on `hops` being on PATH.
 
 `hops doctor --check-overlay` を実行する。`.harnessops/`、`harness-feedback/`、`harness-lab/` の構造を直接組み替えない。
 
