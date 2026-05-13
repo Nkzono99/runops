@@ -12,12 +12,12 @@ from runops.cli.knowledge.common import _find_root
 from runops.cli.knowledge.sources import profile_app, source_app
 from runops.core.actions import ActionStatus
 from runops.core.actions import add_fact as add_fact_action
+from runops.core.actions import promote_fact as promote_fact_action
 from runops.core.actions import save_insight as save_insight_action
 from runops.core.knowledge import (
     FACT_TYPES,
     INSIGHT_TYPES,
     list_insights,
-    promote_candidate_fact,
     query_facts,
 )
 
@@ -460,18 +460,14 @@ def promote_fact(
     """Promote an imported candidate fact into local curated facts.toml."""
     root = _find_root()
 
-    try:
-        promoted = promote_candidate_fact(root, fact_id)
-    except LookupError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(code=1) from None
-    except RuntimeError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(code=1) from None
+    result = promote_fact_action(root, fact_id)
+    if result.status is not ActionStatus.SUCCESS:
+        typer.echo(f"Error: {result.message}", err=True)
+        raise typer.Exit(code=1)
 
     typer.echo(
-        f"Promoted {fact_id} -> {promoted.id}"
-        f" ({promoted.fact_type}, {promoted.confidence})"
+        f"Promoted {fact_id} -> {result.data['fact_id']}"
+        f" ({result.data['fact_type']}, {result.data['confidence']})"
     )
 
 

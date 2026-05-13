@@ -32,6 +32,12 @@ CI でも同じチェックと分岐込み coverage floor が走る。ruff forma
 - CLI テストは exit code + stdout/stderr を検証
 - `_write_if_missing` 等の冪等ヘルパーは「2 回呼んでも壊れない」ことを確認
 
+## HarnessOps feedback loop
+
+- harness / workflow / Agent interface / safety gate に関わる変更をしたら、作業中に出た摩擦が汎用改善かを最後に確認する。
+- 汎用改善候補がある場合は `hops lab capture` で記録し、`harness-lab/views/*` の生成 view を直接編集しない。
+- 候補がない場合も、PR / final summary で「HarnessOps feedback なし」と短く言える状態にしておく。
+
 ## Git ルール
 
 - 1 コミット = 1 論理変更

@@ -85,6 +85,25 @@ v1 では、大容量出力は **run ディレクトリ配下に置いてよい*
 MPI 実行は `job.sh` 内で **`srun` / `mpirun` / `mpiexec` を直接実行** する。
 Python ツールは MPI rank ごとのラッパにはならない。
 
+### 3.6 Public contract 境界
+
+runops が private / pre-public な v0 系である間は、古い CLI option、内部 API、
+project file format の互換 shim を長く維持しない。project-state に影響する
+breaking change は `docs/migrations/v0.md` に移行方法を残す。
+
+v1 で public contract として固定する対象は、まず以下に絞る。
+
+* CLI command surface (`runo ...`) と主要 option
+* project schema (`runops.toml`, `campaign.toml`, `case.toml`, `survey.toml`,
+  `simulators.toml`, `launchers.toml`, `site.toml`)
+* `manifest.toml` schema と run state semantics
+* analysis artifact schema (`analysis/summary.json`, `analysis/artifacts.toml`,
+  survey `summary/` artifacts)
+* MCP result envelope、tool registry、safety metadata
+
+内部 Python API、console output の細かな文言、generated harness template の内部構造は、
+別途明示しない限り public contract とはみなさない。
+
 ---
 
 ## 4. 非目標

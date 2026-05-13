@@ -6,6 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
+from runops.core.actions.specs import ACTION_SPECS
 from runops.mcp.safety import (
     DESTRUCTIVE_DISABLED,
     EXTERNAL_DISABLED,
@@ -175,6 +176,7 @@ def capabilities_payload() -> dict[str, Any]:
 def conformance_report() -> dict[str, Any]:
     """Run lightweight local conformance checks for the registry."""
     names = [spec.name for spec in TOOL_SPECS]
+    specs_by_name = {spec.name: spec for spec in TOOL_SPECS}
     exposed_names = {spec.name for spec in exposed_tool_specs()}
     checks: list[dict[str, Any]] = []
 
@@ -227,6 +229,39 @@ def conformance_report() -> dict[str, Any]:
         "safety_metadata_present",
         not safety_missing,
         "Every tool has valid safety metadata.",
+    )
+    action_mcp_tools = {
+        tool_name
+        for action_spec in ACTION_SPECS.values()
+        for tool_name in action_spec.mcp_tools
+    }
+    missing_action_tools = sorted(action_mcp_tools - set(names))
+    add(
+        "action_mcp_tools_registered",
+        not missing_action_tools,
+        "Every MCP tool referenced by an ActionSpec is registered."
+        if not missing_action_tools
+        else f"Unregistered action MCP tools: {', '.join(missing_action_tools)}",
+    )
+    unsafe_action_tools_without_confirmation = sorted(
+        tool_name
+        for tool_name in action_mcp_tools
+        if tool_name in specs_by_name
+        and specs_by_name[tool_name].safety.level >= 3
+        and (
+            not specs_by_name[tool_name].safety.requires_confirmation
+            or not specs_by_name[tool_name].safety.confirmation_field
+        )
+    )
+    add(
+        "unsafe_action_mcp_tools_require_confirmation",
+        not unsafe_action_tools_without_confirmation,
+        "Unsafe action MCP tools require explicit confirmation metadata."
+        if not unsafe_action_tools_without_confirmation
+        else (
+            "Unsafe action MCP tools without confirmation metadata: "
+            + ", ".join(unsafe_action_tools_without_confirmation)
+        ),
     )
 
     ok = all(bool(check["ok"]) for check in checks)

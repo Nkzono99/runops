@@ -27,6 +27,8 @@ class ActionSpec:
         confirmation_reason: Human-readable reason for the confirmation.
         confirmation_conditions: Dynamic cases that should trigger
             confirmation even if the action is not always gated.
+        cli_commands: Public CLI command paths that expose this action.
+        mcp_tools: MCP tool names that expose or plan this action.
     """
 
     name: str
@@ -41,6 +43,8 @@ class ActionSpec:
     requires_confirmation: bool = False
     confirmation_reason: str = ""
     confirmation_conditions: tuple[str, ...] = ()
+    cli_commands: tuple[tuple[str, ...], ...] = ()
+    mcp_tools: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize metadata for machine-readable agent consumption."""
@@ -54,6 +58,8 @@ class ActionSpec:
             "risk_level": self.risk_level,
             "cost_class": self.cost_class,
             "requires_confirmation": self.requires_confirmation,
+            "cli_commands": [list(command) for command in self.cli_commands],
+            "mcp_tools": list(self.mcp_tools),
         }
         if self.state_change:
             data["state_change"] = self.state_change
@@ -74,6 +80,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         state_change="-> created",
         risk_level="medium",
         cost_class="medium",
+        cli_commands=(("runs", "create"),),
     ),
     "create_survey": ActionSpec(
         name="create_survey",
@@ -83,6 +90,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         state_change="N x -> created",
         risk_level="medium",
         cost_class="medium",
+        cli_commands=(("runs", "sweep"),),
     ),
     "submit_run": ActionSpec(
         name="submit_run",
@@ -97,6 +105,8 @@ ACTION_SPECS: dict[str, ActionSpec] = {
             "required for first bulk submit of a new survey",
             "required after a retry that increases walltime, memory, or nodes",
         ),
+        cli_commands=(("runs", "submit"),),
+        mcp_tools=("runops.job.plan_submit", "runops.job.submit"),
     ),
     "sync_run": ActionSpec(
         name="sync_run",
@@ -106,6 +116,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         state_change="submitted/running -> completed/failed/cancelled",
         risk_level="low",
         cost_class="low",
+        cli_commands=(("runs", "sync"),),
     ),
     "show_log": ActionSpec(
         name="show_log",
@@ -115,6 +126,8 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("run has been submitted at least once",),
         risk_level="low",
         cost_class="low",
+        cli_commands=(("runs", "log"),),
+        mcp_tools=("runops.run.logs",),
     ),
     "summarize_run": ActionSpec(
         name="summarize_run",
@@ -123,6 +136,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("run state == completed",),
         risk_level="low",
         cost_class="medium",
+        cli_commands=(("analyze", "summarize"),),
     ),
     "collect_survey": ActionSpec(
         name="collect_survey",
@@ -131,6 +145,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("survey directory contains at least one completed run",),
         risk_level="low",
         cost_class="medium",
+        cli_commands=(("analyze", "collect"),),
     ),
     "export_publication": ActionSpec(
         name="export_publication",
@@ -147,6 +162,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("target exists", "target is a run or contains runs"),
         risk_level="low",
         cost_class="medium",
+        cli_commands=(("analyze", "export"),),
     ),
     "retry_run": ActionSpec(
         name="retry_run",
@@ -160,6 +176,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         confirmation_conditions=(
             "required when retry adjustments increase walltime, memory, or nodes",
         ),
+        cli_commands=(("runs", "retry"),),
     ),
     "plan_retry": ActionSpec(
         name="plan_retry",
@@ -172,6 +189,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("run state == failed or cancelled",),
         risk_level="low",
         cost_class="low",
+        cli_commands=(("runs", "retry"),),
     ),
     "archive_run": ActionSpec(
         name="archive_run",
@@ -187,6 +205,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         confirmation_reason=(
             "Archiving changes lifecycle state and may move run directories."
         ),
+        cli_commands=(("runs", "archive"),),
     ),
     "purge_work": ActionSpec(
         name="purge_work",
@@ -201,6 +220,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         confirmation_reason=(
             "Purging deletes generated work files and is intentionally gated."
         ),
+        cli_commands=(("runs", "purge-work"),),
     ),
     "cancel_run": ActionSpec(
         name="cancel_run",
@@ -208,8 +228,12 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         required_params=("run_dir",),
         preconditions=("run state in {submitted, running}", "job_id recorded"),
         state_change="submitted/running -> cancelled",
-        risk_level="medium",
+        risk_level="high",
         cost_class="low",
+        requires_confirmation=True,
+        confirmation_reason="Cancelling stops an active Slurm job.",
+        cli_commands=(("runs", "cancel"),),
+        mcp_tools=("runops.job.cancel",),
     ),
     "delete_run": ActionSpec(
         name="delete_run",
@@ -223,6 +247,8 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         cost_class="low",
         requires_confirmation=True,
         confirmation_reason="Deletion removes the run directory irreversibly.",
+        cli_commands=(("runs", "delete"),),
+        mcp_tools=("runops.run.delete",),
     ),
     "save_insight": ActionSpec(
         name="save_insight",
@@ -232,6 +258,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("project loaded",),
         risk_level="low",
         cost_class="low",
+        cli_commands=(("knowledge", "save"),),
     ),
     "add_fact": ActionSpec(
         name="add_fact",
@@ -257,6 +284,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
             "recommended before recording a new high-confidence fact from fresh "
             "survey results",
         ),
+        cli_commands=(("knowledge", "add-fact"),),
     ),
     "promote_fact": ActionSpec(
         name="promote_fact",
@@ -265,6 +293,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         preconditions=("candidate fact exists",),
         risk_level="low",
         cost_class="low",
+        cli_commands=(("knowledge", "promote-fact"),),
     ),
 }
 

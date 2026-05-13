@@ -212,3 +212,7 @@ CLI は `src/runops/cli/mcp.py` で薄く接続する。
 domain logic は MCP layer に隠し実装せず、`core.context`, `core.discovery`,
 `core.manifest`, `slurm.query` など既存の deterministic API を使う。
 
+Agent-facing action との対応は `core/actions/specs.py` の `ActionSpec.mcp_tools`
+に記録する。`runo mcp check` と registry conformance test は、ActionSpec が参照する
+MCP tool が登録済みであること、unsafe な action tool が確認 metadata を持つことを
+検査する。

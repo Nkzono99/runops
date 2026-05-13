@@ -35,6 +35,12 @@ CLI は重要ですが、研究者が日常的に CLI の全体を操作する�
 CLI command、Agent-facing action facade、project harness、確認フローを含む
 運用上の境界として扱います。
 
+Agent-facing action は `src/runops/core/actions/specs.py` の `ActionSpec` を
+machine-readable な契約として持ちます。各 action spec には対応する CLI command
+path と MCP tool 名を記録し、テストで Typer の登録済み command と MCP registry
+に存在することを確認します。これにより CLI / action facade / MCP metadata の
+drift を早期に検出します。
+
 ## 原則
 
 - **正本は Interface Layer ではなく各 Layer に置く**  
