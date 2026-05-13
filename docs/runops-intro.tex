@@ -219,10 +219,10 @@ gh auth login
 \begin{lstlisting}
 mkdir my_simulation && cd my_simulation && git init
 uvx --from runops runo init
-source .venv/bin/activate
+uvx --from runops runo doctor
 \end{lstlisting}
 
-これにより runops のインストール、venv 作成、プロジェクト構造 (runops.toml, simulators.toml, campaign.toml, .runops/ 等) の生成がすべて自動で行われます。
+これにより runtime 用 venv 作成、プロジェクト構造 (runops.toml, simulators.toml, campaign.toml, .runops/ 等) の生成が自動で行われます。runops CLI は \texttt{uvx --from runops runo ...} で実行します。
 
 \subsection*{\color{accent} Step 5: Claude Code を起動 → 以降は AI に任せる}
 
@@ -388,14 +388,14 @@ runops 本体やハーネスファイルの更新は、ユーザーが Claude Co
 
 \begin{lstlisting}[language={},commentstyle={}]
 > /update-runops
-AI: runops package を更新して update-harness を実行します...
+AI: uvx 経由の runops で update-harness を実行します...
     -> CLAUDE.md, skills/, rules/ が最新テンプレートで更新されました
     -> runo doctor で環境を確認 ... OK
 \end{lstlisting}
 
 実行内容:
 \begin{itemize}[nosep]
-  \item \textbf{runops package} を \texttt{uv pip install --upgrade runops} で最新化
+  \item \textbf{uvx 経由の runops} で最新 package を実行
   \item \textbf{runo update-harness} でハーネスファイル (CLAUDE.md, skills, rules, editor settings 等) を再生成
   \item \textbf{不足している visible workspace} として \texttt{notes/}, \texttt{materials/}, \texttt{research/} を補完
   \item \textbf{runo update} でシミュレータパッケージを更新
@@ -476,7 +476,7 @@ runops + Claude Code を始めるためのステップ:
   \item \textbf{Claude Code + gh} --- \texttt{npm install -g @anthropic-ai/claude-code gh}
   \item \textbf{gh ログイン} --- \texttt{gh auth login}
   \item \textbf{プロジェクト初期化} --- \texttt{mkdir my\_sim \&\& cd my\_sim \&\& git init}
-  \item \textbf{runops 初期化} --- \texttt{uvx --from runops runo init \&\& source .venv/bin/activate}
+  \item \textbf{runops 初期化} --- \texttt{uvx --from runops runo init \&\& uvx --from runops runo doctor}
   \item \textbf{Claude Code 起動} --- \texttt{claude}
   \item \textbf{以降はすべて AI に指示} --- 「環境を確認して」「ケースを作って」「サーベイを設計して」\ldots{}
 \end{enumerate}

@@ -28,8 +28,7 @@ interface です。人間は研究意図、制約、確認、解釈に集中し�
 
 ```bash
 uvx --from runops runo init
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
 既存プロジェクトをセットアップする場合:
@@ -37,8 +36,7 @@ runo doctor
 ```bash
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
 `runo init` がディレクトリ構造と初期ファイルを作ります。

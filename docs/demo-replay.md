@@ -19,7 +19,7 @@
 Codex session log から replay HTML を一気に作るには、次の 1 コマンドで十分です。
 
 ```bash
-uv run runo demo build-codex-replay \
+uvx --from runops runo demo build-codex-replay \
   ~/.codex/sessions/2026/04/24/rollout-....jsonl \
   --out replay.html \
   --workspace-root . \
@@ -31,7 +31,7 @@ session log を毎回手で指定したくない場合は、`build-codex-replay`
 最新の Codex session を `~/.codex/sessions` から自動探索します。
 
 ```bash
-uv run runo demo build-codex-replay \
+uvx --from runops runo demo build-codex-replay \
   --out replay.html \
   --workspace-root . \
   --title "RunOps Session Replay"
@@ -48,7 +48,7 @@ uv run runo demo build-codex-replay \
 中間の JSONL も残したい場合は `--events-out` を指定します。
 
 ```bash
-uv run runo demo build-codex-replay \
+uvx --from runops runo demo build-codex-replay \
   ~/.codex/sessions/2026/04/24/rollout-....jsonl \
   --events-out demo-events.jsonl \
   --out replay.html \
@@ -58,7 +58,7 @@ uv run runo demo build-codex-replay \
 自動探索と `--events-out` を併用することもできます。
 
 ```bash
-uv run runo demo build-codex-replay \
+uvx --from runops runo demo build-codex-replay \
   --events-out demo-events.jsonl \
   --out replay.html \
   --workspace-root . \
@@ -70,12 +70,12 @@ uv run runo demo build-codex-replay \
 中間生成物を確認しながら進めたい場合は、import と render を分けて使えます。
 
 ```bash
-uv run runo demo import-codex-session \
+uvx --from runops runo demo import-codex-session \
   ~/.codex/sessions/2026/04/24/rollout-....jsonl \
   --out demo-events.jsonl \
   --workspace-root .
 
-uv run runo demo render-replay \
+uvx --from runops runo demo render-replay \
   demo-events.jsonl \
   --out replay.html \
   --title "Survey Demo Replay" \

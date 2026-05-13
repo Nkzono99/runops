@@ -108,7 +108,7 @@ CLI-backed migration は、同じ project に複数回実行しても壊れな�
 
 ## Update workflow
 
-1. `update-runops` で installed runops package と harness を更新する。
+1. `update-runops` で `uvx` 経由の runops tool と harness を更新する。
 2. release note / migration guide と対象 major の guide を読む。
 3. current project に該当する item があれば `runo migrate apply <id> --dry-run`
    で確認し、定型適用できるものは `runo migrate apply <id>` で実行する。

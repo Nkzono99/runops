@@ -49,6 +49,7 @@ def test_setup_renders_imports_for_builtin_agent_guide(
         _runops_package: str,
         created: list[str],
         _skipped: list[str],
+        **_kwargs: object,
     ) -> None:
         (root / ".venv").mkdir(parents=True, exist_ok=True)
         created.append(".venv")
@@ -79,6 +80,7 @@ def test_setup_invokes_harnessops(
         _runops_package: str,
         _created: list[str],
         _skipped: list[str],
+        **_kwargs: object,
     ) -> None:
         return None
 
@@ -111,6 +113,7 @@ def test_setup_smoke_with_knowledge_attach_render_and_doctor(
         _runops_package: str,
         created: list[str],
         _skipped: list[str],
+        **_kwargs: object,
     ) -> None:
         (root / ".venv").mkdir(parents=True, exist_ok=True)
         created.append(".venv")
@@ -178,6 +181,7 @@ def test_setup_warns_on_invalid_project_config_and_continues(
         _runops_package: str,
         created: list[str],
         _skipped: list[str],
+        **_kwargs: object,
     ) -> None:
         captured_sim_names.append(sim_names)
         created.append(".venv")

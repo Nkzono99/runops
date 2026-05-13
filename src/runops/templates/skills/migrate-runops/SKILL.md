@@ -23,9 +23,9 @@ release note / migration guide の手順へ合わせるための skill です。
 
 必要な範囲で読む:
 
-- `runo context --json`
-- `runo --version`
-- `runo migrate list`
+- `uvx --from runops runo context --json`
+- `uvx --from runops runo --version`
+- `uvx --from runops runo migrate list`
 - release note または migration guide
 - migration item が指定する project file
 - 最近の `notes/YYYY-MM-DD.md` と relevant `research/agenda.md`
@@ -35,8 +35,8 @@ release note / migration guide の手順へ合わせるための skill です。
 ### 1. 対象 version と guide を特定する
 
 ```bash
-runo --version
-runo migrate list
+uvx --from runops runo --version
+uvx --from runops runo migrate list
 ```
 
 project に runops source checkout があるとは限らない。必要な場合は release note、
@@ -59,10 +59,10 @@ installed package の generated guide、または別 checkout の `docs/migratio
 登録済み migration は CLI で確認・適用できる:
 
 ```bash
-runo migrate list
-runo migrate show M0-0001
-runo migrate apply M0-0001 --dry-run
-runo migrate apply M0-0001
+uvx --from runops runo migrate list
+uvx --from runops runo migrate show M0-0001
+uvx --from runops runo migrate apply M0-0001 --dry-run
+uvx --from runops runo migrate apply M0-0001
 ```
 
 CLI で扱えるのは、定型化された idempotent な migration だけ。
@@ -88,9 +88,9 @@ guide にない補完が必要なら、migration を止めて `{{ skill_prefix }
 最低限:
 
 ```bash
-runo doctor
-runo context --json
-runo lint
+uvx --from runops runo doctor
+uvx --from runops runo context --json
+uvx --from runops runo lint
 ```
 
 加えて item の `Validation` に書かれた command / file check を実行する。

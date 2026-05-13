@@ -698,6 +698,7 @@ class TestInit:
             _runops_package: str,
             created: list[str],
             _skipped: list[str],
+            **_kwargs: object,
         ) -> None:
             (project_dir / ".venv").mkdir(parents=True, exist_ok=True)
             created.append(".venv")

@@ -119,9 +119,22 @@ def init(
         str,
         typer.Option(
             "--runops-package",
-            help="Package spec used to install runops into the project .venv.",
+            help=(
+                "Package spec used with --install-runops-into-venv for "
+                "offline or pinned local CLI workflows."
+            ),
         ),
     ] = _DEFAULT_RUNOPS_PACKAGE,
+    install_runops_into_venv: Annotated[
+        bool,
+        typer.Option(
+            "--install-runops-into-venv",
+            help=(
+                "Also install runops into the project .venv. By default, "
+                "use `uvx --from runops runo ...` and keep .venv for runtime."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Initialize a new runops project (runops.toml etc.).
 
@@ -338,7 +351,9 @@ def init(
             for ks in knowledge_sources:
                 save_knowledge_source(project_dir, ks)
 
-    # Bootstrap: .venv + normal runops package install
+    # Bootstrap: .venv for simulator/runtime packages.  The default runops CLI
+    # entrypoint is `uvx --from runops runo ...`; installing runops into the
+    # project venv is an explicit offline/pinned workflow.
     import runops.cli.init as init_facade
 
     init_facade._bootstrap_environment(
@@ -347,6 +362,7 @@ def init(
         runops_package,
         created,
         skipped,
+        install_runops=install_runops_into_venv,
     )
 
     # Materialize package-provided agent docs and external knowledge imports.

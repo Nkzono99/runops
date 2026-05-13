@@ -28,21 +28,27 @@ runops の開発ハーネスは `.claude/` だけではなく、`.codex/` と
 
 ## プロジェクトでの利用方法
 
-CLI は `runo` を標準コマンドとして使う。既存スクリプトとの互換性のため、
-`runops` も同じ CLI を指す stable alias として残す。
+runops project は `uvx` でブートストラップし、project `.venv/` は runtime 用に作る。
+
+CLI は `uvx --from runops runo ...` を標準経路として使う。既存スクリプトとの互換性のため、
+`runops` も同じ CLI を指す stable alias として残すが、案内や harness では `runo` を優先する。
 
 ```bash
 # 新規プロジェクト作成
 mkdir my-project && cd my-project
 uvx --from runops runo init
-source .venv/bin/activate && runo doctor
+uvx --from runops runo doctor
 
 # 既存プロジェクトを clone + セットアップ
 uvx --from runops runo setup https://github.com/user/my-project.git
-source my-project/.venv/bin/activate && runo doctor
+cd my-project
+uvx --from runops runo doctor
 ```
 
-`runo init` が `.venv/` を自動構築し、runops を通常 package install する。
+`runo init` が `.venv/` を自動構築するが、そこは simulator package や解析依存など
+project runtime 用に使う。runops CLI は通常 `.venv/` に常駐 install せず、`uvx` で実行する。
+Agent は `.runops/knowledge/runops/`、`uvx --from runops runo context --json`、
+`uvx --from runops runo --help` を確認入口にする。
 
 ## 技術スタック
 
@@ -80,7 +86,7 @@ uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-und
 uv run ruff check src/ tests/              # Lint
 uv run ruff format --check src/ tests/     # Format check
 uv run mypy src/                           # 型チェック
-uv run runo --help                       # CLI 実行
+uv run runo --help                         # 開発 checkout の CLI 実行
 ```
 
 ## 設計原則

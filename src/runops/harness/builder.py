@@ -24,6 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from runops import __version__
 from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 from runops.harness._skills import render_skill_files as _render_skill_files
 
@@ -361,11 +362,10 @@ def build_harness_bundle(
 # ---------------------------------------------------------------------------
 
 
-def load_harness_lock(project_dir: Path) -> dict[str, str]:
-    """Load the ``harness.lock`` mapping ``relative_path -> template sha256``.
+def load_harness_lock_payload(project_dir: Path) -> dict[str, Any]:
+    """Load the raw ``harness.lock`` payload.
 
-    Returns an empty dict when the lock file is missing, malformed, or when
-    the project predates this feature.
+    Returns an empty dict when the lock file is missing or malformed.
     """
     lock_path = project_dir / HARNESS_LOCK_PATH
     if not lock_path.is_file():
@@ -374,8 +374,16 @@ def load_harness_lock(project_dir: Path) -> dict[str, str]:
         raw = json.loads(lock_path.read_text(encoding="utf-8"))
     except (json.JSONDecodeError, OSError):
         return {}
-    if not isinstance(raw, dict):
-        return {}
+    return raw if isinstance(raw, dict) else {}
+
+
+def load_harness_lock(project_dir: Path) -> dict[str, str]:
+    """Load the ``harness.lock`` mapping ``relative_path -> template sha256``.
+
+    Returns an empty dict when the lock file is missing, malformed, or when
+    the project predates this feature.
+    """
+    raw = load_harness_lock_payload(project_dir)
     hashes = raw.get("hashes")
     if not isinstance(hashes, dict):
         return {}
@@ -386,7 +394,19 @@ def load_harness_lock(project_dir: Path) -> dict[str, str]:
     }
 
 
-def save_harness_lock(project_dir: Path, hashes: dict[str, str]) -> None:
+def applied_harness_runops_version(project_dir: Path) -> str | None:
+    """Return the runops version that last applied project harness files."""
+    raw = load_harness_lock_payload(project_dir)
+    version = raw.get("runops_version")
+    return version if isinstance(version, str) and version else None
+
+
+def save_harness_lock(
+    project_dir: Path,
+    hashes: dict[str, str],
+    *,
+    runops_version: str | None = __version__,
+) -> None:
     """Write the harness lock with sorted entries for stable diffs."""
     lock_path = project_dir / HARNESS_LOCK_PATH
     lock_path.parent.mkdir(parents=True, exist_ok=True)
@@ -394,6 +414,8 @@ def save_harness_lock(project_dir: Path, hashes: dict[str, str]) -> None:
         "version": 1,
         "hashes": dict(sorted(hashes.items())),
     }
+    if runops_version:
+        payload["runops_version"] = runops_version
     lock_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",

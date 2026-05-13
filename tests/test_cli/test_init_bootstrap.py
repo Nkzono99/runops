@@ -46,21 +46,12 @@ def test_bootstrap_creates_venv_and_installs_packages(
 
     assert created == [
         ".venv",
-        "uv pip install runops==1.2.3",
         "pip install (1 packages)",
     ]
     assert skipped == []
     expected_python = str(_python_in_venv(tmp_path / ".venv"))
     assert calls == [
         ["/usr/bin/uv", "venv", str(tmp_path / ".venv")],
-        [
-            "/usr/bin/uv",
-            "pip",
-            "install",
-            "runops==1.2.3",
-            "--python",
-            expected_python,
-        ],
         [
             "/usr/bin/uv",
             "pip",
@@ -73,9 +64,9 @@ def test_bootstrap_creates_venv_and_installs_packages(
 
     out = capsys.readouterr().out
     assert "Creating .venv" in out
-    assert "Installing runops==1.2.3" in out
+    assert "Using uvx for the runops CLI" in out
     assert "Installing: emu" in out
-    assert "Then: runo doctor" in out
+    assert "Next: uvx --from runops runo doctor" in out
 
 
 def test_bootstrap_returns_early_when_venv_creation_fails(
@@ -109,20 +100,17 @@ def test_bootstrap_returns_early_when_venv_creation_fails(
     assert "Warning: uv venv failed: venv failed" in capsys.readouterr().out
 
 
-def test_bootstrap_surfaces_runops_install_failure(
+def test_bootstrap_can_install_runops_into_venv(
     tmp_path: Path,
     monkeypatch: Any,
     capsys: Any,
 ) -> None:
-    """Bootstrap reports runops install failures and continues to sim packages."""
+    """Bootstrap can opt into a project-local runops CLI install."""
+    calls: list[list[str]] = []
 
     def fake_run(argv, **_kwargs):  # type: ignore[no-untyped-def]
-        if argv[:2] == ["uv", "venv"]:
-            return _CompletedProcess()
-        if argv[:3] == ["uv", "pip", "install"]:
-            return _CompletedProcess(returncode=1, stderr="install failed")
-        msg = f"unexpected call: {argv}"
-        raise AssertionError(msg)
+        calls.append(list(argv))
+        return _CompletedProcess()
 
     monkeypatch.setattr("runops.cli.init.bootstrap._find_uv", lambda: "uv")
     monkeypatch.setattr("runops.cli.init.bootstrap.subprocess.run", fake_run)
@@ -135,11 +123,24 @@ def test_bootstrap_surfaces_runops_install_failure(
         "runops==1.2.3",
         created,
         skipped,
+        install_runops=True,
     )
 
-    assert created == [".venv"]
+    assert created == [".venv", "uv pip install runops==1.2.3"]
     assert skipped == []
-    assert "Warning: runops install failed:" in capsys.readouterr().out
+    expected_python = str(_python_in_venv(tmp_path / ".venv"))
+    assert calls == [
+        ["uv", "venv", str(tmp_path / ".venv")],
+        [
+            "uv",
+            "pip",
+            "install",
+            "runops==1.2.3",
+            "--python",
+            expected_python,
+        ],
+    ]
+    assert "Installing runops==1.2.3 into .venv" in capsys.readouterr().out
 
 
 def test_bootstrap_skips_existing_venv_and_surfaces_package_failures(
@@ -180,14 +181,6 @@ def test_bootstrap_skips_existing_venv_and_surfaces_package_failures(
             "uv",
             "pip",
             "install",
-            "runops==1.2.3",
-            "--python",
-            expected_python,
-        ],
-        [
-            "uv",
-            "pip",
-            "install",
             "beach-extra",
             "--python",
             expected_python,
@@ -195,6 +188,5 @@ def test_bootstrap_skips_existing_venv_and_surfaces_package_failures(
     ]
 
     out = capsys.readouterr().out
-    assert "Warning: runops install failed:" in out
     assert "Warning: pip install failed:" in out
     assert "package failed" in out

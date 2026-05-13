@@ -31,22 +31,22 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["uv", "run", "runo", "runs", "submit", "--dry-run"],
+    pattern = ["uvx", "--from", "runops", "runo", "runs", "submit", "--dry-run"],
     decision = "allow",
     justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
     match = [
-        "uv run runo runs submit --dry-run R20260419-0001",
-        "uv run runo runs submit --dry-run --all runs/survey",
+        "uvx --from runops runo runs submit --dry-run R20260419-0001",
+        "uvx --from runops runo runs submit --dry-run --all runs/survey",
     ],
 )
 
 prefix_rule(
-    pattern = ["uv", "run", "runops", "runs", "submit", "--dry-run"],
+    pattern = ["uvx", "--from", "runops", "runops", "runs", "submit", "--dry-run"],
     decision = "allow",
     justification = "Dry-run only reports what would be submitted and does not spend HPC resources.",
     match = [
-        "uv run runops runs submit --dry-run R20260419-0001",
-        "uv run runops runs submit --dry-run --all runs/survey",
+        "uvx --from runops runops runs submit --dry-run R20260419-0001",
+        "uvx --from runops runops runs submit --dry-run --all runs/survey",
     ],
 )
 
@@ -73,24 +73,24 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["uv", "run", "runo", "runs", "submit"],
+    pattern = ["uvx", "--from", "runops", "runo", "runs", "submit"],
     decision = "allow",
     justification = "Agents may submit Slurm jobs after dry-run review and explicit chat confirmation.",
     match = [
-        "uv run runo runs submit R20260419-0001",
-        "uv run runo runs submit --all runs/survey",
-        "uv run runo runs submit -qn gr10451a R20260419-0001",
+        "uvx --from runops runo runs submit R20260419-0001",
+        "uvx --from runops runo runs submit --all runs/survey",
+        "uvx --from runops runo runs submit -qn gr10451a R20260419-0001",
     ],
 )
 
 prefix_rule(
-    pattern = ["uv", "run", "runops", "runs", "submit"],
+    pattern = ["uvx", "--from", "runops", "runops", "runs", "submit"],
     decision = "allow",
     justification = "Agents may submit Slurm jobs after dry-run review and explicit chat confirmation.",
     match = [
-        "uv run runops runs submit R20260419-0001",
-        "uv run runops runs submit --all runs/survey",
-        "uv run runops runs submit -qn gr10451a R20260419-0001",
+        "uvx --from runops runops runs submit R20260419-0001",
+        "uvx --from runops runops runs submit --all runs/survey",
+        "uvx --from runops runops runs submit -qn gr10451a R20260419-0001",
     ],
 )
 

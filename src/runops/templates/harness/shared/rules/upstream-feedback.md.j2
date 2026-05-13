@@ -52,7 +52,7 @@ GitHub issue はサニタイズ済み bundle から作る外部共有チャン�
 4. **まずユーザーに提案する** — issue を切る前に必ず「こういう点で
    runops に issue を立てようと思うがどうか」と相談する。勝手に issue を
    投げない。
-5. ユーザーが OK したら、`.venv` を activate した状態で重複 issue を検索し、
+5. ユーザーが OK したら、`gh` で重複 issue を検索し、
    `gh` を使って issue を作成する:
 
    ```bash
@@ -78,7 +78,7 @@ GitHub issue はサニタイズ済み bundle から作る外部共有チャン�
    <いま何が起きているか / エラーメッセージ>
 
    ## 環境
-   - runops version: $(runo --version 2>/dev/null || echo unknown)
+   - runops version: $(uvx --from runops runo --version 2>/dev/null || echo unknown)
    - OS: $(uname -srm)
    - simulator: <該当 adapter 名 / バージョン>
    - 関連 run: <run_id があれば>

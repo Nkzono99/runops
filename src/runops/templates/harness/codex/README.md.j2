@@ -67,10 +67,11 @@ command policy です。runops は `submit`, `delete`, `purge-work`,
 `rm -rf`, `git reset --hard`, `git push --force`
 のような高コストまたは不可逆な操作だけをここに書きます。
 
+runops CLI は project 側では `uvx --from runops runo ...` で実行します。
 `runo runs submit --dry-run` は HPC 資源を使わない確認コマンドです:
 
 ```bash
-runo runs submit --dry-run --all runs/survey -qn gr10451a
+uvx --from runops runo runs submit --dry-run --all runs/survey -qn gr10451a
 ```
 
 実投入は必ず会話上でユーザー確認を得てから実行します。`submit` は破壊的操作
@@ -82,7 +83,7 @@ rule は `runo runs submit` / `runops runs submit` を permission layer では
 
 Agent 側の行動ルールは AGENTS.md / skills 側に置きます:
 
-- まず `runo runs submit --dry-run ...` で対象 run と skip を確認する
+- まず `uvx --from runops runo runs submit --dry-run ...` で対象 run と skip を確認する
 - 実行前に command、対象 run、queue、QOS、資源量を会話上で提示する
 - ユーザーの明示確認後に submit する
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない
@@ -91,13 +92,13 @@ Agent 側の行動ルールは AGENTS.md / skills 側に置きます:
 
 ```bash
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runo runs submit --dry-run --all runs/survey
+  uvx --from runops runo runs submit --dry-run --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runo runs submit --all runs/survey --dry-run
+  uvx --from runops runo runs submit --all runs/survey --dry-run
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runo runs submit --all runs/survey
+  uvx --from runops runo runs submit --all runs/survey
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
-  runo runs submit R20260419-0001
+  uvx --from runops runo runs submit R20260419-0001
 codex execpolicy check --pretty --rules .codex/rules/runops.rules -- \
   rm -rf runs/R20260419-0001
 ```

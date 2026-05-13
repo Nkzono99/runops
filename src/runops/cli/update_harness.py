@@ -30,6 +30,7 @@ from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
 from runops.harness.builder import (
     GITIGNORE_PATH,
+    applied_harness_runops_version,
     build_gitignore_file,
     build_harness_bundle,
     build_managed_gitignore_block,
@@ -229,6 +230,7 @@ def update_harness(
         only_prefixes = [p.strip() for p in only.split(",") if p.strip()]
 
     lock = load_harness_lock(project_dir)
+    previous_runops_version = applied_harness_runops_version(project_dir)
     new_hashes = harness.hashes()
 
     overwritten: list[str] = []
@@ -291,7 +293,6 @@ def update_harness(
             new_path = full_path.parent / (full_path.name + ".new")
             if not dry_run:
                 new_path.write_text(content, encoding="utf-8")
-                updated_lock[rel_path] = template_hash
             written_new.append(rel_path)
 
     if _harness_path_requested(only_prefixes, GITIGNORE_PATH):
@@ -343,7 +344,6 @@ def update_harness(
                 else:
                     if not dry_run:
                         new_path.write_text(updated_text, encoding="utf-8")
-                        updated_lock[GITIGNORE_PATH] = managed_hash
                     written_new.append(GITIGNORE_PATH)
         else:
             if not dry_run:
@@ -371,7 +371,13 @@ def update_harness(
         if include_research:
             _create_research_skeleton(project_dir, backfilled_workspace)
 
-    if not dry_run:
+    if not dry_run and written_new:
+        save_harness_lock(
+            project_dir,
+            updated_lock,
+            runops_version=previous_runops_version,
+        )
+    elif not dry_run:
         save_harness_lock(project_dir, updated_lock)
 
     harnessops_message: str | None = None

@@ -50,8 +50,10 @@ def _bootstrap_environment(
     runops_package: str,
     created: list[str],
     skipped: list[str],
+    *,
+    install_runops: bool = False,
 ) -> None:
-    """Bootstrap .venv and install runops plus simulator packages."""
+    """Bootstrap .venv and install simulator runtime packages."""
     uv = _find_uv()
     venv_dir = project_dir / ".venv"
     python_path = _python_in_venv(venv_dir)
@@ -77,30 +79,33 @@ def _bootstrap_environment(
             )
             return
 
-    typer.echo(f"  Installing {runops_package} ...")
-    install_result = subprocess.run(
-        [
-            uv,
-            "pip",
-            "install",
-            runops_package,
-            "--python",
-            str(python_path),
-        ],
-        cwd=str(project_dir),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        check=False,
-    )
-    if install_result.returncode == 0:
-        created.append(f"uv pip install {runops_package}")
-    else:
-        typer.echo(
-            f"  Warning: runops install failed:\n"
-            f"    {(install_result.stderr or '').strip()[:300]}"
+    if install_runops:
+        typer.echo(f"  Installing {runops_package} into .venv ...")
+        install_result = subprocess.run(
+            [
+                uv,
+                "pip",
+                "install",
+                runops_package,
+                "--python",
+                str(python_path),
+            ],
+            cwd=str(project_dir),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=False,
         )
+        if install_result.returncode == 0:
+            created.append(f"uv pip install {runops_package}")
+        else:
+            typer.echo(
+                f"  Warning: runops install failed:\n"
+                f"    {(install_result.stderr or '').strip()[:300]}"
+            )
+    else:
+        typer.echo("  Using uvx for the runops CLI; .venv is for project runtime.")
 
     pip_pkgs = _collect_pip_packages(sim_names) if sim_names else []
     if pip_pkgs:
@@ -129,5 +134,5 @@ def _bootstrap_environment(
                 f"    {(pkg_result.stderr or '').strip()[:300]}",
             )
 
-    typer.echo(f"\n  Next: {_activation_hint()}")
-    typer.echo("  Then: runo doctor")
+    typer.echo("\n  Next: uvx --from runops runo doctor")
+    typer.echo(f"  Activate .venv only for runtime tools: {_activation_hint()}")

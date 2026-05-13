@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 from typing import Final
 
-_CLI_COMMANDS: Final[tuple[str, ...]] = ("runo", "runops")
+_CLI_COMMANDS: Final[tuple[str, ...]] = (
+    "uvx --from runops runo",
+    "runo",
+    "runops",
+)
 
 
 def _cli_bash_patterns(*patterns: str) -> tuple[str, ...]:

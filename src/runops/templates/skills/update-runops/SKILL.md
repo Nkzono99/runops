@@ -1,27 +1,34 @@
 ---
 name: update-runops
-description: Update the project-local runops package and refresh harness files. Use when runops has a new release or harness templates need updating.
+description: Update the uvx-run runops tool path and refresh project harness files. Use when runops has a new release, harness templates need updating, or CLI notices report a version mismatch.
 ---
 
 # runops を更新する
 
 通常の project では runops 本体の source checkout を `tools/runops/` に持たない。
-更新は `.venv` に入っている runops package と、project 側 harness の再生成で扱う。
+runops CLI は `uvx --from runops runo ...` を標準経路にし、project `.venv` は
+simulator package、解析依存、runtime tool 用に使う。
 
-## 1. package を更新
+## 1. runops tool version を確認
 
 ```bash
-uv pip install --upgrade runops --python .venv/bin/python
-runo --version
+uvx --from runops runo --version
 ```
 
 特定 version に固定したい場合:
 
 ```bash
+uvx --from "runops==<version>" runo --version
+```
+
+offline / pinned workflow で runops CLI を project `.venv` に常駐させる必要が
+ある場合だけ、明示的に install する:
+
+```bash
 uv pip install "runops==<version>" --python .venv/bin/python
 ```
 
-Windows では Python path を `.venv\Scripts\python.exe` に読み替える。
+通常は `.venv` の runops を更新しない。
 
 runops 本体に local patch が必要な場合は、project の外に source checkout を用意し、
 `{{ skill_prefix }}patch-runops` で branch / commit / upstream disposition を整理する。
@@ -29,14 +36,15 @@ runops 本体に local patch が必要な場合は、project の外に source ch
 ## 2. ハーネスファイルを再生成
 
 ```bash
-runo update-harness
+uvx --from runops runo update-harness
 ```
 
 - 未編集のファイルは自動で上書きされる
 - ユーザーが編集済みのファイルは `<path>.new` として出力されるので diff を確認してマージする
 - `.vscode/settings.json` もこの更新対象に含まれる
 - `notes/`, `materials/`, `research/` は不足している scaffold だけ補完される
-- `.runops/knowledge/runops/agent-user-guide.md` と `imports.md` も installed package から再生成される
+- `.runops/knowledge/runops/agent-user-guide.md` と `imports.md` も実行中の runops package から再生成される
+- `.runops/harness.lock` に最後に適用した runops version が記録される
 - `--dry-run` で事前確認、`--force` で全上書き
 - HarnessOps overlay がある場合は `hops update-harness` も連鎖し、repo-local HarnessOps skills と overlay metadata を更新する
 
@@ -45,9 +53,9 @@ runo update-harness
 まず generated guide と CLI を入口にする。
 
 ```bash
-runo migrate list
-runo migrate show <id>
-runo migrate apply <id> --dry-run
+uvx --from runops runo migrate list
+uvx --from runops runo migrate show <id>
+uvx --from runops runo migrate apply <id> --dry-run
 ```
 
 runops v0 系では後方互換性を強く維持しない。project 側の状態に影響する変更は
@@ -70,7 +78,7 @@ Migration を適用 / skip / defer した場合は、`notes/YYYY-MM-DD.md` に�
 ## 4. シミュレータパッケージを更新
 
 ```bash
-runo update
+uvx --from runops runo update
 ```
 
 `runo update` は adapter が宣言する package spec に合わせて simulator package を更新する。
@@ -85,17 +93,21 @@ runo update
 ## 一括実行
 
 ```bash
-uv pip install --upgrade runops --python .venv/bin/python
-runo update-harness
-runo update
+uvx --from runops runo update-harness
+uvx --from runops runo migrate list
+uvx --from runops runo update
 ```
 
 一括実行後も migration guide の確認は省略しない。
 
 ## 注意
 
-- `update-harness` は runops source checkout を pull しない。現在実行中の installed package が正本。
+- `update-harness` は runops source checkout を pull しない。現在 `uvx` で実行中の package が正本。
+- `.runops/harness.lock` の `runops_version` が実行中 version より古い場合は、
+  `uvx --from runops runo update-harness` を実行する。
+- `.runops/harness.lock` の `runops_version` が実行中 version より新しい場合は、
+  stale な project `.venv` の `runo` を踏んでいる可能性があるため、`uvx --from runops runo ...` を使う。
 - local patch の正本は別 checkout 内の Git branch / commit とする。
 - `update-harness` で `.new` ファイルが生成されたら、差分を確認してから元ファイルに反映する。
 - migration item がある場合は `{{ skill_prefix }}migrate-runops` で扱う。
-- 更新後は `runo doctor` と `runo lint` で環境と project state を確認するとよい。
+- 更新後は `uvx --from runops runo doctor` と `uvx --from runops runo lint` で環境と project state を確認するとよい。

@@ -76,7 +76,7 @@ Harness Layer に置くもの:
 3. relevant skill
 4. relevant layer doc under `docs/layers/`
 5. `.runops/knowledge/enabled/imports.md` と `.runops/knowledge/runops/`
-6. installed package の場所 (`python -c "import runops; print(runops.__file__)"`) は最後の手段
+6. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
 
 ## 他レイヤとの関係
 

@@ -38,28 +38,28 @@ shared な運用変更を入れたら、`AGENTS.md`, `CLAUDE.md`,
 
 ## プロジェクトでの利用方法
 
-runops はプロジェクトごとにブートストラップインストールする。事前のグローバルインストールは不要。
-CLI は `runo` を標準コマンドとして使う。既存スクリプトとの互換性のため、
+runops project は `uvx` でブートストラップし、project `.venv/` は runtime 用に作る。
+事前のグローバルインストールは不要。
+CLI は `uvx --from runops runo ...` を標準経路として使う。既存スクリプトとの互換性のため、
 `runops` も同じ CLI を指す stable alias として残す。
 
 ```bash
 # 新規プロジェクト作成
 mkdir my-project && cd my-project
 uvx --from runops runo init
-
-# activate
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
-`runo init` が `.venv/` を自動構築し、runops を通常 package install する。
-Agent は `.runops/knowledge/runops/`、`runo context --json`、`runo --help` を確認入口にする。
+`runo init` が `.venv/` を自動構築するが、そこは simulator package や解析依存など
+project runtime 用に使う。runops CLI は通常 `.venv/` に常駐 install せず、`uvx` で実行する。
+Agent は `.runops/knowledge/runops/`、`uvx --from runops runo context --json`、
+`uvx --from runops runo --help` を確認入口にする。
 
 ```bash
 # 既存プロジェクトを clone + セットアップ
 uvx --from runops runo setup https://github.com/user/my-project.git
-source my-project/.venv/bin/activate
-runo doctor
+cd my-project
+uvx --from runops runo doctor
 ```
 
 ## 技術スタック
@@ -248,6 +248,12 @@ runops/
 - mypy strict モード
 - テストカバレッジ 80% 以上を目標
 - docstring は Google style
+
+### 開発環境
+
+- このリポジトリでの作業は repo root の `.venv` を使う。Agent は原則として `uv run <command>` で実行し、直接 executable を呼ぶ必要がある場合だけ `.venv/Scripts/<cmd>.exe` (Windows) または `.venv/bin/<cmd>` (Unix) を使う。
+- HarnessOps CLI (`hops`) は `.venv` に PyPI package `harnessops` として通常インストールする。ローカル checkout からの editable install は使わない。
+- `hops` が PATH に見えない場合も、まず `uv run hops ...` か `.venv/Scripts/hops.exe` / `.venv/bin/hops` を使い、外部 `uvx` は `.venv` が壊れている場合の一時 fallback に留める。
 
 ### 設計原則
 

@@ -23,6 +23,7 @@ def _fake_bootstrap_environment(
     _runops_package: str,
     created: list[str],
     _skipped: list[str],
+    **_kwargs: object,
 ) -> None:
     """Create a lightweight venv marker without running uv."""
     (project_dir / ".venv" / "Scripts").mkdir(parents=True, exist_ok=True)

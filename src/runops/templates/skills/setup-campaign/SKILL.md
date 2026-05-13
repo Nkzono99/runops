@@ -16,13 +16,13 @@ description: Set up campaign.toml from a research theme description. Use after r
 
 ```bash
 # プロジェクトの現状を把握
-runo context --no-json
+uvx --from runops runo context --no-json
 
 # シミュレータ固有のガイド（パラメータ名・物理的意味）
 cat CLAUDE.md   # agent_guide セクションにシミュレータ知識がある
 
 # campaign.toml のスキーマ
-runo context --json
+uvx --from runops runo context --json
 
 # 既存のケースがあれば参照
 ls cases/
@@ -92,7 +92,7 @@ campaign 設計の意思決定は raw な状態で `notes/YYYY-MM-DD.md` に残�
 例:
 
 ```bash
-runo notes append "campaign セットアップ" - <<'EOF'
+uvx --from runops runo notes append "campaign セットアップ" - <<'EOF'
 Theme: thermal-motion-induced ion depletion (2D PIC).
 Hypothesis: vti が大きいほど plate 下流の枯渇角 alpha が広がる。
 

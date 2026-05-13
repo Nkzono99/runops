@@ -1,8 +1,9 @@
-<!-- Auto-generated from the installed runops package. Do not edit. -->
+<!-- Auto-generated from the runops package that last ran update-harness. Do not edit. -->
 
 # runops Agent ユーザーガイド
 
-この project は runops で管理されている。Agent はまず `runo context --json`
+この project は runops で管理されている。Agent はまず
+`uvx --from runops runo context --json`
 で現在地を確認し、必要に応じて `runo --help` / `runo <command> --help` と
 project-local skill を参照する。
 
@@ -16,7 +17,7 @@ project-local skill を参照する。
 
 ## 最初に読むもの
 
-1. `runo context --json`
+1. `uvx --from runops runo context --json`
 2. `campaign.toml`
 3. `research/agenda.md`
 4. 関連する `cases/**/case.toml` と `runs/**/survey.toml`
@@ -32,17 +33,18 @@ project-local skill を参照する。
 
 ## runops 自体の確認
 
-runops 本体の所在や version は次で確認する。
+runops CLI は標準では `uvx` で実行する。version と実体は次で確認する。
 
 ```bash
-runo --version
-python -c "import runops; print(runops.__file__)"
-python -c "from importlib import metadata; print(metadata.version('runops'))"
+uvx --from runops runo --version
+uvx --from runops python -c "import runops; print(runops.__file__)"
+uvx --from runops python -c "from importlib import metadata; print(metadata.version('runops'))"
 ```
 
 project に `tools/runops/` があるとは限らない。通常の project では runops は
-`.venv/` に package として install され、Agent 向けの参照情報はこの
-`.runops/knowledge/runops/` 配下に生成される。
+project `.venv/` へ常駐 install せず、CLI 実行時に `uvx --from runops runo ...`
+で解決する。`.venv/` は simulator package や解析依存など runtime 用に使う。
+Agent 向けの参照情報はこの `.runops/knowledge/runops/` 配下に生成される。
 
 ## runops へのフィードバック
 

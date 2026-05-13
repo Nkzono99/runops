@@ -6,9 +6,11 @@ runops local patch、`feedback-runops` / HarnessOps feedback、PR、`update-runo
 
 ## 目的
 
-通常の生成 project には `tools/runops/` を置かず、runops は `.venv/` に
-package として install します。Agent の確認入口は `.runops/knowledge/runops/`、
-`runo context --json`、`runo --help`、package metadata です。
+通常の生成 project には `tools/runops/` を置かず、runops CLI は
+`uvx --from runops runo ...` で実行します。project `.venv/` は simulator package、
+解析依存、runtime tool 用です。Agent の確認入口は `.runops/knowledge/runops/`、
+`uvx --from runops runo context --json`、`uvx --from runops runo --help`、
+package metadata です。
 
 runops 本体の修正が必要な場合は、project とは別の source checkout で扱います。
 この層の目的は、次の 4 つを分けることです。
@@ -27,8 +29,9 @@ runops 本体の修正が必要な場合は、project とは別の source checko
   v0 系では後方互換 layer を長く維持せず、migration guide による移行を優先する。
 - 長期化して複数 patch が並ぶ場合だけ、`notes/reports/runops-local-patches.md`
   のような project-local index を作ってよい。
-- `runo update-harness` は runops source checkout を pull しない。現在実行中の
-  installed package を正として project harness を再生成する。
+- `runo update-harness` は runops source checkout を pull しない。現在 `uvx` で
+  実行中の package を正として project harness を再生成し、`.runops/harness.lock`
+  に適用済み runops version を記録する。
 - HarnessOps が利用できる環境では、`runo init` / `runo setup` は project 側
   `hops init --profile runops-project` を連鎖し、`runo update-harness` は
   `hops update-harness` を連鎖する。HarnessOps 管理ファイルは runops が直接書かず、
@@ -84,8 +87,9 @@ project 側の生成物や研究状態を、そのまま runops 本体に入れ�
 
 ## `update-runops`
 
-`update-runops` は installed runops package を更新し、`runo update-harness` で
-project 側の generated harness と generated knowledge を再生成します。
+`update-runops` は `uvx` で最新の runops package を実行し、
+`runo update-harness` で project 側の generated harness と generated knowledge を
+再生成します。
 
 更新後は release note / migration guide と `runo migrate list` を確認します。
 該当 item がある場合は、定型 migration なら `runo migrate apply <id> --dry-run`

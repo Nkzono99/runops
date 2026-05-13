@@ -28,12 +28,14 @@
 - 通常の project には `tools/runops/` がない前提で作業する
 - runops 本体を修正する必要がある場合は、project の研究作業とは別の
   source checkout を用意し、修正・検証・PR 化を分けて扱う
-- project 側では installed package の version と
-  `.runops/knowledge/runops/` の生成済み guide を確認入口にする
+- project 側では `uvx --from runops runo ...` で実行する runops version と
+  `.runops/harness.lock` の適用済み version、`.runops/knowledge/runops/` の
+  生成済み guide を確認入口にする
 
 ## venv
 
-- **runops コマンド実行前に `.venv/` を activate する**
+- **runops コマンドは `uvx --from runops runo ...` で実行する**
+- `.venv/` は simulator package、解析依存、runtime tool を直接使うときだけ activate する
 
 ## case 作成
 

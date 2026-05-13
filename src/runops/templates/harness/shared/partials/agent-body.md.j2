@@ -1,6 +1,6 @@
 このプロジェクトは runops で管理されています。
-CLI は `runo` を標準コマンドとして使う。`runops` も互換 alias として同じ
-CLI を実行できる。
+CLI は `uvx --from runops runo ...` を標準経路として使う。`runops` も互換 alias として同じ
+CLI を実行できる。`.venv/` は simulator package や解析依存など project runtime 用に使う。
 人が研究目的・ベース入力・計算資源上限を決め、Agent はその範囲で
 campaign 設計、case / survey 編集、run 生成、投入、監視、解析、知見整理を進めます。
 
@@ -11,10 +11,10 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 
 ## まずやること
 
-0. **venv を activate する** — `source .venv/bin/activate` (Linux/Mac) / `.venv\Scripts\activate` (Windows)
-   runops や関連パッケージは `.venv/` にインストール済み。activate しないと `runo` コマンドが使えない。
-1. `runo context --json` で project の現在地を把握する
-2. 必要なら `runo lint --scope structure,analysis,knowledge` で読み入口と成果物索引を確認する
+0. **runops CLI は uvx で呼ぶ** — 例: `uvx --from runops runo context --json`
+   `.venv/` は必要な runtime tool を直接実行するときだけ activate する。
+1. `uvx --from runops runo context --json` で project の現在地を把握する
+2. 必要なら `uvx --from runops runo lint --scope structure,analysis,knowledge` で読み入口と成果物索引を確認する
 3. `campaign.toml` を読む
 4. `research/agenda.md` があれば読む
 5. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
@@ -44,7 +44,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | `{{ skill_prefix }}research-agenda` | `research/agenda.md` の現在判断を更新する |
 | `{{ skill_prefix }}feedback-runops` | runops 本体へのバグ報告・機能要望を HarnessOps 経由で記録し、issue 下書きを作る |
 | `{{ skill_prefix }}patch-runops` | 必要時に別 checkout で runops 本体を修正し、HarnessOps feedback/PR/local-only を判定 |
-| `{{ skill_prefix }}update-runops` | installed runops package と project harness を更新し、migration guide を確認する |
+| `{{ skill_prefix }}update-runops` | uvx で runops tool と project harness を更新し、migration guide を確認する |
 | `{{ skill_prefix }}migrate-runops` | `docs/migrations/` に従って project 側状態を移行する |
 | `{{ skill_prefix }}python-package-refactor` | Python package の構造リファクタリングを API 保持と検証付きで進める |
 | `{{ skill_prefix }}release` | プロジェクトのマイルストーンタグを作成 |
@@ -171,8 +171,9 @@ lab notebook の entry が積み上がってストーリーになったら、
 ## 情報源の優先順位
 
 1. `{{ skills_dir }}` → enabled knowledge (`.runops/knowledge/enabled/imports.md`) → simulator docs (`refs/`)
-2. `runo --help` / `runo <command> --help` (`runops` でも同じ)
-3. installed package の場所 (`python -c "import runops; print(runops.__file__)"`) は最後の手段
+2. `uvx --from runops runo --help` / `uvx --from runops runo <command> --help`
+   (`runops` alias でも同じ)
+3. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
 {% if doc_repos %}
 
 ## リファレンスリポジトリ

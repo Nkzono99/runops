@@ -131,8 +131,7 @@ Agent は確認前に、対象 run、queue、資源量、想定 core-hour、変�
 
 ```bash
 uvx --from runops runo init
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
 既存 project:
@@ -140,8 +139,7 @@ runo doctor
 ```bash
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
 ここまで終わったら、CLI を順に叩くのではなく Agent に研究内容を渡します。

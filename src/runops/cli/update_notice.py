@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import sys
 import urllib.error
 import urllib.request
@@ -13,13 +12,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from packaging.version import InvalidVersion, Version
+
+from runops.harness.builder import applied_harness_runops_version
+
 _PYPI_JSON_URL = "https://pypi.org/pypi/runops/json"
 _DISABLE_ENV = "RUNOPS_DISABLE_VERSION_CHECK"
 _FORCE_ENV = "RUNOPS_FORCE_VERSION_CHECK"
 _CACHE_ENV = "RUNOPS_UPDATE_CHECK_CACHE"
 _CHECK_INTERVAL = timedelta(hours=24)
 _NOTICE_INTERVAL = timedelta(hours=24)
-_VERSION_RE = re.compile(r"^v?(\d+)(?:\.(\d+))?(?:\.(\d+))?")
 
 
 def maybe_emit_update_notice(
@@ -37,6 +39,7 @@ def maybe_emit_update_notice(
         current_version,
         program=program,
         cache_path=default_cache_path(env),
+        project_dir=find_project_root(Path.cwd()),
     )
     if message:
         sys.stderr.write(f"{message}\n")
@@ -73,6 +76,8 @@ def build_update_notice(
     *,
     program: str,
     cache_path: Path,
+    project_dir: Path | None = None,
+    applied_version: str | None = None,
     now: datetime | None = None,
     fetch_latest: Callable[[], str | None] | None = None,
 ) -> str | None:
@@ -80,36 +85,95 @@ def build_update_notice(
     now = now or datetime.now(timezone.utc)
     fetch_latest = fetch_latest or fetch_latest_version
     cache = _read_cache(cache_path)
+    if applied_version is None and project_dir is not None:
+        applied_version = applied_harness_runops_version(project_dir)
 
     latest = _latest_from_fresh_cache(cache, now)
     if latest is None:
         latest = fetch_latest()
-        if latest is None:
-            return None
-        cache["latest_version"] = latest
-        cache["checked_at"] = _format_dt(now)
-        _write_cache(cache_path, cache)
+        if latest is not None:
+            cache["latest_version"] = latest
+            cache["checked_at"] = _format_dt(now)
+            _write_cache(cache_path, cache)
 
-    if not _is_newer_version(latest, current_version):
+    notices = _build_notice_sections(
+        current_version=current_version,
+        latest_version=latest,
+        applied_version=applied_version,
+        program=program,
+    )
+    if not notices:
         return None
 
-    if not _should_emit_notice(cache, latest, now):
+    notice_key = "|".join(notices)
+    if not _should_emit_notice(cache, notice_key, now):
         return None
 
-    cache["notice_version"] = latest
+    cache["notice_version"] = notice_key
     cache["last_notice_at"] = _format_dt(now)
     _write_cache(cache_path, cache)
+    return "\n".join(notices)
 
-    return "\n".join(
-        [
-            f"A new runops release is available: {current_version} -> {latest}",
-            "Use the project skill `$update-runops` (Codex) or "
-            "`/update-runops` (Claude Code), or run:",
-            "  uv pip install --upgrade runops --python .venv/bin/python",
-            f"  {program} update-harness",
-            f"Set {_DISABLE_ENV}=1 to hide this notice.",
-        ]
-    )
+
+def _build_notice_sections(
+    *,
+    current_version: str,
+    latest_version: str | None,
+    applied_version: str | None,
+    program: str,
+) -> list[str]:
+    """Build update notice sections without touching cache state."""
+    notices: list[str] = []
+    command_name = _preferred_program(program)
+    if latest_version is not None and _is_newer_version(
+        latest_version,
+        current_version,
+    ):
+        notices.extend(
+            [
+                f"A new runops release is available: {current_version} -> "
+                f"{latest_version}",
+                "Preferred project CLI flow:",
+                f"  uvx --from runops {command_name} update-harness",
+                "Use the project skill `$update-runops` (Codex) or "
+                "`/update-runops` (Claude Code) to refresh the harness and "
+                "check migrations.",
+            ]
+        )
+
+    if applied_version is not None and _is_newer_version(
+        current_version,
+        applied_version,
+    ):
+        if notices:
+            notices.append("")
+        notices.extend(
+            [
+                "This project's runops harness is older than the CLI running "
+                f"now: {applied_version} -> {current_version}",
+                "Refresh project harness files with:",
+                f"  uvx --from runops {command_name} update-harness",
+            ]
+        )
+    elif applied_version is not None and _is_newer_version(
+        applied_version,
+        current_version,
+    ):
+        if notices:
+            notices.append("")
+        notices.extend(
+            [
+                "This project harness was last applied with a newer runops "
+                f"version ({applied_version}) than the CLI running now "
+                f"({current_version}).",
+                "You may be using an old project .venv `runo`; prefer:",
+                f"  uvx --from runops {command_name} <command>",
+            ]
+        )
+
+    if notices:
+        notices.append(f"Set {_DISABLE_ENV}=1 to hide this notice.")
+    return notices
 
 
 def fetch_latest_version(timeout: float = 1.0) -> str | None:
@@ -150,6 +214,18 @@ def default_cache_path(env: Mapping[str, str] | None = None) -> Path:
     if cache_root:
         return Path(cache_root) / "runops" / "update-check.json"
     return Path.home() / ".cache" / "runops" / "update-check.json"
+
+
+def find_project_root(start: Path) -> Path | None:
+    """Return the nearest runops project root at or above ``start``."""
+    current = start.resolve()
+    candidates = (current, *current.parents)
+    for directory in candidates:
+        if (directory / "runops.toml").is_file() or (
+            directory / ".runops" / "harness.lock"
+        ).is_file():
+            return directory
+    return None
 
 
 def _latest_from_fresh_cache(cache: dict[str, Any], now: datetime) -> str | None:
@@ -210,9 +286,16 @@ def _is_newer_version(candidate: str, current: str) -> bool:
     return _version_key(candidate) > _version_key(current)
 
 
-def _version_key(version: str) -> tuple[int, int, int]:
-    match = _VERSION_RE.match(version.strip())
-    if match is None:
-        return (0, 0, 0)
-    parts = [int(part) if part is not None else 0 for part in match.groups()]
-    return (parts[0], parts[1], parts[2])
+def _version_key(version: str) -> Version:
+    normalized = version.strip()
+    if normalized.startswith("v"):
+        normalized = normalized[1:]
+    try:
+        return Version(normalized)
+    except InvalidVersion:
+        return Version("0")
+
+
+def _preferred_program(program: str) -> str:
+    """Return the canonical CLI name shown in update guidance."""
+    return "runo" if program in {"runo", "runops"} else program

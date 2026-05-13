@@ -17,6 +17,10 @@ def test_build_claude_settings_exposes_expected_policy() -> None:
     assert "deny" in data["permissions"]
     assert "Bash(runo analyze plot*)" in data["permissions"]["allow"]
     assert "Bash(runo analyze export*)" in data["permissions"]["allow"]
+    assert "Bash(uvx --from runops runo analyze plot*)" in data["permissions"]["allow"]
+    assert (
+        "Bash(uvx --from runops runo analyze export*)" in data["permissions"]["allow"]
+    )
     assert "Bash(runops analyze plot*)" in data["permissions"]["allow"]
     assert "Bash(runops analyze export*)" in data["permissions"]["allow"]
     assert "Edit(/campaign.toml)" in data["permissions"]["allow"]
@@ -44,8 +48,10 @@ def test_runs_submit_is_allow_listed() -> None:
     """runo/runops submit is allowed; workflow rules require review first."""
     data = json.loads(build_claude_settings())
     assert "Bash(runo runs submit*)" in data["permissions"]["allow"]
+    assert "Bash(uvx --from runops runo runs submit*)" in data["permissions"]["allow"]
     assert "Bash(runops runs submit*)" in data["permissions"]["allow"]
     assert "Bash(runo runs submit*)" not in data["permissions"]["ask"]
+    assert "Bash(uvx --from runops runo runs submit*)" not in data["permissions"]["ask"]
     assert "Bash(runops runs submit*)" not in data["permissions"]["ask"]
 
 

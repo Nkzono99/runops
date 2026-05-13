@@ -13,7 +13,8 @@ description: Interactively prepare a runops project after runo init or runo setu
 この skill が見えている時点では、基本的に project は生成済みとみなす。
 bootstrap が済んだかを確認することを主目的にしない。
 
-この skill の主成果は、`runo context` や `runo doctor` の確認そのものではなく、
+この skill の主成果は、`uvx --from runops runo context` や
+`uvx --from runops runo doctor` の確認そのものではなく、
 **生成済み project の現在状態を読み、利用者が次に進められる形へ案内すること**。
 致命的な blocker がなければ、状態確認だけで応答を終えない。
 必ず「セットアップ後に行うこと」に進み、状態要約、次アクション、
@@ -30,7 +31,7 @@ harness を使い始める入口**として扱う。`runops.toml` が見つか�
   blocker だけにする。
 - `doctor` の未解決項目は、利用者に先に聞かず agent が確認する。blocker があれば
   こちらから短く共有し、修復方針を示す。
-- `runo context` / `runo doctor` の確認だけで応答を終えない。致命的な blocker が
+- `uvx --from runops runo context` / `uvx --from runops runo doctor` の確認だけで応答を終えない。致命的な blocker が
   なければ、必ず次に進むための案内まで出す。
 - `pwd` / `ls` は「init 成功判定」ではなく、今どの project を見ているかの確認として使う。
 - 直接指示が十分なら、追加質問で止めずに実行する。
@@ -53,12 +54,12 @@ project root にいるか、または親 directory に `runops.toml` がある�
 次を実行して現状を把握する:
 
 ```bash
-runo context --no-json
-runo doctor
+uvx --from runops runo context --no-json
+uvx --from runops runo doctor
 ```
 
 `runops.toml` が見つからない場合は、まず cwd が project root から外れていないか確認する。
-`runo` が使えない、`.venv/` が壊れているなど実行環境の問題なら、短く状況を説明して
+`uvx` が使えない、`.venv/` が壊れているなど実行環境の問題なら、短く状況を説明して
 `{{ skill_prefix }}setup-env` の内容に従って環境を修復する。
 それ以外は、確認結果を判断材料として使い、次の「セットアップ後に行うこと」へ進む。
 
@@ -98,7 +99,8 @@ submit はまだしない。
 
 この場合:
 
-1. `runo context --no-json` と `runo doctor` で project の現在状態を読む
+1. `uvx --from runops runo context --no-json` と
+   `uvx --from runops runo doctor` で project の現在状態を読む
 2. simulator / site / launcher の不足があれば修復方針を出す
 3. `{{ skill_prefix }}setup-campaign` / `{{ skill_prefix }}new-case` /
    `{{ skill_prefix }}survey-design` を必要に応じて使う
@@ -114,8 +116,8 @@ project root から外れていないか確認する。`.venv/` がない、`run
 
 ```bash
 cd <project>
-runo context --no-json
-runo doctor
+uvx --from runops runo context --no-json
+uvx --from runops runo doctor
 ```
 
 ### harness や環境が壊れていた場合
@@ -123,9 +125,8 @@ runo doctor
 `{{ skill_prefix }}setup-env` で環境を修復する。必要なら次も使う:
 
 ```bash
-source .venv/bin/activate
-runo doctor
-runo update-harness
+uvx --from runops runo doctor
+uvx --from runops runo update-harness
 ```
 
 ### 新規作成 / clone から必要な場合

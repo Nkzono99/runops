@@ -1,7 +1,7 @@
 # Python venv
 .venv/
 
-# runops tool (cloned by runo init)
+# Optional local tools (runops itself is normally invoked via uvx)
 tools/
 
 # Reference repos (cloned by runo init)

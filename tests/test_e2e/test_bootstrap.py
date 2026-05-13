@@ -22,6 +22,7 @@ def _fake_bootstrap_environment(
     _runops_package: str,
     created: list[str],
     skipped: list[str],
+    **_kwargs: object,
 ) -> None:
     """Create the minimum bootstrap artifacts used by E2E tests."""
     venv_dir = project_dir / ".venv"

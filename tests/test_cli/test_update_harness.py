@@ -12,6 +12,7 @@ from runops.cli.main import app
 from runops.harness.builder import (
     GITIGNORE_PATH,
     HARNESS_LOCK_PATH,
+    applied_harness_runops_version,
     build_managed_gitignore_block,
     hash_text,
     load_harness_lock,
@@ -178,6 +179,26 @@ class TestUpdateHarnessBasic:
         # .new file exists
         new_file = tmp_path / "CLAUDE.md.new"
         assert new_file.exists()
+
+    def test_new_file_does_not_advance_applied_runops_version(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Writing .new leaves harness version stale until the user merges."""
+        _init_project(tmp_path)
+        lock = load_harness_lock(tmp_path)
+        save_harness_lock(tmp_path, lock, runops_version="0.1.0")
+        claude_md = tmp_path / "CLAUDE.md"
+        previous_hash = lock["CLAUDE.md"]
+
+        claude_md.write_text("# My custom CLAUDE.md\n", encoding="utf-8")
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert (tmp_path / "CLAUDE.md.new").exists()
+        assert applied_harness_runops_version(tmp_path) == "0.1.0"
+        assert load_harness_lock(tmp_path)["CLAUDE.md"] == previous_hash
 
     def test_force_overwrites_edited(self, tmp_path: Path) -> None:
         """--force overwrites even user-edited files."""
@@ -454,6 +475,8 @@ class TestHarnessLock:
         assert lock_path.exists()
         data = json.loads(lock_path.read_text(encoding="utf-8"))
         assert data["version"] == 1
+        assert isinstance(data["runops_version"], str)
+        assert applied_harness_runops_version(tmp_path) == data["runops_version"]
         assert isinstance(data["hashes"], dict)
         assert len(data["hashes"]) > 0
 

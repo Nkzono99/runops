@@ -29,6 +29,13 @@ def _hops_in_venv(project_dir: Path) -> Path:
     return project_dir / ".venv" / "bin" / "hops"
 
 
+def _project_uses_uv(project_dir: Path) -> bool:
+    """Return whether ``uv run`` is likely to use a project-local environment."""
+    return (project_dir / "uv.lock").exists() or (
+        project_dir / "pyproject.toml"
+    ).exists()
+
+
 def resolve_hops_command(project_dir: Path) -> list[str] | None:
     """Return a command prefix for ``hops``, preferring project-local installs."""
     env_command = os.environ.get("RUNOPS_HOPS_COMMAND")
@@ -42,6 +49,14 @@ def resolve_hops_command(project_dir: Path) -> list[str] | None:
     hops = shutil.which("hops")
     if hops:
         return [hops]
+
+    uv = shutil.which("uv")
+    if uv and _project_uses_uv(project_dir):
+        return [uv, "run", "hops"]
+
+    uvx = shutil.which("uvx")
+    if uvx:
+        return [uvx, "--from", "harnessops", "hops"]
     return None
 
 

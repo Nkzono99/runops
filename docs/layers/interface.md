@@ -65,8 +65,7 @@ drift を早期に検出します。
 
 ```bash
 uvx --from runops runo init
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
 既存 project:
@@ -74,8 +73,7 @@ runo doctor
 ```bash
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
-source .venv/bin/activate
-runo doctor
+uvx --from runops runo doctor
 ```
 
 ここまで終わったら、CLI を順番に叩くのではなく Agent に研究内容を渡します。

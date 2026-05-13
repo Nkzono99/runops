@@ -9,6 +9,9 @@ user-invocable: false
 詳細なフィールド定義は `runo <command> --help`、schemas、または installed
 runops package に同梱された generated guide を参照。
 
+project 側で実行するときの標準形は `uvx --from runops runo <command>`。
+以下の例では読みやすさのため `runo` と省略している。
+
 ## 現在地を把握する
 
 ```bash

@@ -50,9 +50,22 @@ def setup(
         str,
         typer.Option(
             "--runops-package",
-            help="Package spec used to install runops into the project .venv.",
+            help=(
+                "Package spec used with --install-runops-into-venv for "
+                "offline or pinned local CLI workflows."
+            ),
         ),
     ] = _DEFAULT_RUNOPS_PACKAGE,
+    install_runops_into_venv: Annotated[
+        bool,
+        typer.Option(
+            "--install-runops-into-venv",
+            help=(
+                "Also install runops into the project .venv. By default, "
+                "use `uvx --from runops runo ...` and keep .venv for runtime."
+            ),
+        ),
+    ] = False,
     no_harnessops: Annotated[
         bool,
         typer.Option(
@@ -65,9 +78,10 @@ def setup(
 
     Clones the repository (if URL given), then bootstraps the
     development environment (.venv, refs/) without touching
-    existing configuration files (TOML, CLAUDE.md, etc.). If HarnessOps
-    is available, setup also delegates project overlay initialization to
-    ``hops``.
+    existing configuration files (TOML, CLAUDE.md, etc.). The standard
+    runops CLI entrypoint is ``uvx --from runops runo ...``; the project
+    ``.venv`` is kept for simulator/runtime packages. If HarnessOps is
+    available, setup also delegates project overlay initialization to ``hops``.
 
     Bootstrap usage (no prior install needed):
       uvx --from runops runo setup https://github.com/user/my-project.git
@@ -103,10 +117,17 @@ def setup(
     created: list[str] = []
     skipped: list[str] = []
 
-    # 3. Bootstrap .venv + normal runops package install
+    # 3. Bootstrap .venv for simulator/runtime packages
     from runops.cli.init import _bootstrap_environment
 
-    _bootstrap_environment(project_dir, sim_names, runops_package, created, skipped)
+    _bootstrap_environment(
+        project_dir,
+        sim_names,
+        runops_package,
+        created,
+        skipped,
+        install_runops=install_runops_into_venv,
+    )
 
     # 4. Clone refs/ (doc repos)
     if sim_names:
@@ -162,12 +183,12 @@ def setup(
         for item in skipped:
             typer.echo(f"    {item}")
 
+    typer.echo(f"\n  Next: cd {project_dir.name} && uvx --from runops runo doctor")
     if sys.platform == "win32":
         activate_cmd = r".venv\Scripts\activate"
     else:
         activate_cmd = "source .venv/bin/activate"
-    typer.echo(f"\n  Next: cd {project_dir.name} && {activate_cmd}")
-    typer.echo("  Then: runo doctor")
+    typer.echo(f"  Activate .venv only for runtime tools: {activate_cmd}")
 
 
 def _clone_project(url: str, dest: Path | None) -> Path:
