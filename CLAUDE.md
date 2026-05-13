@@ -143,7 +143,7 @@ project-state に影響する breaking change は `docs/migrations/v0.md` に移
 - ruff format / ruff check / mypy strict / テストカバレッジ 80%+
 - docstring は Google style
 - テスト: Slurm はモック、TOML は fixtures、CLI は CliRunner
-- Git: 1 コミット = 1 論理変更、`--no-verify` / `--force` 禁止
+- Git: GitHub Flow を採用し、`main` への direct push は禁止。1 コミット = 1 論理変更、`--no-verify` / `--force` 禁止
 - release 時は `pyproject.toml` + `__init__.py` の version を同時に更新し、annotated tag / GitHub Release は日本語で書く
 
 ## Adapter 実装時の注意

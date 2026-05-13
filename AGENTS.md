@@ -283,9 +283,11 @@ runops/
 
 - run の大容量出力 (work/outputs/, work/restart/, work/tmp/) は .gitignore で除外
 - テスト fixtures の TOML ファイルは Git 管理対象
+- GitHub Flow を採用する。`main` への direct push は禁止し、変更は branch + PR で入れる
+- PR merge 前に CI green を確認する。`--force` / `--no-verify` は使わない
 - `gh release create` などで release を切るときは、先に `pyproject.toml` の `[project].version` を更新し、Git tag / release 名と同じバージョンに揃えること
 - release の annotated tag message と GitHub Release 本文は日本語で書く
-- release の `git commit` → `git tag -a` → `git push origin main` → `git push origin vX.Y.Z` は順に実行し、並列化しない
+- release は `release/vX.Y.Z` branch + PR で version commit を `main` に入れ、merge 後の `main` の release commit に `git tag -a` を切って `git push origin vX.Y.Z` する
 - Codex の個人用メモや一時 override は `AGENTS.override.md` に置き、Git 管理しない
 
 ## ビルド・実行
