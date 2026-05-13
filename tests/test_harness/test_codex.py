@@ -164,7 +164,15 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     claude_setup = bundle.files[".claude/skills/setup-runops/SKILL.md"]
     assert "`$setup-env`" in codex_setup
     assert "`$setup-campaign`" in codex_setup
+    assert "project は生成済み" in codex_setup
+    assert "状態確認だけで応答を終えない" in codex_setup
+    assert "必ず「セットアップ後に行うこと」" in codex_setup
+    assert "project の状態はこちらで確認します" in codex_setup
+    assert "doctor で未解決の項目はありますか" not in codex_setup
+    assert 'git commit -m "chore: scaffold runops project"' in codex_setup
     assert "`/setup-env`" in claude_setup
+    assert "状態確認だけで応答を終えない" in claude_setup
+    assert 'git commit -m "chore: scaffold runops project"' in claude_setup
     assert "{{ skill_prefix }}" not in codex_setup
 
 

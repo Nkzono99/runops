@@ -23,8 +23,12 @@ runner = CliRunner()
 
 
 @pytest.fixture(autouse=True)
-def _mock_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_init_external_processes: None,
+) -> None:
     """Skip the bootstrap step (uv install) in all tests."""
+    del mock_init_external_processes
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
@@ -355,6 +359,36 @@ class TestUpdateHarnessBasic:
         assert (tmp_path / "CLAUDE.md").read_text(encoding="utf-8") != "# A\n"
         # AGENTS.md was NOT touched
         assert (tmp_path / "AGENTS.md").read_text(encoding="utf-8") == "# B\n"
+
+    def test_force_refreshes_setup_runops_guidance(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """update-harness refreshes setup-runops onboarding guidance."""
+        _init_project(tmp_path)
+        skill_path = tmp_path / ".agents" / "skills" / "setup-runops" / "SKILL.md"
+        skill_path.write_text("stale setup-runops\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--force",
+                "--only",
+                ".agents/skills/setup-runops/SKILL.md",
+            ],
+        )
+
+        assert result.exit_code == 0
+        content = skill_path.read_text(encoding="utf-8")
+        assert "project は生成済み" in content
+        assert "状態確認だけで応答を終えない" in content
+        assert "必ず「セットアップ後に行うこと」" in content
+        assert "project の状態はこちらで確認します" in content
+        assert "doctor で未解決の項目はありますか" not in content
+        assert 'git commit -m "chore: scaffold runops project"' in content
 
 
 class TestInitUpstreamFeedback:

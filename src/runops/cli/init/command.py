@@ -11,6 +11,7 @@ from typing import Annotated, Any, Optional
 import typer
 
 from runops import __version__
+from runops.cli.init.github_auth import ensure_github_auth_for_simulators
 from runops.cli.init.knowledge import _clone_doc_repos, _prepare_knowledge_imports
 from runops.cli.init.prompting import _BundledSiteProfile
 from runops.cli.init.scaffold import (
@@ -100,6 +101,20 @@ def init(
             help="Do not initialize the project-side HarnessOps overlay.",
         ),
     ] = False,
+    gh_auth_login: Annotated[
+        bool,
+        typer.Option(
+            "--gh-auth-login",
+            help="Run `gh auth login` when GitHub authentication is required.",
+        ),
+    ] = False,
+    skip_github_auth_check: Annotated[
+        bool,
+        typer.Option(
+            "--skip-github-auth-check",
+            help="Skip GitHub authentication preflight for simulator docs.",
+        ),
+    ] = False,
     runops_package: Annotated[
         str,
         typer.Option(
@@ -126,34 +141,16 @@ def init(
     interactive = not yes
     project_dir = (path or Path.cwd()).resolve()
 
-    if not project_dir.exists():
-        project_dir.mkdir(parents=True)
-
     # Interactive project name
     if interactive and not name:
         project_name = typer.prompt("Project name", default=project_dir.name)
     else:
         project_name = name or project_dir.name
 
-    created: list[str] = []
-    skipped: list[str] = []
-
     upstream_feedback = not no_upstream_feedback
 
-    # runops.toml
-    harness_line = (
-        f"\n[harness]\nupstream_feedback = {'true' if upstream_feedback else 'false'}\n"
-    )
-    simproject_content = (
-        f"#:schema {_SCHEMA_BASE_URL}/runops.json\n"
-        f'[project]\nname = "{project_name}"\ndescription = ""\n' + harness_line
-    )
-    if _write_if_missing(project_dir / _SIMPROJECT_FILE, simproject_content):
-        created.append(_SIMPROJECT_FILE)
-    else:
-        skipped.append(_SIMPROJECT_FILE)
-
-    # simulators.toml
+    # Resolve interactive choices before writing files so failed preflights do
+    # not leave a half-created project behind.
     sim_configs: dict[str, dict[str, Any]] = {}
     sim_names: list[str] = []
 
@@ -171,14 +168,6 @@ def init(
     else:
         sim_content = "[simulators]\n"
 
-    sim_schema = f"#:schema {_SCHEMA_BASE_URL}/simulators.json\n"
-    sim_content = sim_schema + sim_content
-    if _write_if_missing(project_dir / _SIMULATORS_FILE, sim_content):
-        created.append(_SIMULATORS_FILE)
-    else:
-        skipped.append(_SIMULATORS_FILE)
-
-    # launchers.toml
     site_profile: _BundledSiteProfile | None = None
     if interactive:
         import runops.cli.init as init_facade
@@ -190,6 +179,42 @@ def init(
             "srun": {"type": "srun", "use_slurm_ntasks": True},
         }
         launcher_content = _build_launchers_toml(launcher_configs)
+
+    ensure_github_auth_for_simulators(
+        sim_names,
+        interactive=interactive,
+        login=gh_auth_login,
+        skip=skip_github_auth_check,
+    )
+
+    if not project_dir.exists():
+        project_dir.mkdir(parents=True)
+
+    created: list[str] = []
+    skipped: list[str] = []
+
+    # runops.toml
+    harness_line = (
+        f"\n[harness]\nupstream_feedback = {'true' if upstream_feedback else 'false'}\n"
+    )
+    simproject_content = (
+        f"#:schema {_SCHEMA_BASE_URL}/runops.json\n"
+        f'[project]\nname = "{project_name}"\ndescription = ""\n' + harness_line
+    )
+    if _write_if_missing(project_dir / _SIMPROJECT_FILE, simproject_content):
+        created.append(_SIMPROJECT_FILE)
+    else:
+        skipped.append(_SIMPROJECT_FILE)
+
+    # simulators.toml
+    sim_schema = f"#:schema {_SCHEMA_BASE_URL}/simulators.json\n"
+    sim_content = sim_schema + sim_content
+    if _write_if_missing(project_dir / _SIMULATORS_FILE, sim_content):
+        created.append(_SIMULATORS_FILE)
+    else:
+        skipped.append(_SIMULATORS_FILE)
+
+    # launchers.toml
 
     launcher_schema = f"#:schema {_SCHEMA_BASE_URL}/launchers.json\n"
     launcher_content = launcher_schema + launcher_content

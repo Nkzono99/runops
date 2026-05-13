@@ -39,6 +39,7 @@ from runops.cli.status import status, sync
 from runops.cli.submit import run_cmd
 from runops.cli.update import update
 from runops.cli.update_harness import update_harness
+from runops.cli.update_notice import maybe_emit_update_notice
 from runops.cli.update_refs import update_refs
 from runops.core.event_log import (
     EVENT_LOG_ENV_VAR,
@@ -159,6 +160,11 @@ def _build_app(name: str) -> typer.Typer:
                 "program": name,
                 "argv": sys.argv[1:],
             },
+        )
+        maybe_emit_update_notice(
+            program=name,
+            argv=sys.argv[1:],
+            current_version=__version__,
         )
 
     cli_app.command("init")(init)

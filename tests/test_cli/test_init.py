@@ -7,9 +7,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
+import typer
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+from runops.core.environment import EnvironmentInfo
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 from runops.harness.harnessops import HarnessOpsResult
 
@@ -17,8 +19,12 @@ runner = CliRunner()
 
 
 @pytest.fixture(autouse=True)
-def _mock_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
+def _mock_bootstrap(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_init_external_processes: None,
+) -> None:
     """Skip the bootstrap step (uv install) in all init tests."""
+    del mock_init_external_processes
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
@@ -29,6 +35,14 @@ def _mock_bootstrap(monkeypatch: pytest.MonkeyPatch) -> None:
             "skipped",
             "HarnessOps skipped (test)",
         ),
+    )
+    monkeypatch.setattr(
+        "runops.core.environment.detect_environment",
+        lambda: EnvironmentInfo(cluster_name="test-cluster"),
+    )
+    monkeypatch.setattr(
+        "runops.cli.init.command.ensure_github_auth_for_simulators",
+        lambda *_args, **_kwargs: None,
     )
 
 
@@ -459,6 +473,12 @@ class TestInit:
         ).read_text(encoding="utf-8")
         assert "$setup-env" in setup_runops_content
         assert "$setup-campaign" in setup_runops_content
+        assert "project は生成済み" in setup_runops_content
+        assert "状態確認だけで応答を終えない" in setup_runops_content
+        assert "project の状態はこちらで確認します" in setup_runops_content
+        assert "doctor で未解決の項目はありますか" not in setup_runops_content
+        assert 'git commit -m "chore: scaffold runops project"' in setup_runops_content
+        assert "次に頼みやすい形で 2-4 個" in setup_runops_content
         assert "{{ skill_prefix }}" not in setup_runops_content
         analyze_content = (skills_dir / "analyze" / "SKILL.md").read_text(
             encoding="utf-8"
@@ -700,6 +720,75 @@ class TestInit:
         result = runner.invoke(app, ["init", "--path", str(tmp_path)], input=user_input)
         assert result.exit_code == 0
         assert "Project name" in result.output
+
+    def test_init_github_auth_failure_happens_before_writes(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """GitHub auth preflight fails before scaffold files are written."""
+
+        def _fail_auth(
+            _sim_names: list[str],
+            *,
+            interactive: bool,
+            login: bool,
+            skip: bool,
+        ) -> None:
+            assert interactive is False
+            assert login is False
+            assert skip is False
+            raise typer.Exit(code=1)
+
+        monkeypatch.setattr(
+            "runops.cli.init.command.ensure_github_auth_for_simulators",
+            _fail_auth,
+        )
+
+        result = runner.invoke(app, ["init", "emses", "-y", "--path", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert not (tmp_path / "runops.toml").exists()
+        assert not (tmp_path / "simulators.toml").exists()
+
+    def test_init_can_skip_github_auth_preflight(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--skip-github-auth-check is forwarded to the auth preflight."""
+        calls: list[bool] = []
+
+        def _record_auth(
+            _sim_names: list[str],
+            *,
+            interactive: bool,
+            login: bool,
+            skip: bool,
+        ) -> None:
+            del interactive, login
+            calls.append(skip)
+
+        monkeypatch.setattr(
+            "runops.cli.init.command.ensure_github_auth_for_simulators",
+            _record_auth,
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                "emses",
+                "-y",
+                "--skip-github-auth-check",
+                "--path",
+                str(tmp_path),
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert calls == [True]
+        assert (tmp_path / "runops.toml").exists()
 
 
 class TestDoctor:
