@@ -4,7 +4,7 @@
       ".agents/skills/harnessops-bridge/SKILL.md": "sha256:54fbcc3fd3b62c22564e7f4f78acdc41e3448acf3abc3733bb030e4852bce173",
       ".agents/skills/hops-add-failure/SKILL.md": "sha256:74406e5bd9a2cbf51748f5a7b40c040ba0e3fd10055cc96eb72d8185e3cefc20",
       ".agents/skills/hops-compact-lab-memory/SKILL.md": "sha256:565e0293d2512910fb3093a3b4c55fd61d987dd4f2cbe5401063ecec50397484",
-      ".agents/skills/hops-daily-steward/SKILL.md": "sha256:1db2777252e5bc85e6c1da351f8242576f42ad20fb21c2ce8c11fa4040714887",
+      ".agents/skills/hops-daily-steward/SKILL.md": "sha256:e9785f47a28be73909e33193141d15b1673e0bbb12daa9c5f0e425d2fd19ca1f",
       ".agents/skills/hops-diagnose/SKILL.md": "sha256:11ac79c919cde244af19fea7ebebf583aee9dfa1afcf1a14d68de2ecef5443e7",
       ".agents/skills/hops-export-feedback/SKILL.md": "sha256:fef12024b27ae617a5f191a2da034176934182b807ed063ad103b62ec0e3f5d4",
       ".agents/skills/hops-import-feedback/SKILL.md": "sha256:fe9a32739936fb658d10d5c5675f108a2f25e084d4c7e2c4253490f82e1b3363",
@@ -17,7 +17,7 @@
       ".claude/skills/harnessops-bridge/SKILL.md": "sha256:54fbcc3fd3b62c22564e7f4f78acdc41e3448acf3abc3733bb030e4852bce173",
       ".claude/skills/hops-add-failure/SKILL.md": "sha256:dceadfdfd5be346b7b523fb7ca8cded2413a8bc14c3edf99675a4401656e03b2",
       ".claude/skills/hops-compact-lab-memory/SKILL.md": "sha256:565e0293d2512910fb3093a3b4c55fd61d987dd4f2cbe5401063ecec50397484",
-      ".claude/skills/hops-daily-steward/SKILL.md": "sha256:1db2777252e5bc85e6c1da351f8242576f42ad20fb21c2ce8c11fa4040714887",
+      ".claude/skills/hops-daily-steward/SKILL.md": "sha256:e9785f47a28be73909e33193141d15b1673e0bbb12daa9c5f0e425d2fd19ca1f",
       ".claude/skills/hops-diagnose/SKILL.md": "sha256:11ac79c919cde244af19fea7ebebf583aee9dfa1afcf1a14d68de2ecef5443e7",
       ".claude/skills/hops-export-feedback/SKILL.md": "sha256:fb33bcc188101f55399fc213799377718f31d7ebc1d02c69cf527f87c6087eb3",
       ".claude/skills/hops-import-feedback/SKILL.md": "sha256:fe9a32739936fb658d10d5c5675f108a2f25e084d4c7e2c4253490f82e1b3363",
@@ -29,7 +29,7 @@
       ".claude/skills/hops-update-harness/SKILL.md": "sha256:ff972cb584cb420205e216e325ea6158c171617447fcaa2e0dded80e06c1e4a5"
     }
   },
-  "harnessops_version": "0.1.8",
+  "harnessops_version": "0.1.9",
   "layout_version": "0.1",
   "managed_files": {
     "harness-lab/README.md": "sha256:789a733220c9918b65f6d7afbddb13ccc2d842485cca9426bb8e5dc52c24a797",
