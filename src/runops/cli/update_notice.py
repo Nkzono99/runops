@@ -134,7 +134,8 @@ def _build_notice_sections(
                 f"A new runops release is available: {current_version} -> "
                 f"{latest_version}",
                 "Preferred project CLI flow:",
-                f"  uvx --from runops {command_name} update-harness",
+                f"  uvx --from runops {command_name} update-harness --plan",
+                f"  uvx --from runops {command_name} update-harness --apply-chain",
                 "Use the project skill `$update-runops` (Codex) or "
                 "`/update-runops` (Claude Code) to refresh the harness and "
                 "check migrations.",
@@ -151,8 +152,9 @@ def _build_notice_sections(
             [
                 "This project's runops harness is older than the CLI running "
                 f"now: {applied_version} -> {current_version}",
-                "Refresh project harness files with:",
-                f"  uvx --from runops {command_name} update-harness",
+                "Refresh project harness files through the versioned chain:",
+                f"  uvx --from runops {command_name} update-harness --plan",
+                f"  uvx --from runops {command_name} update-harness --apply-chain",
             ]
         )
     elif applied_version is not None and _is_newer_version(

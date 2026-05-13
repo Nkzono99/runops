@@ -33,24 +33,31 @@ uv pip install "runops==<version>" --python .venv/bin/python
 runops 本体に local patch が必要な場合は、project の外に source checkout を用意し、
 `{{ skill_prefix }}patch-runops` で branch / commit / upstream disposition を整理する。
 
-## 2. ハーネスファイルを再生成
+## 2. versioned harness upgrade chain を確認・適用
 
 ```bash
-uvx --from runops runo update-harness
+uvx --from runops runo update-harness --plan
+uvx --from runops runo update-harness --apply-chain
 ```
 
+- `--plan` は `.runops/harness.lock` の最後に適用した runops version から、
+  target までの checkpoint chain を表示する
+- `--apply-chain` は各 checkpoint を `uvx --from runops==<version>` で呼び替えて
+  `update-harness --upgrade-step` を順に実行する
 - 未編集のファイルは自動で上書きされる
 - ユーザーが編集済みのファイルは `<path>.new` として出力されるので diff を確認してマージする
 - `.vscode/settings.json` もこの更新対象に含まれる
 - `notes/`, `materials/`, `research/` は不足している scaffold だけ補完される
 - `.runops/knowledge/runops/agent-user-guide.md` と `imports.md` も実行中の runops package から再生成される
 - `.runops/harness.lock` に最後に適用した runops version が記録される
+- `.runops/harness.lock` の `upgrade_chain` に exact-version step の履歴が記録される
 - `--dry-run` で事前確認、`--force` で全上書き
 - HarnessOps overlay がある場合は `hops update-harness` も連鎖し、repo-local HarnessOps skills と overlay metadata を更新する
 
 ## 3. migration guide を確認
 
-まず generated guide と CLI を入口にする。
+まず generated guide と CLI を入口にする。harness chain は自動で踏むが、
+project-state migration は別物なので、runner の結果と migration guide を確認する。
 
 ```bash
 uvx --from runops runo migrate list
@@ -93,7 +100,8 @@ uvx --from runops runo update
 ## 一括実行
 
 ```bash
-uvx --from runops runo update-harness
+uvx --from runops runo update-harness --plan
+uvx --from runops runo update-harness --apply-chain
 uvx --from runops runo migrate list
 uvx --from runops runo update
 ```
@@ -104,7 +112,8 @@ uvx --from runops runo update
 
 - `update-harness` は runops source checkout を pull しない。現在 `uvx` で実行中の package が正本。
 - `.runops/harness.lock` の `runops_version` が実行中 version より古い場合は、
-  `uvx --from runops runo update-harness` を実行する。
+  `uvx --from runops runo update-harness --plan` で chain を確認してから
+  `--apply-chain` を実行する。
 - `.runops/harness.lock` の `runops_version` が実行中 version より新しい場合は、
   stale な project `.venv` の `runo` を踏んでいる可能性があるため、`uvx --from runops runo ...` を使う。
 - local patch の正本は別 checkout 内の Git branch / commit とする。

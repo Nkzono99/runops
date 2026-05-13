@@ -33,13 +33,15 @@ runo runs history -n 0   # 全件
 ## runops 更新後の移行
 
 ```bash
+runo update-harness --plan
+runo update-harness --apply-chain
 runo migrate list
 runo migrate show M0-0001
 runo migrate apply M0-0001 --dry-run
-runo migrate apply M0-0001
 ```
 
-Migration guide は release note、`runo migrate list/show`、または別の runops
+Harness 更新は `.runops/harness.lock` の `runops_version` から versioned chain を踏む。
+Project-state migration guide は release note、`runo migrate list/show`、または別の runops
 source checkout の `docs/migrations/` を参照する。
 CLI で扱えるのは定型 migration だけ。判断が必要なものは `migrate-runops` skill で扱う。
 

@@ -8,8 +8,9 @@ description: Apply runops project-state migrations from docs/migrations after up
 `{{ skill_prefix }}migrate-runops` は、runops 更新後に project 側の状態を
 release note / migration guide の手順へ合わせるための skill です。
 
-`{{ skill_prefix }}update-runops` は runops 本体と harness を更新する入口。
-この skill は、そのあとに必要な project file / generated index / schema の移行だけを扱います。
+`{{ skill_prefix }}update-runops` は runops 本体と harness を versioned upgrade chain で
+更新する入口。この skill は、そのあとに必要な project file / generated index / schema の
+移行だけを扱います。
 
 ## Version policy
 
@@ -25,6 +26,7 @@ release note / migration guide の手順へ合わせるための skill です。
 
 - `uvx --from runops runo context --json`
 - `uvx --from runops runo --version`
+- `uvx --from runops runo update-harness --plan`
 - `uvx --from runops runo migrate list`
 - release note または migration guide
 - migration item が指定する project file
@@ -36,13 +38,26 @@ release note / migration guide の手順へ合わせるための skill です。
 
 ```bash
 uvx --from runops runo --version
+uvx --from runops runo update-harness --plan
 uvx --from runops runo migrate list
 ```
 
+`update-harness --plan` は harness の versioned chain を確認するためのもの。
+project-state migration は migration guide と `migrate list/show/apply` で別途確認する。
 project に runops source checkout があるとは限らない。必要な場合は release note、
 installed package の generated guide、または別 checkout の `docs/migrations/` を読む。
 
-### 2. migration checklist を作る
+### 2. runner 結果と migration checklist を作る
+
+まず update-runops で実行した chain を確認する:
+
+```markdown
+Runner plan:
+- harness: 0.8.0 -> 0.8.2 -> 0.9.0
+- result: applied / deferred / failed
+```
+
+そのうえで project-state migration item ごとに次を判定する:
 
 各 item について次を判定する:
 
@@ -138,6 +153,8 @@ EOF
 
 - Target version:
 - Guide:
+- Runner plan:
+- Chain applied:
 - Applied:
 - Skipped:
 - Deferred:

@@ -26,7 +26,8 @@ def test_update_notice_points_to_project_skill(tmp_path) -> None:
     assert "0.9.0 -> 0.9.1" in message
     assert "$update-runops" in message
     assert "/update-runops" in message
-    assert "uvx --from runops runo update-harness" in message
+    assert "uvx --from runops runo update-harness --plan" in message
+    assert "uvx --from runops runo update-harness --apply-chain" in message
 
 
 def test_update_notice_is_throttled_by_cache(tmp_path) -> None:
@@ -69,7 +70,8 @@ def test_update_notice_reports_stale_project_harness(tmp_path) -> None:
     assert message is not None
     assert "project's runops harness is older" in message
     assert "0.9.0 -> 0.9.1" in message
-    assert "uvx --from runops runo update-harness" in message
+    assert "uvx --from runops runo update-harness --plan" in message
+    assert "uvx --from runops runo update-harness --apply-chain" in message
 
 
 def test_update_notice_warns_about_older_cli_than_harness(tmp_path) -> None:
@@ -103,7 +105,7 @@ def test_update_notice_uses_canonical_runo_for_legacy_alias(tmp_path) -> None:
     )
 
     assert message is not None
-    assert "uvx --from runops runo update-harness" in message
+    assert "uvx --from runops runo update-harness --plan" in message
     assert "uvx --from runops runops update-harness" not in message
 
 

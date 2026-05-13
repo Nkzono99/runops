@@ -401,13 +401,36 @@ def applied_harness_runops_version(project_dir: Path) -> str | None:
     return version if isinstance(version, str) and version else None
 
 
+def load_harness_upgrade_chain(project_dir: Path) -> tuple[dict[str, str], ...]:
+    """Return recorded versioned harness upgrade events."""
+    raw = load_harness_lock_payload(project_dir)
+    events = raw.get("upgrade_chain")
+    if not isinstance(events, list):
+        return ()
+
+    normalized: list[dict[str, str]] = []
+    for event in events:
+        if not isinstance(event, dict):
+            continue
+        normalized.append(
+            {
+                str(key): str(value)
+                for key, value in event.items()
+                if isinstance(key, str) and isinstance(value, str)
+            }
+        )
+    return tuple(normalized)
+
+
 def save_harness_lock(
     project_dir: Path,
     hashes: dict[str, str],
     *,
     runops_version: str | None = __version__,
+    upgrade_event: dict[str, str] | None = None,
 ) -> None:
     """Write the harness lock with sorted entries for stable diffs."""
+    existing_upgrade_chain = list(load_harness_upgrade_chain(project_dir))
     lock_path = project_dir / HARNESS_LOCK_PATH
     lock_path.parent.mkdir(parents=True, exist_ok=True)
     payload: dict[str, Any] = {
@@ -416,6 +439,10 @@ def save_harness_lock(
     }
     if runops_version:
         payload["runops_version"] = runops_version
+    if upgrade_event is not None:
+        existing_upgrade_chain.append(upgrade_event)
+    if existing_upgrade_chain:
+        payload["upgrade_chain"] = existing_upgrade_chain
     lock_path.write_text(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",

@@ -126,7 +126,8 @@ uvx --from runops runo doctor
 
 ```bash
 uvx --from runops runo doctor
-uvx --from runops runo update-harness
+uvx --from runops runo update-harness --plan
+uvx --from runops runo update-harness --apply-chain
 ```
 
 ### 新規作成 / clone から必要な場合

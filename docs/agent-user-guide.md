@@ -102,8 +102,10 @@ skill で project 外の runops source checkout を使う。local patch の正�
 `feedback-runops` で HarnessOps に記録し、サニタイズ済み issue 下書きにする。詳細は
 [Upstream Integration Layer](layers/upstream.md) を参照。
 
-runops 自体を更新するときは `update-runops` skill を使う。更新後に project 側の
-file format、manifest、analysis artifact、harness scaffold などの移行が必要なら、
+runops 自体を更新するときは `update-runops` skill を使う。Harness scaffold は
+`uvx --from runops runo update-harness --plan` で chain を確認し、
+`uvx --from runops runo update-harness --apply-chain` で exact version を順に踏んで適用する。
+更新後に project 側の file format、manifest、analysis artifact などの移行が必要なら、
 release note / migration guide を読み、定型 migration は
 `runo migrate apply M0-0001 --dry-run` → `runo migrate apply M0-0001` で適用する。
 CLI 未対応または判断が必要なものは `migrate-runops` skill で扱い、適用 / skip / defer を

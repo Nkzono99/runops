@@ -223,7 +223,7 @@ runops/
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
 | `runo update` | シミュレータパッケージのアップグレード |
-| `runo update-harness` | project 側 Agent harness / managed scaffold を再生成 |
+| `runo update-harness --plan/apply-chain` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
 | `runo update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
 | `runo knowledge save` | 知見を .runops/insights/ に保存 |
 | `runo knowledge add-fact` | 構造化 fact を .runops/facts.toml に追加 |

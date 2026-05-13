@@ -100,7 +100,7 @@ uvx --from runops runo doctor
 | `runo config add-simulator` | シミュレータ追加 |
 | `runo config add-launcher` | ランチャー追加 |
 | `runo update` | シミュレータパッケージのアップグレード |
-| `runo update-harness` | project 側 Agent harness / managed scaffold を再生成 |
+| `runo update-harness --plan/apply-chain` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
 | `runo update-refs [SIMS...]` | refs/ リポジトリ更新 + knowledge index 再生成 |
 | `runo mcp serve --transport stdio` | local MCP provider を stdio で起動 |
 | `runo mcp serve --transport streamable-http` | local MCP provider を HTTP で起動 |

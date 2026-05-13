@@ -36,4 +36,5 @@ Windows では `.venv\Scripts\runo.exe doctor` に読み替える。
 - HPC ノードでは login ノードで環境構築し、compute ノードでは同じ `.venv` を使う
 - `module load` が必要なモジュールは `simulators.toml` の `modules` に定義済み
 - runops 更新: `{{ skill_prefix }}update-runops` または
-  `uvx --from runops runo update-harness`
+  `uvx --from runops runo update-harness --plan` →
+  `uvx --from runops runo update-harness --apply-chain`

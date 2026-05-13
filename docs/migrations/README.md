@@ -6,19 +6,28 @@
 `update-runops` は runops 本体と harness を更新する入口、`migrate-runops` はこの
 guide に従って project 側の migration を適用する入口です。
 
-定型 migration は CLI でも適用できます。基本形は次です。
+Harness 更新は `update-harness` の versioned upgrade chain で行います。
+`.runops/harness.lock` の `runops_version` から target までを checkpoint ごとに計画し、
+適用時は exact version の runops を `uvx` で呼び替えます。
+
+```bash
+uvx --from runops runo update-harness --plan
+uvx --from runops runo update-harness --apply-chain
+```
+
+定型 project-state migration は CLI でも適用できます。基本形は次です。
 
 ```bash
 # 登録済み migration を確認
-runo migrate list
-runo migrate list --version v0
-runo migrate show M0-0001
+uvx --from runops runo migrate list
+uvx --from runops runo migrate list --version v0
+uvx --from runops runo migrate show M0-0001
 
 # 事前確認
-runo migrate apply M0-0001 --dry-run
+uvx --from runops runo migrate apply M0-0001 --dry-run
 
 # 適用
-runo migrate apply M0-0001
+uvx --from runops runo migrate apply M0-0001
 ```
 
 Migration の正本 ID は `M0-0001` の形式です。
@@ -108,7 +117,7 @@ CLI-backed migration は、同じ project に複数回実行しても壊れな�
 
 ## Update workflow
 
-1. `update-runops` で `uvx` 経由の runops tool と harness を更新する。
+1. `update-runops` で `uvx` 経由の runops tool と harness upgrade chain を確認・適用する。
 2. release note / migration guide と対象 major の guide を読む。
 3. current project に該当する item があれば `runo migrate apply <id> --dry-run`
    で確認し、定型適用できるものは `runo migrate apply <id>` で実行する。

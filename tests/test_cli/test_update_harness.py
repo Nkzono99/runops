@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -16,6 +17,7 @@ from runops.harness.builder import (
     build_managed_gitignore_block,
     hash_text,
     load_harness_lock,
+    load_harness_upgrade_chain,
     save_harness_lock,
 )
 from runops.harness.harnessops import HarnessOpsResult
@@ -193,12 +195,140 @@ class TestUpdateHarnessBasic:
 
         claude_md.write_text("# My custom CLAUDE.md\n", encoding="utf-8")
 
-        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--upgrade-step",
+                "--from-version",
+                "0.1.0",
+            ],
+        )
 
         assert result.exit_code == 0
         assert (tmp_path / "CLAUDE.md.new").exists()
         assert applied_harness_runops_version(tmp_path) == "0.1.0"
         assert load_harness_lock(tmp_path)["CLAUDE.md"] == previous_hash
+
+    def test_plain_update_harness_requires_chain_for_stale_lock(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Plain update-harness refuses to skip a stale version chain."""
+        _init_project(tmp_path)
+        lock = load_harness_lock(tmp_path)
+        save_harness_lock(tmp_path, lock, runops_version="0.1.0")
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 1
+        assert "planned upgrade chain" in result.output
+        assert "--apply-chain" in result.output
+
+    def test_plan_shows_versioned_upgrade_chain(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--plan prints checkpoint steps without running them."""
+        _init_project(tmp_path)
+        lock = load_harness_lock(tmp_path)
+        save_harness_lock(tmp_path, lock, runops_version="0.8.0")
+        monkeypatch.setattr(
+            "runops.cli.update_harness._fetch_pypi_runops_versions",
+            lambda: ("0.8.2", "0.9.0"),
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--plan",
+                "--target",
+                "0.9.0",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert "project harness applied: 0.8.0" in result.output
+        assert "1. 0.8.0 -> 0.8.2" in result.output
+        assert "2. 0.8.2 -> 0.9.0" in result.output
+
+    def test_apply_chain_runs_uvx_exact_versions(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--apply-chain delegates each step to uvx with exact versions."""
+        _init_project(tmp_path)
+        lock = load_harness_lock(tmp_path)
+        save_harness_lock(tmp_path, lock, runops_version="0.8.0")
+        monkeypatch.setattr(
+            "runops.cli.update_harness._fetch_pypi_runops_versions",
+            lambda: ("0.8.2", "0.9.0"),
+        )
+        monkeypatch.setattr(
+            "runops.cli.update_harness.shutil.which",
+            lambda _name: "uvx",
+        )
+        commands: list[list[str]] = []
+
+        def _fake_run(
+            command: list[str],
+            *,
+            project_dir: Path,
+        ) -> subprocess.CompletedProcess[str]:
+            assert project_dir == tmp_path
+            commands.append(command)
+            return subprocess.CompletedProcess(command, 0)
+
+        monkeypatch.setattr(
+            "runops.cli.update_harness._run_upgrade_step_command",
+            _fake_run,
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--apply-chain",
+                "--target",
+                "0.9.0",
+                "--no-harnessops",
+            ],
+        )
+
+        assert result.exit_code == 0
+        assert commands == [
+            [
+                "uvx",
+                "--from",
+                "runops==0.8.2",
+                "runo",
+                "update-harness",
+                str(tmp_path.resolve()),
+                "--upgrade-step",
+                "--from-version",
+                "0.8.0",
+                "--no-harnessops",
+            ],
+            [
+                "uvx",
+                "--from",
+                "runops==0.9.0",
+                "runo",
+                "update-harness",
+                str(tmp_path.resolve()),
+                "--upgrade-step",
+                "--from-version",
+                "0.8.2",
+                "--no-harnessops",
+            ],
+        ]
 
     def test_force_overwrites_edited(self, tmp_path: Path) -> None:
         """--force overwrites even user-edited files."""
@@ -487,6 +617,28 @@ class TestHarnessLock:
         for _path, h in lock.items():
             assert len(h) == 64
             int(h, 16)  # raises if not hex
+
+    def test_upgrade_step_records_upgrade_chain_event(self, tmp_path: Path) -> None:
+        """Exact-version upgrade steps append a provenance event."""
+        _init_project(tmp_path)
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--upgrade-step",
+                "--from-version",
+                "0.8.0",
+            ],
+        )
+
+        assert result.exit_code == 0
+        events = load_harness_upgrade_chain(tmp_path)
+        assert events[-1]["from"] == "0.8.0"
+        assert events[-1]["to"]
+        assert events[-1]["command"] == "update-harness --upgrade-step"
 
     def test_no_lock_treated_as_all_edited(self, tmp_path: Path) -> None:
         """When harness.lock is missing, all files are treated as user-edited."""

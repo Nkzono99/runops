@@ -88,10 +88,11 @@ project 側の生成物や研究状態を、そのまま runops 本体に入れ�
 ## `update-runops`
 
 `update-runops` は `uvx` で最新の runops package を実行し、
-`runo update-harness` で project 側の generated harness と generated knowledge を
-再生成します。
+`runo update-harness --plan` で project 側の generated harness と generated knowledge の
+versioned upgrade chain を確認してから、`runo update-harness --apply-chain` で
+exact version を順に踏んで再生成します。
 
-更新後は release note / migration guide と `runo migrate list` を確認します。
+Harness 更新後は release note / migration guide と `runo migrate list` を確認します。
 該当 item がある場合は、定型 migration なら `runo migrate apply <id> --dry-run`
 で確認してから `runo migrate apply <id>` で適用します。CLI 未対応または判断が
 必要なものは `migrate-runops` skill に渡し、適用 / skip / defer を
