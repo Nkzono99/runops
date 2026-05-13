@@ -1,6 +1,6 @@
 ---
 name: release
-description: "Prepare and publish a new runops release. Bump version, sync __init__.py, draft Japanese release notes, create commit/tag/GitHub Release, and push to trigger PyPI publish."
+description: "Prepare and publish a new runops release through GitHub Flow. Bump version, sync __init__.py, draft Japanese release notes, open/merge a PR, tag main, create GitHub Release, and verify PyPI publish."
 ---
 
 # runops リリース
@@ -24,7 +24,10 @@ $release 0.3.0      # 明示的にバージョン指定
 ```
 
 引数なしで呼んだ場合は、変更内容から bump レベルを自動判定し、
-確認 → リリースまで一気通貫で実行する。
+確認 → release PR → tag → GitHub Release → publish 確認まで一気通貫で実行する。
+
+`main` への direct push は禁止。release commit も必ず release branch から PR に載せ、
+CI green 後に `main` へ merge してから tag を切る。
 
 ## 手順
 
@@ -86,32 +89,57 @@ commit message から以下を分類する:
 1. `pyproject.toml` の `version = "X.Y.Z"` — pip / PyPI が参照する正本
 2. `src/runops/__init__.py` の `__version__ = "X.Y.Z"` — ランタイム参照
 
-### 5. コミットとタグ
+### 5. release branch でコミットする
+
+`main` を最新化してから release branch を作る。既に release branch 上なら、base が
+最新 `origin/main` から分岐していることを確認する。
 
 ```bash
+git fetch origin
+git switch main
+git pull --ff-only origin main
+git switch -c release/vX.Y.Z
 git add pyproject.toml src/runops/__init__.py
 git commit -m "chore: bump version to X.Y.Z"
-git tag -a vX.Y.Z -m "<日本語のリリースノート要約>"
 ```
 
-`git commit` と `git tag` は**順に**実行する。並列に走らせない。
-tag が直前の commit ではなく 1 つ前を指すと publish が壊れる。
+### 6. release PR を作成し、merge する
 
-### 6. push して tag を公開する
-
-ユーザーの確認を得てから push する:
+release branch を push して PR を作成する。`main` へ直接 push しない。
 
 ```bash
-git push origin main
+git push -u origin release/vX.Y.Z
+gh pr create \
+  --base main \
+  --head release/vX.Y.Z \
+  --title "chore: release X.Y.Z" \
+  --body-file <release-notes.md>
+```
+
+PR の CI が green であることを確認してから merge する。merge 後、ローカル `main` を
+必ず fast-forward で最新化する。
+
+```bash
+gh pr checks --watch
+gh pr merge --squash --delete-branch
+git switch main
+git pull --ff-only origin main
+```
+
+### 7. main の release commit に tag を付けて公開する
+
+tag は merge 後の `main` の release commit に付ける。release branch 上では tag を切らない。
+tag push により `.github/workflows/publish.yml` が起動し、CI が自動で PyPI にパブリッシュする。
+
+```bash
+git tag -a vX.Y.Z -m "<日本語のリリースノート要約>"
 git push origin vX.Y.Z
 ```
 
-`v*` タグの push により `.github/workflows/publish.yml` が起動し、
-CI が自動で PyPI にパブリッシュする。
+`git pull --ff-only origin main`、`git tag -a`、`git push origin vX.Y.Z` は順に実行する。
+tag が release commit 以外を指すと publish が壊れる。
 
-`main` と tag の push も分けて順に実行する。
-
-### 7. GitHub Release を作成する
+### 8. GitHub Release を作成する
 
 tag を push したら、同じ tag に対する GitHub Release を必ず作成する。
 annotated tag に日本語のリリースノートを入れている場合は、それをそのまま使う:
@@ -134,7 +162,7 @@ gh release edit vX.Y.Z \
 古い tag の Release を後から作るときは、最新 release 扱いにならないよう必要に応じて
 `--latest=false` を付ける。最新の通常リリースだけを Latest にする。
 
-### 8. 確認
+### 9. 確認
 
 ```bash
 gh run list --workflow=publish.yml --limit 1
@@ -152,4 +180,4 @@ gh release view vX.Y.Z --json tagName,name,body,url
 2. bump レベルを自動判定
 3. 日本語のリリースノート草案を作る
 4. 変更サマリとバージョンをユーザーに提示して確認
-5. 確認が取れたら手順 4〜8 を順に実行 (バージョン更新 → コミット → タグ → push → GitHub Release 作成)
+5. 確認が取れたら手順 4〜9 を順に実行 (バージョン更新 → release PR → merge → tag push → GitHub Release 作成)
