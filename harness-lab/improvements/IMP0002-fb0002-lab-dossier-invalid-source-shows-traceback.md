@@ -2,11 +2,11 @@
 id: IMP0002
 record_type: improvement_dossier
 created_at: '2026-05-13T18:13:12+09:00'
-updated_at: '2026-05-13T18:13:22+09:00'
-status: active
+updated_at: '2026-05-13T21:08:42+09:00'
+status: needs-more-evidence
 source_type: local-reproduction
 scope: harnessops-core
-maturity: proposed
+maturity: investigated
 relation: new
 promotion_level: core-bugfix
 source_feedback: FB0002
@@ -14,15 +14,20 @@ eval_cases:
 - E0002
 hypotheses:
 - H0002
-decisions: []
+decisions:
+- D0001
 research_scans: []
 classification:
   capability: lab_cli_error_handling
   failure_class: expected_user_error_traceback
 guard:
   status: candidate
-  path: tests/test_cli/test_mvp_flow.py::test_lab_dossier_rejects_research_scan_without_traceback
-investigation: []
+  path: harnessops-core:tests/test_cli/test_mvp_flow.py::test_lab_dossier_rejects_research_scan_without_traceback
+investigation:
+- created_at: '2026-05-13T21:08:03+09:00'
+  kind: reproduction
+  summary: 'Reproduced the current failure in runops upstream-lab: uv run --with-editable . hops lab dossier --from RS0001 exits 1 with a rich traceback from harnessops.cli.lab.dossier into harnessops.core.records._feedback_for_record, ending in ValueError: dossier は FB/E/H/D レコードから作成してください: RS0001.'
+  evidence_ref: 'command: uv run --with-editable . hops lab dossier --from RS0001; guard target: harnessops-core:tests/test_cli/test_mvp_flow.py'
 links:
   issue_url:
 ---
@@ -31,14 +36,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: proposed
+- status: needs-more-evidence
+- maturity: investigated
 - source_type: local-reproduction
 - scope: harnessops-core
 - relation: new
 - promotion_level: core-bugfix
 - source_feedback: `FB0002`
-- linked_records: `FB0002`, `E0002`, `H0002`
+- linked_records: `FB0002`, `E0002`, `H0002`, `D0001`
 
 ## Source Observation
 
@@ -65,7 +70,7 @@ The lab dossier command should catch unsupported source record types and print a
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-13T21:08:03+09:00 [reproduction] Reproduced the current failure in runops upstream-lab: uv run --with-editable . hops lab dossier --from RS0001 exits 1 with a rich traceback from harnessops.cli.lab.dossier into harnessops.core.records._feedback_for_record, ending in ValueError: dossier は FB/E/H/D レコードから作成してください: RS0001. (evidence: command: uv run --with-editable . hops lab dossier --from RS0001; guard target: harnessops-core:tests/test_cli/test_mvp_flow.py)
 
 ## Research Scans
 
@@ -83,7 +88,10 @@ research scan はまだありません。
 
 - failure_class: expected_user_error_traceback
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0002-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0002-manual-score.md`
+- scores: impact=3, mechanism_clarity=5, evaluability=5, minimality=5, regression_risk=2, operator_burden=4, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Current behavior is confirmed failing: hops lab dossier --from RS0001 prints a rich traceback for an expected user error. The proposed fix is narrow and testable in HarnessOps core by adding a no-traceback CliRunner guard for RS research-scan input. Adoption is blocked until the upstream fix is implemented and the guard test passes; avoid broad ValueError handling that could hide internal corruption.
 
 
 ## Hypotheses
@@ -131,12 +139,12 @@ Reject if the fix suppresses unexpected internal exceptions or makes debugging r
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0002-manual-score.md`
 
 ## Guard
 
 - status: candidate
-- path: tests/test_cli/test_mvp_flow.py::test_lab_dossier_rejects_research_scan_without_traceback
+- path: harnessops-core:tests/test_cli/test_mvp_flow.py::test_lab_dossier_rejects_research_scan_without_traceback
 
 ## Links
 
@@ -148,4 +156,34 @@ Reject if the fix suppresses unexpected internal exceptions or makes debugging r
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0001: D0001: needs-more-evidence H0002
+
+
+Source: `harness-lab/records/decisions/D0001-needs-more-evidence-h0002.md`
+
+
+# D0001: needs-more-evidence H0002
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+Reproduction confirms the failure and E0002 is evaluable, but no HarnessOps core fix or passing guard has been recorded yet.
+
+## 証拠
+
+harness-lab/views/eval-results/E0002-manual-score.yml plus local reproduction command uv run --with-editable . hops lab dossier --from RS0001.
+
+## 回帰リスク
+
+The proposed handler could hide real dossier corruption if it catches broad ValueError without checking the domain condition.
+
+## フォローアップ
+
+Implement the HarnessOps core fix, add tests/test_cli/test_mvp_flow.py::test_lab_dossier_rejects_research_scan_without_traceback, run that guard and full validation, then reconsider adoption.
+
+## 回帰ガード
+
+harnessops-core:tests/test_cli/test_mvp_flow.py::test_lab_dossier_rejects_research_scan_without_traceback
