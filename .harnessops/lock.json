@@ -1,10 +1,25 @@
 {
-  "harnessops_version": "0.1.2",
+  "agent_bridge": {
+    "managed_files": {
+      ".agents/skills/hops-add-failure/SKILL.md": "sha256:f8af7efed7d55283c0ff53e9981f72e7f2febc496e1846697095927d841d7aaf",
+      ".agents/skills/hops-compact-lab-memory/SKILL.md": "sha256:50e61db2eab2bbd4d0ac1ad51de453431e4865ddb858d4f43721998584e3b918",
+      ".agents/skills/hops-diagnose/SKILL.md": "sha256:e477d8203012763a44ac31c2d5dbb9c1c01743b911a7701a6ba8bff59ea242b1",
+      ".agents/skills/hops-export-feedback/SKILL.md": "sha256:80b89fc8a315d9e15b11d06a2c68fdd56c4b113a866e27536f92095bf936aba1",
+      ".agents/skills/hops-import-feedback/SKILL.md": "sha256:58bebe65702fc09548eb9528603468580b6191943ecc1a71ab94cfafecf6a86d",
+      ".agents/skills/hops-issue-triage/SKILL.md": "sha256:067042d67234a200d051db8de6192ca8df617c790e45150929c15da120e50df3",
+      ".agents/skills/hops-research-improvements/SKILL.md": "sha256:6fae33ca49e3b146700fd8e7d7f53c496336197143ad0ca0aee855c7644a9df4",
+      ".agents/skills/hops-route-feedback/SKILL.md": "sha256:e1e1ae93e3f8e2487481284883d1ac7052d6ad6a017d9d08b17268ae4b07eef3",
+      ".agents/skills/hops-update-harness/SKILL.md": "sha256:55186be4580b5e455b60d548bc26e7a39264b6432a0f2ab4b100917430ca132a"
+    }
+  },
+  "harnessops_version": "0.1.4",
   "layout_version": "0.1",
   "managed_files": {
-    "harness-lab/README.md": "sha256:440eea30a3b85b64a5b79ea8a8e9f497f029328ca1b18e96fb9bf13a372348b5",
+    "harness-lab/README.md": "sha256:789a733220c9918b65f6d7afbddb13ccc2d842485cca9426bb8e5dc52c24a797",
     "harness-lab/views/backlog.md": "sha256:0ed4436872ad24f9c73737b7f84290306dc4baaf36154b7e36be521e985b791c",
-    "harness-lab/views/imported-feedback.md": "sha256:9630141a12d9193006288c003dfaa239a7cd85ba0b286c989a208b1e56167641",
+    "harness-lab/views/imported-feedback.md": "sha256:db32f290c20f8dabfd6253e51b1faec21b01dc06dba45f1904c4a2d9731711b8",
+    "harness-lab/views/improvements.md": "sha256:1ae95085536b1cdb963cff7aea376275fcf3ac39d8d608e8513d49615e781f05",
+    "harness-lab/views/research-scans.md": "sha256:bd0369a4e7e23a36aa2f807c69b58d166c6b53cad01363a4856e8916537f5d11",
     "harness-lab/views/score-trajectory.md": "sha256:a3d2f445609e5e9da0269ece3b10aff2414f3830bd185ad257d32ae19026b616"
   },
   "migrations": [],
