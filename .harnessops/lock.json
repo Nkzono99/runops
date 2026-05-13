@@ -18,8 +18,8 @@
     "harness-lab/README.md": "sha256:789a733220c9918b65f6d7afbddb13ccc2d842485cca9426bb8e5dc52c24a797",
     "harness-lab/views/backlog.md": "sha256:0ed4436872ad24f9c73737b7f84290306dc4baaf36154b7e36be521e985b791c",
     "harness-lab/views/imported-feedback.md": "sha256:db32f290c20f8dabfd6253e51b1faec21b01dc06dba45f1904c4a2d9731711b8",
-    "harness-lab/views/improvements.md": "sha256:1ae95085536b1cdb963cff7aea376275fcf3ac39d8d608e8513d49615e781f05",
-    "harness-lab/views/research-scans.md": "sha256:bd0369a4e7e23a36aa2f807c69b58d166c6b53cad01363a4856e8916537f5d11",
+    "harness-lab/views/improvements.md": "sha256:940667aef95a4e0c0ed2da1efa71a351cb8642ae01b3ec59a72d19caa58e776b",
+    "harness-lab/views/research-scans.md": "sha256:6d61d712641e7eddc710614cf7bc59889c78e9532dc82666e4d82dadcc06cf7a",
     "harness-lab/views/score-trajectory.md": "sha256:a3d2f445609e5e9da0269ece3b10aff2414f3830bd185ad257d32ae19026b616"
   },
   "migrations": [],
