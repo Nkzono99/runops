@@ -14,7 +14,7 @@ This skill is a compact steward / conductor, not a new workflow engine:
 - detect repo role from `.harnessops/project.toml`
 - read current HOPS state
 - route work to existing skills
-- select at most one systemic candidate
+- select lane-bounded work, with a conservative systemic cap
 - advance local work when automated gates pass
 - report actions, blockers, and human decisions
 
@@ -61,7 +61,7 @@ For scheduled automation, delegate routine intake to CLI:
 hops steward preflight --pull --json
 ```
 
-If `can_continue` is false, stop and report. This command performs pull-first safety, doctor/check-records, migrate check, overlay counts, lane trigger scaffold, subagent plan scaffold, and run ledger creation.
+If `can_continue` is false, stop and report. This command performs pull-first safety, doctor/check-records, migrate check, overlay counts, lab health/stale-memory intake, lane trigger scaffold, subagent plan scaffold, and run ledger creation.
 
 Manual fallback only when the CLI is unavailable:
 
@@ -109,8 +109,12 @@ Weekly:
 
 # Selection Rules
 
-- New systemic candidate: max 1 per run.
+- Runtime config may override these caps, but do not increase scope by default just because more items are visible.
+- New systemic candidate: max 1 per run by default. Use 3 only for an explicit backlog cleanup run, and 5 only for an explicit maintenance sweep with strong validation time budget.
+- Existing dossier metadata / guard backfills: max 3 per run by default.
+- Read-only routing, park, reject, and no-op decisions: max 5 per run by default.
 - Existing dossier notes: max 1-3 per run.
+- Each advanced item still needs its own evidence, risk, validation or guard plan, and report line. More items must not dilute the proof standard.
 - Raw Ideas are ephemeral; do not capture them directly.
 - Prefer existing issue / dossier / record over new records.
 - `park`, `reject`, `local-only`, and no-op are valid outcomes.
@@ -152,6 +156,7 @@ If local changes were made, run validation and then choose one policy from the a
 
 - `patch-only`: leave the patch in the worktree and report that the next scheduled run will stop until reviewed.
 - `commit-local`: after validation passes, create a local automation branch or commit on the authorized branch.
+- `merge-automation-branch`: after validation passes, commit to an automation branch, push only that branch, then merge it into the authorized `merge-target-branch` or `base-branch` via the repository's normal merge path.
 
 Use CLI for the mechanical ending:
 
@@ -162,7 +167,17 @@ hops steward finalize --policy commit-local --validation-passed --json
 
 If the automation prompt does not specify a policy, default to `patch-only`.
 
-Push, PR, issue, and release actions are outside `hops steward finalize`; run them only when the automation prompt explicitly authorizes them and after validation plus a final remote divergence check.
+Push, PR, merge, issue, and release actions are outside `hops steward finalize`; run them only when the automation prompt explicitly authorizes them and after validation plus a final remote divergence check.
+
+Prefer GitHub Flow: commit to an automation feature branch, open or update a PR, and merge that branch into the protected `main`/base branch when validation and required checks pass. Direct push to `main` or another protected base branch should be disabled by repository rules and treated as unavailable unless a human explicitly authorizes a different repo policy. If a specific repo uses a Git Flow style integration branch, merge to `develop` or the configured `merge-target-branch` instead.
+
+Before merging an automation branch:
+
+1. Fetch the remote.
+2. Confirm the merge target is not behind or diverged in a way that requires manual conflict resolution.
+3. Confirm validation passed on the exact commit being merged, or that required remote checks have passed when the repo enforces them.
+4. Use a PR merge, squash merge, or fast-forward merge according to repo policy.
+5. If merge is blocked by branch protection, required checks, or conflicts, leave the pushed automation branch or PR and report the blocker.
 
 # Decision Card
 
@@ -189,7 +204,7 @@ Return a concise daily report:
 - actions performed
 - validation result
 - local changes / local commit state
-- remote actions performed or skipped by policy
+- remote actions performed or skipped by policy, including pushed branch, PR, or merge target
 - blocked or parked items
 - remote actions requiring confirmation
 - run ledger: branch, start_sha, head_sha, pull_status, issue_snapshot
