@@ -45,7 +45,14 @@ def _init_project(
     )
     result = runner.invoke(
         app,
-        ["init", *simulators, "-y", "--path", str(project_dir)],
+        [
+            "init",
+            *simulators,
+            "-y",
+            "--skip-github-auth-check",
+            "--path",
+            str(project_dir),
+        ],
     )
     assert result.exit_code == 0, result.output
 

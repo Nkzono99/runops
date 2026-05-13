@@ -161,7 +161,7 @@ class TestInteractiveInit:
         )
         result = runner.invoke(
             app,
-            ["init", "--path", str(tmp_path)],
+            ["init", "--skip-github-auth-check", "--path", str(tmp_path)],
             input=user_input,
         )
         assert result.exit_code == 0
