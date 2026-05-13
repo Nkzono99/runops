@@ -1,18 +1,22 @@
 {
   "agent_bridge": {
     "managed_files": {
+      ".agents/skills/harnessops-bridge/SKILL.md": "sha256:bb9df7015075433a8348c263bc006f3fd9c894a26b8ddad224d36357c2a42873",
       ".agents/skills/hops-add-failure/SKILL.md": "sha256:f8af7efed7d55283c0ff53e9981f72e7f2febc496e1846697095927d841d7aaf",
       ".agents/skills/hops-compact-lab-memory/SKILL.md": "sha256:50e61db2eab2bbd4d0ac1ad51de453431e4865ddb858d4f43721998584e3b918",
+      ".agents/skills/hops-daily-steward/SKILL.md": "sha256:abbd5922da1ff21530235dd9009b9a24dfdef3303518a1f80d9ae936d064a954",
       ".agents/skills/hops-diagnose/SKILL.md": "sha256:e477d8203012763a44ac31c2d5dbb9c1c01743b911a7701a6ba8bff59ea242b1",
       ".agents/skills/hops-export-feedback/SKILL.md": "sha256:80b89fc8a315d9e15b11d06a2c68fdd56c4b113a866e27536f92095bf936aba1",
       ".agents/skills/hops-import-feedback/SKILL.md": "sha256:58bebe65702fc09548eb9528603468580b6191943ecc1a71ab94cfafecf6a86d",
       ".agents/skills/hops-issue-triage/SKILL.md": "sha256:067042d67234a200d051db8de6192ca8df617c790e45150929c15da120e50df3",
-      ".agents/skills/hops-research-improvements/SKILL.md": "sha256:6fae33ca49e3b146700fd8e7d7f53c496336197143ad0ca0aee855c7644a9df4",
+      ".agents/skills/hops-open-meta-scan/SKILL.md": "sha256:228fc87966ba590ef1ef0644233e8dc749c354c6e525298b474c74a231464dcf",
+      ".agents/skills/hops-research-improvements/SKILL.md": "sha256:5a706e0efca3a3bbb696bc86e9b14049688f13a8864aff66600435d421dff668",
       ".agents/skills/hops-route-feedback/SKILL.md": "sha256:e1e1ae93e3f8e2487481284883d1ac7052d6ad6a017d9d08b17268ae4b07eef3",
+      ".agents/skills/hops-run-lab/SKILL.md": "sha256:0d8841f779c4b11b44b6c6454e0c465120d505af7b6faf56fcc5989cb2279ac5",
       ".agents/skills/hops-update-harness/SKILL.md": "sha256:55186be4580b5e455b60d548bc26e7a39264b6432a0f2ab4b100917430ca132a"
     }
   },
-  "harnessops_version": "0.1.4",
+  "harnessops_version": "0.1.6",
   "layout_version": "0.1",
   "managed_files": {
     "harness-lab/README.md": "sha256:789a733220c9918b65f6d7afbddb13ccc2d842485cca9426bb8e5dc52c24a797",
