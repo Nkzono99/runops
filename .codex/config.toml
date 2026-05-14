@@ -8,8 +8,9 @@
 #
 # See .codex/README.md for the full wiring guide.
 
-# Local automations for this repository intentionally run unattended maintenance
-# such as `git pull`, issue triage, web lookup, fixes, tests, commits, and push.
+# HarnessOps daily automations for this repository intentionally run unattended
+# maintenance such as `git pull`, issue review, web lookup, fixes, tests,
+# commits, and push.
 # Use full access by default so those runs do not get stuck behind the
 # workspace-write sandbox or blocked network access.
 sandbox_mode = "danger-full-access"
