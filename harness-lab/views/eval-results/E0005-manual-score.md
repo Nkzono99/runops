@@ -21,6 +21,6 @@ Implemented read-only MCP analysis tools: runops.analysis.artifacts, runops.surv
 
 ## 評価ケース
 
-- capability: unclassified
-- failure_class: unclassified
+- capability: mcp_analysis_result_inspection
+- failure_class: missing_paper_facing_analysis_artifact_inspect
 - source_feedback: FB0005

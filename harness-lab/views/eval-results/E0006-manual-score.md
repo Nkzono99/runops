@@ -21,6 +21,6 @@ Implemented the paper request contract with docs, schema, scaffold template, and
 
 ## 評価ケース
 
-- capability: unclassified
-- failure_class: unclassified
+- capability: paper_request_contract
+- failure_class: missing_paper_to_runops_request_contract
 - source_feedback: FB0006

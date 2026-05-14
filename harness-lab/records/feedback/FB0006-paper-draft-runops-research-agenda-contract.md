@@ -19,11 +19,15 @@ source:
     updated_at: '2026-05-14T01:53:22Z'
     comments: []
 classification:
-  failure_class: unclassified
-  capability: unclassified
+  failure_class: missing_paper_to_runops_request_contract
+  capability: paper_request_contract
 links:
   eval_case:
   issue_url: https://github.com/Nkzono99/runops/issues/69
+disposition:
+  type: meta-harness-candidate
+  target:
+  status: draft
 ---
 
 # FB0006: paper draft からの追加解析・追加実験要望を runops research agenda に取り込む contract を設計する

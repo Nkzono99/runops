@@ -19,11 +19,15 @@ source:
     updated_at: '2026-05-14T01:53:14Z'
     comments: []
 classification:
-  failure_class: unclassified
-  capability: unclassified
+  failure_class: missing_paper_facing_analysis_artifact_inspect
+  capability: mcp_analysis_result_inspection
 links:
   eval_case:
   issue_url: https://github.com/Nkzono99/runops/issues/68
+disposition:
+  type: target-upstream-candidate
+  target:
+  status: draft
 ---
 
 # FB0005: MCP から analysis artifacts / survey summary を paper 向けに inspect できるようにする

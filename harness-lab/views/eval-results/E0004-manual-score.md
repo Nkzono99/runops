@@ -21,6 +21,6 @@ Implemented read-only MCP publication export tools: runops.publication.exports.l
 
 ## 評価ケース
 
-- capability: unclassified
-- failure_class: unclassified
+- capability: mcp_publication_export_inspection
+- failure_class: missing_publication_export_manifest_inspect
 - source_feedback: FB0004
