@@ -978,6 +978,8 @@ status = "open"
 human_gate = true
 ```
 
+空の queue では `[[requests]]` を省略し、`schema_version = 1` だけを置ける。
+
 `type` は `analysis_request`, `figure_request`, `experiment_request`,
 `evidence_gap`, `export_request` のいずれか。
 `priority` は `low | medium | high | urgent`、`status` は

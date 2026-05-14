@@ -98,7 +98,8 @@ def test_paper_requests_schema_defines_request_contract() -> None:
     request_schema = schema["properties"]["requests"]["items"]
 
     assert schema["properties"]["schema_version"]["const"] == 1
-    assert "requests" in schema["required"]
+    assert "requests" in schema["properties"]
+    assert schema["required"] == ["schema_version"]
     assert request_schema["properties"]["type"]["enum"] == [
         "analysis_request",
         "figure_request",
