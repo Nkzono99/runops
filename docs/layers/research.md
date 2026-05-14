@@ -25,6 +25,7 @@ decision ledger です。
 research/
   README.md
   agenda.md
+  paper_requests.toml
   proposals/
     .gitkeep
   reviews/
@@ -33,6 +34,18 @@ research/
 
 `runo init` はこの構成を作ります。既存 project では `runo update-harness` が、
 不足している `research/` scaffold だけを補完します。
+
+## paper request contract
+
+paper draft から出た追加解析・図表・追加実験・export 要望は
+`research/paper_requests.toml` に structured queue として置けます。これは
+実行キューではなく、paper 側の文脈を `research/agenda.md` や
+`research/proposals/` へ戻すための handoff です。
+
+詳細な schema と例は [Paper Request Contract](../paper-requests.md) を参照します。
+MCP では `runops.paper.requests.list` と `runops.paper.request.plan` が read / plan
+入口を提供します。追加実験の run creation / survey expansion / submit は明示操作に
+残します。
 
 ## context 入口
 
@@ -52,6 +65,7 @@ research/
 | `notes/YYYY-MM-DD.md` | 日次 lab notebook | append-only |
 | `notes/reports/` | 整理済み long-form report | 改稿可 |
 | `research/agenda.md` | 現在の研究判断 | mutable |
+| `research/paper_requests.toml` | paper draft から戻る解析・図表・実験要望 | structured queue |
 | `research/proposals/` | 実行前の重い判断 | 必要時に新規作成 |
 | `research/reviews/` | 過去判断の snapshot | checkpoint ごとに新規作成 |
 | `.agents/skills/`, `.claude/skills/` | Agent の手順 | harness template から生成 |

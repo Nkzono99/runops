@@ -120,6 +120,7 @@ def _missing_workspace_scaffold(
                 "research/",
                 "research/README.md",
                 "research/agenda.md",
+                "research/paper_requests.toml",
                 "research/proposals/",
                 "research/proposals/.gitkeep",
                 "research/reviews/",

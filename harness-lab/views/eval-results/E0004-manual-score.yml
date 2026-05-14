@@ -1,0 +1,17 @@
+schema_version: '0.1'
+record_type: manual_eval_result
+created_at: '2026-05-14T11:43:44+09:00'
+eval_case: E0004
+experiment:
+scores:
+  impact: 4
+  mechanism_clarity: 5
+  evaluability: 5
+  minimality: 4
+  regression_risk: 2
+  operator_burden: 4
+  anti_theater: 5
+  maintainability: 4
+  privacy_sanitization_risk: 5
+notes: 'Implemented read-only MCP publication export tools: runops.publication.exports.list and runops.publication.export.inspect. Validation passed: ruff check src/ tests/, mypy src/, pytest, pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80, and runo mcp check.'
+source_record: harness-lab/records/eval-cases/E0004-fb0004-mcp-publication-export-manifest-inspect.md

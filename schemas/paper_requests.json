@@ -1,0 +1,99 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://runops.dev/schemas/paper_requests.json",
+  "title": "runops paper-facing request queue",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "requests"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "requests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "id",
+          "type",
+          "title",
+          "paper_context",
+          "desired_artifact",
+          "source_link",
+          "priority",
+          "status"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "analysis_request",
+              "figure_request",
+              "experiment_request",
+              "evidence_gap",
+              "export_request"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "paper_id": {
+            "type": "string"
+          },
+          "paper_context": {
+            "type": "string",
+            "minLength": 1
+          },
+          "desired_artifact": {
+            "type": "string",
+            "minLength": 1
+          },
+          "source_link": {
+            "type": "string",
+            "minLength": 1
+          },
+          "related_runs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "related_surveys": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "priority": {
+            "type": "string",
+            "enum": ["low", "medium", "high", "urgent"]
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "planned",
+              "in_progress",
+              "blocked",
+              "done",
+              "rejected"
+            ]
+          },
+          "human_gate": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
