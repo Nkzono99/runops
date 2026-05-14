@@ -534,7 +534,7 @@ class TestInit:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         config = (tmp_path / ".codex" / "config.toml").read_text(encoding="utf-8")
         assert 'sandbox_mode = "workspace-write"' in config
-        assert "project_doc_max_bytes = 65536" in config
+        assert "project_doc_max_bytes = 32768" in config
         assert "approval_policy =" not in config
         assert "network_access =" not in config
         assert "[sandbox_workspace_write]" not in config

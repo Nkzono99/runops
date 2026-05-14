@@ -1,384 +1,141 @@
-# AGENTS.md — runops
+# AGENTS.md - runops
 
-## プロジェクト概要
+## 入口
 
-HPC 環境における Slurm ベースのシミュレーション実行管理 CLI ツール。
-run ディレクトリを日常運用の主単位とし、パラメータサーベイ展開・job 投入・状態追跡・provenance 記録・解析補助を一貫して管理する。
+このファイルは Codex が最初に読む短い案内である。詳細手順は
+`.agents/skills/`、設計・運用リファレンスは `.codex/rules/*.md`、仕様は
+`SPEC.md` に分ける。AGENTS.md は 150 行程度を上限目安に保ち、長い表や手順を
+ここへ戻さない。
 
-仕様書: `SPEC.md`
+runops は HPC 環境における Slurm ベースのシミュレーション実行管理 CLI。
+run ディレクトリを日常運用の主単位とし、パラメータサーベイ展開、job 投入、
+状態追跡、provenance 記録、解析補助を一貫して管理する。
 
 ## コミュニケーション
 
-- **日本語で応答する**。コード・コマンド・変数名・エラーメッセージは英語のまま
-- commit message は英語 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)
-- Agent 向けドキュメント (rules, skills, agents) は日本語で書いてよい
+- 日本語で応答する。コード、コマンド、変数名、エラーメッセージは英語のまま。
+- commit message は英語 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)。
+- Agent 向けドキュメント (rules, skills, agents) は日本語で書いてよい。
+- 個人用メモや一時 override は `AGENTS.override.md` に置き、Git 管理しない。
+
+## 参照先
+
+| 用途 | ファイル |
+|---|---|
+| 仕様 | `SPEC.md` |
+| アーキテクチャ境界 | `.codex/rules/architecture.md` |
+| 全コマンド一覧 | `.codex/rules/commands.md` |
+| 品質ゲート / Git / release | `.codex/rules/dev-workflow.md` |
+| よくあるミス | `.codex/rules/gotchas.md` |
+| 知識層 | `.codex/rules/knowledge-layer.md` |
+| 高コスト / 不可逆 command policy | `.codex/rules/runops.rules` |
+| Codex 設定の読み込み | `.codex/README.md` |
 
 ## Codex ハーネス
 
-このリポジトリでは Claude Code 用の `.claude/` に加えて、Codex 用に以下を置く。
+このリポジトリは Claude Code 用の `.claude/` に加えて Codex 用の
+`.codex/` と `.agents/skills/` を持つ。
 
 | 目的 | Codex 側 | Claude 側 |
-|------|----------|-----------|
+|---|---|---|
 | Project doc | `AGENTS.md` | `CLAUDE.md` |
 | 定型スキル | `.agents/skills/<name>/SKILL.md` | `.claude/skills/<name>/SKILL.md` |
 | 専門 agent 由来の知識 | `.agents/skills/<name>/SKILL.md` | `.claude/agents/<name>.md` |
 | 実行設定 | `.codex/config.toml` | `.claude/settings.json` |
-| 高コスト / 不可逆 command policy | `.codex/rules/runops.rules` | `.claude/settings.json` permissions |
-| 設計・運用リファレンス | `.codex/rules/*.md` | `.claude/rules/*.md` |
+| command policy | `.codex/rules/runops.rules` | `.claude/settings.json` permissions |
+| リファレンス | `.codex/rules/*.md` | `.claude/rules/*.md` |
 
 Codex ではスキルを `$check`, `$release`, `$implement-core` のように `$` 付きで呼ぶ。
-Claude Code の `/check` などとは表記が異なる。
-
 Codex の project-local config は、この repo を trusted project として登録したときに読む。
-詳細は `.codex/README.md` を参照する。
-shared な運用変更を入れたら、`AGENTS.md`, `CLAUDE.md`,
-`.agents/skills/release/SKILL.md`, `.claude/skills/release/SKILL.md`,
-`.codex/rules/dev-workflow.md`, `.claude/rules/dev-workflow.md`,
-`.codex/rules/gotchas.md`, `.claude/rules/gotchas.md` の drift も点検する。
 
-## プロジェクトでの利用方法
+shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
+`.agents/skills/*`, `.claude/skills/*`, `.codex/rules/*`,
+`.claude/rules/*` の意図的でない drift を点検する。
 
-runops project は `uvx` でブートストラップし、project `.venv/` は runtime 用に作る。
-事前のグローバルインストールは不要。
-CLI は `uvx --from runops runo ...` を標準経路として使う。既存スクリプトとの互換性のため、
-`runops` も同じ CLI を指す stable alias として残す。
+## 開発環境
+
+- このリポジトリでの作業は repo root の `.venv` を使い、原則 `uv run <command>` で実行する。
+- runops project を使う側では `uvx --from runops runo ...` を標準経路にする。
+- CLI 名は `runo` を優先する。`runops` は互換 alias として残す。
+- 技術スタックは Python 3.10+ / uv / Typer / TOML / pytest / ruff / mypy strict。
+
+## HarnessOps 導線
+
+HarnessOps CLI (`hops`) は `.venv` に常駐 install せず、`uvx --from harnessops hops ...` で実行する。
+診断は `$hops-diagnose` または `uvx --from harnessops hops doctor --check-overlay --check-records`。
+ハーネス摩擦や上流改善候補は `$harnessops-bridge` / `$hops-add-failure` で記録し、lab 評価は `$hops-run-lab`、更新は `$hops-update-harness` を使う。
+`.harnessops/`, `harness-feedback/`, `harness-lab/` は手で組み替えず、更新は `uvx --refresh-package harnessops --from harnessops hops update-harness ...` に委譲する。
+
+## 主要ディレクトリ
+
+```text
+src/runops/
+  cli/        Typer entrypoints。薄い層に保つ
+  core/       ドメインロジック。CLI / Slurm に依存しない
+  adapters/   Simulator Adapter
+  launchers/  Launcher Profile
+  jobgen/     job.sh 生成
+  slurm/      sbatch / squeue / sacct 連携
+  mcp/        Ops MCP provider
+  harness/    project 側 harness 生成 / 更新
+  templates/  project / case / survey 用テンプレート
+tests/
+  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/
+```
+
+## ビルドと検証
 
 ```bash
-# 新規プロジェクト作成
-mkdir my-project && cd my-project
-uvx --from runops runo init
-uvx --from runops runo doctor
-```
-
-`runo init` が `.venv/` を自動構築するが、そこは simulator package や解析依存など
-project runtime 用に使う。runops CLI は通常 `.venv/` に常駐 install せず、`uvx` で実行する。
-Agent は `.runops/knowledge/runops/`、`uvx --from runops runo context --json`、
-`uvx --from runops runo --help` を確認入口にする。
-
-```bash
-# 既存プロジェクトを clone + セットアップ
-uvx --from runops runo setup https://github.com/user/my-project.git
-cd my-project
-uvx --from runops runo doctor
-```
-
-## 技術スタック
-
-- 言語: Python 3.10+
-- パッケージ管理: uv (pyproject.toml)
-- CLI フレームワーク: typer (click ベース)
-- 設定ファイル形式: TOML (tomli / tomli-w)
-- テスト: pytest
-- Lint/Format: ruff
-- 型チェック: mypy (strict)
-
-## ディレクトリ構成
-
-```
-runops/
-  pyproject.toml
-  src/
-    runops/
-      __init__.py
-      cli/              # CLI エントリポイント (typer)
-        main.py
-        init/           # runo init / doctor / scaffold / bootstrap
-        knowledge/      # runo knowledge / knowledge source
-        setup.py        # runo setup (clone + bootstrap)
-        new.py          # runo case new
-        create.py       # runo runs create / sweep
-        submit.py       # runo runs submit
-        status.py       # runo runs status / sync
-        manage.py       # runo runs archive / purge-work / cancel / delete
-        retry.py        # runo runs retry
-        regenerate.py   # runo runs regenerate
-        lint.py         # runo lint
-        mcp.py          # runo mcp serve / check / tools
-        migrate.py      # runo migrate
-        update_harness.py
-        ...
-      core/             # ドメインロジック
-        actions/         # CLI / Agent action facade と registry
-        analysis/        # summary / collect / plot / export / comparison
-        project.py
-        case.py
-        survey/          # Survey 展開・parameter 直積
-        run/             # RunInfo・run_id 採番・run directory 作成
-          __init__.py
-        manifest.py
-        state.py
-        provenance.py
-        discovery.py
-        site/            # HPC site profile 解決
-        environment/     # 実行環境検出・記述
-        validation/      # パラメータバリデーション
-        lint/            # project health check
-        migrations/      # project-state migration registry
-        research/        # research/agenda.md summary
-        run_creation/    # case/survey から run を生成する orchestration
-          __init__.py
-          manifest.py
-          merge.py
-        knowledge_source/  # 外部知識ソース管理
-          __init__.py
-          config.py
-          render.py
-          validation.py
-        demo/            # session import / replay UI
-          __init__.py
-          importer.py
-          replay.py
-        publication/     # paper-facing export bundle
-        ...
-      adapters/         # Simulator Adapter
-        __init__.py
-        base.py         # SimulatorAdapter 抽象基底クラス
-        registry.py     # Adapter 登録・lookup
-      launchers/        # Launcher Profile
-        __init__.py
-        base.py         # Launcher 抽象基底クラス
-        srun.py
-        mpirun.py
-        mpiexec.py
-      jobgen/           # job.sh 生成
-        __init__.py
-        generator.py
-      slurm/            # Slurm 連携 (sbatch / squeue / sacct)
-        __init__.py
-        submit.py
-        query.py
-      mcp/              # Ops MCP provider (FastMCP / envelope / registry)
-        server.py
-        tools.py
-        schemas.py
-        safety.py
-        registry.py
-      sites/            # bundled site preset (runo init で読込)
-        __init__.py
-        camphor.toml
-        camphor.md
-      harness/          # project 側 harness 生成 / 更新ロジック
-        __init__.py
-        builder.py
-        claude.py
-        codex.py
-      templates/        # project / case / survey 用 静的テンプレート
-        __init__.py
-        ...
-  tests/
-    conftest.py
-    test_core/
-    test_cli/
-    test_adapters/
-    test_launchers/
-    test_slurm/
-    fixtures/           # テスト用 TOML ファイル等
-```
-
-## 主要コマンド
-
-| コマンド | 説明 |
-|---------|------|
-| `runo --version` | runops package version を表示 |
-| `runo init [SIMS...] -y` | Project 初期化 (対話型がデフォルト) |
-| `runo setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
-| `runo doctor` | 環境検査 |
-| `runo context --json` | Agent 向け project context を JSON で取得 |
-| `runo lint [PATH] [--scope ...]` | project state の health check |
-| `runo migrate list/show/apply` | project-state migration の確認・適用 |
-| `runo mcp serve --transport stdio` | MCP provider を stdio で起動 |
-| `runo mcp serve --transport streamable-http --host 127.0.0.1 --port 18765` | MCP provider を Streamable HTTP で起動 |
-| `runo mcp check` | MCP registry / safety contract の軽量検査 |
-| `runo mcp tools --json` | MCP tool metadata を JSON で表示 |
-| `runo case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 (`--minimal` で小さな bundled テンプレート、EMSES では `emu generate -u` を自動実行) |
-| `runo runs create CASE` | case から単一 run を生成 |
-| `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 (`--dry-run` で件数・パラメータ・概算 core-hour を表示するだけ) |
-| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
-| `runo runs submit --all [DIR] [--yes]` | created な run を確認付きで一括投入 (`--yes` で確認省略) |
-| `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
-| `runo runs status [RUNS...]` | run 状態確認 (run_id・run dir・survey dir を複数渡してまとめて表示可) |
-| `runo runs sync [RUNS...]` | Slurm 状態を manifest に反映 (bulk 対応: survey 配下の created run + terminal state な run は silent skip) |
-| `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 (`--watch` で N 秒ごとに自動更新) |
-| `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗 (state, step/N, %, last Slurm state) を 1 つの表で表示 |
-| `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...]` | run 一覧表示 (複数 PATH 指定可) |
-| `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
-| `runo runs extend` | スナップショットから継続 run 生成 |
-| `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備。`--plan` では状態を戻さず partial output と retry intent を記録 |
-| `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
-| `runo analyze summarize [RUN]` | run 解析 summary 生成 |
-| `runo analyze collect [DIR]` | survey 集計 |
-| `runo analyze plot [DIR]` | survey 集計結果を可視化 |
-| `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
-| `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
-| `runo notes append TITLE [BODY]` | 今日の lab notebook (`notes/YYYY-MM-DD.md`) に追記 (`-` または省略で stdin) |
-| `runo notes list` | active / history の lab notebook 日付一覧 |
-| `runo notes show [DATE\|today\|latest]` | active / history から指定日の lab notebook を表示 |
-| `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
-| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
-| `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
-| `runo runs cancel [RUN]` | scancel + sync を同時実行し、submitted/running な run を停止 |
-| `runo runs delete [RUN]` | created/cancelled/failed な run ディレクトリをハード削除 (completed/archived は archive→purge-work を使う) |
-| `runo config show` | 設定表示 |
-| `runo config add-simulator` | シミュレータ追加 (対話型) |
-| `runo config add-launcher` | ランチャー追加 (対話型) |
-| `runo update` | シミュレータパッケージのアップグレード |
-| `runo update-harness --plan/apply-chain` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
-| `runo update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
-| `runo knowledge save` | 知見を .runops/insights/ に保存 |
-| `runo knowledge add-fact` | 構造化 fact を .runops/facts.toml に追加 |
-| `runo knowledge list` | 知見一覧表示 |
-| `runo knowledge facts` | 構造化 fact 一覧表示 |
-| `runo knowledge show` | 知見の詳細表示 |
-| `runo knowledge source list` | 外部知識ソース一覧表示 |
-| `runo knowledge source attach` | 外部知識ソースを接続 (git / path) |
-| `runo knowledge source detach` | 外部知識ソースを切断 |
-| `runo knowledge source sync` | 知識ソース同期 + 外部知見取り込み |
-| `runo knowledge source render` | 有効な profile から imports.md を生成 |
-| `runo knowledge source status` | 知識統合の状態表示 |
-| `runo knowledge profile enable/disable` | source profile の有効 / 無効化 |
-
-全コマンドは引数省略時にカレントディレクトリをデフォルトとする。
-
-## 開発ルール
-
-### コーディング規約
-
-- ruff format / ruff check を CI で強制
-- mypy strict モード
-- テストカバレッジ 80% 以上を目標
-- docstring は Google style
-
-### 開発環境
-
-- このリポジトリでの作業は repo root の `.venv` を使う。Agent は原則として `uv run <command>` で実行し、直接 executable を呼ぶ必要がある場合だけ `.venv/Scripts/<cmd>.exe` (Windows) または `.venv/bin/<cmd>` (Unix) を使う。
-- HarnessOps CLI (`hops`) は project `.venv` に常駐 install せず、`uvx --from harnessops hops ...` で実行する。
-- HarnessOps overlay / agent bridge を最新化するときは、PyPI 最新を明示して `uvx --refresh-package harnessops --from harnessops hops update-harness ...` を使う。ローカル checkout からの editable install は使わない。
-
-### 設計原則
-
-- **run ディレクトリが主単位**: すべての操作は run_id または run ディレクトリを基点とする
-- **不変と可変の分離**: run_id は不変、パスは可変（分類・整理用）
-- **Simulator Adapter パターン**: simulator 固有処理は Adapter に閉じ込める。core は simulator に依存しない
-- **Launcher Profile パターン**: MPI 起動方式は Launcher に閉じ込める
-- **MPI に介入しない**: Python ツールは rank ごとのラッパにならない。job.sh で srun/mpirun を直接実行
-- **manifest.toml が正本**: run の状態・由来・provenance はすべて manifest.toml に記録
-- **cwd ベース**: 全コマンドはカレントディレクトリをデフォルトターゲットとする
-
-### 後方互換性
-
-- **現在は private / v0 系**のため、後方互換性は強く維持しなくてよい
-- コマンド名・引数・ファイル形式は自由に変更可能。エイリアスや互換レイヤーは原則不要
-- project-state に影響する breaking change は `docs/migrations/v0.md` に移行方法を残す
-- 将来 v1 で public 化する際に CLI / project schema / manifest / analysis artifact schema を固める
-
-### テスト方針
-
-- Slurm 依存部分はモック化 (実 HPC なしでテスト可能にする)
-- TOML 読書きは fixtures ディレクトリのサンプルファイルを使用
-- CLI テストは typer の CliRunner を使用
-- Adapter / Launcher は抽象基底クラスの contract test を用意
-
-### Git 管理
-
-- run の大容量出力 (work/outputs/, work/restart/, work/tmp/) は .gitignore で除外
-- テスト fixtures の TOML ファイルは Git 管理対象
-- GitHub Flow を採用する。`main` への direct push は禁止し、変更は branch + PR で入れる
-- PR merge 前に CI green を確認する。`--force` / `--no-verify` は使わない
-- `gh release create` などで release を切るときは、先に `pyproject.toml` の `[project].version` を更新し、Git tag / release 名と同じバージョンに揃えること
-- release の annotated tag message と GitHub Release 本文は日本語で書く
-- release は `release/vX.Y.Z` branch + PR で version commit を `main` に入れ、merge 後の `main` の release commit に `git tag -a` を切って `git push origin vX.Y.Z` する
-- Codex の個人用メモや一時 override は `AGENTS.override.md` に置き、Git 管理しない
-
-## ビルド・実行
-
-```bash
-# 開発環境セットアップ
 uv sync --dev
-
-# テスト
-uv run pytest
-
-# Coverage (CI と同じ分岐込み floor)
-uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
-
-# Lint
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
-
-# 型チェック
-uv run mypy src/
-
-# CLI 実行 (開発中)
 uv run runo --help
+uv run ruff format --check src/ tests/
+uv run ruff check src/ tests/
+uv run mypy src/
+uv run pytest
+uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
 ```
 
-## 状態遷移
+コードを変えたら、対象範囲に応じて `$check` または `$test-module` を使う。
+CLI の詳細は `.codex/rules/commands.md` を参照し、コマンド追加・変更時は
+そちらを正本として更新する。
 
-```
-created → submitted → running → completed
-created/submitted/running → failed
-submitted/running → cancelled
-completed → archived → purged
-```
+## 設計原則
 
-## Adapter 実装時の注意
+- run ディレクトリが主単位。すべての操作は run_id または run dir を基点にする。
+- run_id は不変、パスは分類・整理用に可変。
+- `manifest.toml` が正本。状態・由来・provenance は manifest に記録する。
+- CLI は薄くし、実処理は `core/` または専用レイヤに置く。
+- simulator 固有処理は Adapter、MPI 起動方式は Launcher に閉じ込める。
+- Python ツールは MPI rank ごとのラッパにならない。job.sh で srun/mpirun を直接実行する。
+- 全コマンドはカレントディレクトリをデフォルトターゲットとする。
 
-新しい Simulator Adapter を追加する場合:
-1. `src/runops/adapters/base.py` の `SimulatorAdapter` を継承
-2. 全抽象メソッドを実装: render_inputs, resolve_runtime, build_program_command, detect_outputs, detect_status, summarize, collect_provenance
-3. オプションメソッドの実装: parameter_schema, validate_params, required_outputs, knowledge_sources, agent_guide, case_template, doc_repos, pip_packages
-4. `adapters/registry.py` に登録
-5. `simulators.toml` に設定エントリを追加
-6. テストを `tests/test_adapters/` に追加
+状態遷移:
 
-## 知識層 (Knowledge Layer)
-
-AI エージェントがシミュレーションを自律的に行うための知識管理。
-詳細は `docs/layers/knowledge.md` を参照。
-
-- **シミュレータ知識**: `refs/` + `.runops/knowledge/` (update-refs で更新)
-- **外部共有知識**: `runops.toml` の `[knowledge]` に基づき外部ソースを接続し、必要に応じて `refs/knowledge/` 配下へ同期 (`knowledge source attach/sync` で管理)
-- **実行環境**: `.runops/environment.toml` (doctor で自動検出)
-- **研究意図**: `campaign.toml` (ユーザーが記述)
-- **実験知見 (curated)**: `.runops/insights/` (knowledge save / knowledge source sync で管理)
-- **構造化知識 (curated)**: `.runops/facts.toml` (knowledge add-fact / knowledge facts で管理)
-- **lab notebook (chronological)**: `notes/YYYY-MM-DD.md` (`runo notes append` で時系列追記)、古い日次ノートは `notes/history/YYYY/YYYY-MM-DD.md`
-- **長文レポート**: `notes/reports/<topic>.md` (改稿可)
-- **研究判断の台帳**: `research/agenda.md` (現在の高レベルな研究判断。本文は日本語)
-
-curated knowledge / lab notebook / research agenda は役割を分ける:
-
-- `.runops/insights/` / `.runops/facts.toml` は整理済の永続知見 (上書き可・名前付き・atomic)
-- `notes/YYYY-MM-DD.md` は append-only な時系列ログ。準備フェーズの意思決定・観察・仮説・TODO をその場で残し、古くなったら `notes/history/YYYY/` に archive する
-- `research/agenda.md` は mutable な現在判断の正本。TODO ではなく、active question、current decision、paused/killed、判断が変わる条件を残す
-- 価値が出てきたら `notes/reports/` で refined version を書き、さらに `.runops/insights/` / `facts.toml` に昇格
-
-### 外部知識ソース
-
-複数プロジェクト間で共有する知識を外部リポジトリとして管理し、project に接続できる。
-`runops.toml` の `[knowledge]` セクションで設定する。
-
-```bash
-# 外部知識ソースの接続
-runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
-runo knowledge source attach path local-kb ../hpc-knowledge
-
-# 同期・レンダリング
-runo knowledge source sync
-runo knowledge source render
-
-# 状態確認
-runo knowledge source status
-runo knowledge source list
+```text
+created -> submitted -> running -> completed
+created/submitted/running -> failed
+submitted/running -> cancelled
+completed -> archived -> purged
 ```
 
-`runo init` 時に GitHub の `*shared_knowledge*` リポジトリを自動検索し、対話的に接続できる。
-`runo setup` 時は `runops.toml` に設定された知識ソースを自動同期する。
+## 実装時の入口
 
-主要コマンド:
-- `runo update-refs` — refs/ リポジトリ更新 + ナレッジインデックス再生成
-- `runo knowledge source attach/detach/sync/render/status` — 外部知識ソース管理
-- `runo knowledge save/list/show` — Markdown 知見の管理
-- `runo knowledge add-fact/facts` — 構造化知識の管理
-- `runo doctor` — 環境検出・保存
+core は `$implement-core`、CLI は `$implement-cli`、Slurm は `$implement-slurm`、
+Launcher / job.sh は `$implement-launcher`、Simulator Adapter は `$implement-adapter`。
+テスト追加は `$test-writer`、仕様準拠レビューは `$spec-reviewer`、
+ハーネス改善は `$improve-harness`、ドキュメント反映は `$update-docs` を使う。
+
+## 後方互換性と Git
+
+現在は private / v0 系のため、後方互換性は強く維持しなくてよい。
+project-state に影響する breaking change は `docs/migrations/v0.md` に移行方法を残す。
+
+GitHub Flow を採用する。`main` への direct push、`--force`、`--no-verify` は使わない。
+release は `$release` を使い、`pyproject.toml` と `src/runops/__init__.py` の version を
+同時に更新する。annotated tag message と GitHub Release 本文は日本語で書く。
+
+## 知識層
+
+AI エージェント向けの知識管理は `.codex/rules/knowledge-layer.md` と
+`docs/layers/knowledge.md` を参照する。`research/agenda.md` は mutable な現在判断の
+台帳であり、TODO 置き場ではない。

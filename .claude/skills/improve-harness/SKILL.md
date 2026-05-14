@@ -35,6 +35,7 @@ ls src/runops/templates/skills/
 - よくあるミス (Gotchas)
 - ワークフロー規約
 - 高コスト / 不可逆 command の policy
+- `AGENTS.md` / `CLAUDE.md` は入口に限定し、150 行程度を超えそうなら rules か skill に分離
 
 **スキル (`.claude/skills/<name>/SKILL.md`, `.agents/skills/<name>/SKILL.md`)** — 繰り返す定型作業
 - description はトリガー条件を書く (「いつ発火すべきか」)
@@ -85,5 +86,7 @@ ls -la .codex/rules/ .agents/skills/
   Codex 側は高コスト / 不可逆操作の policy に絞る
 - settings.json の `allow` / `deny` は **先頭一致** でマッチする。
   パターンが広すぎると意図しないコマンドまで通る
-- CLAUDE.md / AGENTS.md は長くなりすぎないようにする。定型手順は skill、
-  高コスト / 不可逆 command policy は settings / rules に分離
+- CLAUDE.md / AGENTS.md は長くなりすぎないようにする。長いコマンド表は rules、
+  定型手順は skill、高コスト / 不可逆 command policy は settings / rules に分離
+- Codex 側の `project_doc_max_bytes` を上げて解決しない。まず AGENTS.md を短くし、
+  詳細は progressive disclosure にする

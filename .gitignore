@@ -232,3 +232,9 @@ runs/**/analysis/.ipynb_checkpoints/
 simproject.toml
 
 refs/
+
+# BEGIN harnessops
+.harnessops/cache/*
+!.harnessops/cache/.gitkeep
+.harnessops/tmp/
+# END harnessops

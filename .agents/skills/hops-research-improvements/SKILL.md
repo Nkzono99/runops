@@ -21,11 +21,11 @@ repo 役割ごとの扱い:
 2. `rg` でコード、docs、tests、skills、`harness-lab/views/*.md`、`harness-feedback/records/*.md` を調べる。存在しない overlay は無理に作らない。既存 dossier、feedback、判断、ガード、未解決 open question があれば優先する。
 3. 外部比較が判断を変えそうな場合だけ web 調査する。検索語にローカルパス、非公開語、未公開研究の文脈を入れない。一次情報、公式 docs、論文、標準実務を優先し、URL を evidence として残す。
 4. 観測を「local evidence」「codebase evidence」「external benchmark」「risk / counterexample」に分ける。
-5. 記録や issue 化の前に anti-myopia strategy pass を必ず行う。候補観測を horizon（immediate bugfix / workflow design / evaluation methodology / cross-project harness principle）と generalization（`local-only` / `repeated-pattern` / `cross-project` / `strategic`）で分類し、最大1件の systemic candidate に合成する。最新の小さな摩擦を、そのまま新規 record にしない。
+5. 記録や issue 化の前に anti-myopia strategy pass を必ず行う。候補観測を horizon（immediate bugfix / workflow design / evaluation methodology / cross-project harness principle）と generalization（`local-only` / `repeated-pattern` / `cross-project` / `strategic`）で分類し、`selected_for_execution`、`queued_for_later`、`record_only`、`park`、`reject` の ranked queue に分ける。最新の小さな摩擦を、そのまま新規 record にしない。
 6. local-only な候補は `park` または `reject as local` にする。ただし、より広い failure class の evidence や guardrail になる場合だけ systemic candidate の根拠として残す。
 7. target/meta lab repo で既存テーマに入るなら新規 capture せず、`hops lab investigate` と `hops lab classify` で追記する。新しい failure class や cross-project pattern で、少なくとも2つの target/project repo に効く説明ができるなら `hops lab capture` または `hops lab research-scan` に進める。
 8. project repo で観測した改善候補は、上流へ戻す feedback として記録・ルーティング・サニタイズする。project repo 内で `hops lab capture` や `hops propose` を実行しない。
-9. target/meta lab repo で実装可能な systemic candidate だけ `hops lab new-eval-case` と `hops propose` に進める。仮説には mechanism、minimal implementation、alternative、evaluation plan、kill criteria を入れる。
+9. target/meta lab repo で実装可能な `selected_for_execution` だけ `hops lab new-eval-case` と `hops propose` に進める。仮説には mechanism、minimal implementation、alternative、evaluation plan、kill criteria を入れる。execution 数は daily steward の risk-tier / work-packet budget に従い、発見・記録・queue 作成は単一候補へ潰さない。
 
 ## 使うコマンド
 
@@ -51,8 +51,9 @@ hops feedback export --target <target> --sanitize
 - Scope: 対象 capability / failure class / 既存 dossier。
 - Raw Ideas Considered: open scan から持ち込んだ案と、捨てた案。
 - Evidence: local path、コード上の根拠、外部URL、反例。
-- Candidate Horizon: 各観測の horizon、generalization、`local-only`/`park` 判断、systemic candidate への接続。
-- Candidates: 改善候補、既存テーマとの relation、推奨コマンド。systemic candidate は最大1件に絞る。
+- Candidate Horizon: 各観測の horizon、generalization、`local-only`/`park` 判断、candidate queue への接続。
+- Candidate Queue: `selected_for_execution`、`queued_for_later`、`record_only`、`park`、`reject` に分け、各 item に evidence、risk tier、relation、next command を付ける。
+- Execution Selection: daily steward から呼ばれた場合、実行候補は risk budget 内に絞るが、発見・記録・queue は複数候補を残す。
 - Recommendation: note、classify、capture、propose、park、reject、local-only のどれにするか。
 
 複数候補があり、target/meta lab repo で後からルーティングや比較評価に戻りそうな場合は、回答だけで終えず `hops lab research-scan` を使う。`--local-evidence`、`--codebase-evidence`、`--external-benchmark`、`--risk` は `summary|ref`、`--candidate` は `title|relation|recommendation|next command` の形で渡す。project repo では research-scan ではなく、failure/feedback/export の結果と推奨 next command を短く報告する。
@@ -72,7 +73,7 @@ hops feedback export --target <target> --sanitize
 
 ## ガードレール
 
-- 調査を長文化しない。候補は最大5件に絞る。
+- 調査を長文化しない。回答に載せる候補は通常5件程度に絞るが、daily steward 用の queue では実行数だけを risk budget で制御する。
 - web 由来の知見は必ず URL または出典名を残す。
 - 未サニタイズ情報を外部検索語、Issue本文、PR本文へ出さない。
 - リモート Issue 作成や外部共有は人間の明示なしに行わない。

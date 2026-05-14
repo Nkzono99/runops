@@ -35,6 +35,7 @@ ls src/runops/templates/skills/
 - よくあるミス (Gotchas)
 - ワークフロー規約
 - 高コスト / 不可逆 command の policy
+- `AGENTS.md` は入口に限定し、150 行程度を超えそうなら `.codex/rules/` か skill に分離
 
 **スキル (`.agents/skills/<name>/SKILL.md`)** — 繰り返す定型作業
 - description はトリガー条件を書く (「いつ発火すべきか」)
@@ -79,4 +80,5 @@ ls -la .codex/rules/ .agents/skills/
   builder.py にエントリを足す必要がある (プロジェクトハーネスの場合)
 - 開発ハーネス (`.claude/`, `.codex/`, `.agents/skills/`) は builder を経由しない。直接ファイルを置く
 - `.claude/settings.json` の `allow` / `deny` と `.codex/rules/*.rules` は完全互換ではない。Codex 側は高コスト / 不可逆操作の policy に絞る
-- AGENTS.md は長くなりすぎないようにする。定型手順は `.agents/skills/`、高コスト / 不可逆 command policy は `.codex/rules/` に分離
+- AGENTS.md は長くなりすぎないようにする。長いコマンド表は `.codex/rules/commands.md`、定型手順は `.agents/skills/`、高コスト / 不可逆 command policy は `.codex/rules/` に分離
+- `project_doc_max_bytes` を上げて解決しない。まず AGENTS.md を短くし、詳細は progressive disclosure にする

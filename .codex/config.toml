@@ -16,9 +16,9 @@ sandbox_mode = "danger-full-access"
 approval_policy = "never"
 web_search = "live"
 
-# AGENTS.md is intentionally substantial because it doubles as the project
-# onboarding document for Codex.
-project_doc_max_bytes = 65536
+# Keep AGENTS.md compact; detailed guidance belongs in .codex/rules/ and
+# .agents/skills/. This budget intentionally stays near the default 32 KiB.
+project_doc_max_bytes = 32768
 
 [tools]
 web_search = { context_size = "medium" }

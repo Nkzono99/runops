@@ -12,7 +12,7 @@ Claude Code 用の `.claude/` と同じ運用思想を共有しますが、Codex
 - `.agents/skills/<name>/SKILL.md`
   — Codex の Agent Skill。`$skill-name` または自動発火で呼ばれる。
 - `.codex/config.toml`
-  — sandbox mode、approval mode、web search、project doc budget などの
+  — sandbox mode、approval mode、web search、AGENTS.md を短く保つ budget などの
   repo-local 既定値。
 - `.codex/rules/runops.rules`
   — sandbox 外実行に escalation するときの command policy。
@@ -48,6 +48,9 @@ trust_level = "trusted"
 GitHub issue 確認、web search、修正、test、commit、push まで unattended に
 実行できることを優先し、`sandbox_mode = "danger-full-access"`,
 `approval_policy = "never"`, `web_search = "live"` を共有設定にします。
+AGENTS.md は短い入口に保ち、詳細は `.codex/rules/*.md` と `.agents/skills/`
+へ分けます。`project_doc_max_bytes` は膨張を吸収するためではなく、
+truncation を早めに見つけるための guardrail として扱います。
 
 - `.codex/config.toml`
   — repo-local default。project trust 後に読み、local automation の既定許可
