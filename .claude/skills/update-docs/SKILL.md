@@ -14,7 +14,7 @@ description: "Reflect code changes into documentation. Scan recent commits or st
 
 | ファイル | 内容 | 更新タイミング |
 |---------|------|---------------|
-| `CLAUDE.md` | プロジェクト概要・主要コマンド表 | コマンド追加・変更時 |
+| `CLAUDE.md` | Claude が最初に読む短い入口 | 上位方針・参照先・ハーネス責務が変わった時 |
 | `.claude/rules/commands.md` | 全コマンド一覧 | CLI 引数追加・変更時 |
 | `.claude/rules/dev-workflow.md` | 開発ワークフロー | ビルド手順・品質ゲート変更時 |
 | `.claude/rules/architecture.md` | アーキテクチャ原則 | レイヤ構造変更時 |
@@ -49,11 +49,11 @@ git diff --stat
 
 | 変更の種類 | 更新対象 |
 |-----------|---------|
-| CLI オプション追加・変更 | `commands.md`, `CLAUDE.md`, `toml-reference.md` |
+| CLI オプション追加・変更 | `commands.md`, `toml-reference.md` |
 | TOML フィールド追加 | `toml-reference.md` |
 | 新スキル追加 | プロジェクト側テンプレートの CLAUDE.md (スキル一覧があれば) |
 | サイト固有の変更 | `src/runops/sites/<site>.md` |
-| Adapter / Launcher 追加 | `docs/extending.md`, `CLAUDE.md` |
+| Adapter / Launcher 追加 | `docs/extending.md` |
 | アーキテクチャ変更 | `architecture.md` |
 
 ### 3. ドキュメントを更新する
@@ -71,3 +71,4 @@ git diff --stat
 - ドキュメントの書き方や文体は既存部分に合わせる
 - 日本語ドキュメントと英語ドキュメントの両方を更新する
 - ハーネス二重構造に注意: 開発者向け (`.claude/`) とプロジェクト側 (`src/runops/templates/`) は別物
+- `AGENTS.md` / `CLAUDE.md` は 150 行程度を目安に短く保つ。長いコマンド表は rules、定型手順は skills に置く

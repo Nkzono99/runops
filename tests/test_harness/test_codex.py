@@ -15,7 +15,7 @@ def test_build_codex_config_keeps_repo_stable_defaults() -> None:
     content = build_codex_config("demo")
     assert "demo" in content
     assert 'sandbox_mode = "workspace-write"' in content
-    assert "project_doc_max_bytes = 65536" in content
+    assert "project_doc_max_bytes = 32768" in content
     assert "approval_policy =" not in content
     assert "network_access =" not in content
     assert "[sandbox_workspace_write]" not in content

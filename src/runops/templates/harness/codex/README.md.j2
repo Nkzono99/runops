@@ -6,7 +6,7 @@ Codex CLI 用の設定です。
 ## 自動読み込みされるもの
 
 - `.codex/config.toml`
-  — sandbox_mode や project doc budget などの repo-local 既定値。
+  — sandbox_mode や AGENTS.md を短く保つ budget などの repo-local 既定値。
 - `.agents/skills/<name>/SKILL.md`
   — Codex の Agent Skill。`$skill-name` または自動発火で呼ばれる。
 - `.codex/rules/runops.rules`
@@ -29,8 +29,8 @@ trust_level = "trusted"
 
 生成される `.codex/config.toml` は、Git 管理しても環境差が出にくい
 project-local default だけを置きます。初期状態では `sandbox_mode` と
-`project_doc_max_bytes` を共有し、`approval_policy` と `network_access` は
-書きません。
+AGENTS.md を短く保つための `project_doc_max_bytes` を共有し、
+`approval_policy` と `network_access` は書きません。
 
 - `.codex/config.toml`
   — repo-local default。project trust 後に読むが、実行時の許可モードを

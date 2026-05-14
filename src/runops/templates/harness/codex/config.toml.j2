@@ -16,6 +16,6 @@
 # protects writes outside the tree.
 sandbox_mode = "workspace-write"
 
-# runops AGENTS.md can grow as simulators and knowledge sources are
-# added. Give Codex enough room before project instructions truncate.
-project_doc_max_bytes = 65536
+# Keep AGENTS.md compact; detailed simulator workflow should live in
+# .agents/skills/, generated knowledge, or directory-specific AGENTS.md files.
+project_doc_max_bytes = 32768
