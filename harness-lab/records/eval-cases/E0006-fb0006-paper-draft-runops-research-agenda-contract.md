@@ -3,8 +3,8 @@ id: E0006
 record_type: eval_case
 created_at: '2026-05-14T11:15:09+09:00'
 status: active
-capability: unclassified
-failure_class: unclassified
+capability: paper_request_contract
+failure_class: missing_paper_to_runops_request_contract
 source_feedback: FB0006
 ---
 
@@ -22,7 +22,7 @@ updated_at: 2026-05-14T01:53:22Z
 
 ## タスク
 
-`unclassified` の `unclassified` を減らす最小変更を設計または実装し、次の再現条件が解消されるか評価してください。
+`paper_request_contract` の `missing_paper_to_runops_request_contract` を減らす最小変更を設計または実装し、次の再現条件が解消されるか評価してください。
 
 送信元フィードバックバンドルを参照してください。
 
@@ -32,14 +32,14 @@ updated_at: 2026-05-14T01:53:22Z
 
 ## 合格基準
 
-- `unclassified` の再現条件が検出または防止される。
+- `missing_paper_to_runops_request_contract` の再現条件が検出または防止される。
 - 提案または実装される変更が source feedback の期待変更に対応している。
 - `hops eval --case E0006 --manual` の score と notes で採用判断に必要な証拠を説明できる。
 - 非公開プロジェクト詳細を追加で要求しない。
 
 ## 不合格基準
 
-- `unclassified` の再現条件を見逃す。
+- `missing_paper_to_runops_request_contract` の再現条件を見逃す。
 - source feedback の期待変更と無関係な改善案になる。
 - 評価が yml score へ記録されず、採用判断の証拠として追えない。
 - 再現または判断に非公開文脈が必要になる。

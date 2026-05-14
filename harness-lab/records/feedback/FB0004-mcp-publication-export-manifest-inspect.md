@@ -19,11 +19,15 @@ source:
     updated_at: '2026-05-14T01:53:06Z'
     comments: []
 classification:
-  failure_class: unclassified
-  capability: unclassified
+  failure_class: missing_publication_export_manifest_inspect
+  capability: mcp_publication_export_inspection
 links:
   eval_case:
   issue_url: https://github.com/Nkzono99/runops/issues/67
+disposition:
+  type: protocol-candidate
+  target:
+  status: draft
 ---
 
 # FB0004: MCP から publication export 一覧と manifest を inspect できるようにする
