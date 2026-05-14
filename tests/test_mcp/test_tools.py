@@ -348,3 +348,18 @@ human_gate = true
     assert plan["status"] == "ok"
     assert plan["data"]["route"] == "research/proposals/"
     assert plan["data"]["will_submit"] is False
+
+
+def test_paper_requests_list_accepts_empty_queue(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "research").mkdir()
+    (project_root / "research" / "paper_requests.toml").write_text(
+        "schema_version = 1\n",
+        encoding="utf-8",
+    )
+
+    listing = tools.paper_requests_list(project_root=str(project_root))
+
+    assert listing["status"] == "ok"
+    assert listing["data"]["matched_count"] == 0
+    assert listing["data"]["requests"] == []
