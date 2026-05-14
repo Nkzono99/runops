@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from runops.core.manifest import ManifestData, write_manifest
@@ -50,6 +51,33 @@ def _make_run(project_root: Path, *, status: str = "created") -> Path:
         log_event=False,
     )
     return run_dir
+
+
+def _make_survey(project_root: Path) -> Path:
+    survey_dir = project_root / "runs" / "angle_scan"
+    run_dir = survey_dir / "R20260512-0002"
+    (run_dir / "analysis").mkdir(parents=True)
+    (run_dir / "work").mkdir()
+    write_manifest(
+        run_dir,
+        ManifestData(
+            run={
+                "id": "R20260512-0002",
+                "display_name": "survey-run",
+                "status": "completed",
+            },
+            origin={"case": "demo_case", "survey": "angle_scan"},
+            simulator={"name": "generic", "adapter": "generic"},
+            classification={"tags": ["survey"]},
+        ),
+        log_event=False,
+    )
+    return survey_dir
+
+
+def _write_json(path: Path, payload: dict[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def test_health_returns_contract_envelope() -> None:
@@ -138,3 +166,185 @@ def test_job_plan_submit_blocks_non_created_run(tmp_path: Path) -> None:
     assert result["status"] == "blocked"
     assert result["data"]["will_submit"] is False
     assert result["errors"][0]["code"] == "precondition_failed"
+
+
+def test_publication_exports_list_and_inspect_manifest(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    export_dir = project_root / "exports" / "papers" / "draft-a" / "fig2-baseline"
+    _write_json(
+        export_dir / "manifest.json",
+        {
+            "schema_version": 2,
+            "paper_id": "draft-a",
+            "export_name": "fig2-baseline",
+            "target_kind": "run",
+            "created_at": "2026-05-14T00:00:00+00:00",
+            "source_run_ids": ["R20260512-0001"],
+            "paper": {"id": "draft-a", "slug": "draft-a"},
+            "export": {
+                "id": "draft-a/fig2-baseline",
+                "name": "fig2-baseline",
+                "created_at": "2026-05-14T00:00:00+00:00",
+            },
+            "source": {"kind": "run", "run_count": 1},
+            "files": [
+                {
+                    "role": "run_summary",
+                    "source_path": "runs/R20260512-0001/analysis/summary.json",
+                    "export_path": "files/summary.json",
+                }
+            ],
+            "warnings": [],
+        },
+    )
+    (export_dir / "README.md").write_text("# Export\n", encoding="utf-8")
+
+    listing = tools.publication_exports_list(
+        project_root=str(project_root),
+        paper_id="draft-a",
+    )
+    inspected = tools.publication_export_inspect(
+        project_root=str(project_root),
+        export="draft-a/fig2-baseline",
+    )
+
+    assert listing["status"] == "ok"
+    assert listing["data"]["matched_count"] == 1
+    assert listing["data"]["exports"][0]["id"] == "draft-a/fig2-baseline"
+    assert inspected["status"] == "ok"
+    assert inspected["data"]["export"]["source_run_ids"] == ["R20260512-0001"]
+    assert inspected["data"]["files"][0]["role"] == "run_summary"
+
+
+def test_publication_exports_list_reports_broken_manifest(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    export_dir = project_root / "exports" / "papers" / "draft-a" / "broken"
+    export_dir.mkdir(parents=True)
+    (export_dir / "manifest.json").write_text("{bad json", encoding="utf-8")
+
+    result = tools.publication_exports_list(project_root=str(project_root))
+
+    assert result["status"] == "warning"
+    assert result["data"]["exports"][0]["valid"] is False
+    assert result["warnings"][0]["code"] == "manifest_invalid"
+
+
+def test_analysis_artifacts_reads_run_index(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    run_dir = _make_run(project_root)
+    (run_dir / "analysis" / "figures").mkdir(parents=True)
+    (run_dir / "analysis" / "figures" / "phi.png").write_bytes(b"png")
+    (run_dir / "analysis" / "artifacts.toml").write_text(
+        """
+schema_version = 1
+scope = "run"
+generated_by = "test"
+
+[[artifacts]]
+kind = "figure"
+path = "figures/phi.png"
+title = "Potential"
+status = "draft"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = tools.analysis_artifacts(
+        "R20260512-0001",
+        project_root=str(project_root),
+        kind="figure",
+    )
+
+    assert result["status"] == "ok"
+    assert result["data"]["matched_count"] == 1
+    artifact = result["data"]["artifacts"][0]
+    assert artifact["title"] == "Potential"
+    assert artifact["project_relative_path"].endswith(
+        "runs/R20260512-0001/analysis/figures/phi.png"
+    )
+
+
+def test_survey_summary_and_plot_columns_read_existing_summary(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    survey_dir = _make_survey(project_root)
+    _write_json(
+        survey_dir / "summary" / "survey_summary.json",
+        {
+            "total_runs": 1,
+            "summaries_collected": 1,
+            "missing_summaries": 0,
+            "state_counts": {"completed": 1},
+            "readiness_counts": {"ready": 1},
+            "numeric_stats": {"metric.alpha": {"count": 1.0, "mean": 0.5}},
+            "readiness_issues": [],
+            "warnings": [],
+            "runs": [
+                {
+                    "run_id": "R20260512-0002",
+                    "display_name": "survey-run",
+                    "status": "completed",
+                    "analysis_status": "ready",
+                    "analysis_ready": True,
+                    "flat_summary": {"metric.alpha": 0.5},
+                    "flat_metadata": {"param.angle": 30},
+                }
+            ],
+        },
+    )
+
+    summary = tools.survey_summary(
+        "runs/angle_scan",
+        project_root=str(project_root),
+        include_runs=True,
+    )
+    columns = tools.analysis_plot_columns(
+        "runs/angle_scan",
+        project_root=str(project_root),
+    )
+
+    assert summary["status"] == "ok"
+    assert summary["data"]["run_count"] == 1
+    assert summary["data"]["runs"][0]["run_id"] == "R20260512-0002"
+    assert columns["status"] == "ok"
+    assert "metric.alpha" in columns["data"]["columns"]
+    assert "param.angle" in columns["data"]["columns"]
+
+
+def test_paper_requests_list_and_plan(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "research").mkdir()
+    (project_root / "research" / "paper_requests.toml").write_text(
+        """
+schema_version = 1
+
+[[requests]]
+id = "PAPER-REQ-0001"
+type = "experiment_request"
+title = "Run one more angle"
+paper_id = "draft-a"
+paper_context = "Results section"
+desired_artifact = "comparison table"
+source_link = "refs/links.toml#paper.draft-a"
+priority = "high"
+status = "open"
+related_runs = ["R20260512-0002"]
+human_gate = true
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    listing = tools.paper_requests_list(
+        project_root=str(project_root),
+        paper_id="draft-a",
+    )
+    plan = tools.paper_request_plan(
+        "PAPER-REQ-0001",
+        project_root=str(project_root),
+    )
+
+    assert listing["status"] == "ok"
+    assert listing["data"]["matched_count"] == 1
+    assert listing["data"]["requests"][0]["priority"] == "high"
+    assert plan["status"] == "ok"
+    assert plan["data"]["route"] == "research/proposals/"
+    assert plan["data"]["will_submit"] is False

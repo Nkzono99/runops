@@ -102,6 +102,124 @@ def _register_tools(mcp: FastMCP) -> None:
         return tools.project_doctor(project_root=project_root)
 
     @mcp.tool(
+        name="runops.publication.exports.list",
+        description="List paper-facing publication exports without mutating files.",
+        structured_output=True,
+    )
+    def publication_exports_list(
+        project_root: str | None = None,
+        paper_id: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        return tools.publication_exports_list(
+            project_root=project_root,
+            paper_id=paper_id,
+            limit=limit,
+        )
+
+    @mcp.tool(
+        name="runops.publication.export.inspect",
+        description="Inspect one publication export manifest without mutating files.",
+        structured_output=True,
+    )
+    def publication_export_inspect(
+        project_root: str | None = None,
+        export: str | None = None,
+        paper_id: str | None = None,
+        name: str | None = None,
+        limit: int = 200,
+    ) -> dict[str, Any]:
+        return tools.publication_export_inspect(
+            project_root=project_root,
+            export=export,
+            paper_id=paper_id,
+            name=name,
+            limit=limit,
+        )
+
+    @mcp.tool(
+        name="runops.analysis.artifacts",
+        description="Inspect run or survey analysis artifact indexes.",
+        structured_output=True,
+    )
+    def analysis_artifacts(
+        target: str,
+        project_root: str | None = None,
+        kind: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        return tools.analysis_artifacts(
+            target=target,
+            project_root=project_root,
+            kind=kind,
+            limit=limit,
+        )
+
+    @mcp.tool(
+        name="runops.survey.summary",
+        description="Inspect an existing survey summary aggregate.",
+        structured_output=True,
+    )
+    def survey_summary(
+        survey: str,
+        project_root: str | None = None,
+        include_runs: bool = False,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        return tools.survey_summary(
+            survey=survey,
+            project_root=project_root,
+            include_runs=include_runs,
+            limit=limit,
+        )
+
+    @mcp.tool(
+        name="runops.analysis.plot_columns",
+        description="List survey plot columns from an existing summary aggregate.",
+        structured_output=True,
+    )
+    def analysis_plot_columns(
+        survey: str,
+        project_root: str | None = None,
+    ) -> dict[str, Any]:
+        return tools.analysis_plot_columns(
+            survey=survey,
+            project_root=project_root,
+        )
+
+    @mcp.tool(
+        name="runops.paper.requests.list",
+        description="List paper-facing requests from the project research layer.",
+        structured_output=True,
+    )
+    def paper_requests_list(
+        project_root: str | None = None,
+        paper_id: str | None = None,
+        status_filter: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        return tools.paper_requests_list(
+            project_root=project_root,
+            paper_id=paper_id,
+            status_filter=status_filter,
+            limit=limit,
+        )
+
+    @mcp.tool(
+        name="runops.paper.request.plan",
+        description="Plan how to route a paper-facing request without mutating files.",
+        structured_output=True,
+    )
+    def paper_request_plan(
+        request_id: str,
+        project_root: str | None = None,
+    ) -> dict[str, Any]:
+        return tools.paper_request_plan(
+            request_id=request_id,
+            project_root=project_root,
+        )
+
+    @mcp.tool(
         name="runops.run.list",
         description="List run directories and manifest states.",
         structured_output=True,

@@ -49,6 +49,13 @@ _TOOL_ATTRS = {
     "runops.project.status": "project_status",
     "runops.project.inspect": "project_inspect",
     "runops.project.doctor": "project_doctor",
+    "runops.publication.exports.list": "publication_exports_list",
+    "runops.publication.export.inspect": "publication_export_inspect",
+    "runops.analysis.artifacts": "analysis_artifacts",
+    "runops.survey.summary": "survey_summary",
+    "runops.analysis.plot_columns": "analysis_plot_columns",
+    "runops.paper.requests.list": "paper_requests_list",
+    "runops.paper.request.plan": "paper_request_plan",
     "runops.run.list": "run_list",
     "runops.run.inspect": "run_inspect",
     "runops.run.logs": "run_logs",
@@ -92,6 +99,84 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
     assert fake.tools["runops.project.list"]["callback"](project_root="root") == {
         "stub": "runops.project.list",
         "kwargs": {"project_root": "root"},
+    }
+    assert fake.tools["runops.publication.exports.list"]["callback"](
+        project_root="root",
+        paper_id="draft-a",
+        limit=5,
+    ) == {
+        "stub": "runops.publication.exports.list",
+        "kwargs": {"project_root": "root", "paper_id": "draft-a", "limit": 5},
+    }
+    assert fake.tools["runops.publication.export.inspect"]["callback"](
+        project_root="root",
+        export="draft-a/fig2",
+        limit=10,
+    ) == {
+        "stub": "runops.publication.export.inspect",
+        "kwargs": {
+            "project_root": "root",
+            "export": "draft-a/fig2",
+            "paper_id": None,
+            "name": None,
+            "limit": 10,
+        },
+    }
+    assert fake.tools["runops.analysis.artifacts"]["callback"](
+        "R20260512-0001",
+        project_root="root",
+        kind="figure",
+        limit=2,
+    ) == {
+        "stub": "runops.analysis.artifacts",
+        "kwargs": {
+            "target": "R20260512-0001",
+            "project_root": "root",
+            "kind": "figure",
+            "limit": 2,
+        },
+    }
+    assert fake.tools["runops.survey.summary"]["callback"](
+        "runs/survey-a",
+        project_root="root",
+        include_runs=True,
+        limit=2,
+    ) == {
+        "stub": "runops.survey.summary",
+        "kwargs": {
+            "survey": "runs/survey-a",
+            "project_root": "root",
+            "include_runs": True,
+            "limit": 2,
+        },
+    }
+    assert fake.tools["runops.analysis.plot_columns"]["callback"](
+        "runs/survey-a",
+        project_root="root",
+    ) == {
+        "stub": "runops.analysis.plot_columns",
+        "kwargs": {"survey": "runs/survey-a", "project_root": "root"},
+    }
+    assert fake.tools["runops.paper.requests.list"]["callback"](
+        project_root="root",
+        paper_id="draft-a",
+        status_filter="open",
+        limit=2,
+    ) == {
+        "stub": "runops.paper.requests.list",
+        "kwargs": {
+            "project_root": "root",
+            "paper_id": "draft-a",
+            "status_filter": "open",
+            "limit": 2,
+        },
+    }
+    assert fake.tools["runops.paper.request.plan"]["callback"](
+        "REQ-001",
+        project_root="root",
+    ) == {
+        "stub": "runops.paper.request.plan",
+        "kwargs": {"request_id": "REQ-001", "project_root": "root"},
     }
     assert fake.tools["runops.run.list"]["callback"](
         project_root="root",
@@ -159,10 +244,17 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
 
     assert set(calls) >= {
         "runops.health",
+        "runops.analysis.artifacts",
+        "runops.analysis.plot_columns",
+        "runops.paper.request.plan",
+        "runops.paper.requests.list",
         "runops.project.list",
+        "runops.publication.export.inspect",
+        "runops.publication.exports.list",
         "runops.run.list",
         "runops.run.inspect",
         "runops.run.logs",
+        "runops.survey.summary",
         "runops.slurm.queue",
         "runops.slurm.job.inspect",
         "runops.job.plan_submit",

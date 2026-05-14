@@ -205,6 +205,7 @@ class TestInit:
         assert "research/agenda.md" in content
         assert "本文は日本語" in content
         assert "判断の台帳" in codex_content
+        assert (tmp_path / "research" / "paper_requests.toml").is_file()
 
     def test_init_creates_migrate_runops_skill(self, tmp_path: Path) -> None:
         """The migrate-runops skill is rendered for Claude and Codex."""

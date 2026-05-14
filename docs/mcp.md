@@ -116,6 +116,31 @@ error / blocked も JSON-RPC protocol error ではなく、通常の tool result
 `runops.slurm.queue(live=true)` と `runops.slurm.job.inspect` は Slurm command を読むため、
 Slurm が PATH にない環境では blocked envelope を返すことがある。
 
+### analysis / publication tools
+
+| Tool | Safety | 内容 |
+|------|--------|------|
+| `runops.analysis.artifacts` | inspect | run の `analysis/artifacts.toml` または survey の `summary/artifacts.toml` を読む |
+| `runops.survey.summary` | inspect | 既存 `summary/survey_summary.json` の counts / stats / readiness を読む |
+| `runops.analysis.plot_columns` | inspect | 既存 `survey_summary.json` から plot 可能な列を返す |
+| `runops.publication.exports.list` | read | `exports/papers/` 配下の publication export manifest を列挙する |
+| `runops.publication.export.inspect` | inspect | 1 つの publication export `manifest.json` と files/source metadata を読む |
+
+これらは read / inspect 専用で、`runo analyze collect`, `plot`, `export` のような
+成果物生成は行わない。missing / 壊れた artifact index や manifest は MCP protocol
+error ではなく、warning / error を含む envelope として返す。
+
+### paper request tools
+
+| Tool | Safety | 内容 |
+|------|--------|------|
+| `runops.paper.requests.list` | read | `research/paper_requests.toml` の paper-facing request を列挙する |
+| `runops.paper.request.plan` | plan | 1 件の request を `research/agenda.md` / `research/proposals/` へ戻す plan を返す |
+
+paper request は paper draft から runops project に戻る追加解析・図表・追加実験・export
+要望の contract であり、実行キューではない。`experiment_request` も MCP 経由では
+submit せず、case / survey design と human gate を含む plan に留める。
+
 ## Submit Planning
 
 `runops.job.plan_submit` は `runo runs submit --dry-run` 相当の structured plan を返す。
@@ -163,6 +188,13 @@ enabled_tools = [
   "runops.project.status",
   "runops.project.inspect",
   "runops.project.doctor",
+  "runops.publication.exports.list",
+  "runops.publication.export.inspect",
+  "runops.analysis.artifacts",
+  "runops.survey.summary",
+  "runops.analysis.plot_columns",
+  "runops.paper.requests.list",
+  "runops.paper.request.plan",
   "runops.run.list",
   "runops.run.inspect",
   "runops.run.logs",

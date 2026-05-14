@@ -174,6 +174,11 @@ def apply_research_agenda_scaffold(context: MigrationContext) -> MigrationResult
             Path("research/agenda.md"), "file", "scaffold/research/agenda.md"
         ),
         _ScaffoldTarget(
+            Path("research/paper_requests.toml"),
+            "file",
+            "scaffold/research/paper_requests.toml",
+        ),
+        _ScaffoldTarget(
             Path("research/proposals/.gitkeep"),
             "file",
             "scaffold/research/proposals/.gitkeep",

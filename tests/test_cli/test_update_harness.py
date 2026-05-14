@@ -371,6 +371,7 @@ class TestUpdateHarnessBasic:
         (tmp_path / "materials" / "README.md").unlink()
         (tmp_path / "materials" / "papers").rmdir()
         (tmp_path / "research" / "agenda.md").unlink()
+        (tmp_path / "research" / "paper_requests.toml").unlink()
         (tmp_path / "research" / "reviews" / ".gitkeep").unlink()
 
         result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
@@ -382,11 +383,13 @@ class TestUpdateHarnessBasic:
         assert (tmp_path / "materials" / "README.md").is_file()
         assert (tmp_path / "materials" / "papers").is_dir()
         assert (tmp_path / "research" / "agenda.md").is_file()
+        assert (tmp_path / "research" / "paper_requests.toml").is_file()
         assert (tmp_path / "research" / "reviews" / ".gitkeep").is_file()
         lock = load_harness_lock(tmp_path)
         assert "notes/README.md" not in lock
         assert "materials/README.md" not in lock
         assert "research/agenda.md" not in lock
+        assert "research/paper_requests.toml" not in lock
 
     def test_only_can_limit_workspace_backfill(self, tmp_path: Path) -> None:
         """--only respects visible workspace backfill targets."""

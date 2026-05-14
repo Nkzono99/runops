@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import shutil
+import sys
 from collections import Counter
 from pathlib import Path
 from time import perf_counter
 from typing import Any
 
 from runops import __version__
+from runops.core.analysis.artifacts import read_artifacts_index
 from runops.core.context import build_project_context
 from runops.core.discovery import discover_runs, resolve_run, validate_uniqueness
 from runops.core.exceptions import SimctlError
@@ -32,6 +35,11 @@ from runops.mcp.schemas import (
 )
 from runops.slurm.query import SlurmQueryError, query_job_status
 from runops.slurm.submit import SlurmNotFoundError
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 def _tool_start() -> tuple[str, float]:
@@ -117,6 +125,288 @@ def _find_latest_log(work_dir: Path, patterns: list[str]) -> Path | None:
 def _tail_text(path: Path, lines: int) -> list[str]:
     content = path.read_text(encoding="utf-8", errors="replace").splitlines()
     return content[-lines:] if len(content) > lines else content
+
+
+def _safe_limit(limit: int, *, default: int = 100, maximum: int = 1000) -> int:
+    if limit <= 0:
+        return default
+    return min(limit, maximum)
+
+
+def _load_json_object(path: Path) -> dict[str, Any]:
+    with open(path, encoding="utf-8") as f:
+        data = json.load(f)
+    if not isinstance(data, dict):
+        raise SimctlError(f"Invalid JSON object at {path}")
+    return data
+
+
+def _load_toml_object(path: Path) -> dict[str, Any]:
+    with open(path, "rb") as f:
+        data = tomllib.load(f)
+    if not isinstance(data, dict):
+        raise SimctlError(f"Invalid TOML object at {path}")
+    return data
+
+
+def _slugify_token(value: str) -> str:
+    text = value.strip().lower()
+    chars: list[str] = []
+    last_dash = False
+    for ch in text:
+        if ch.isalnum():
+            chars.append(ch)
+            last_dash = False
+            continue
+        if (ch in {"-", "_", ".", "/"} or ch.isspace()) and not last_dash:
+            chars.append("-")
+            last_dash = True
+    return "".join(chars).strip("-")
+
+
+def _normalize_string_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [str(item) for item in value if str(item)]
+
+
+def _publication_manifest_row(
+    project_root: Path,
+    export_dir: Path,
+    manifest: dict[str, Any],
+) -> dict[str, Any]:
+    export_section = manifest.get("export", {})
+    if not isinstance(export_section, dict):
+        export_section = {}
+    paper_section = manifest.get("paper", {})
+    if not isinstance(paper_section, dict):
+        paper_section = {}
+
+    paper_id = str(
+        manifest.get("paper_id") or paper_section.get("id") or export_dir.parent.name
+    )
+    export_name = str(
+        manifest.get("export_name") or export_section.get("name") or export_dir.name
+    )
+    export_id = str(export_section.get("id") or f"{paper_id}/{export_name}")
+    manifest_warnings = manifest.get("warnings", [])
+    if not isinstance(manifest_warnings, list):
+        manifest_warnings = []
+
+    return {
+        "id": export_id,
+        "paper_id": paper_id,
+        "export_name": export_name,
+        "target_kind": str(manifest.get("target_kind", "")),
+        "source_run_ids": _normalize_string_list(manifest.get("source_run_ids", [])),
+        "created_at": str(
+            manifest.get("created_at") or export_section.get("created_at") or ""
+        ),
+        "manifest_path": _relative_or_absolute(
+            export_dir / "manifest.json", project_root
+        ),
+        "manifest_abspath": str(export_dir / "manifest.json"),
+        "readme_path": _relative_or_absolute(export_dir / "README.md", project_root),
+        "readme_abspath": str(export_dir / "README.md"),
+        "warning_count": len(manifest_warnings),
+        "valid": True,
+    }
+
+
+def _broken_publication_export_row(
+    project_root: Path,
+    export_dir: Path,
+    message: str,
+) -> dict[str, Any]:
+    paper_id = export_dir.parent.name
+    export_name = export_dir.name
+    return {
+        "id": f"{paper_id}/{export_name}",
+        "paper_id": paper_id,
+        "export_name": export_name,
+        "target_kind": "",
+        "source_run_ids": [],
+        "created_at": "",
+        "manifest_path": _relative_or_absolute(
+            export_dir / "manifest.json", project_root
+        ),
+        "manifest_abspath": str(export_dir / "manifest.json"),
+        "readme_path": _relative_or_absolute(export_dir / "README.md", project_root),
+        "readme_abspath": str(export_dir / "README.md"),
+        "warning_count": 1,
+        "valid": False,
+        "error": message,
+    }
+
+
+def _resolve_publication_export_dir(
+    project_root: Path,
+    *,
+    export: str | None,
+    paper_id: str | None,
+    name: str | None,
+) -> Path:
+    if export:
+        candidate = Path(export).expanduser()
+        if candidate.is_absolute() and candidate.is_dir():
+            return candidate.resolve()
+        relative = (project_root / candidate).resolve()
+        if relative.is_dir():
+            return relative
+        parts = export.replace("\\", "/").strip("/").split("/")
+        if len(parts) == 2:
+            return (
+                project_root
+                / "exports"
+                / "papers"
+                / _slugify_token(parts[0])
+                / _slugify_token(parts[1])
+            ).resolve()
+
+    if paper_id and name:
+        return (
+            project_root
+            / "exports"
+            / "papers"
+            / _slugify_token(paper_id)
+            / _slugify_token(name)
+        ).resolve()
+
+    raise SimctlError("Specify export or paper_id + name.")
+
+
+def _resolve_run_or_survey_target(target: str, project_root: Path) -> tuple[str, Path]:
+    candidate = Path(target).expanduser()
+    candidates: list[Path] = []
+    if candidate.is_absolute():
+        candidates.append(candidate.resolve())
+    else:
+        candidates.append((project_root / candidate).resolve())
+        candidates.append((Path.cwd() / candidate).resolve())
+
+    for path in candidates:
+        if (path / "manifest.toml").is_file():
+            return "run", path
+        if path.is_dir() and discover_runs(path):
+            return "survey", path
+
+    run_dir = resolve_run(target, project_root / "runs")
+    return "run", run_dir
+
+
+def _resolve_survey_dir(survey: str, project_root: Path) -> Path:
+    kind, path = _resolve_run_or_survey_target(survey, project_root)
+    if kind != "survey":
+        raise SimctlError(f"Target is not a survey directory: {survey}")
+    return path
+
+
+def _artifact_payload(
+    project_root: Path,
+    base_dir: Path,
+    artifact: dict[str, Any],
+) -> dict[str, Any]:
+    payload = dict(artifact)
+    rel_path = str(artifact.get("path", "")).strip()
+    payload["relative_path"] = rel_path
+    if rel_path:
+        artifact_path = (base_dir / rel_path).resolve()
+        payload["absolute_path"] = str(artifact_path)
+        payload["project_relative_path"] = _relative_or_absolute(
+            artifact_path,
+            project_root,
+        )
+    else:
+        payload["absolute_path"] = ""
+        payload["project_relative_path"] = ""
+    return payload
+
+
+def _flatten_mapping(data: dict[str, Any], prefix: str = "") -> dict[str, Any]:
+    flat: dict[str, Any] = {}
+    for key, value in data.items():
+        flat_key = f"{prefix}.{key}" if prefix else str(key)
+        if isinstance(value, dict):
+            flat.update(_flatten_mapping(value, flat_key))
+            continue
+        flat[flat_key] = value
+    return flat
+
+
+def _survey_plot_columns_from_aggregate(aggregate: dict[str, Any]) -> list[str]:
+    columns: set[str] = set()
+    runs = aggregate.get("runs", [])
+    if isinstance(runs, list):
+        for item in runs:
+            if not isinstance(item, dict):
+                continue
+            row = {
+                "run_id": item.get("run_id", ""),
+                "display_name": item.get("display_name", ""),
+                "status": item.get("status", ""),
+            }
+            for key in (
+                "analysis_status",
+                "analysis_ready",
+                "simulator_status",
+                "summary_available",
+                "summary_status",
+                "summary_partial",
+                "missing_required_artifacts",
+            ):
+                if key in item:
+                    row[key] = item[key]
+            flat_metadata = item.get("flat_metadata", {})
+            if isinstance(flat_metadata, dict):
+                row.update(flat_metadata)
+            flat_summary = item.get("flat_summary", {})
+            if isinstance(flat_summary, dict):
+                row.update(flat_summary)
+            columns.update(row)
+
+    preferred = [
+        "run_id",
+        "display_name",
+        "status",
+        "analysis_status",
+        "analysis_ready",
+        "simulator_status",
+        "summary_available",
+        "summary_status",
+        "summary_partial",
+        "missing_required_artifacts",
+    ]
+    return [
+        *[column for column in preferred if column in columns],
+        *sorted(columns - set(preferred)),
+    ]
+
+
+def _load_paper_requests(project_root: Path) -> tuple[Path, list[dict[str, Any]]]:
+    path = project_root / "research" / "paper_requests.toml"
+    data = _load_toml_object(path)
+    raw_requests = data.get("requests", [])
+    if not isinstance(raw_requests, list):
+        raise SimctlError("research/paper_requests.toml must contain [[requests]].")
+    return path, [item for item in raw_requests if isinstance(item, dict)]
+
+
+def _paper_request_row(
+    request: dict[str, Any],
+    *,
+    project_root: Path,
+    schema_path: Path,
+) -> dict[str, Any]:
+    row = dict(request)
+    row["id"] = str(request.get("id", "")).strip()
+    row["type"] = str(request.get("type", "")).strip()
+    row["title"] = str(request.get("title", "")).strip()
+    row["priority"] = str(request.get("priority", "")).strip() or "medium"
+    row["status"] = str(request.get("status", "")).strip() or "open"
+    row["schema_path"] = _relative_or_absolute(schema_path, project_root)
+    for key in ("related_runs", "related_surveys"):
+        row[key] = _normalize_string_list(request.get(key, []))
+    return row
 
 
 def health() -> dict[str, Any]:
@@ -368,6 +658,715 @@ def project_doctor(project_root: str | None = None) -> dict[str, Any]:
             warning(str(check["name"]), str(check["message"]), severity="medium")
             for check in failed
         ],
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def publication_exports_list(
+    project_root: str | None = None,
+    paper_id: str | None = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """List existing publication export manifests without creating files."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.publication.exports.list")
+    inputs = {"project_root": project_root, "paper_id": paper_id, "limit": limit}
+    try:
+        root = _resolve_project_root(project_root)
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="project_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    paper_root = root / "exports" / "papers"
+    if not paper_root.is_dir():
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="ok",
+            summary="No publication exports found.",
+            data={"exports": [], "matched_count": 0, "total_count": 0},
+            project_root=root,
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    paper_dirs = [path for path in sorted(paper_root.iterdir()) if path.is_dir()]
+    if paper_id:
+        token = _slugify_token(paper_id)
+        paper_dirs = [path for path in paper_dirs if path.name == token]
+
+    rows: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+    for paper_dir in paper_dirs:
+        for export_dir in sorted(path for path in paper_dir.iterdir() if path.is_dir()):
+            manifest_path = export_dir / "manifest.json"
+            if not manifest_path.is_file():
+                message = (
+                    f"Missing manifest.json for {paper_dir.name}/{export_dir.name}"
+                )
+                rows.append(_broken_publication_export_row(root, export_dir, message))
+                warnings.append(warning("manifest_missing", message, severity="low"))
+                continue
+            try:
+                manifest = _load_json_object(manifest_path)
+            except (OSError, json.JSONDecodeError, SimctlError) as exc:
+                message = f"Invalid manifest {manifest_path}: {exc}"
+                rows.append(_broken_publication_export_row(root, export_dir, message))
+                warnings.append(warning("manifest_invalid", message))
+                continue
+            rows.append(_publication_manifest_row(root, export_dir, manifest))
+
+    safe_limit = _safe_limit(limit)
+    clipped = rows[:safe_limit]
+    if len(rows) > len(clipped):
+        warnings.append(
+            warning(
+                "result_limited",
+                f"Returned {len(clipped)} of {len(rows)} publication exports.",
+                severity="low",
+            )
+        )
+    status: EnvelopeStatus = "warning" if warnings else "ok"
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status=status,
+        summary=f"{len(rows)} publication export(s) matched.",
+        data={
+            "exports": clipped,
+            "matched_count": len(rows),
+            "total_count": sum(
+                1
+                for paper_dir in paper_dirs
+                for path in paper_dir.iterdir()
+                if path.is_dir()
+            ),
+        },
+        project_root=root,
+        warnings=warnings,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def publication_export_inspect(
+    project_root: str | None = None,
+    export: str | None = None,
+    paper_id: str | None = None,
+    name: str | None = None,
+    limit: int = 200,
+) -> dict[str, Any]:
+    """Inspect one publication export manifest without mutating files."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.publication.export.inspect")
+    inputs = {
+        "project_root": project_root,
+        "export": export,
+        "paper_id": paper_id,
+        "name": name,
+        "limit": limit,
+    }
+    try:
+        root = _resolve_project_root(project_root)
+        export_dir = _resolve_publication_export_dir(
+            root,
+            export=export,
+            paper_id=paper_id,
+            name=name,
+        )
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="export_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    manifest_path = export_dir / "manifest.json"
+    if not export_dir.is_dir() or not manifest_path.is_file():
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="manifest_not_found",
+            message=f"Publication export manifest not found: {manifest_path}",
+            project_root=root,
+            inputs=inputs,
+        )
+
+    try:
+        manifest = _load_json_object(manifest_path)
+    except (OSError, json.JSONDecodeError, SimctlError) as exc:
+        message = f"Invalid manifest {manifest_path}: {exc}"
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={
+                "export": _broken_publication_export_row(root, export_dir, message),
+                "manifest": {},
+                "files": [],
+                "file_count": 0,
+                "source": {},
+            },
+            project_root=root,
+            warnings=[warning("manifest_invalid", message)],
+            errors=[error("manifest_invalid", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    files = manifest.get("files", [])
+    if not isinstance(files, list):
+        files = []
+    safe_limit = _safe_limit(limit, default=200)
+    clipped_files = [item for item in files if isinstance(item, dict)][:safe_limit]
+    warnings = []
+    if len(files) > len(clipped_files):
+        warnings.append(
+            warning(
+                "result_limited",
+                f"Returned {len(clipped_files)} of {len(files)} exported files.",
+                severity="low",
+            )
+        )
+    manifest_warnings = manifest.get("warnings", [])
+    if not isinstance(manifest_warnings, list):
+        manifest_warnings = []
+    for item in manifest_warnings:
+        warnings.append(warning("manifest_warning", str(item), severity="low"))
+
+    source = manifest.get("source", {})
+    if not isinstance(source, dict):
+        source = {}
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="warning" if warnings else "ok",
+        summary=(
+            f"Publication export {export_dir.parent.name}/{export_dir.name} inspected."
+        ),
+        data={
+            "export": _publication_manifest_row(root, export_dir, manifest),
+            "manifest": manifest,
+            "files": clipped_files,
+            "file_count": len(files),
+            "source": source,
+            "manifest_warnings": manifest_warnings,
+        },
+        project_root=root,
+        warnings=warnings,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def analysis_artifacts(
+    target: str,
+    project_root: str | None = None,
+    kind: str | None = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Inspect run or survey analysis artifact rows without collecting outputs."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.analysis.artifacts")
+    inputs = {
+        "target": target,
+        "project_root": project_root,
+        "kind": kind,
+        "limit": limit,
+    }
+    try:
+        root = _resolve_project_root(project_root)
+        target_kind, target_dir = _resolve_run_or_survey_target(target, root)
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="target_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    if target_kind == "run":
+        index_path = target_dir / "analysis" / "artifacts.toml"
+        base_dir = target_dir / "analysis"
+    else:
+        index_path = target_dir / "summary" / "artifacts.toml"
+        base_dir = target_dir / "summary"
+
+    if not index_path.is_file():
+        message = f"Artifact index not found: {_relative_or_absolute(index_path, root)}"
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={
+                "target_kind": target_kind,
+                "target_path": _relative_or_absolute(target_dir, root),
+                "artifacts": [],
+                "matched_count": 0,
+                "index_path": _relative_or_absolute(index_path, root),
+            },
+            project_root=root,
+            warnings=[warning("artifacts_missing", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    try:
+        raw_artifacts = read_artifacts_index(index_path)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        message = f"Invalid artifact index {index_path}: {exc}"
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={"artifacts": [], "matched_count": 0},
+            project_root=root,
+            warnings=[warning("artifacts_invalid", message)],
+            errors=[error("artifacts_invalid", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    normalized_kind = kind.strip() if kind else ""
+    artifacts = [
+        _artifact_payload(root, base_dir, item)
+        for item in raw_artifacts
+        if not normalized_kind or str(item.get("kind", "")) == normalized_kind
+    ]
+    safe_limit = _safe_limit(limit)
+    clipped = artifacts[:safe_limit]
+    warnings = []
+    if len(artifacts) > len(clipped):
+        warnings.append(
+            warning(
+                "result_limited",
+                f"Returned {len(clipped)} of {len(artifacts)} artifacts.",
+                severity="low",
+            )
+        )
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="warning" if warnings else "ok",
+        summary=f"{len(artifacts)} artifact(s) matched.",
+        data={
+            "target_kind": target_kind,
+            "target_path": _relative_or_absolute(target_dir, root),
+            "index_path": _relative_or_absolute(index_path, root),
+            "artifacts": clipped,
+            "matched_count": len(artifacts),
+        },
+        project_root=root,
+        warnings=warnings,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def survey_summary(
+    survey: str,
+    project_root: str | None = None,
+    include_runs: bool = False,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """Inspect an existing survey_summary.json without collecting summaries."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.survey.summary")
+    inputs = {
+        "survey": survey,
+        "project_root": project_root,
+        "include_runs": include_runs,
+        "limit": limit,
+    }
+    try:
+        root = _resolve_project_root(project_root)
+        survey_dir = _resolve_survey_dir(survey, root)
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="survey_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    summary_path = survey_dir / "summary" / "survey_summary.json"
+    if not summary_path.is_file():
+        message = (
+            f"Survey summary not found: {_relative_or_absolute(summary_path, root)}"
+        )
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={
+                "survey_path": _relative_or_absolute(survey_dir, root),
+                "summary_path": _relative_or_absolute(summary_path, root),
+                "runs": [],
+            },
+            project_root=root,
+            warnings=[warning("survey_summary_missing", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    try:
+        aggregate = _load_json_object(summary_path)
+    except (OSError, json.JSONDecodeError, SimctlError) as exc:
+        message = f"Invalid survey summary {summary_path}: {exc}"
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={"runs": []},
+            project_root=root,
+            warnings=[warning("survey_summary_invalid", message)],
+            errors=[error("survey_summary_invalid", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    runs = aggregate.get("runs", [])
+    if not isinstance(runs, list):
+        runs = []
+    safe_limit = _safe_limit(limit)
+    summary_warnings = aggregate.get("warnings", [])
+    if not isinstance(summary_warnings, list):
+        summary_warnings = []
+    warnings = [
+        warning("survey_summary_warning", str(item), severity="low")
+        for item in summary_warnings
+    ]
+    data = {
+        "survey_path": _relative_or_absolute(survey_dir, root),
+        "summary_path": _relative_or_absolute(summary_path, root),
+        "total_runs": aggregate.get("total_runs", len(runs)),
+        "summaries_collected": aggregate.get("summaries_collected", 0),
+        "missing_summaries": aggregate.get("missing_summaries", 0),
+        "state_counts": aggregate.get("state_counts", {}),
+        "readiness_counts": aggregate.get("readiness_counts", {}),
+        "numeric_stats": aggregate.get("numeric_stats", {}),
+        "readiness_issues": aggregate.get("readiness_issues", []),
+        "warning_count": len(summary_warnings),
+        "run_count": len(runs),
+    }
+    if include_runs:
+        data["runs"] = runs[:safe_limit]
+        if len(runs) > safe_limit:
+            warnings.append(
+                warning(
+                    "result_limited",
+                    f"Returned {safe_limit} of {len(runs)} survey runs.",
+                    severity="low",
+                )
+            )
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="warning" if warnings else "ok",
+        summary=f"Survey summary has {len(runs)} run row(s).",
+        data=data,
+        project_root=root,
+        warnings=warnings,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def analysis_plot_columns(
+    survey: str,
+    project_root: str | None = None,
+) -> dict[str, Any]:
+    """List plot columns from an existing survey_summary.json without collecting."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.analysis.plot_columns")
+    inputs = {"survey": survey, "project_root": project_root}
+    try:
+        root = _resolve_project_root(project_root)
+        survey_dir = _resolve_survey_dir(survey, root)
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="survey_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    summary_path = survey_dir / "summary" / "survey_summary.json"
+    if not summary_path.is_file():
+        message = (
+            f"Survey summary not found: {_relative_or_absolute(summary_path, root)}"
+        )
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={"columns": []},
+            project_root=root,
+            warnings=[warning("survey_summary_missing", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    try:
+        aggregate = _load_json_object(summary_path)
+    except (OSError, json.JSONDecodeError, SimctlError) as exc:
+        message = f"Invalid survey summary {summary_path}: {exc}"
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={"columns": []},
+            project_root=root,
+            warnings=[warning("survey_summary_invalid", message)],
+            errors=[error("survey_summary_invalid", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    columns = _survey_plot_columns_from_aggregate(aggregate)
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="ok",
+        summary=f"{len(columns)} plot column(s) available.",
+        data={
+            "survey_path": _relative_or_absolute(survey_dir, root),
+            "summary_path": _relative_or_absolute(summary_path, root),
+            "columns": columns,
+        },
+        project_root=root,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def paper_requests_list(
+    project_root: str | None = None,
+    paper_id: str | None = None,
+    status_filter: str | None = None,
+    limit: int = 100,
+) -> dict[str, Any]:
+    """List paper-facing requests from research/paper_requests.toml."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.paper.requests.list")
+    inputs = {
+        "project_root": project_root,
+        "paper_id": paper_id,
+        "status_filter": status_filter,
+        "limit": limit,
+    }
+    try:
+        root = _resolve_project_root(project_root)
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="project_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    schema_path = root / "research" / "paper_requests.toml"
+    if not schema_path.is_file():
+        message = "research/paper_requests.toml not found."
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={
+                "requests": [],
+                "matched_count": 0,
+                "schema_path": _relative_or_absolute(schema_path, root),
+            },
+            project_root=root,
+            warnings=[warning("paper_requests_missing", message, severity="low")],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    try:
+        schema_path, raw_requests = _load_paper_requests(root)
+    except (OSError, tomllib.TOMLDecodeError, SimctlError) as exc:
+        message = f"Invalid paper request file {schema_path}: {exc}"
+        return envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            status="warning",
+            summary=message,
+            data={"requests": [], "matched_count": 0},
+            project_root=root,
+            warnings=[warning("paper_requests_invalid", message)],
+            errors=[error("paper_requests_invalid", message)],
+            started_at=started_at,
+            started_perf=started_perf,
+            inputs=inputs,
+        )
+
+    rows = [
+        _paper_request_row(item, project_root=root, schema_path=schema_path)
+        for item in raw_requests
+    ]
+    if paper_id:
+        rows = [row for row in rows if str(row.get("paper_id", "")) == paper_id]
+    if status_filter:
+        rows = [row for row in rows if row["status"] == status_filter]
+    safe_limit = _safe_limit(limit)
+    clipped = rows[:safe_limit]
+    warnings = []
+    if len(rows) > safe_limit:
+        warnings.append(
+            warning(
+                "result_limited",
+                f"Returned {safe_limit} of {len(rows)} paper requests.",
+                severity="low",
+            )
+        )
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="warning" if warnings else "ok",
+        summary=f"{len(rows)} paper request(s) matched.",
+        data={
+            "requests": clipped,
+            "matched_count": len(rows),
+            "schema_path": _relative_or_absolute(schema_path, root),
+        },
+        project_root=root,
+        warnings=warnings,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def paper_request_plan(
+    request_id: str,
+    project_root: str | None = None,
+) -> dict[str, Any]:
+    """Plan how to route one paper-facing request without mutating files."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.paper.request.plan")
+    inputs = {"request_id": request_id, "project_root": project_root}
+    try:
+        root = _resolve_project_root(project_root)
+        schema_path, raw_requests = _load_paper_requests(root)
+    except (OSError, tomllib.TOMLDecodeError, SimctlError) as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="paper_requests_unavailable",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    rows = [
+        _paper_request_row(item, project_root=root, schema_path=schema_path)
+        for item in raw_requests
+    ]
+    request = next((row for row in rows if row["id"] == request_id), None)
+    if request is None:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="paper_request_not_found",
+            message=f"Paper request not found: {request_id}",
+            project_root=root,
+            inputs=inputs,
+        )
+
+    request_type = str(request.get("type", ""))
+    proposal_needed = request_type in {"experiment_request", "evidence_gap"}
+    route = "research/agenda.md"
+    if proposal_needed or request.get("human_gate"):
+        route = "research/proposals/"
+    planned_actions = [
+        {
+            "title": "Review the paper request",
+            "kind": "plan",
+            "target": request["id"],
+            "requires_user": True,
+        },
+        {
+            "title": f"Record current decision in {route}",
+            "kind": "plan",
+            "target": route,
+            "requires_user": True,
+        },
+    ]
+    if request_type == "export_request":
+        planned_actions.append(
+            {
+                "title": "Inspect available publication exports",
+                "kind": "plan",
+                "tool": "runops.publication.exports.list",
+                "requires_user": False,
+            }
+        )
+    elif request_type in {"analysis_request", "figure_request"}:
+        planned_actions.append(
+            {
+                "title": "Inspect analysis artifacts and survey summaries",
+                "kind": "plan",
+                "tool": "runops.analysis.artifacts",
+                "requires_user": False,
+            }
+        )
+    elif request_type == "experiment_request":
+        planned_actions.append(
+            {
+                "title": "Design a case or survey; do not submit jobs automatically",
+                "kind": "plan",
+                "requires_user": True,
+            }
+        )
+
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="ok",
+        summary=f"Paper request {request_id} planned without side effects.",
+        data={
+            "request": request,
+            "route": route,
+            "will_submit": False,
+            "will_mutate_files": False,
+        },
+        project_root=root,
+        next_actions=planned_actions,
         started_at=started_at,
         started_perf=started_perf,
         inputs=inputs,

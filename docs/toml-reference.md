@@ -952,6 +952,38 @@ runo analyze export R20260412-0003 --paper draft-a --paper-status placeholder
 runo analyze export runs/sheath/angle_scan --paper draft-a --mode symlink
 ```
 
+## research/paper_requests.toml
+
+paper draft から runops project へ戻す追加解析・図表・追加実験・export 要望の
+structured queue。schema は `schemas/paper_requests.json`。
+これは実行キューではなく、`research/agenda.md` や `research/proposals/` へ
+判断を戻すための handoff である。
+
+```toml
+#:schema https://runops.dev/schemas/paper_requests.json
+schema_version = 1
+
+[[requests]]
+id = "PAPER-REQ-0001"
+type = "analysis_request"
+title = "Add sheath width comparison for Figure 2"
+paper_id = "draft-a"
+paper_context = "Results / Figure 2"
+desired_artifact = "table or figure comparing sheath width across angle_scan"
+source_link = "refs/links.toml#paper.draft-a"
+related_runs = ["R20260412-0003"]
+related_surveys = ["runs/sheath/angle_scan"]
+priority = "medium"
+status = "open"
+human_gate = true
+```
+
+`type` は `analysis_request`, `figure_request`, `experiment_request`,
+`evidence_gap`, `export_request` のいずれか。
+`priority` は `low | medium | high | urgent`、`status` は
+`open | planned | in_progress | blocked | done | rejected`。
+追加実験の実行は明示操作に残し、MCP 経由で自動 submit しない。
+
 ---
 
 ## JSON Schema

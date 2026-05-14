@@ -1,0 +1,20 @@
+#:schema https://runops.dev/schemas/paper_requests.json
+schema_version = 1
+
+# Paper-facing requests are structured handoffs from a paper draft back into
+# this runops project. Keep execution explicit: requests may plan analysis,
+# export, case, or survey work, but they do not submit jobs by themselves.
+#
+# [[requests]]
+# id = "PAPER-REQ-0001"
+# type = "analysis_request"  # analysis_request | figure_request | experiment_request | evidence_gap | export_request
+# title = "Add sheath width comparison for Figure 2"
+# paper_id = "draft-a"
+# paper_context = "Results / Figure 2"
+# desired_artifact = "table or figure comparing sheath width across angle_scan"
+# source_link = "refs/links.toml#paper.draft-a"
+# related_runs = ["R20260412-0003"]
+# related_surveys = ["runs/sheath/angle_scan"]
+# priority = "medium"        # low | medium | high | urgent
+# status = "open"            # open | planned | in_progress | blocked | done | rejected
+# human_gate = true

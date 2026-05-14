@@ -4,6 +4,7 @@
 時系列の作業ログではなく、実行管理ログでもありません。
 
 - `agenda.md` — mutable な現在の研究判断の正本
+- `paper_requests.toml` — paper draft から戻る解析・図表・追加実験要望
 - `proposals/` — 高コスト・方向転換・新 model など、実行前に残す任意の判断記録
 - `reviews/` — 主要結果・意外な失敗・pause/kill/pivot などの checkpoint snapshot
 
@@ -18,6 +19,7 @@
 | `notes/YYYY-MM-DD.md` | 日次 lab notebook | append-only |
 | `notes/reports/` | 整理済み long-form report | 改稿可 |
 | `research/agenda.md` | 現在の研究判断 | mutable |
+| `research/paper_requests.toml` | paper draft 由来の要望 | structured queue |
 | `research/proposals/` | 実行前の重い判断 | 必要時に新規作成 |
 | `research/reviews/` | 過去判断の snapshot | checkpoint ごとに新規作成 |
 | `.runops/` | runops の機械状態・curated knowledge | runops command / skill で管理 |
@@ -71,3 +73,13 @@
 runops 本体に戻すべき繰り返しの摩擦、missing command、docs gap、bug、
 改善案だけを書きます。共有するときは `feedback-runops` skill で HarnessOps に
 記録し、サニタイズ済み issue 下書きを作ります。
+
+## paper request
+
+paper draft から「追加解析が必要」「この条件の run を追加したい」
+「この export は placeholder 扱い」などの要望が出た場合は、
+`paper_requests.toml` に structured request として置けます。これは自動実行の
+指示ではなく、`agenda.md` や必要な proposal に戻すための handoff です。
+
+追加実験の run creation / survey expansion / submit は、必ず別の明示操作として
+扱います。

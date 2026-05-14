@@ -78,6 +78,41 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         "Diagnose project configuration without mutating project files.",
         READ,
     ),
+    ToolSpec(
+        "runops.publication.exports.list",
+        "List paper-facing publication exports without mutating files.",
+        READ,
+    ),
+    ToolSpec(
+        "runops.publication.export.inspect",
+        "Inspect one publication export manifest without mutating files.",
+        INSPECT,
+    ),
+    ToolSpec(
+        "runops.analysis.artifacts",
+        "Inspect run or survey analysis artifact indexes.",
+        INSPECT,
+    ),
+    ToolSpec(
+        "runops.survey.summary",
+        "Inspect an existing survey summary aggregate.",
+        INSPECT,
+    ),
+    ToolSpec(
+        "runops.analysis.plot_columns",
+        "List survey plot columns from an existing summary aggregate.",
+        INSPECT,
+    ),
+    ToolSpec(
+        "runops.paper.requests.list",
+        "List paper-facing requests from the project research layer.",
+        READ,
+    ),
+    ToolSpec(
+        "runops.paper.request.plan",
+        "Plan how to route a paper-facing request without mutating files.",
+        PLAN,
+    ),
     ToolSpec("runops.run.list", "List run directories and manifest states.", READ),
     ToolSpec("runops.run.inspect", "Inspect one run manifest and readiness.", INSPECT),
     ToolSpec("runops.run.logs", "Return tail lines from the latest run log.", INSPECT),
@@ -130,9 +165,16 @@ REQUIRED_COMMON_TOOLS = {
 }
 
 REQUIRED_RUNOPS_TOOLS = REQUIRED_COMMON_TOOLS | {
+    "runops.analysis.artifacts",
+    "runops.analysis.plot_columns",
+    "runops.paper.request.plan",
+    "runops.paper.requests.list",
+    "runops.publication.export.inspect",
+    "runops.publication.exports.list",
     "runops.run.list",
     "runops.run.inspect",
     "runops.run.logs",
+    "runops.survey.summary",
     "runops.slurm.queue",
     "runops.job.plan_submit",
 }
