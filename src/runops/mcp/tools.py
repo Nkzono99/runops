@@ -556,10 +556,14 @@ def _validate_paper_request_candidate(
         str(item.get("id", "")).strip() == request_id for item in raw_requests
     )
     if duplicate:
-        warnings.append(
-            warning(
+        errors.append(
+            error(
                 "paper_request_duplicate_id",
                 f"Paper request id already exists: {request_id}",
+                hint=(
+                    "Use suggested_request_id or omit request_id to let runops "
+                    "pick one."
+                ),
             )
         )
     return errors, warnings
@@ -1540,8 +1544,12 @@ def paper_request_draft(
         request,
         raw_requests=raw_requests,
     )
+    validation_items = [*validation_errors, *validation_warnings]
     duplicate_id = any(
-        item["code"] == "paper_request_duplicate_id" for item in validation_warnings
+        item["code"] == "paper_request_duplicate_id" for item in validation_items
+    )
+    suggested_request_id = (
+        _next_paper_request_id(raw_requests) if duplicate_id else request["id"]
     )
     is_valid = not validation_errors
     snippet = _paper_request_toml_snippet(request) if is_valid else ""
@@ -1568,6 +1576,7 @@ def paper_request_draft(
         data={
             "valid": is_valid,
             "request": request,
+            "suggested_request_id": suggested_request_id,
             "toml_snippet": snippet,
             "target_path": _relative_or_absolute(schema_path, root),
             "existing_queue": {

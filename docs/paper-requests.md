@@ -45,7 +45,7 @@ human_gate = true
 - `runops.paper.requests.list` は request queue を read-only に列挙する。
 - `runops.paper.request.draft` は candidate request を検証し、正規化済み
   object、追記用 TOML snippet、target path、既存 queue 状態、duplicate id や
-  enum mismatch の警告を返す。file mutation は行わない。
+  enum mismatch の診断を返す。file mutation は行わない。
 - `runops.paper.request.plan` は 1 件の request を agenda / proposal へ戻す
   plan を返す。file mutation、run creation、job submit は行わない。
 - 図表候補や export 候補の確認は `runops.analysis.artifacts`,
@@ -56,3 +56,6 @@ paperops から handoff するときは、paperops 側で runops schema や enum
 `desired_artifact`, `source_link`, `priority`, `related_runs`,
 `related_surveys`, `human_gate` を渡して preview / validation する。返された
 `toml_snippet` は人間の確認後に `research/paper_requests.toml` へ追記する。
+既存 queue と `request_id` が重複した場合、`draft` は `valid=false`、
+`toml_snippet=""`、append next action なしを返し、代替候補を
+`suggested_request_id` に入れる。
