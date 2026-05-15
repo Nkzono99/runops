@@ -7,3 +7,4 @@
 - `FB0004` triaged mcp_publication_export_inspection missing_publication_export_manifest_inspect
 - `FB0005` triaged mcp_analysis_result_inspection missing_paper_facing_analysis_artifact_inspect
 - `FB0006` triaged paper_request_contract missing_paper_to_runops_request_contract
+- `FB0007` triaged unclassified unclassified

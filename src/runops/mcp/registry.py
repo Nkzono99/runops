@@ -109,6 +109,11 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         READ,
     ),
     ToolSpec(
+        "runops.paper.request.draft",
+        "Draft and validate a paper-facing request without mutating files.",
+        PLAN,
+    ),
+    ToolSpec(
         "runops.paper.request.plan",
         "Plan how to route a paper-facing request without mutating files.",
         PLAN,
@@ -167,6 +172,7 @@ REQUIRED_COMMON_TOOLS = {
 REQUIRED_RUNOPS_TOOLS = REQUIRED_COMMON_TOOLS | {
     "runops.analysis.artifacts",
     "runops.analysis.plot_columns",
+    "runops.paper.request.draft",
     "runops.paper.request.plan",
     "runops.paper.requests.list",
     "runops.publication.export.inspect",

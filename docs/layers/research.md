@@ -43,9 +43,11 @@ paper draft から出た追加解析・図表・追加実験・export 要望は
 `research/proposals/` へ戻すための handoff です。
 
 詳細な schema と例は [Paper Request Contract](../paper-requests.md) を参照します。
-MCP では `runops.paper.requests.list` と `runops.paper.request.plan` が read / plan
-入口を提供します。追加実験の run creation / survey expansion / submit は明示操作に
-残します。
+MCP では `runops.paper.request.draft`, `runops.paper.requests.list`,
+`runops.paper.request.plan` が read / plan 入口を提供します。paperops など外部の
+paper tool は draft tool で request 候補を preview / validation してから、人間の
+確認後に `paper_requests.toml` へ追記します。追加実験の run creation / survey
+expansion / submit は明示操作に残します。
 
 ## context 入口
 

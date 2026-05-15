@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import sys
 from collections import Counter
 from pathlib import Path
 from time import perf_counter
 from typing import Any
+
+import tomli_w
 
 from runops import __version__
 from runops.core.analysis.artifacts import read_artifacts_index
@@ -40,6 +43,34 @@ if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
+
+_PAPER_REQUEST_TYPES = [
+    "analysis_request",
+    "figure_request",
+    "experiment_request",
+    "evidence_gap",
+    "export_request",
+]
+_PAPER_REQUEST_PRIORITIES = ["low", "medium", "high", "urgent"]
+_PAPER_REQUEST_STATUSES = [
+    "open",
+    "planned",
+    "in_progress",
+    "blocked",
+    "done",
+    "rejected",
+]
+_PAPER_REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+_PAPER_REQUEST_REQUIRED_FIELDS = (
+    "id",
+    "type",
+    "title",
+    "paper_context",
+    "desired_artifact",
+    "source_link",
+    "priority",
+    "status",
+)
 
 
 def _tool_start() -> tuple[str, float]:
@@ -164,10 +195,16 @@ def _slugify_token(value: str) -> str:
     return "".join(chars).strip("-")
 
 
+def _clean_string(value: Any) -> str:
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
 def _normalize_string_list(value: Any) -> list[str]:
     if not isinstance(value, list):
         return []
-    return [str(item) for item in value if str(item)]
+    return [text for item in value if (text := _clean_string(item))]
 
 
 def _publication_manifest_row(
@@ -407,6 +444,129 @@ def _paper_request_row(
     for key in ("related_runs", "related_surveys"):
         row[key] = _normalize_string_list(request.get(key, []))
     return row
+
+
+def _next_paper_request_id(raw_requests: list[dict[str, Any]]) -> str:
+    used = {str(item.get("id", "")).strip() for item in raw_requests}
+    for index in range(1, 10000):
+        candidate = f"PAPER-REQ-{index:04d}"
+        if candidate not in used:
+            return candidate
+    raise SimctlError("No available paper request id in PAPER-REQ-0001..9999.")
+
+
+def _paper_request_candidate(
+    *,
+    raw_requests: list[dict[str, Any]],
+    request_id: str | None,
+    request_type: str,
+    title: str,
+    paper_context: str,
+    desired_artifact: str,
+    source_link: str,
+    paper_id: str | None,
+    priority: str,
+    status: str,
+    related_runs: list[str] | None,
+    related_surveys: list[str] | None,
+    human_gate: bool,
+) -> dict[str, Any]:
+    resolved_id = _clean_string(request_id) or _next_paper_request_id(raw_requests)
+    request: dict[str, Any] = {
+        "id": resolved_id,
+        "type": _clean_string(request_type),
+        "title": _clean_string(title),
+        "paper_context": _clean_string(paper_context),
+        "desired_artifact": _clean_string(desired_artifact),
+        "source_link": _clean_string(source_link),
+        "priority": _clean_string(priority) or "medium",
+        "status": _clean_string(status) or "open",
+        "human_gate": bool(human_gate),
+    }
+    resolved_paper_id = _clean_string(paper_id)
+    if resolved_paper_id:
+        request["paper_id"] = resolved_paper_id
+    normalized_runs = _normalize_string_list(related_runs or [])
+    if normalized_runs:
+        request["related_runs"] = normalized_runs
+    normalized_surveys = _normalize_string_list(related_surveys or [])
+    if normalized_surveys:
+        request["related_surveys"] = normalized_surveys
+    return request
+
+
+def _validate_paper_request_candidate(
+    request: dict[str, Any],
+    *,
+    raw_requests: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    errors: list[dict[str, Any]] = []
+    warnings: list[dict[str, Any]] = []
+    for field in _PAPER_REQUEST_REQUIRED_FIELDS:
+        value = request.get(field, "")
+        if not str(value).strip():
+            errors.append(
+                error(
+                    "paper_request_missing_field",
+                    f"Paper request field is required: {field}",
+                )
+            )
+
+    request_id = str(request.get("id", ""))
+    if request_id and _PAPER_REQUEST_ID_RE.match(request_id) is None:
+        errors.append(
+            error(
+                "paper_request_invalid_id",
+                f"Invalid paper request id: {request_id}",
+                hint="Use letters, digits, underscore, dot, colon, or dash.",
+            )
+        )
+
+    request_type = str(request.get("type", ""))
+    if request_type and request_type not in _PAPER_REQUEST_TYPES:
+        errors.append(
+            error(
+                "paper_request_invalid_type",
+                f"Invalid paper request type: {request_type}",
+                hint="Allowed values: " + ", ".join(_PAPER_REQUEST_TYPES),
+            )
+        )
+
+    priority = str(request.get("priority", ""))
+    if priority and priority not in _PAPER_REQUEST_PRIORITIES:
+        errors.append(
+            error(
+                "paper_request_invalid_priority",
+                f"Invalid paper request priority: {priority}",
+                hint="Allowed values: " + ", ".join(_PAPER_REQUEST_PRIORITIES),
+            )
+        )
+
+    status = str(request.get("status", ""))
+    if status and status not in _PAPER_REQUEST_STATUSES:
+        errors.append(
+            error(
+                "paper_request_invalid_status",
+                f"Invalid paper request status: {status}",
+                hint="Allowed values: " + ", ".join(_PAPER_REQUEST_STATUSES),
+            )
+        )
+
+    duplicate = any(
+        str(item.get("id", "")).strip() == request_id for item in raw_requests
+    )
+    if duplicate:
+        warnings.append(
+            warning(
+                "paper_request_duplicate_id",
+                f"Paper request id already exists: {request_id}",
+            )
+        )
+    return errors, warnings
+
+
+def _paper_request_toml_snippet(request: dict[str, Any]) -> str:
+    return tomli_w.dumps({"requests": [request]}).strip() + "\n"
 
 
 def health() -> dict[str, Any]:
@@ -1267,6 +1427,165 @@ def paper_requests_list(
         },
         project_root=root,
         warnings=warnings,
+        started_at=started_at,
+        started_perf=started_perf,
+        inputs=inputs,
+    )
+
+
+def paper_request_draft(
+    project_root: str | None = None,
+    request_id: str | None = None,
+    request_type: str = "analysis_request",
+    title: str = "",
+    paper_context: str = "",
+    desired_artifact: str = "",
+    source_link: str = "",
+    paper_id: str | None = None,
+    priority: str = "medium",
+    status: str = "open",
+    related_runs: list[str] | None = None,
+    related_surveys: list[str] | None = None,
+    human_gate: bool = True,
+) -> dict[str, Any]:
+    """Draft and validate a paper-facing request without mutating files."""
+    started_at, started_perf = _tool_start()
+    spec = tool_spec("runops.paper.request.draft")
+    inputs = {
+        "project_root": project_root,
+        "request_id": request_id,
+        "request_type": request_type,
+        "title": title,
+        "paper_context": paper_context,
+        "desired_artifact": desired_artifact,
+        "source_link": source_link,
+        "paper_id": paper_id,
+        "priority": priority,
+        "status": status,
+        "related_runs": related_runs,
+        "related_surveys": related_surveys,
+        "human_gate": human_gate,
+    }
+    try:
+        root = _resolve_project_root(project_root)
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="project_not_found",
+            message=str(exc),
+            inputs=inputs,
+        )
+
+    schema_path = root / "research" / "paper_requests.toml"
+    queue_exists = schema_path.is_file()
+    raw_requests: list[dict[str, Any]] = []
+    if queue_exists:
+        try:
+            _, raw_requests = _load_paper_requests(root)
+        except (OSError, tomllib.TOMLDecodeError, SimctlError) as exc:
+            message = f"Invalid paper request file {schema_path}: {exc}"
+            return envelope(
+                tool=spec.name,
+                safety=spec.safety,
+                status="warning",
+                summary=message,
+                data={
+                    "valid": False,
+                    "request": {},
+                    "toml_snippet": "",
+                    "target_path": _relative_or_absolute(schema_path, root),
+                    "existing_queue": {
+                        "exists": True,
+                        "request_count": 0,
+                        "duplicate_id": False,
+                    },
+                    "will_mutate_files": False,
+                },
+                project_root=root,
+                warnings=[warning("paper_requests_invalid", message)],
+                errors=[error("paper_requests_invalid", message)],
+                started_at=started_at,
+                started_perf=started_perf,
+                inputs=inputs,
+            )
+
+    try:
+        request = _paper_request_candidate(
+            raw_requests=raw_requests,
+            request_id=request_id,
+            request_type=request_type,
+            title=title,
+            paper_context=paper_context,
+            desired_artifact=desired_artifact,
+            source_link=source_link,
+            paper_id=paper_id,
+            priority=priority,
+            status=status,
+            related_runs=related_runs,
+            related_surveys=related_surveys,
+            human_gate=human_gate,
+        )
+    except SimctlError as exc:
+        return blocked_envelope(
+            tool=spec.name,
+            safety=spec.safety,
+            code="paper_request_id_unavailable",
+            message=str(exc),
+            project_root=root,
+            inputs=inputs,
+        )
+
+    validation_errors, validation_warnings = _validate_paper_request_candidate(
+        request,
+        raw_requests=raw_requests,
+    )
+    duplicate_id = any(
+        item["code"] == "paper_request_duplicate_id" for item in validation_warnings
+    )
+    is_valid = not validation_errors
+    snippet = _paper_request_toml_snippet(request) if is_valid else ""
+    summary = (
+        f"Paper request {request['id']} is ready to append without side effects."
+        if is_valid
+        else f"Paper request {request['id']} has validation errors."
+    )
+    next_actions = []
+    if is_valid:
+        next_actions.append(
+            {
+                "title": "Append the TOML snippet to research/paper_requests.toml",
+                "kind": "plan",
+                "target": _relative_or_absolute(schema_path, root),
+                "requires_user": True,
+            }
+        )
+    return envelope(
+        tool=spec.name,
+        safety=spec.safety,
+        status="warning" if validation_errors or validation_warnings else "ok",
+        summary=summary,
+        data={
+            "valid": is_valid,
+            "request": request,
+            "toml_snippet": snippet,
+            "target_path": _relative_or_absolute(schema_path, root),
+            "existing_queue": {
+                "exists": queue_exists,
+                "request_count": len(raw_requests),
+                "duplicate_id": duplicate_id,
+            },
+            "allowed_values": {
+                "type": _PAPER_REQUEST_TYPES,
+                "priority": _PAPER_REQUEST_PRIORITIES,
+                "status": _PAPER_REQUEST_STATUSES,
+            },
+            "will_mutate_files": False,
+        },
+        project_root=root,
+        warnings=validation_warnings,
+        errors=validation_errors,
+        next_actions=next_actions,
         started_at=started_at,
         started_perf=started_perf,
         inputs=inputs,

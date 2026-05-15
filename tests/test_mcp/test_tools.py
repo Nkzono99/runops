@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from runops.core.manifest import ManifestData, write_manifest
 from runops.mcp import tools
@@ -78,6 +79,22 @@ def _make_survey(project_root: Path) -> Path:
 def _write_json(path: Path, payload: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
+def _paper_request_kwargs(**overrides: Any) -> dict[str, Any]:
+    data: dict[str, Any] = {
+        "request_type": "analysis_request",
+        "title": "Add sheath width comparison",
+        "paper_context": "Results / Figure 2",
+        "desired_artifact": "comparison table",
+        "source_link": "refs/links.toml#paper.draft-a",
+        "paper_id": "draft-a",
+        "priority": "medium",
+        "related_runs": ["R20260512-0002"],
+        "human_gate": True,
+    }
+    data.update(overrides)
+    return data
 
 
 def test_health_returns_contract_envelope() -> None:
@@ -363,3 +380,114 @@ def test_paper_requests_list_accepts_empty_queue(tmp_path: Path) -> None:
     assert listing["status"] == "ok"
     assert listing["data"]["matched_count"] == 0
     assert listing["data"]["requests"] == []
+
+
+def test_paper_request_draft_accepts_empty_queue(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "research").mkdir()
+    (project_root / "research" / "paper_requests.toml").write_text(
+        "schema_version = 1\n",
+        encoding="utf-8",
+    )
+
+    result = tools.paper_request_draft(
+        project_root=str(project_root),
+        **_paper_request_kwargs(request_type="figure_request"),
+    )
+
+    assert result["status"] == "ok"
+    assert result["data"]["valid"] is True
+    assert result["data"]["request"]["id"] == "PAPER-REQ-0001"
+    assert result["data"]["request"]["type"] == "figure_request"
+    assert result["data"]["existing_queue"]["request_count"] == 0
+    assert result["data"]["will_mutate_files"] is False
+    assert "[[requests]]" in result["data"]["toml_snippet"]
+    assert 'type = "figure_request"' in result["data"]["toml_snippet"]
+
+
+def test_paper_request_draft_uses_next_id_for_existing_queue(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "research").mkdir()
+    (project_root / "research" / "paper_requests.toml").write_text(
+        """
+schema_version = 1
+
+[[requests]]
+id = "PAPER-REQ-0001"
+type = "analysis_request"
+title = "Existing request"
+paper_context = "Results"
+desired_artifact = "table"
+source_link = "refs/links.toml#paper.draft-a"
+priority = "medium"
+status = "open"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = tools.paper_request_draft(
+        project_root=str(project_root),
+        **_paper_request_kwargs(),
+    )
+
+    assert result["status"] == "ok"
+    assert result["data"]["request"]["id"] == "PAPER-REQ-0002"
+    assert result["data"]["existing_queue"]["exists"] is True
+    assert result["data"]["existing_queue"]["request_count"] == 1
+
+
+def test_paper_request_draft_warns_on_duplicate_id(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "research").mkdir()
+    (project_root / "research" / "paper_requests.toml").write_text(
+        """
+schema_version = 1
+
+[[requests]]
+id = "PAPER-REQ-0001"
+type = "analysis_request"
+title = "Existing request"
+paper_context = "Results"
+desired_artifact = "table"
+source_link = "refs/links.toml#paper.draft-a"
+priority = "medium"
+status = "open"
+""".lstrip(),
+        encoding="utf-8",
+    )
+
+    result = tools.paper_request_draft(
+        project_root=str(project_root),
+        **_paper_request_kwargs(request_id="PAPER-REQ-0001"),
+    )
+
+    assert result["status"] == "warning"
+    assert result["data"]["valid"] is True
+    assert result["data"]["existing_queue"]["duplicate_id"] is True
+    assert result["warnings"][0]["code"] == "paper_request_duplicate_id"
+
+
+def test_paper_request_draft_reports_invalid_enums(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "research").mkdir()
+    (project_root / "research" / "paper_requests.toml").write_text(
+        "schema_version = 1\n",
+        encoding="utf-8",
+    )
+
+    result = tools.paper_request_draft(
+        project_root=str(project_root),
+        **_paper_request_kwargs(
+            request_type="bad_type",
+            priority="immediate",
+            status="waiting",
+        ),
+    )
+
+    error_codes = {item["code"] for item in result["errors"]}
+    assert result["status"] == "warning"
+    assert result["data"]["valid"] is False
+    assert result["data"]["toml_snippet"] == ""
+    assert "paper_request_invalid_type" in error_codes
+    assert "paper_request_invalid_priority" in error_codes
+    assert "paper_request_invalid_status" in error_codes
