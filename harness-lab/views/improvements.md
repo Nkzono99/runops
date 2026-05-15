@@ -9,3 +9,4 @@
 - `IMP0006` adopted maturity=adopted scope=runops-target promotion=target-feature source=FB0006 paper_request_contract missing_paper_to_runops_request_contract
 - `IMP0007` adopted maturity=adopted scope=runops-target promotion=target-feature source=FB0007 unclassified unclassified
 - `IMP0008` adopted maturity=adopted scope=runops-target promotion=target-feature source=FB0008 unclassified unclassified
+- `IMP0009` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0009 lab_classification_metadata missing_classification_backfill_command

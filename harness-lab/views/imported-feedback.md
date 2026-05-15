@@ -9,3 +9,4 @@
 - `FB0006` triaged paper_request_contract missing_paper_to_runops_request_contract
 - `FB0007` triaged unclassified unclassified
 - `FB0008` triaged unclassified unclassified
+- `FB0009` triaged lab_classification_metadata missing_classification_backfill_command

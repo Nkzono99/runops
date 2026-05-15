@@ -36,8 +36,8 @@
   "managed_files": {
     "harness-lab/README.md": "sha256:789a733220c9918b65f6d7afbddb13ccc2d842485cca9426bb8e5dc52c24a797",
     "harness-lab/views/backlog.md": "sha256:0ed4436872ad24f9c73737b7f84290306dc4baaf36154b7e36be521e985b791c",
-    "harness-lab/views/imported-feedback.md": "sha256:03f6a3ad485e5a0232421afd7c9e0519a3626e980a2cc0e5e3ce9c048afe0ca4",
-    "harness-lab/views/improvements.md": "sha256:ebda4260fe4d31b014b81ba7138339c93a0115c07e406ab447a7e92914d677b1",
+    "harness-lab/views/imported-feedback.md": "sha256:b8f02d55cdd9429be35eb3c44ff932e240804fdc5d98c813352b1357b507596d",
+    "harness-lab/views/improvements.md": "sha256:d49cf00f3280ef142b15ea3344c8e50713e376275cebb20eaae92dc69c9d8292",
     "harness-lab/views/research-scans.md": "sha256:6d61d712641e7eddc710614cf7bc59889c78e9532dc82666e4d82dadcc06cf7a",
     "harness-lab/views/score-trajectory.md": "sha256:a3d2f445609e5e9da0269ece3b10aff2414f3830bd185ad257d32ae19026b616"
   },
