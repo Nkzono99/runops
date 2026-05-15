@@ -144,6 +144,8 @@ submit せず、case / survey design と human gate を含む plan に留める�
 paperops など外部の paper tool は `runops.paper.request.draft` で enum、id 形式、
 重複、保存先を preview してから、人間の確認後に snippet を
 `research/paper_requests.toml` へ追記する。
+duplicate id は append 可能な warning ではなく validation error として扱い、
+`toml_snippet` と append next action は返さず、`suggested_request_id` を返す。
 
 ## Submit Planning
 

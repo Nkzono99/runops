@@ -462,9 +462,12 @@ status = "open"
     )
 
     assert result["status"] == "warning"
-    assert result["data"]["valid"] is True
+    assert result["data"]["valid"] is False
+    assert result["data"]["toml_snippet"] == ""
+    assert result["data"]["suggested_request_id"] == "PAPER-REQ-0002"
     assert result["data"]["existing_queue"]["duplicate_id"] is True
-    assert result["warnings"][0]["code"] == "paper_request_duplicate_id"
+    assert result["next_actions"] == []
+    assert result["errors"][0]["code"] == "paper_request_duplicate_id"
 
 
 def test_paper_request_draft_reports_invalid_enums(tmp_path: Path) -> None:
