@@ -135,11 +135,15 @@ error ではなく、warning / error を含む envelope として返す。
 | Tool | Safety | 内容 |
 |------|--------|------|
 | `runops.paper.requests.list` | read | `research/paper_requests.toml` の paper-facing request を列挙する |
+| `runops.paper.request.draft` | plan | paper-facing request 候補を検証し、追記用 TOML snippet と保存先を返す |
 | `runops.paper.request.plan` | plan | 1 件の request を `research/agenda.md` / `research/proposals/` へ戻す plan を返す |
 
 paper request は paper draft から runops project に戻る追加解析・図表・追加実験・export
 要望の contract であり、実行キューではない。`experiment_request` も MCP 経由では
 submit せず、case / survey design と human gate を含む plan に留める。
+paperops など外部の paper tool は `runops.paper.request.draft` で enum、id 形式、
+重複、保存先を preview してから、人間の確認後に snippet を
+`research/paper_requests.toml` へ追記する。
 
 ## Submit Planning
 
@@ -194,6 +198,7 @@ enabled_tools = [
   "runops.survey.summary",
   "runops.analysis.plot_columns",
   "runops.paper.requests.list",
+  "runops.paper.request.draft",
   "runops.paper.request.plan",
   "runops.run.list",
   "runops.run.inspect",

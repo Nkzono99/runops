@@ -206,6 +206,42 @@ def _register_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(
+        name="runops.paper.request.draft",
+        description="Draft and validate a paper-facing request without mutating files.",
+        structured_output=True,
+    )
+    def paper_request_draft(
+        project_root: str | None = None,
+        request_id: str | None = None,
+        request_type: str = "analysis_request",
+        title: str = "",
+        paper_context: str = "",
+        desired_artifact: str = "",
+        source_link: str = "",
+        paper_id: str | None = None,
+        priority: str = "medium",
+        status: str = "open",
+        related_runs: list[str] | None = None,
+        related_surveys: list[str] | None = None,
+        human_gate: bool = True,
+    ) -> dict[str, Any]:
+        return tools.paper_request_draft(
+            project_root=project_root,
+            request_id=request_id,
+            request_type=request_type,
+            title=title,
+            paper_context=paper_context,
+            desired_artifact=desired_artifact,
+            source_link=source_link,
+            paper_id=paper_id,
+            priority=priority,
+            status=status,
+            related_runs=related_runs,
+            related_surveys=related_surveys,
+            human_gate=human_gate,
+        )
+
+    @mcp.tool(
         name="runops.paper.request.plan",
         description="Plan how to route a paper-facing request without mutating files.",
         structured_output=True,
