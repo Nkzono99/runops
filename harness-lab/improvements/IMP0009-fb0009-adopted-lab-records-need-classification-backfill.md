@@ -2,27 +2,37 @@
 id: IMP0009
 record_type: improvement_dossier
 created_at: '2026-05-16T04:06:28+09:00'
-updated_at: '2026-05-16T04:06:28+09:00'
-status: active
-source_type: observation
+updated_at: '2026-05-17T04:24:33+09:00'
+status: needs-more-evidence
+source_type: local-reproduction
 scope: harnessops-core
-maturity: hypothesis
-relation: new
-promotion_level: target-lab-case
+maturity: investigated
+relation: extends
+promotion_level: core-bugfix
 source_feedback: FB0009
 eval_cases:
 - E0009
 hypotheses:
 - H0009
-decisions: []
-research_scans: []
+decisions:
+- D0008
+research_scans:
+- RS0002
 classification:
   capability: lab_classification_metadata
   failure_class: missing_classification_backfill_command
 guard:
-  status: not-defined
-  path:
-investigation: []
+  status: candidate
+  path: harnessops-core:tests/test_cli/test_lab_classify.py::test_lab_classify_backfills_capability_and_failure_class
+investigation:
+- created_at: '2026-05-17T04:17:10+09:00'
+  kind: codebase
+  summary: 'Open scan found the same classification gap before adoption: issue-execution imported FB0010-FB0014 and created IMP0010-IMP0014, but all five are already in the manual-eval queue with capability/failure_class still unclassified. This broadens the failure from post-adoption backfill to an import/propose-time taxonomy gate before evaluator scoring.'
+  evidence_ref: harness-lab/views/improvements.md; harness-lab/views/imported-feedback.md; hops lab review queue --json
+- created_at: '2026-05-17T04:23:51+09:00'
+  kind: reproduction
+  summary: 'Reconfirmed priority-lane blocker: hops lab classify exposes maturity/scope/relation/promotion/guard options but no capability or failure-class option, while review queue contains IMP0010-IMP0014 already awaiting manual eval with unclassified taxonomy.'
+  evidence_ref: uvx --from harnessops hops lab classify --help; uvx --from harnessops hops lab review queue --json
 links:
   issue_url:
 ---
@@ -31,14 +41,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: hypothesis
-- source_type: observation
+- status: needs-more-evidence
+- maturity: investigated
+- source_type: local-reproduction
 - scope: harnessops-core
-- relation: new
-- promotion_level: target-lab-case
+- relation: extends
+- promotion_level: core-bugfix
 - source_feedback: `FB0009`
-- linked_records: `FB0009`, `E0009`, `H0009`
+- linked_records: `FB0009`, `RS0002`, `E0009`, `H0009`, `D0008`
 
 ## Source Observation
 
@@ -65,11 +75,59 @@ HarnessOps should provide a CLI-supported path to backfill capability and failur
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-17T04:17:10+09:00 [codebase] Open scan found the same classification gap before adoption: issue-execution imported FB0010-FB0014 and created IMP0010-IMP0014, but all five are already in the manual-eval queue with capability/failure_class still unclassified. This broadens the failure from post-adoption backfill to an import/propose-time taxonomy gate before evaluator scoring. (evidence: harness-lab/views/improvements.md; harness-lab/views/imported-feedback.md; hops lab review queue --json)
+- 2026-05-17T04:23:51+09:00 [reproduction] Reconfirmed priority-lane blocker: hops lab classify exposes maturity/scope/relation/promotion/guard options but no capability or failure-class option, while review queue contains IMP0010-IMP0014 already awaiting manual eval with unclassified taxonomy. (evidence: uvx --from harnessops hops lab classify --help; uvx --from harnessops hops lab review queue --json)
 
 ## Research Scans
 
-research scan はまだありません。
+### RS0002: RS0002: Issue import taxonomy guard before scoring
+
+
+Source: `harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md`
+
+
+# RS0002: Issue import taxonomy guard before scoring
+
+## Scope
+
+- scope: harnessops-core
+- existing_dossier: IMP0009
+- capability: lab_classification_metadata
+- failure_class: missing_import_taxonomy_gate
+
+## Evidence
+
+### Local
+
+- Issue lane imported #84-#88 as FB0010-FB0014 and created IMP0010-IMP0014; all five remain unclassified before evaluator scoring (ref: harness-lab/views/improvements.md)
+
+### Codebase
+
+- lab review queue prioritizes IMP0010-IMP0014 for manual eval/decisions while capability and failure_class are unclassified (ref: hops lab review queue --json)
+
+### External
+
+- なし
+
+### Risk And Counterexample
+
+- Scoring five related GitHub Flow records before taxonomy and relation are clear can fragment evaluator effort and hide the shared delegated-finalization capability (ref: harness-lab/records/feedback/FB0010-hops-github-flow-pr-label.md; harness-lab/records/feedback/FB0011-hops-github-flow-pr-view-checks-watch.md; harness-lab/records/feedback/FB0013-hops-github-flow-merge-merge-strategy.md; harness-lab/records/feedback/FB0014-hops-github-flow-merge-json-post-merge.md)
+
+## Candidates
+
+| candidate | relation | recommendation | next_command |
+|---|---|---|---|
+| Issue-import classification gate | extends IMP0009 | Require import/propose flow to capture capability/failure_class before manual eval queue, or mark records blocked for classification | hops lab classify/backfill or import taxonomy option |
+| Bundle related github-flow records | queued_for_later | Classify FB0010-FB0014 under a common GitHub Flow finalization capability before evaluator decides each separately | hops lab investigate/classify related IMP0010-IMP0014 |
+
+## Recommendation
+
+classify existing IMP0009 and queue taxonomy gating before manual scoring
+
+## Next Commands
+
+- `hops lab classify/backfill or import taxonomy option`
+- `hops lab investigate/classify related IMP0010-IMP0014`
 
 
 ## Evaluation
@@ -83,7 +141,10 @@ research scan はまだありません。
 
 - failure_class: missing_classification_backfill_command
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0009-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0009-manual-score.md`
+- scores: impact=4, mechanism_clarity=5, evaluability=5, minimality=4, regression_risk=2, operator_burden=5, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Priority-lane evidence confirms the failure remains current: the public hops lab classify command still lacks capability/failure-class options, and review queue already contains IMP0010-IMP0014 awaiting manual eval with unclassified taxonomy. The narrow upstream fix is testable as a CLI-supported backfill or pre-eval gate that updates related FB/E/H/IMP records and generated views without direct overlay edits. Adoption should wait until the HarnessOps core guard passes, because broad metadata rewriting could corrupt historical decision evidence.
 
 
 ## Hypotheses
@@ -131,12 +192,12 @@ Reject if the path requires direct file edits, rewrites unrelated decision evide
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0009-manual-score.md`
 
 ## Guard
 
-- status: not-defined
-- path: None
+- status: candidate
+- path: harnessops-core:tests/test_cli/test_lab_classify.py::test_lab_classify_backfills_capability_and_failure_class
 
 ## Links
 
@@ -148,4 +209,34 @@ Reject if the path requires direct file edits, rewrites unrelated decision evide
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0008: D0008: needs-more-evidence H0009
+
+
+Source: `harness-lab/records/decisions/D0008-needs-more-evidence-h0009.md`
+
+
+# D0008: needs-more-evidence H0009
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+The failure is reproduced and the proposed taxonomy backfill path is clear, but no HarnessOps core implementation or passing guard has been recorded yet.
+
+## 証拠
+
+E0009 manual score plus priority-lane reproduction: hops lab classify --help lacks capability/failure-class options, and hops lab review queue shows IMP0010-IMP0014 still unclassified before scoring.
+
+## 回帰リスク
+
+Medium if implemented as a broad metadata rewrite: it could mutate historical decision evidence or silently change unrelated dossiers. Keep the backfill command explicit and fixture-driven.
+
+## フォローアップ
+
+Implement the HarnessOps core backfill or pre-eval classification gate, run the guard, regenerate affected dossiers/views, then classify and score IMP0010-IMP0014.
+
+## 回帰ガード
+
+harnessops-core:tests/test_cli/test_lab_classify.py::test_lab_classify_backfills_capability_and_failure_class
