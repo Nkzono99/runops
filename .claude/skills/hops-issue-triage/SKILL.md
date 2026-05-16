@@ -53,20 +53,20 @@ hops feedback import --issue <issue-number> --repo <owner/repo>
 2. project repo 側で観測した失敗なら、issue をそのまま転載せず、失敗として記録してから routing する。
 
 ```bash
-hops add-failure --target <target> ...
-hops route --record F0001
-hops add-feedback --from F0001 --target <target>
+hops feedback add-failure --target <target> ...
+hops feedback route --record F0001
+hops feedback add --from F0001 --target <target>
 hops feedback export --target <target> --sanitize
 ```
 
 3. imported feedback を改善候補として扱う場合は評価ケース化する。
 
 ```bash
-hops lab new-eval-case --from FB0001
-hops propose --from E0001
+hops lab eval-case create --from FB0001
+hops lab propose --from E0001
 ```
 
-4. 実装後は `hops eval --case <Eid> --manual` を使い、証拠、回帰リスク、ガードパスが揃うまで `adopted` 判断を作らない。
+4. 実装後は `hops lab eval --case <Eid> --manual` を使い、証拠、回帰リスク、ガードパスが揃うまで `adopted` 判断を作らない。
 
 ## 完了時の issue close 作法
 

@@ -4,6 +4,6 @@ description: プロジェクト失敗、ハーネス摩擦、ローカル回避�
 ---
 Use `uvx --from harnessops hops <command>` for CLI invocations in target/project repos; do not rely on `hops` being on PATH.
 
-HarnessOps を使う。`hops doctor --check-overlay` を実行し、`.harnessops/`、`harness-feedback/`、`harness-lab/` の構造を直接組み替えない。`hops add-failure`、`hops route`、`hops feedback export --sanitize` を呼び出す。
+HarnessOps を使う。`hops doctor --check-overlay` を実行し、`.harnessops/`、`harness-feedback/`、`harness-lab/` の構造を直接組み替えない。`hops feedback add-failure`、`hops feedback route`、`hops feedback export --sanitize` を呼び出す。
 
 プロジェクト発展は `research/` または `notes/` に残し、ターゲットまたはメタへの昇格前に非公開文脈をサニタイズする。
