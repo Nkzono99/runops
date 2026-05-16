@@ -10,22 +10,22 @@ Use `uvx --from harnessops hops <command>` for CLI invocations in target/project
 
 repo 役割ごとの扱い:
 
-- HarnessOps core または target repository（`harness-lab/` を持つ repo）では、改善調査を `hops lab research-scan`、`hops lab investigate`、`hops lab classify`、必要なら `hops lab capture`、`hops lab new-eval-case`、`hops propose` へ進める。
-- project repository（`harness-feedback/` を持つ repo）では、上流改善の採用判断や `harness-lab/` 作成をしない。観測した失敗や改善候補を `hops add-failure`、`hops route`、`hops add-feedback`、`hops feedback export --sanitize` へ進め、target/HarnessOps 側で import/eval/propose できる形にする。
+- HarnessOps core または target repository（`harness-lab/` を持つ repo）では、改善調査を `hops lab research-scan`、`hops lab investigate`、`hops lab classify`、必要なら `hops lab capture`、`hops lab eval-case create`、`hops lab propose` へ進める。
+- project repository（`harness-feedback/` を持つ repo）では、上流改善の採用判断や `harness-lab/` 作成をしない。観測した失敗や改善候補を `hops feedback add-failure`、`hops feedback route`、`hops feedback add`、`hops feedback export --sanitize` へ進め、target/HarnessOps 側で import/eval/propose できる形にする。
 - 役割が曖昧な場合は、`hops detect` と `.harnessops/project.toml` を確認し、target repo と project repo のどちらの workflow が適切かを決めてから記録する。
 
 ## 調査手順
 
 0. raw idea がまだない場合は、まず `hops-open-meta-scan` 相当の open scan を短く行い、Raw Ideas と Counterframes を出してからこの selection/routing lane に戻る。発散前に record 化しない。
 1. 調査スコープを1文で置く。repo 役割、対象 capability、疑っている failure class、既存 dossier/feedback に足す調査か新規候補探索かを決める。
-2. `rg` でコード、docs、tests、skills、`harness-lab/views/*.md`、`harness-feedback/records/*.md` を調べる。存在しない overlay は無理に作らない。既存 dossier、feedback、判断、ガード、未解決 open question があれば優先する。
+2. target/meta lab repo では、まず `hops lab review context --capability <capability> --json` または `hops lab review queue --json` を使って、既存 dossier、判断、ガード、未解決 open question を取り出す。その後 `rg` でコード、docs、tests、skills、`harness-lab/views/*.md`、`harness-feedback/records/*.md` を調べる。存在しない overlay は無理に作らない。
 3. 外部比較が判断を変えそうな場合だけ web 調査する。検索語にローカルパス、非公開語、未公開研究の文脈を入れない。一次情報、公式 docs、論文、標準実務を優先し、URL を evidence として残す。
 4. 観測を「local evidence」「codebase evidence」「external benchmark」「risk / counterexample」に分ける。
 5. 記録や issue 化の前に anti-myopia strategy pass を必ず行う。候補観測を horizon（immediate bugfix / workflow design / evaluation methodology / cross-project harness principle）と generalization（`local-only` / `repeated-pattern` / `cross-project` / `strategic`）で分類し、`selected_for_execution`、`queued_for_later`、`record_only`、`park`、`reject` の ranked queue に分ける。最新の小さな摩擦を、そのまま新規 record にしない。
 6. local-only な候補は `park` または `reject as local` にする。ただし、より広い failure class の evidence や guardrail になる場合だけ systemic candidate の根拠として残す。
 7. target/meta lab repo で既存テーマに入るなら新規 capture せず、`hops lab investigate` と `hops lab classify` で追記する。新しい failure class や cross-project pattern で、少なくとも2つの target/project repo に効く説明ができるなら `hops lab capture` または `hops lab research-scan` に進める。
-8. project repo で観測した改善候補は、上流へ戻す feedback として記録・ルーティング・サニタイズする。project repo 内で `hops lab capture` や `hops propose` を実行しない。
-9. target/meta lab repo で実装可能な `selected_for_execution` だけ `hops lab new-eval-case` と `hops propose` に進める。仮説には mechanism、minimal implementation、alternative、evaluation plan、kill criteria を入れる。execution 数は daily steward の risk-tier / work-packet budget に従い、発見・記録・queue 作成は単一候補へ潰さない。
+8. project repo で観測した改善候補は、上流へ戻す feedback として記録・ルーティング・サニタイズする。project repo 内で `hops lab capture` や `hops lab propose` を実行しない。
+9. target/meta lab repo で実装可能な `selected_for_execution` だけ `hops lab eval-case create` と `hops lab propose` に進める。仮説には mechanism、minimal implementation、alternative、evaluation plan、kill criteria を入れる。execution 数は daily steward の risk-tier / work-packet budget に従い、発見・記録・queue 作成は単一候補へ潰さない。
 
 ## 使うコマンド
 
@@ -34,13 +34,16 @@ hops lab investigate --from IMP0001 --kind external-benchmark --summary "<比較
 hops lab classify --from IMP0001 --source-type external-benchmark --scope harnessops-core --maturity investigated --relation extends
 hops lab research-scan --title "<title>" --scope "<scope>" --capability "<capability>" --failure-class "<failure>" --candidate "<candidate>|<relation>|<recommendation>|<next command>" --recommendation "<recommendation>"
 hops lab capture --title "<title>" --summary "<observation>" --expected-change "<expected>"
-hops lab new-eval-case --from FB0001
+hops lab eval-case create --from FB0001
+hops lab review queue --json
+hops lab review context --capability "<capability>" --json
+hops lab review lint --warn-only
 hops lab memory lint --warn-only
-hops lab compact --force
-hops propose --from E0001 --hypothesis "<hypothesis>" --mechanism "<mechanism>" --minimal-implementation "<minimal>"
-hops add-failure --target <target> --title "<title>" --summary "<observed failure>"
-hops route --record F0001
-hops add-feedback --from F0001 --target <target>
+hops lab memory compact --force
+hops lab propose --from E0001 --hypothesis "<hypothesis>" --mechanism "<mechanism>" --minimal-implementation "<minimal>"
+hops feedback add-failure --target <target> --title "<title>" --summary "<observed failure>"
+hops feedback route --record F0001
+hops feedback add --from F0001 --target <target>
 hops feedback export --target <target> --sanitize
 ```
 
@@ -69,7 +72,7 @@ hops feedback export --target <target> --sanitize
 - 外部実務を輸入するときは、そのまま一般ルールにせず、HarnessOps の失敗クラス、能力、ガードへ写像する。
 - 「良さそう」だけで採用しない。評価ケース、比較ベースライン、ガード、または中止基準が作れないものは `park` する。
 - skill や rule を増やすより、既存 workflow への統合、削除、migration、`update-harness` で整理できないかを先に見る。
-- 既存 dossier が多くなり調査の入口が重い場合は、records を削除せず `hops lab memory lint --warn-only` で発火基準を確認する。`hops lab compact` は source ID へ戻れる deterministic snapshot として使い、抽象化が必要なら `hops-compact-lab-memory` skill に渡す。
+- 既存 dossier が多くなり調査の入口が重い場合は、records を削除せず `hops lab memory lint --warn-only` で発火基準を確認する。`hops lab memory compact` は source ID へ戻れる deterministic snapshot として使い、抽象化が必要なら `hops-compact-lab-memory` skill に渡す。
 
 ## ガードレール
 

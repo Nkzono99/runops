@@ -6,7 +6,7 @@ Use `uvx --from harnessops hops <command>` for CLI invocations in target/project
 
 `hops doctor --check-overlay` を実行し、`.harnessops/project.toml` を読んで repo 役割を確認する。`.harnessops/`、`harness-feedback/`、`harness-lab/` の構造を直接組み替えない。
 
-この skill は発想のための open scan であり、管理のための workflow ではない。デフォルトでは `hops lab capture`、`hops lab research-scan`、`hops lab new-eval-case`、`hops propose`、GitHub Issue 作成を実行しない。ユーザーが記録・評価・実装を求めたら、出た idea を `hops-research-improvements` または `hops-run-lab` に渡す。
+この skill は発想のための open scan であり、管理のための workflow ではない。デフォルトでは `hops lab capture`、`hops lab research-scan`、`hops lab eval-case create`、`hops lab propose`、GitHub Issue 作成を実行しない。ユーザーが記録・評価・実装を求めたら、出た idea を `hops-research-improvements` または `hops-run-lab` に渡す。
 
 ## 進め方
 

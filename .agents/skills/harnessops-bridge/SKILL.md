@@ -16,10 +16,10 @@ description: プロジェクト失敗の記録、上流フィードバックの�
 - `uvx --from harnessops hops lab dossier --from <FBid>`
 - `uvx --from harnessops hops lab investigate --from <IMPid> --summary <summary>`
 - `uvx --from harnessops hops lab classify --from <IMPid>`
-- `uvx --from harnessops hops lab new-eval-case --from <FBid>`
-- `uvx --from harnessops hops propose --from <Eid>`
-- `uvx --from harnessops hops eval --case <Eid> --manual`
-- `uvx --from harnessops hops decide --from <id> --status <status>`
+- `uvx --from harnessops hops lab eval-case create --from <FBid>`
+- `uvx --from harnessops hops lab propose --from <Eid>`
+- `uvx --from harnessops hops lab eval --case <Eid> --manual`
+- `uvx --from harnessops hops lab decide --from <id> --status <status>`
 - `uvx --refresh-package harnessops --from harnessops hops update-harness`
 - `uvx --refresh-package harnessops --from harnessops hops update-harness --plan-upgrade`
 - `uvx --from harnessops hops migrate --check`
