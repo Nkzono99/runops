@@ -10,3 +10,8 @@
 - `FB0007` triaged unclassified unclassified
 - `FB0008` triaged unclassified unclassified
 - `FB0009` triaged lab_classification_metadata missing_classification_backfill_command
+- `FB0010` triaged unclassified unclassified
+- `FB0011` triaged unclassified unclassified
+- `FB0012` triaged unclassified unclassified
+- `FB0013` triaged unclassified unclassified
+- `FB0014` triaged unclassified unclassified

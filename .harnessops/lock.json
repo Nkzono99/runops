@@ -46,9 +46,9 @@
   "managed_files": {
     "harness-lab/README.md": "sha256:795d3e87ce80e3391ec930f263648bd5e667007c771706c50e2dada0311d4526",
     "harness-lab/views/backlog.md": "sha256:0ed4436872ad24f9c73737b7f84290306dc4baaf36154b7e36be521e985b791c",
-    "harness-lab/views/imported-feedback.md": "sha256:b8f02d55cdd9429be35eb3c44ff932e240804fdc5d98c813352b1357b507596d",
-    "harness-lab/views/improvements.md": "sha256:d49cf00f3280ef142b15ea3344c8e50713e376275cebb20eaae92dc69c9d8292",
-    "harness-lab/views/research-scans.md": "sha256:6d61d712641e7eddc710614cf7bc59889c78e9532dc82666e4d82dadcc06cf7a",
+    "harness-lab/views/imported-feedback.md": "sha256:15d792bd1bc3b1e63285f3d454f721da63e49c1bba6ea02fc63ca21f65bee027",
+    "harness-lab/views/improvements.md": "sha256:9f214b790f12e8402cf4e47487bde489f52db1a5a6116a02a24e7b716578d6ac",
+    "harness-lab/views/research-scans.md": "sha256:4a9da0c58a9cb8e71887ec355d9ad20279d41d4e86b2c0065d38d745405fd952",
     "harness-lab/views/score-trajectory.md": "sha256:a3d2f445609e5e9da0269ece3b10aff2414f3830bd185ad257d32ae19026b616"
   },
   "migrations": [],
