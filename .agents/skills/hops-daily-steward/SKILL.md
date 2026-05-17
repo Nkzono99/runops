@@ -1,12 +1,12 @@
 ---
 name: hops-daily-steward
-description: Run one unattended HarnessOps daily automation as a thin supervisor. Use when Codex should pull/preflight a clean repo, then sequentially delegate maintenance, issue execution, invention/lab organization, priority improvement execution, and PR/merge finalization to lane-specific HOPS skills without doing lane work directly.
+description: Run one unattended HarnessOps daily automation as a thin supervisor. Use when Codex should pull/preflight a clean repo, then sequentially delegate maintenance, issue execution, open meta scan, invention/lab organization, priority improvement execution, and PR/merge finalization to lane-specific HOPS skills without doing lane work directly.
 ---
 Use `uvx --from harnessops hops <command>` in target/project repos unless repo-local docs prove `hops` is available.
 
 # Mission
 
-Supervise one daily run. Keep this skill small: the supervisor owns order, gates, delegation, and final synthesis. It must not perform maintenance, issue work, invention, implementation, lab evaluation, PR creation, merge, or release directly.
+Supervise one daily run. Keep this skill small: the supervisor owns order, gates, delegation, and final synthesis. It must not perform maintenance, issue work, open meta scanning, invention, implementation, lab evaluation, PR creation, merge, or release directly.
 
 Read `.harnessops/project.toml` before delegation. State changes must go through `hops`; do not directly reorganize `.harnessops/`, `harness-feedback/`, or `harness-lab/`.
 
