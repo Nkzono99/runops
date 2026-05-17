@@ -1,6 +1,6 @@
 ---
 name: hops-priority-improvement-steward
-description: Run the priority improvement lane inside a HOPS daily supervisor. Use for selecting and advancing important recorded HOPS improvements, eval cases, hypotheses, decisions, guards, docs, tests, or repo-native implementation after maintenance, issue, and invention lanes.
+description: Run the priority improvement lane inside a HOPS daily supervisor. Use for selecting and advancing important recorded HOPS improvements, eval cases, hypotheses, decisions, guards, docs, tests, or repo-native implementation after maintenance, issue, open meta scan, and invention lanes.
 ---
 Use `uvx --from harnessops hops <command>` in target/project repos unless repo-local docs prove `hops` is available.
 
@@ -12,7 +12,7 @@ Read `.harnessops/project.toml`. Use `hops` for state changes; do not directly r
 
 # Selection
 
-Start with `hops lab review queue --json` in target/meta lab repos. Then inspect recent lane results and the highest-ranked recorded `IMP`, `RS`, `FB`, `E`, `H`, and `D` items. Rank by:
+Start with `hops lab review queue --json` in target/meta lab repos. Then inspect recent lane results, including any structured `artifacts.meta_scan` handoff from the open-meta and invention lanes, and the highest-ranked recorded `IMP`, `RS`, `FB`, `E`, `H`, and `D` items. Rank by:
 
 - user-blocking or automation-blocking impact
 - cross-project applicability

@@ -18,7 +18,7 @@ Expect the supervisor to provide preflight JSON and runtime policy. Default dail
 
 1. Recheck `hops doctor --check-overlay --check-records` and `hops migrate --check` if the preflight summary is missing or stale.
 2. Apply `hops-update-harness` when stale HarnessOps state or `update-policy: apply` is present.
-   - In target/project repos, prefer `uvx --refresh-package harnessops --from harnessops hops update-harness --agent-bridge --codex`.
+   - In target/project repos, prefer `uvx --refresh-package harnessops --from harnessops hops update-harness --agent-bridge` so `[agents]` selects the repo-local bridge hosts.
    - In HarnessOps core, do not PyPI self-update; treat lifecycle drift as repo-local implementation work for a later lane.
 3. For target/meta lab repos, handle safe lab maintenance:
    - run `hops lab memory lint --warn-only` when lab health is missing or stale

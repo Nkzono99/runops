@@ -15,3 +15,4 @@
 - `IMP0012` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0012 unclassified unclassified
 - `IMP0013` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0013 unclassified unclassified
 - `IMP0014` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0014 unclassified unclassified
+- `IMP0015` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-workflow source=FB0015 steward_lane_handoff transient_lane_artifact_loss
