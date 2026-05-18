@@ -2,8 +2,8 @@
 id: IMP0001
 record_type: improvement_dossier
 created_at: '2026-05-13T17:57:54+09:00'
-updated_at: '2026-05-13T17:59:47+09:00'
-status: active
+updated_at: '2026-05-19T04:24:11+09:00'
+status: needs-more-evidence
 source_type: codebase-and-local-friction
 scope: harnessops-core
 maturity: investigated
@@ -14,7 +14,8 @@ eval_cases:
 - E0001
 hypotheses:
 - H0001
-decisions: []
+decisions:
+- D0010
 research_scans:
 - RS0001
 classification:
@@ -32,6 +33,10 @@ investigation:
   kind: risk
   summary: The HOPS update generated a .new view that would have replaced an existing imported-feedback entry with an empty view. Manual review prevented data loss, suggesting update-harness conflict handling should preserve record-derived views or surface a stronger warning when a generated view drops known records.
   evidence_ref: harness-lab/views/imported-feedback.md; .agents/skills/hops-update-harness/SKILL.md
+- created_at: '2026-05-19T04:19:05+09:00'
+  kind: codebase
+  summary: 'Open-meta selected dual Codex/Claude harness parity as systemic evidence: maintenance produced synchronized edits in paired .agents/skills and .claude/skills files while AGENTS.md and docs/layers/harness.md require intentional drift review. Route this as an extension of harness improvement capture, not a new local record; next evaluation should check update-harness or bridge generation can detect paired-file divergence before release.'
+  evidence_ref: AGENTS.md:53; docs/layers/harness.md:68; current git diff for paired HOPS skills
 links:
   issue_url:
 ---
@@ -40,14 +45,14 @@ links:
 
 ## Status
 
-- status: active
+- status: needs-more-evidence
 - maturity: investigated
 - source_type: codebase-and-local-friction
 - scope: harnessops-core
 - relation: extends
 - promotion_level: target-lab-case
 - source_feedback: `FB0001`
-- linked_records: `FB0001`, `RS0001`, `E0001`, `H0001`
+- linked_records: `FB0001`, `RS0001`, `E0001`, `H0001`, `D0010`
 
 ## Source Observation
 
@@ -76,6 +81,7 @@ HarnessOps に improve-harness 相当の汎用 skill/capability を追加し、t
 
 - 2026-05-13T17:58:32+09:00 [codebase] Recent runops onboarding fixes show this capability must capture implementation-time friction, not only issue triage: setup-runops guidance had to account for skills being distributed only after init/setup, agent-owned doctor checks, baseline commit guidance, PyPI-style update notices, gh auth preflight before file writes, and test-speed guard fixtures. (evidence: src/runops/templates/skills/setup-runops/SKILL.md; src/runops/cli/update_notice.py; src/runops/cli/init/github_auth.py; tests/conftest.py; tests/test_cli/test_init_github_auth.py; tests/test_cli/test_update_notice.py)
 - 2026-05-13T17:58:39+09:00 [risk] The HOPS update generated a .new view that would have replaced an existing imported-feedback entry with an empty view. Manual review prevented data loss, suggesting update-harness conflict handling should preserve record-derived views or surface a stronger warning when a generated view drops known records. (evidence: harness-lab/views/imported-feedback.md; .agents/skills/hops-update-harness/SKILL.md)
+- 2026-05-19T04:19:05+09:00 [codebase] Open-meta selected dual Codex/Claude harness parity as systemic evidence: maintenance produced synchronized edits in paired .agents/skills and .claude/skills files while AGENTS.md and docs/layers/harness.md require intentional drift review. Route this as an extension of harness improvement capture, not a new local record; next evaluation should check update-harness or bridge generation can detect paired-file divergence before release. (evidence: AGENTS.md:53; docs/layers/harness.md:68; current git diff for paired HOPS skills)
 
 ## Research Scans
 
@@ -138,7 +144,10 @@ classify
 
 - failure_class: missing_proactive_harness_lab_capture
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0001-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0001-manual-score.md`
+- scores: impact=4, mechanism_clarity=5, evaluability=4, minimality=4, regression_risk=2, operator_burden=4, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Priority-lane evidence supports the failure: IMP0001 and RS0001 show non-issue harness improvement work was only captured after local friction, and the current maintenance diff again required paired Codex/Claude harness drift review. The proposed HOPS-side improve-harness workflow has a clear mechanism and can be evaluated with target harness drift fixtures plus a guard for generated-view conflict warnings and paired skill divergence. Adoption should wait for HarnessOps core implementation and a passing guard, because moving too much target-specific judgment upstream could create noisy lab capture or hide intentional drift.
 
 
 ## Hypotheses
@@ -186,7 +195,7 @@ HOPS 側へ寄せることで target 固有の修正判断が曖昧になり、�
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0001-manual-score.md`
 
 ## Guard
 
@@ -203,4 +212,34 @@ HOPS 側へ寄せることで target 固有の修正判断が曖昧になり、�
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0010: D0010: needs-more-evidence H0001
+
+
+Source: `harness-lab/records/decisions/D0010-needs-more-evidence-h0001.md`
+
+
+# D0010: needs-more-evidence H0001
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+The cross-target mechanism and target-lab evidence are clear, but this lane only produced evaluation evidence; no HarnessOps core improve-harness workflow or passing guard has been recorded yet.
+
+## 証拠
+
+E0001 manual score plus IMP0001/RS0001 evidence: non-issue runops harness improvements and the current paired Codex/Claude skill diff both required explicit capture and drift review.
+
+## 回帰リスク
+
+Medium if the upstream workflow becomes noisy or rewrites target-specific harness judgment; keep the HOPS workflow as a capture/drift gate with explicit target bridge boundaries.
+
+## フォローアップ
+
+Implement the HarnessOps core improve-harness workflow or update-harness/bridge guard for generated-view conflict warnings and paired Codex/Claude skill divergence, run the guard, then reconsider adoption.
+
+## 回帰ガード
+
+harnessops-core:tests/test_skills/test_improve_harness.py::test_target_bridge_suggests_lab_capture_for_paired_harness_drift

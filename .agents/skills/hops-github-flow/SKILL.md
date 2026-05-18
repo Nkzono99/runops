@@ -40,7 +40,7 @@ uvx --from harnessops hops github-flow pr --title "<title>" --body "<summary>" -
 6. required checks が通り、conflict がなければ merge する。
 
 ```bash
-uvx --from harnessops hops github-flow merge --require-checks
+uvx --from harnessops hops github-flow merge --require-checks --method auto
 ```
 
 ## 判断基準
@@ -49,7 +49,7 @@ uvx --from harnessops hops github-flow merge --require-checks
 - project repo ではこの flow を使わない。project 側の観測は `harness-feedback/` に記録し、必要に応じて target/meta repo に export/import する。
 - `[github_flow] enabled = false` の repo ではこの skill を使わず、`hops update-harness --agent-bridge --no-github-flow` で配布対象から外す。
 - `publish` は validation 済みの変更だけに使う。validation なしで commit/push が必要な場合は、人間の明示指示を確認する。
-- merge 前に required checks と conflict 状態を確認する。失敗時は merge せず、原因を報告する。
+- merge 前に required checks と conflict 状態を確認する。`--method auto` は repo policy から `merge` / `squash` / `rebase` を選ぶ。失敗時は merge せず、原因を報告する。
 
 ## 出力
 

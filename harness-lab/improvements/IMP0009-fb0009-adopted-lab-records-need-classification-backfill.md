@@ -2,7 +2,7 @@
 id: IMP0009
 record_type: improvement_dossier
 created_at: '2026-05-16T04:06:28+09:00'
-updated_at: '2026-05-17T04:24:33+09:00'
+updated_at: '2026-05-19T04:19:16+09:00'
 status: needs-more-evidence
 source_type: local-reproduction
 scope: harnessops-core
@@ -33,6 +33,10 @@ investigation:
   kind: reproduction
   summary: 'Reconfirmed priority-lane blocker: hops lab classify exposes maturity/scope/relation/promotion/guard options but no capability or failure-class option, while review queue contains IMP0010-IMP0014 already awaiting manual eval with unclassified taxonomy.'
   evidence_ref: uvx --from harnessops hops lab classify --help; uvx --from harnessops hops lab review queue --json
+- created_at: '2026-05-19T04:19:16+09:00'
+  kind: queue-analysis
+  summary: 'Open-meta queue-pressure idea is better treated as decision debt evidence for classification gating: review queue currently shows high-priority IMP0010-IMP0014 with manual-eval-needed and decision-needed reasons while their capability and failure_class are still unclassified. RS0002 already recommends bundling related github-flow records before scoring, so this should extend existing classification metadata work instead of creating a separate queue metric record.'
+  evidence_ref: uvx --from harnessops hops lab review queue --json; harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md
 links:
   issue_url:
 ---
@@ -77,6 +81,7 @@ HarnessOps should provide a CLI-supported path to backfill capability and failur
 
 - 2026-05-17T04:17:10+09:00 [codebase] Open scan found the same classification gap before adoption: issue-execution imported FB0010-FB0014 and created IMP0010-IMP0014, but all five are already in the manual-eval queue with capability/failure_class still unclassified. This broadens the failure from post-adoption backfill to an import/propose-time taxonomy gate before evaluator scoring. (evidence: harness-lab/views/improvements.md; harness-lab/views/imported-feedback.md; hops lab review queue --json)
 - 2026-05-17T04:23:51+09:00 [reproduction] Reconfirmed priority-lane blocker: hops lab classify exposes maturity/scope/relation/promotion/guard options but no capability or failure-class option, while review queue contains IMP0010-IMP0014 already awaiting manual eval with unclassified taxonomy. (evidence: uvx --from harnessops hops lab classify --help; uvx --from harnessops hops lab review queue --json)
+- 2026-05-19T04:19:16+09:00 [queue-analysis] Open-meta queue-pressure idea is better treated as decision debt evidence for classification gating: review queue currently shows high-priority IMP0010-IMP0014 with manual-eval-needed and decision-needed reasons while their capability and failure_class are still unclassified. RS0002 already recommends bundling related github-flow records before scoring, so this should extend existing classification metadata work instead of creating a separate queue metric record. (evidence: uvx --from harnessops hops lab review queue --json; harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md)
 
 ## Research Scans
 
