@@ -22,6 +22,8 @@ Start with `hops lab review queue --json` in target/meta lab repos. Then inspect
 
 Do not pick a trivial cleanup merely because it is easiest unless all higher-value candidates are blocked.
 
+Before opening new work, run a consolidation-first pass over the chosen candidate: check whether it extends an existing `FB`/`IMP`/`RS`, whether a stale queue item can be retired by investigation/classification/eval/decision, and whether duplicates should be parked or rejected. Prefer retiring or advancing existing records over adding more local-only records when the implementation value is comparable.
+
 # Work
 
 1. For target/meta lab repos, use `hops-run-lab` to create or advance eval cases, hypotheses, manual evals, decisions, and classifications.
