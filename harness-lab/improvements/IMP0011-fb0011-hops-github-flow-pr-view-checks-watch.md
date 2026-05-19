@@ -2,19 +2,20 @@
 id: IMP0011
 record_type: improvement_dossier
 created_at: '2026-05-17T04:12:35+09:00'
-updated_at: '2026-05-17T04:12:35+09:00'
-status: active
+updated_at: '2026-05-20T04:26:59+09:00'
+status: needs-more-evidence
 source_type: observation
 scope: harnessops-core
-maturity: hypothesis
-relation: new
-promotion_level: target-lab-case
+maturity: investigated
+relation: extends
+promotion_level: core-workflow
 source_feedback: FB0011
 eval_cases:
 - E0011
 hypotheses:
 - H0011
-decisions: []
+decisions:
+- D0012
 research_scans: []
 classification:
   capability: unclassified
@@ -22,7 +23,11 @@ classification:
 guard:
   status: not-defined
   path:
-investigation: []
+investigation:
+- created_at: '2026-05-20T04:24:44+09:00'
+  kind: queue-consolidation
+  summary: Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0010, IMP0013, and IMP0014. It is the shared inspection/checks portion of delegated PR finalization, not a separate target-repo feature.
+  evidence_ref: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json
 links:
   issue_url: https://github.com/Nkzono99/runops/issues/85
 ---
@@ -31,14 +36,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: hypothesis
+- status: needs-more-evidence
+- maturity: investigated
 - source_type: observation
 - scope: harnessops-core
-- relation: new
-- promotion_level: target-lab-case
+- relation: extends
+- promotion_level: core-workflow
 - source_feedback: `FB0011`
-- linked_records: `FB0011`, `E0011`, `H0011`
+- linked_records: `FB0011`, `E0011`, `H0011`, `D0012`
 
 ## Source Observation
 
@@ -101,7 +106,7 @@ GitHub Flow を HOPS CLI に委譲するなら、PR 状態確認と required che
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-20T04:24:44+09:00 [queue-consolidation] Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0010, IMP0013, and IMP0014. It is the shared inspection/checks portion of delegated PR finalization, not a separate target-repo feature. (evidence: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json)
 
 ## Research Scans
 
@@ -119,7 +124,10 @@ research scan はまだありません。
 
 - failure_class: unclassified
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0011-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0011-manual-score.md`
+- scores: impact=4, mechanism_clarity=4, evaluability=5, minimality=3, regression_risk=3, operator_burden=5, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Consolidated under the GitHub Flow finalization bundle. View/checks/watch support has high automation impact because finalization lanes currently need direct gh pr view/checks calls; complexity is higher because required-check states and watch timeout behavior must match merge semantics.
 
 
 ## Hypotheses
@@ -167,7 +175,7 @@ Reject if the commands produce ambiguous check states or require repo-specific l
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0011-manual-score.md`
 
 ## Guard
 
@@ -184,4 +192,34 @@ Reject if the commands produce ambiguous check states or require repo-specific l
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0012: D0012: needs-more-evidence H0011
+
+
+Source: `harness-lab/records/decisions/D0012-needs-more-evidence-h0011.md`
+
+
+# D0012: needs-more-evidence H0011
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+Worth pursuing upstream, but it needs HarnessOps core implementation and mocked check-state guards before any issue can be closed.
+
+## 証拠
+
+E0011 manual score; RS0002/IMP0009 consolidation context; supervisor run 20260520-040215-980747f
+
+## 回帰リスク
+
+Medium: ambiguous pending/failed/missing/skipped check normalization could make automation merge decisions unsafe.
+
+## フォローアップ
+
+Implement github-flow view and checks/watch in HarnessOps, reuse merge required-check semantics, and guard pending, failed, passed, missing, skipped, and timeout JSON.
+
+## 回帰ガード
+
+harnessops-core:tests/test_cli/test_github_flow.py::test_checks_required_states_and_watch_json

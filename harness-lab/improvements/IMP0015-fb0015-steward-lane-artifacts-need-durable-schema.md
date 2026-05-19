@@ -2,12 +2,12 @@
 id: IMP0015
 record_type: improvement_dossier
 created_at: '2026-05-18T04:20:52+09:00'
-updated_at: '2026-05-18T04:22:05+09:00'
+updated_at: '2026-05-20T04:18:55+09:00'
 status: needs-more-evidence
 source_type: local-reproduction
 scope: harnessops-core
 maturity: investigated
-relation: new
+relation: extends
 promotion_level: core-workflow
 source_feedback: FB0015
 eval_cases:
@@ -28,6 +28,10 @@ investigation:
   kind: codebase
   summary: 'Priority review confirmed RS0003 is a valid cross-lane handoff problem, but the current lab promotion path is feedback-centric: create_eval_case records source_feedback and create_or_update_improvement_dossier only normalizes FB/E/H/D back to imported_feedback. A direct RS-to-eval route would risk an orphan eval/hypothesis, so this lane promoted RS0003 through FB0015 before scoring.'
   evidence_ref: RS0003; harnessops.core.lab_records.create_eval_case; harnessops.core.improvement_dossier._feedback_for_record
+- created_at: '2026-05-20T04:18:45+09:00'
+  kind: lane-artifact-routing
+  summary: '20260520 open-meta again produced raw_ideas/counterframes/routing_hints consumed by invention, but the lane deliberately avoided new records because RS0003/IMP0015 already cover durable artifacts. This supports the existing schema-plus-expiry proposal and reinforces the promotion rule: transient scan output should become permanent only through explicit feedback/research promotion.'
+  evidence_ref: open-meta artifacts in .harnessops/cache/steward-runs/20260520-040215-980747f.json; harness-lab/records/research-scans/RS0003-steward-lane-artifacts-need-durable-schema.md; harness-lab/improvements/IMP0015-fb0015-steward-lane-artifacts-need-durable-schema.md
 links:
   issue_url:
 ---
@@ -40,7 +44,7 @@ links:
 - maturity: investigated
 - source_type: local-reproduction
 - scope: harnessops-core
-- relation: new
+- relation: extends
 - promotion_level: core-workflow
 - source_feedback: `FB0015`
 - linked_records: `FB0015`, `E0015`, `H0015`, `D0009`
@@ -71,6 +75,7 @@ HarnessOps should define a narrow steward lane artifact lifecycle: schema-checke
 ## Investigation
 
 - 2026-05-18T04:21:03+09:00 [codebase] Priority review confirmed RS0003 is a valid cross-lane handoff problem, but the current lab promotion path is feedback-centric: create_eval_case records source_feedback and create_or_update_improvement_dossier only normalizes FB/E/H/D back to imported_feedback. A direct RS-to-eval route would risk an orphan eval/hypothesis, so this lane promoted RS0003 through FB0015 before scoring. (evidence: RS0003; harnessops.core.lab_records.create_eval_case; harnessops.core.improvement_dossier._feedback_for_record)
+- 2026-05-20T04:18:45+09:00 [lane-artifact-routing] 20260520 open-meta again produced raw_ideas/counterframes/routing_hints consumed by invention, but the lane deliberately avoided new records because RS0003/IMP0015 already cover durable artifacts. This supports the existing schema-plus-expiry proposal and reinforces the promotion rule: transient scan output should become permanent only through explicit feedback/research promotion. (evidence: open-meta artifacts in .harnessops/cache/steward-runs/20260520-040215-980747f.json; harness-lab/records/research-scans/RS0003-steward-lane-artifacts-need-durable-schema.md; harness-lab/improvements/IMP0015-fb0015-steward-lane-artifacts-need-durable-schema.md)
 
 ## Research Scans
 

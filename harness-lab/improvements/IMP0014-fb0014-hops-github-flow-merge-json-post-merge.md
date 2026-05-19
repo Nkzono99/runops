@@ -2,19 +2,20 @@
 id: IMP0014
 record_type: improvement_dossier
 created_at: '2026-05-17T04:13:04+09:00'
-updated_at: '2026-05-17T04:13:04+09:00'
-status: active
+updated_at: '2026-05-20T04:27:05+09:00'
+status: needs-more-evidence
 source_type: observation
 scope: harnessops-core
-maturity: hypothesis
-relation: new
-promotion_level: target-lab-case
+maturity: investigated
+relation: extends
+promotion_level: core-workflow
 source_feedback: FB0014
 eval_cases:
 - E0014
 hypotheses:
 - H0014
-decisions: []
+decisions:
+- D0014
 research_scans: []
 classification:
   capability: unclassified
@@ -22,7 +23,11 @@ classification:
 guard:
   status: not-defined
   path:
-investigation: []
+investigation:
+- created_at: '2026-05-20T04:24:53+09:00'
+  kind: queue-consolidation
+  summary: Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0010, IMP0011, and IMP0013. It is the post-merge reporting portion of delegated PR finalization and should be evaluated with the same upstream guard family.
+  evidence_ref: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json
 links:
   issue_url: https://github.com/Nkzono99/runops/issues/88
 ---
@@ -31,14 +36,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: hypothesis
+- status: needs-more-evidence
+- maturity: investigated
 - source_type: observation
 - scope: harnessops-core
-- relation: new
-- promotion_level: target-lab-case
+- relation: extends
+- promotion_level: core-workflow
 - source_feedback: `FB0014`
-- linked_records: `FB0014`, `E0014`, `H0014`
+- linked_records: `FB0014`, `E0014`, `H0014`, `D0014`
 
 ## Source Observation
 
@@ -102,7 +107,7 @@ runops PR #83 の merge 時、`hops github-flow merge 83 --require-checks --dele
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-20T04:24:53+09:00 [queue-consolidation] Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0010, IMP0011, and IMP0013. It is the post-merge reporting portion of delegated PR finalization and should be evaluated with the same upstream guard family. (evidence: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json)
 
 ## Research Scans
 
@@ -120,7 +125,10 @@ research scan はまだありません。
 
 - failure_class: unclassified
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0014-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0014-manual-score.md`
+- scores: impact=4, mechanism_clarity=5, evaluability=5, minimality=4, regression_risk=2, operator_burden=5, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Consolidated under the GitHub Flow finalization bundle. Post-merge JSON has direct finalization value because it removes the extra gh pr view call after merge; implementation should separate pre-merge and post-merge fields so successful merges cannot look OPEN.
 
 
 ## Hypotheses
@@ -168,7 +176,7 @@ Reject if successful merges can be reported as open without an explicit pre_merg
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0014-manual-score.md`
 
 ## Guard
 
@@ -185,4 +193,34 @@ Reject if successful merges can be reported as open without an explicit pre_merg
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0014: D0014: needs-more-evidence H0014
+
+
+Source: `harness-lab/records/decisions/D0014-needs-more-evidence-h0014.md`
+
+
+# D0014: needs-more-evidence H0014
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+Strong upstream candidate, but needs core code and guard evidence for post-merge state and lookup-failure handling.
+
+## 証拠
+
+E0014 manual score; RS0002/IMP0009 consolidation context; supervisor run 20260520-040215-980747f
+
+## 回帰リスク
+
+Low-to-medium: post-merge lookup can fail after a successful merge, so output must preserve merge success and report lookup failure separately.
+
+## フォローアップ
+
+Extend HarnessOps merge JSON with merged/post_merge_pr/mergeCommit/deletedBranch/checks summary fields and guard compatibility with existing JSON.
+
+## 回帰ガード
+
+harnessops-core:tests/test_cli/test_github_flow.py::test_merge_json_includes_post_merge_state

@@ -1,0 +1,17 @@
+schema_version: '0.1'
+record_type: manual_eval_result
+created_at: '2026-05-20T04:25:47+09:00'
+eval_case: E0011
+experiment:
+scores:
+  impact: 4
+  mechanism_clarity: 4
+  evaluability: 5
+  minimality: 3
+  regression_risk: 3
+  operator_burden: 5
+  anti_theater: 5
+  maintainability: 4
+  privacy_sanitization_risk: 5
+notes: Consolidated under the GitHub Flow finalization bundle. View/checks/watch support has high automation impact because finalization lanes currently need direct gh pr view/checks calls; complexity is higher because required-check states and watch timeout behavior must match merge semantics.
+source_record: harness-lab/records/eval-cases/E0011-fb0011-hops-github-flow-pr-view-checks-watch.md

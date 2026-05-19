@@ -2,7 +2,7 @@
 id: IMP0009
 record_type: improvement_dossier
 created_at: '2026-05-16T04:06:28+09:00'
-updated_at: '2026-05-19T04:19:16+09:00'
+updated_at: '2026-05-20T04:18:34+09:00'
 status: needs-more-evidence
 source_type: local-reproduction
 scope: harnessops-core
@@ -37,6 +37,10 @@ investigation:
   kind: queue-analysis
   summary: 'Open-meta queue-pressure idea is better treated as decision debt evidence for classification gating: review queue currently shows high-priority IMP0010-IMP0014 with manual-eval-needed and decision-needed reasons while their capability and failure_class are still unclassified. RS0002 already recommends bundling related github-flow records before scoring, so this should extend existing classification metadata work instead of creating a separate queue metric record.'
   evidence_ref: uvx --from harnessops hops lab review queue --json; harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md
+- created_at: '2026-05-20T04:18:33+09:00'
+  kind: queue-consolidation
+  summary: '20260520 invention pass selected the GitHub Flow finalization bundle as an extension of RS0002/IMP0009 rather than a new record: IMP0010, IMP0011, IMP0013, and IMP0014 all describe delegated PR/finalization surface gaps, while IMP0012 should stay separate as update-harness whitespace drift. Priority should classify or bundle the GitHub Flow items before scoring them individually.'
+  evidence_ref: open-meta artifacts in .harnessops/cache/steward-runs/20260520-040215-980747f.json; uvx --from harnessops hops lab review queue --json; harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md
 links:
   issue_url:
 ---
@@ -82,6 +86,7 @@ HarnessOps should provide a CLI-supported path to backfill capability and failur
 - 2026-05-17T04:17:10+09:00 [codebase] Open scan found the same classification gap before adoption: issue-execution imported FB0010-FB0014 and created IMP0010-IMP0014, but all five are already in the manual-eval queue with capability/failure_class still unclassified. This broadens the failure from post-adoption backfill to an import/propose-time taxonomy gate before evaluator scoring. (evidence: harness-lab/views/improvements.md; harness-lab/views/imported-feedback.md; hops lab review queue --json)
 - 2026-05-17T04:23:51+09:00 [reproduction] Reconfirmed priority-lane blocker: hops lab classify exposes maturity/scope/relation/promotion/guard options but no capability or failure-class option, while review queue contains IMP0010-IMP0014 already awaiting manual eval with unclassified taxonomy. (evidence: uvx --from harnessops hops lab classify --help; uvx --from harnessops hops lab review queue --json)
 - 2026-05-19T04:19:16+09:00 [queue-analysis] Open-meta queue-pressure idea is better treated as decision debt evidence for classification gating: review queue currently shows high-priority IMP0010-IMP0014 with manual-eval-needed and decision-needed reasons while their capability and failure_class are still unclassified. RS0002 already recommends bundling related github-flow records before scoring, so this should extend existing classification metadata work instead of creating a separate queue metric record. (evidence: uvx --from harnessops hops lab review queue --json; harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md)
+- 2026-05-20T04:18:33+09:00 [queue-consolidation] 20260520 invention pass selected the GitHub Flow finalization bundle as an extension of RS0002/IMP0009 rather than a new record: IMP0010, IMP0011, IMP0013, and IMP0014 all describe delegated PR/finalization surface gaps, while IMP0012 should stay separate as update-harness whitespace drift. Priority should classify or bundle the GitHub Flow items before scoring them individually. (evidence: open-meta artifacts in .harnessops/cache/steward-runs/20260520-040215-980747f.json; uvx --from harnessops hops lab review queue --json; harness-lab/records/research-scans/RS0002-issue-import-taxonomy-guard-before-scoring.md)
 
 ## Research Scans
 

@@ -2,19 +2,20 @@
 id: IMP0010
 record_type: improvement_dossier
 created_at: '2026-05-17T04:12:25+09:00'
-updated_at: '2026-05-17T04:12:25+09:00'
-status: active
+updated_at: '2026-05-20T04:26:57+09:00'
+status: needs-more-evidence
 source_type: observation
 scope: harnessops-core
-maturity: hypothesis
-relation: new
-promotion_level: target-lab-case
+maturity: investigated
+relation: extends
+promotion_level: core-workflow
 source_feedback: FB0010
 eval_cases:
 - E0010
 hypotheses:
 - H0010
-decisions: []
+decisions:
+- D0011
 research_scans: []
 classification:
   capability: unclassified
@@ -22,7 +23,11 @@ classification:
 guard:
   status: not-defined
   path:
-investigation: []
+investigation:
+- created_at: '2026-05-20T04:24:40+09:00'
+  kind: queue-consolidation
+  summary: Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0011, IMP0013, and IMP0014. Candidate taxonomy is capability=github_flow_finalization and failure_class=delegated_pr_finalization_escape_hatch, but the current HOPS classify CLI cannot backfill capability/failure_class without direct overlay edits.
+  evidence_ref: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json
 links:
   issue_url: https://github.com/Nkzono99/runops/issues/84
 ---
@@ -31,14 +36,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: hypothesis
+- status: needs-more-evidence
+- maturity: investigated
 - source_type: observation
 - scope: harnessops-core
-- relation: new
-- promotion_level: target-lab-case
+- relation: extends
+- promotion_level: core-workflow
 - source_feedback: `FB0010`
-- linked_records: `FB0010`, `E0010`, `H0010`
+- linked_records: `FB0010`, `E0010`, `H0010`, `D0011`
 
 ## Source Observation
 
@@ -96,7 +101,7 @@ updated_at: 2026-05-16T05:06:05Z
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-20T04:24:40+09:00 [queue-consolidation] Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0011, IMP0013, and IMP0014. Candidate taxonomy is capability=github_flow_finalization and failure_class=delegated_pr_finalization_escape_hatch, but the current HOPS classify CLI cannot backfill capability/failure_class without direct overlay edits. (evidence: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json)
 
 ## Research Scans
 
@@ -114,7 +119,10 @@ research scan はまだありません。
 
 - failure_class: unclassified
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0010-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0010-manual-score.md`
+- scores: impact=4, mechanism_clarity=5, evaluability=5, minimality=4, regression_risk=2, operator_burden=4, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Consolidated under the GitHub Flow finalization bundle. Label support is a narrow upstream HOPS extension that removes post-PR gh pr edit calls; classify capability/failure_class backfill is still blocked by the current HOPS CLI, so adoption should wait for HarnessOps core implementation and guard evidence.
 
 
 ## Hypotheses
@@ -162,7 +170,7 @@ Reject if label support requires direct gh calls in lane scripts or changes curr
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0010-manual-score.md`
 
 ## Guard
 
@@ -179,4 +187,34 @@ Reject if label support requires direct gh calls in lane scripts or changes curr
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0011: D0011: needs-more-evidence H0010
+
+
+Source: `harness-lab/records/decisions/D0011-needs-more-evidence-h0010.md`
+
+
+# D0011: needs-more-evidence H0010
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+Clear upstream HOPS finalization feature, but no HarnessOps core implementation or passing guard exists in this target repo run.
+
+## 証拠
+
+E0010 manual score; RS0002/IMP0009 consolidation context; supervisor run 20260520-040215-980747f
+
+## 回帰リスク
+
+Low-to-medium: label application can fail after PR creation, so JSON must preserve the PR URL and label failure details without changing unlabeled behavior.
+
+## フォローアップ
+
+Implement label options in HarnessOps github-flow pr, include label result JSON, run mocked labeled/unlabeled PR guards, then backfill capability/failure_class through a supported command.
+
+## 回帰ガード
+
+harnessops-core:tests/test_cli/test_github_flow.py::test_pr_applies_labels_and_reports_json
