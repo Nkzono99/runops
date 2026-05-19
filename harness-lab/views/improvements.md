@@ -10,9 +10,9 @@
 - `IMP0007` adopted maturity=adopted scope=runops-target promotion=target-feature source=FB0007 unclassified unclassified
 - `IMP0008` adopted maturity=adopted scope=runops-target promotion=target-feature source=FB0008 unclassified unclassified
 - `IMP0009` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-bugfix source=FB0009 lab_classification_metadata missing_classification_backfill_command
-- `IMP0010` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0010 unclassified unclassified
-- `IMP0011` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0011 unclassified unclassified
-- `IMP0012` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0012 unclassified unclassified
-- `IMP0013` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0013 unclassified unclassified
-- `IMP0014` active maturity=hypothesis scope=harnessops-core promotion=target-lab-case source=FB0014 unclassified unclassified
+- `IMP0010` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-workflow source=FB0010 unclassified unclassified
+- `IMP0011` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-workflow source=FB0011 unclassified unclassified
+- `IMP0012` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-bugfix source=FB0012 unclassified unclassified
+- `IMP0013` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-workflow source=FB0013 unclassified unclassified
+- `IMP0014` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-workflow source=FB0014 unclassified unclassified
 - `IMP0015` needs-more-evidence maturity=investigated scope=harnessops-core promotion=core-workflow source=FB0015 steward_lane_handoff transient_lane_artifact_loss

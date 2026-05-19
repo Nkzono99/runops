@@ -2,19 +2,20 @@
 id: IMP0013
 record_type: improvement_dossier
 created_at: '2026-05-17T04:12:53+09:00'
-updated_at: '2026-05-17T04:12:53+09:00'
-status: active
+updated_at: '2026-05-20T04:27:03+09:00'
+status: needs-more-evidence
 source_type: observation
 scope: harnessops-core
-maturity: hypothesis
-relation: new
-promotion_level: target-lab-case
+maturity: investigated
+relation: extends
+promotion_level: core-workflow
 source_feedback: FB0013
 eval_cases:
 - E0013
 hypotheses:
 - H0013
-decisions: []
+decisions:
+- D0013
 research_scans: []
 classification:
   capability: unclassified
@@ -22,7 +23,11 @@ classification:
 guard:
   status: not-defined
   path:
-investigation: []
+investigation:
+- created_at: '2026-05-20T04:24:49+09:00'
+  kind: queue-consolidation
+  summary: Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0010, IMP0011, and IMP0014. It is the merge-policy portion of delegated PR finalization and should be evaluated with the same upstream guard family.
+  evidence_ref: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json
 links:
   issue_url: https://github.com/Nkzono99/runops/issues/87
 ---
@@ -31,14 +36,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: hypothesis
+- status: needs-more-evidence
+- maturity: investigated
 - source_type: observation
 - scope: harnessops-core
-- relation: new
-- promotion_level: target-lab-case
+- relation: extends
+- promotion_level: core-workflow
 - source_feedback: `FB0013`
-- linked_records: `FB0013`, `E0013`, `H0013`
+- linked_records: `FB0013`, `E0013`, `H0013`, `D0013`
 
 ## Source Observation
 
@@ -98,7 +103,7 @@ repository policy や automation lane ごとに squash / merge commit / rebase �
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-20T04:24:49+09:00 [queue-consolidation] Priority lane consolidated this as part of the GitHub Flow finalization bundle with IMP0010, IMP0011, and IMP0014. It is the merge-policy portion of delegated PR finalization and should be evaluated with the same upstream guard family. (evidence: RS0002; IMP0009; .harnessops/cache/steward-runs/20260520-040215-980747f.json)
 
 ## Research Scans
 
@@ -116,7 +121,10 @@ research scan はまだありません。
 
 - failure_class: unclassified
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0013-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0013-manual-score.md`
+- scores: impact=4, mechanism_clarity=5, evaluability=5, minimality=4, regression_risk=3, operator_burden=4, anti_theater=5, maintainability=4, privacy_sanitization_risk=5
+- notes: Consolidated under the GitHub Flow finalization bundle. Merge strategy selection is a narrow policy-control addition and should preserve the current merge default while allowing explicit squash/rebase where repo policy requires it.
 
 
 ## Hypotheses
@@ -164,7 +172,7 @@ Reject if strategy support weakens required-check enforcement or changes the cur
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0013-manual-score.md`
 
 ## Guard
 
@@ -181,4 +189,34 @@ Reject if strategy support weakens required-check enforcement or changes the cur
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0013: D0013: needs-more-evidence H0013
+
+
+Source: `harness-lab/records/decisions/D0013-needs-more-evidence-h0013.md`
+
+
+# D0013: needs-more-evidence H0013
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+Mechanism and guard path are clear, but upstream HOPS implementation and strategy failure reporting are still missing.
+
+## 証拠
+
+E0013 manual score; RS0002/IMP0009 consolidation context; supervisor run 20260520-040215-980747f
+
+## 回帰リスク
+
+Medium: a repo-disabled strategy can fail after checks pass, and the default merge behavior must remain compatible.
+
+## フォローアップ
+
+Add a validated merge strategy option in HarnessOps, map it to gh pr merge flags, include strategy in JSON, and test default/merge/squash/rebase/failure paths.
+
+## 回帰ガード
+
+harnessops-core:tests/test_cli/test_github_flow.py::test_merge_strategy_maps_to_gh_flags_and_json

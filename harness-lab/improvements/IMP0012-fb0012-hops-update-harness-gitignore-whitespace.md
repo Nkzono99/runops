@@ -2,19 +2,20 @@
 id: IMP0012
 record_type: improvement_dossier
 created_at: '2026-05-17T04:12:44+09:00'
-updated_at: '2026-05-17T04:12:44+09:00'
-status: active
+updated_at: '2026-05-20T04:27:01+09:00'
+status: needs-more-evidence
 source_type: observation
 scope: harnessops-core
-maturity: hypothesis
+maturity: investigated
 relation: new
-promotion_level: target-lab-case
+promotion_level: core-bugfix
 source_feedback: FB0012
 eval_cases:
 - E0012
 hypotheses:
 - H0012
-decisions: []
+decisions:
+- D0015
 research_scans: []
 classification:
   capability: unclassified
@@ -22,7 +23,11 @@ classification:
 guard:
   status: not-defined
   path:
-investigation: []
+investigation:
+- created_at: '2026-05-20T04:24:58+09:00'
+  kind: priority-review
+  summary: Priority lane kept this separate from the GitHub Flow finalization bundle. The current maintenance lane reported update-harness completed with no git diff, so this remains an upstream fixture/regression-guard request rather than a reproduced target-repo change in this run.
+  evidence_ref: harness-lab/improvements/IMP0012-fb0012-hops-update-harness-gitignore-whitespace.md; maintenance lane result in .harnessops/cache/steward-runs/20260520-040215-980747f.json
 links:
   issue_url: https://github.com/Nkzono99/runops/issues/86
 ---
@@ -31,14 +36,14 @@ links:
 
 ## Status
 
-- status: active
-- maturity: hypothesis
+- status: needs-more-evidence
+- maturity: investigated
 - source_type: observation
 - scope: harnessops-core
 - relation: new
-- promotion_level: target-lab-case
+- promotion_level: core-bugfix
 - source_feedback: `FB0012`
-- linked_records: `FB0012`, `E0012`, `H0012`
+- linked_records: `FB0012`, `E0012`, `H0012`, `D0015`
 
 ## Source Observation
 
@@ -95,7 +100,7 @@ HarnessOps managed artifact 更新で `.gitignore` のような既存ファイ�
 
 ## Investigation
 
-調査メモはまだありません。
+- 2026-05-20T04:24:58+09:00 [priority-review] Priority lane kept this separate from the GitHub Flow finalization bundle. The current maintenance lane reported update-harness completed with no git diff, so this remains an upstream fixture/regression-guard request rather than a reproduced target-repo change in this run. (evidence: harness-lab/improvements/IMP0012-fb0012-hops-update-harness-gitignore-whitespace.md; maintenance lane result in .harnessops/cache/steward-runs/20260520-040215-980747f.json)
 
 ## Research Scans
 
@@ -113,7 +118,10 @@ research scan はまだありません。
 
 - failure_class: unclassified
 
-- manual_eval: 未実施
+- manual_eval_yml: `harness-lab/views/eval-results/E0012-manual-score.yml`
+- manual_eval_md: `harness-lab/views/eval-results/E0012-manual-score.md`
+- scores: impact=3, mechanism_clarity=4, evaluability=5, minimality=4, regression_risk=3, operator_burden=4, anti_theater=4, maintainability=4, privacy_sanitization_risk=5
+- notes: Kept separate from the GitHub Flow finalization bundle. The original update-harness whitespace churn is actionable as an upstream fixture, but this run did not reproduce target-repo dirtiness: maintenance reported update-harness ok with clean git status.
 
 
 ## Hypotheses
@@ -161,7 +169,7 @@ Reject if the writer silently rewrites user-managed files or suppresses real con
 
 ## Evidence
 
-評価結果はまだありません。
+`harness-lab/views/eval-results/E0012-manual-score.md`
 
 ## Guard
 
@@ -178,4 +186,34 @@ Reject if the writer silently rewrites user-managed files or suppresses real con
 
 ## Decision Log
 
-判断レコードはまだありません。
+### D0015: D0015: needs-more-evidence H0012
+
+
+Source: `harness-lab/records/decisions/D0015-needs-more-evidence-h0012.md`
+
+
+# D0015: needs-more-evidence H0012
+
+## 判断
+
+needs-more-evidence
+
+## 理由
+
+Needs upstream fixture and guard before adoption; current target run provides a non-reproduction signal, not enough evidence to close the issue.
+
+## 証拠
+
+E0012 manual score; RS0002/IMP0009 consolidation context; supervisor run 20260520-040215-980747f
+
+## 回帰リスク
+
+Medium: normalization must preserve intentional whitespace-sensitive changes and avoid silently rewriting user-managed files.
+
+## フォローアップ
+
+Add HarnessOps update-harness fixtures for CRLF/LF .gitignore, normalized no-op writes, template trailing whitespace, and diff-check reporting.
+
+## 回帰ガード
+
+harnessops-core:tests/test_harness/test_update_harness.py::test_update_harness_preserves_gitignore_newlines_and_skips_normalized_noop
