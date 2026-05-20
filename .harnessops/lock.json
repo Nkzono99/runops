@@ -41,14 +41,14 @@
       ".claude/skills/hops-update-harness/SKILL.md": "sha256:20b28985e5b3463eac61f00e90dc3cd47060d4d8639aa0d309467b0426ec3748"
     }
   },
-  "harnessops_version": "0.1.14",
+  "harnessops_version": "0.1.15",
   "layout_version": "0.1",
   "managed_files": {
     "harness-lab/README.md": "sha256:795d3e87ce80e3391ec930f263648bd5e667007c771706c50e2dada0311d4526",
     "harness-lab/views/backlog.md": "sha256:0ed4436872ad24f9c73737b7f84290306dc4baaf36154b7e36be521e985b791c",
-    "harness-lab/views/imported-feedback.md": "sha256:2e3b90aeec715bd50e7c76097212b5609fa28d0a2d3d2e0e8125889ff0594508",
-    "harness-lab/views/improvements.md": "sha256:dc16d5ac3033c714897611c7ceebedd2b84dbc2b292f69b4c4893d524446e1f2",
-    "harness-lab/views/research-scans.md": "sha256:7fb10dcd23935a4f8a4dcec803b4efcb22fe433bbb1bf6a994d4af68926068f0",
+    "harness-lab/views/imported-feedback.md": "sha256:bf001b1950d29021d4369d9e0f6cc71c6155215cad27638b7b3fe4f3cf851b7a",
+    "harness-lab/views/improvements.md": "sha256:9c4cfd9c6b6c8eade6379317ad49187a09a08590a0c5b2658b208ca07d644adb",
+    "harness-lab/views/research-scans.md": "sha256:b32262b62d655d37226f3e2757429577af438351f6e9123f10298a0eabd12a26",
     "harness-lab/views/score-trajectory.md": "sha256:a3d2f445609e5e9da0269ece3b10aff2414f3830bd185ad257d32ae19026b616"
   },
   "migrations": [],
