@@ -2,7 +2,7 @@
 id: IMP0016
 record_type: improvement_dossier
 created_at: '2026-05-21T04:17:15+09:00'
-updated_at: '2026-05-21T04:18:58+09:00'
+updated_at: '2026-05-22T04:12:29+09:00'
 status: needs-more-evidence
 source_type: local-reproduction
 scope: harnessops-core
@@ -28,6 +28,10 @@ investigation:
   kind: workflow-design
   summary: 'Priority review connected RS0005 to a concrete upstream workflow gap: runops documents target-owned context surfaces and gates, but autonomous steward lanes only receive lane-local summaries unless a supervisor passes those target facts explicitly. In a runops source checkout, runo context --json correctly fails without runops.toml, so a HOPS pre-lane digest must treat project context as an optional target-owned input and cite fallback docs/rules rather than persisting inferred target memory.'
   evidence_ref: RS0005; uv run runo context --json ProjectNotFoundError in source checkout; README.md:94-121; docs/agent-user-guide.md:20,70,144-166,197; docs/layers/interface.md:51-55,109-110,127,154-159; docs/mcp.md:35-46,142-143; .codex/rules/commands.md:13
+- created_at: '2026-05-22T04:12:28+09:00'
+  kind: codebase
+  summary: 'Open-meta mode-map idea extends pre-lane target intent: README/docs split agent work across experiment operations, paper-support exports, harness maintenance, and upstream feedback, but no concise mode map tells an autonomous lane which posture and safety gates apply before acting.'
+  evidence_ref: README.md:163-174;docs/agent-user-guide.md:28-44;docs/mcp.md:133-143
 links:
   issue_url:
 ---
@@ -71,6 +75,7 @@ HarnessOps should evaluate a narrow pre-lane target intent digest contract that 
 ## Investigation
 
 - 2026-05-21T04:17:55+09:00 [workflow-design] Priority review connected RS0005 to a concrete upstream workflow gap: runops documents target-owned context surfaces and gates, but autonomous steward lanes only receive lane-local summaries unless a supervisor passes those target facts explicitly. In a runops source checkout, runo context --json correctly fails without runops.toml, so a HOPS pre-lane digest must treat project context as an optional target-owned input and cite fallback docs/rules rather than persisting inferred target memory. (evidence: RS0005; uv run runo context --json ProjectNotFoundError in source checkout; README.md:94-121; docs/agent-user-guide.md:20,70,144-166,197; docs/layers/interface.md:51-55,109-110,127,154-159; docs/mcp.md:35-46,142-143; .codex/rules/commands.md:13)
+- 2026-05-22T04:12:28+09:00 [codebase] Open-meta mode-map idea extends pre-lane target intent: README/docs split agent work across experiment operations, paper-support exports, harness maintenance, and upstream feedback, but no concise mode map tells an autonomous lane which posture and safety gates apply before acting. (evidence: README.md:163-174;docs/agent-user-guide.md:28-44;docs/mcp.md:133-143)
 
 ## Research Scans
 
