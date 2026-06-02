@@ -20,6 +20,7 @@ runops の開発ハーネスは `.claude/` だけではなく、`.codex/` と
 
 - Claude 固有設定は `.claude/`、Codex 固有設定は `.codex/` に置く
 - 共通ワークフローや運用知識は、tool 固有の文法差を除いて意図的な差分だけを残す
+- HarnessOps upstream lab overlay は repo 外の `../runops-harness-lab` に置き、repo 内 `harness-lab/` は再作成・Git 管理しない
 - shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
   `.claude/skills/improve-harness/SKILL.md`, `.agents/skills/improve-harness/SKILL.md`,
   `.claude/skills/release/SKILL.md`, `.agents/skills/release/SKILL.md`,

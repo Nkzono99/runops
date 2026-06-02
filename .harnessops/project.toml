@@ -14,7 +14,7 @@ adapter = "runops_upstream"
 
 [overlay]
 mode = "upstream-lab"
-path = "harness-lab"
+path = "../runops-harness-lab"
 managed_by = "harnessops"
 
 [privacy]
