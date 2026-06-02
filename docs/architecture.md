@@ -636,17 +636,20 @@ AI エージェントがシミュレーションを自律的に実行するた�
 ### シミュレータ知識
 
 ```
-refs/{repo}/docs/          ← シミュレータ開発者が管理
-    ↓ runo update-refs
-.runops/knowledge/{sim}.md ← インデックス (自動生成)
+simulator/environment plugin ← シミュレータ開発者・環境管理者が管理
+    ↓ Codex plugin install / explicit knowledge source
+.runops/knowledge/enabled/imports.md ← Agent context bundle (自動生成)
+    ↓ 任意: runo init --with-refs / runo update-refs
+refs/{repo}/docs/          ← ローカル mirror fallback
     ↓ AI が参照
 adapter.parameter_schema() ← 構造化メタデータ
 adapter.validate_params()  ← 物理的バリデーション
 adapter.required_outputs() ← analysis-ready に必要な成果物
 ```
 
-- `refs/`: `runo init` 時に `doc_repos()` からクローン
-- `knowledge_sources()`: インデックス対象のファイルパターン
+- simulator/environment plugin: 長文の Agent context、環境スキル、解析ライブラリ利用法
+- `refs/`: `runo init --with-refs` または手動 clone で使う任意のローカル mirror
+- `doc_repos()` / `knowledge_sources()`: 任意 mirror を使う場合の clone 先とインデックス対象
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
 - `validate_params()`: CFL 条件、Debye 長解像度など
 - `required_outputs()`: completed run を analysis-ready とみなす前に必要な出力カテゴリ

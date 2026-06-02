@@ -407,7 +407,7 @@ class TestInit:
         assert "Skipped" in result.output
 
     def test_init_claude_md_with_simulators(self, tmp_path: Path) -> None:
-        """CLAUDE.md includes refs but not inline simulator details."""
+        """CLAUDE.md defaults to plugin/knowledge guidance without refs."""
         runner.invoke(app, ["init", "emses", "beach", "-y", "--path", str(tmp_path)])
         content = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
         # Simulator details are via imports.md, not inline
@@ -415,9 +415,48 @@ class TestInit:
         assert "Agent ガイド" not in content
         assert "runo context" in content
         assert "campaign.toml" in content
-        # Ref repos should be listed
-        assert "リファレンスリポジトリ" in content
-        # Cookbook rule should be generated separately
+        assert "任意のリファレンスミラー" not in content
+        cookbook_rule = tmp_path / ".claude" / "rules" / "cookbook.md"
+        assert not cookbook_rule.exists()
+
+    def test_init_with_refs_includes_reference_guidance(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """--with-refs opts into local refs mirrors and cookbook guidance."""
+        auth_calls: list[bool] = []
+
+        def _record_auth(
+            _sim_names: list[str],
+            *,
+            interactive: bool,
+            login: bool,
+            skip: bool,
+            include_refs: bool,
+        ) -> None:
+            del interactive, login, skip
+            auth_calls.append(include_refs)
+
+        monkeypatch.setattr(
+            "runops.cli.init.command.ensure_github_auth_for_simulators",
+            _record_auth,
+        )
+        monkeypatch.setattr(
+            "runops.cli.init.command._clone_doc_repos",
+            lambda *_args, **_kwargs: (["refs/MPIEMSES3D/"], []),
+        )
+
+        result = runner.invoke(
+            app,
+            ["init", "emses", "-y", "--with-refs", "--path", str(tmp_path)],
+        )
+
+        assert result.exit_code == 0
+        assert auth_calls == [True]
+        content = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
+        assert "任意のリファレンスミラー" in content
+        assert "refs/MPIEMSES3D" in content
         cookbook_rule = tmp_path / ".claude" / "rules" / "cookbook.md"
         assert cookbook_rule.exists()
         assert "cookbook" in cookbook_rule.read_text(encoding="utf-8").lower()
@@ -445,8 +484,8 @@ class TestInit:
         assert "$new-case" in content
         assert "/new-case" not in content
         assert "Codex 補助ルール" in content
-        assert "Simulator Cookbook ルール" in content
         assert "runops へのフィードバック" in content
+        assert "Simulator Cookbook ルール" not in content
         assert "globs: refs/**/cookbook/**" not in content
 
     def test_init_skills(self, tmp_path: Path) -> None:
@@ -736,10 +775,12 @@ class TestInit:
             interactive: bool,
             login: bool,
             skip: bool,
+            include_refs: bool,
         ) -> None:
             assert interactive is False
             assert login is False
             assert skip is False
+            assert include_refs is False
             raise typer.Exit(code=1)
 
         monkeypatch.setattr(
@@ -759,7 +800,7 @@ class TestInit:
         monkeypatch: pytest.MonkeyPatch,
     ) -> None:
         """--skip-github-auth-check is forwarded to the auth preflight."""
-        calls: list[bool] = []
+        calls: list[tuple[bool, bool]] = []
 
         def _record_auth(
             _sim_names: list[str],
@@ -767,9 +808,10 @@ class TestInit:
             interactive: bool,
             login: bool,
             skip: bool,
+            include_refs: bool,
         ) -> None:
             del interactive, login
-            calls.append(skip)
+            calls.append((skip, include_refs))
 
         monkeypatch.setattr(
             "runops.cli.init.command.ensure_github_auth_for_simulators",
@@ -789,7 +831,7 @@ class TestInit:
         )
 
         assert result.exit_code == 0
-        assert calls == [True]
+        assert calls == [(True, False)]
         assert (tmp_path / "runops.toml").exists()
 
 

@@ -89,8 +89,8 @@ uvx --from runops runo doctor
 
 | コマンド | 説明 |
 |---------|------|
-| `runo init [SIMS...] [-y]` | プロジェクトの初期化。対話型がデフォルト |
-| `runo setup [URL]` | 既存 runops project の clone + セットアップ |
+| `runo init [SIMS...] [-y] [--with-refs]` | プロジェクトの初期化。対話型がデフォルト、refs mirror は opt-in |
+| `runo setup [URL] [--with-refs]` | 既存 runops project の clone + セットアップ。refs mirror は opt-in |
 | `runo doctor [PATH]` | 環境検査。設定、sbatch、run_id 一意性、環境検出を確認 |
 | `runo context [DIR]` | Agent 向け project context の要約を表示 |
 | `runo context --json` | Agent 向け context を JSON で取得 |
@@ -101,7 +101,7 @@ uvx --from runops runo doctor
 | `runo config add-launcher` | ランチャー追加 |
 | `runo update` | シミュレータパッケージのアップグレード |
 | `runo update-harness --plan/apply-chain` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
-| `runo update-refs [SIMS...]` | refs/ リポジトリ更新 + knowledge index 再生成 |
+| `runo update-refs [SIMS...]` | 任意 refs mirror 更新 + knowledge index 再生成 |
 | `runo mcp serve --transport stdio` | local MCP provider を stdio で起動 |
 | `runo mcp serve --transport streamable-http` | local MCP provider を HTTP で起動 |
 | `runo mcp check` | MCP tool registry / safety contract の軽量検査 |

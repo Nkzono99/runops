@@ -206,12 +206,28 @@ def test_agents_md_does_not_use_import_syntax() -> None:
     assert "/new-case" not in agents
 
 
-def test_agents_md_inlines_shared_codex_rules() -> None:
-    """Codex gets shared cookbook/upstream guidance through AGENTS.md."""
+def test_agents_md_inlines_default_shared_codex_rules() -> None:
+    """Codex gets upstream guidance through AGENTS.md by default."""
     bundle = build_harness_bundle(
         "demo",
         ["emses"],
         upstream_feedback=True,
+    )
+    agents = bundle.files["AGENTS.md"]
+    assert "## Codex 補助ルール" in agents
+    assert "### runops へのフィードバック" in agents
+    assert "### Simulator Cookbook ルール" not in agents
+    # The Claude rule frontmatter must not be embedded into AGENTS.md.
+    assert "globs: refs/**/cookbook/**" not in agents
+
+
+def test_agents_md_inlines_reference_cookbook_when_enabled() -> None:
+    """Codex gets cookbook guidance when local refs mirrors are enabled."""
+    bundle = build_harness_bundle(
+        "demo",
+        ["emses"],
+        upstream_feedback=True,
+        include_reference_repos=True,
     )
     agents = bundle.files["AGENTS.md"]
     assert "## Codex 補助ルール" in agents

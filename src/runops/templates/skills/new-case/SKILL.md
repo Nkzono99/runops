@@ -62,11 +62,11 @@ walltime = "02:00:00"
 ### パラメータの確認方法
 
 ```bash
-# CLAUDE.md の agent_guide セクションでパラメータ名を確認
+# 有効な simulator plugin skill / enabled knowledge / materials を先に確認
 cat CLAUDE.md
 
-# cookbook で推奨パラメータ・値域を確認
-cat refs/<repo>/cookbook/index.toml
+# refs mirror がある project だけ cookbook で推奨パラメータ・値域を確認
+test -f refs/<repo>/cookbook/index.toml && cat refs/<repo>/cookbook/index.toml
 
 # 既知の制約を確認
 runo knowledge facts
@@ -94,7 +94,7 @@ case を作る時の意思決定は `notes/YYYY-MM-DD.md` に残す:
 
 - どのパラメータをデフォルトから変えたか・なぜか
 - `sensitive` パラメータを動かした理由 (cookbook の警告を承知の上で)
-- 入力テンプレートで参考にした既存 case / cookbook fragment
+- 入力テンプレートで参考にした plugin guide / knowledge source / 既存 case / cookbook fragment
 - 一度試して没にしたパラメータ値とその理由
 
 ```bash

@@ -259,6 +259,7 @@ def build_harness_bundle(
     *,
     upstream_feedback: bool = True,
     knowledge_imports_path: str = "",
+    include_reference_repos: bool = False,
 ) -> HarnessBundle:
     """Render every harness file into an in-memory bundle.
 
@@ -269,6 +270,9 @@ def build_harness_bundle(
             rule.  ``runops init --no-upstream-feedback`` sets this to False.
         knowledge_imports_path: Relative path to the rendered imports file,
             or empty string if knowledge imports are not configured.
+        include_reference_repos: Include adapter-declared ``refs/`` repository
+            guidance.  This is opt-in because simulator long-form context is
+            normally provided by Codex plugins or explicit knowledge sources.
 
     Returns:
         Bundle keyed by project-relative path; consumers iterate it to write
@@ -283,7 +287,11 @@ def build_harness_bundle(
     from runops.templates import load_static, render
 
     files: dict[str, str] = {}
-    doc_repos = _collect_doc_repos(simulator_names) if simulator_names else []
+    doc_repos = (
+        _collect_doc_repos(simulator_names)
+        if include_reference_repos and simulator_names
+        else []
+    )
     include_cookbook_rule = bool(simulator_names and doc_repos)
 
     files[CLAUDE_MD] = _render_agent_md(

@@ -116,16 +116,16 @@ class SimulatorAdapter(ABC):
 
     @classmethod
     def doc_repos(cls) -> list[tuple[str, str]]:
-        """Return documentation/reference repositories to clone.
+        """Return optional documentation/reference repositories.
 
-        Override in subclasses to list Git repositories that contain
-        parameter references, usage examples, or documentation that
-        AI agents and users can consult.
+        Override in subclasses to list Git repositories that contain parameter
+        references, usage examples, or documentation that AI agents and users
+        can consult when the project opts into local refs mirrors.
 
         Returns:
             List of ``(clone_url, dest_dir_name)`` tuples.
             ``dest_dir_name`` is the directory name under the project's
-            ``refs/`` directory.
+            optional ``refs/`` mirror directory.
         """
         return []
 
@@ -134,8 +134,8 @@ class SimulatorAdapter(ABC):
         """Return glob patterns for knowledge-relevant files per doc repo.
 
         Override in subclasses to specify which files in each reference
-        repository (under ``refs/``) should be indexed into the
-        ``.runops/knowledge/`` directory.
+        repository should be indexed into the ``.runops/knowledge/`` directory
+        when that repository exists under the optional ``refs/`` mirror.
 
         Returns:
             Dictionary mapping ``dest_dir_name`` (from :meth:`doc_repos`)

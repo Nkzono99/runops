@@ -41,6 +41,7 @@ from runops.core.upgrade_chain import (
     build_upgrade_plan,
     latest_version_in_versions,
 )
+from runops.harness._adapters import collect_doc_repos
 from runops.harness.builder import (
     GITIGNORE_PATH,
     applied_harness_runops_version,
@@ -81,6 +82,16 @@ def _harness_path_requested(
         return True
     return any(
         rel_path == prefix or rel_path.startswith(prefix) for prefix in only_prefixes
+    )
+
+
+def _has_reference_repos(project_dir: Path, simulator_names: list[str]) -> bool:
+    """Return whether this project has adapter-declared refs mirrors."""
+    if not simulator_names:
+        return False
+    return any(
+        (project_dir / "refs" / dest).is_dir()
+        for _url, dest in collect_doc_repos(simulator_names)
     )
 
 
@@ -522,6 +533,7 @@ def update_harness(
         simulator_names,
         upstream_feedback=upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
+        include_reference_repos=_has_reference_repos(project_dir, simulator_names),
     )
 
     # Filter by --only

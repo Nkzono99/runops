@@ -228,14 +228,15 @@ def update_refs(
         typer.Option("--dry-run", help="Show what would be updated."),
     ] = False,
 ) -> None:
-    """Update reference repos (refs/) and regenerate knowledge indexes.
+    """Update optional reference mirrors (refs/) and knowledge indexes.
 
-    Fetches the latest commits for all simulator reference repositories
-    and rebuilds the .runops/knowledge/ index files.
+    Fetches the latest commits for simulator reference repositories that were
+    cloned with ``runo init --with-refs`` or managed manually, then rebuilds
+    the .runops/knowledge/ index files.
 
     Examples:
-      runo update-refs            # update all refs
-      runo update-refs emses      # update only EMSES refs
+      runo update-refs            # update all local refs mirrors
+      runo update-refs emses      # update only EMSES refs mirror
       runo update-refs --dry-run  # show what would be updated
     """
     try:
@@ -315,7 +316,10 @@ def update_refs(
     for dest in sorted(repos_to_update):
         repo_path = refs_dir / dest
         if not repo_path.is_dir():
-            typer.echo(f"  refs/{dest}/ — not cloned, skipping (run 'runo init' first)")
+            typer.echo(
+                f"  refs/{dest}/ — not cloned, skipping "
+                "(run 'runo init --with-refs' first or clone it manually)"
+            )
             continue
 
         old_hash, new_hash, msg = _pull_shallow(repo_path)

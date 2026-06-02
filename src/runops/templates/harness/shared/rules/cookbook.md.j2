@@ -1,11 +1,12 @@
 {{ rule_heading | default("#") }} Simulator Cookbook ルール
 
-`refs/` 以下のシミュレータリポジトリに `cookbook/` がある場合、
-入力例やフラグメントをパラメータ生成の出発点として使う。
+local reference mirror (`refs/`) のシミュレータリポジトリに `cookbook/` がある場合だけ、
+入力例やフラグメントをパラメータ生成の補助情報として使う。まず plugin skill、
+enabled knowledge、`materials/` を確認し、`refs/` は任意の fallback として扱う。
 
 {{ rule_heading | default("#") }}# 読取順序
 
-1. `refs/<repo>/cookbook/index.toml` で `tags` / `status` から候補を絞る
+1. `refs/<repo>/cookbook/index.toml` が存在するか確認し、`tags` / `status` から候補を絞る
 2. 候補 entry の `meta.toml` で `[applicability]` と `[recommended]` を確認
 3. `input.toml` の実ファイルを読む
 4. fragment を使うときは `[merge]` と `[compatibility]` を確認してから合成

@@ -5,8 +5,9 @@
 `materials/` に置きます。現在の高レベルな研究判断は `research/agenda.md` に
 置きます。
 
-`.runops/knowledge/` は `runo update-refs` や `runo knowledge source render` が
-生成する Agent context です。`.runops/insights/` と `.runops/facts.toml` は
+`.runops/knowledge/` は simulator/environment plugin、任意の `refs/` mirror、
+`runo knowledge source render` などから生成する Agent context です。
+`.runops/insights/` と `.runops/facts.toml` は
 互換性のため残る advanced/structured knowledge store と考え、日常のメモや
 レポートはまず `notes/`, `materials/`, `research/` に置くのを推奨します。
 

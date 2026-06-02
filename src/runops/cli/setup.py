@@ -10,6 +10,7 @@ from typing import Annotated, Optional
 import typer
 
 from runops import __version__
+from runops.cli.init.github_auth import ensure_github_auth_for_simulators
 from runops.core.exceptions import ProjectConfigError
 from runops.core.project import ProjectConfig, load_project
 from runops.core.repository import repo_name_from_url
@@ -73,11 +74,42 @@ def setup(
             help="Do not initialize or verify the project-side HarnessOps overlay.",
         ),
     ] = False,
+    gh_auth_login: Annotated[
+        bool,
+        typer.Option(
+            "--gh-auth-login",
+            help=(
+                "Run `gh auth login` when simulator packages or --with-refs "
+                "need GitHub authentication."
+            ),
+        ),
+    ] = False,
+    skip_github_auth_check: Annotated[
+        bool,
+        typer.Option(
+            "--skip-github-auth-check",
+            help=(
+                "Skip GitHub authentication preflight for simulator packages "
+                "and --with-refs."
+            ),
+        ),
+    ] = False,
+    with_refs: Annotated[
+        bool,
+        typer.Option(
+            "--with-refs",
+            help=(
+                "Clone adapter-declared simulator doc repositories into refs/. "
+                "By default, simulator knowledge is expected from plugins or "
+                "explicit knowledge sources."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Set up a runops project from an existing Git repository.
 
     Clones the repository (if URL given), then bootstraps the
-    development environment (.venv, refs/) without touching
+    development environment (.venv and optional refs/) without touching
     existing configuration files (TOML, CLAUDE.md, etc.). The standard
     runops CLI entrypoint is ``uvx --from runops runo ...``; the project
     ``.venv`` is kept for simulator/runtime packages. If HarnessOps is
@@ -114,6 +146,14 @@ def setup(
     if project is not None:
         sim_names = list(project.simulators.keys())
 
+    ensure_github_auth_for_simulators(
+        sim_names,
+        interactive=False,
+        login=gh_auth_login,
+        skip=skip_github_auth_check,
+        include_refs=with_refs,
+    )
+
     created: list[str] = []
     skipped: list[str] = []
 
@@ -129,8 +169,8 @@ def setup(
         install_runops=install_runops_into_venv,
     )
 
-    # 4. Clone refs/ (doc repos)
-    if sim_names:
+    # 4. Clone optional refs/ mirrors (doc repos)
+    if with_refs and sim_names:
         from runops.cli.init import _clone_doc_repos
 
         refs_created, refs_skipped = _clone_doc_repos(project_dir, sim_names)

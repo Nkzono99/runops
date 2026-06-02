@@ -8,25 +8,28 @@ description: Design a parameter survey. Use when planning a parameter sweep, cre
 ## 手順
 
 1. 指定されたケースの `case.toml` と入力ファイルを読む
-2. `refs/` の cookbook で既存の入力例を探す
+2. simulator plugin skill、enabled knowledge、`materials/` で既存の入力例や制約を探す
+3. `refs/` mirror がある場合だけ cookbook を fallback として確認する
    - `cookbook/index.toml` で `tags` と `recommended_for` から候補を絞る
    - 候補の `meta.toml` で `[recommended].vary_first` と `[edit_policy]` を確認
    - `[cost]` から計算コストを見積もる
-3. `.runops/facts.toml` で既知の制約を確認する
-4. `survey.toml` を生成する
-5. 生成される run 数とコスト見積もりを報告する
+4. `.runops/facts.toml` で既知の制約を確認する
+5. `survey.toml` を生成する
+6. 生成される run 数とコスト見積もりを報告する
 
 ## cookbook の活用
 
 ```bash
-# cookbook の entry 一覧を確認
-cat refs/<repo>/cookbook/index.toml
+# refs mirror がある場合だけ cookbook の entry 一覧を確認
+test -f refs/<repo>/cookbook/index.toml && cat refs/<repo>/cookbook/index.toml
 
 # 候補 entry の詳細を確認
-cat refs/<repo>/cookbook/examples/<category>/<name>/meta.toml
+test -f refs/<repo>/cookbook/examples/<category>/<name>/meta.toml && \
+  cat refs/<repo>/cookbook/examples/<category>/<name>/meta.toml
 
 # 入力例を参照
-cat refs/<repo>/cookbook/examples/<category>/<name>/input.toml
+test -f refs/<repo>/cookbook/examples/<category>/<name>/input.toml && \
+  cat refs/<repo>/cookbook/examples/<category>/<name>/input.toml
 
 # 既知の制約を確認
 runo knowledge facts

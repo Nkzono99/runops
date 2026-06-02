@@ -6,8 +6,8 @@
 
 | コマンド | 説明 |
 |---------|------|
-| `runops init [SIMS...] -y` | Project 初期化 (対話型がデフォルト) |
-| `runops setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
+| `runops init [SIMS...] -y [--with-refs]` | Project 初期化 (対話型がデフォルト、refs mirror は opt-in) |
+| `runops setup [URL] [--with-refs]` | 既存プロジェクトを clone + 環境セットアップ (refs mirror は opt-in) |
 | `runops doctor` | 環境検査 |
 | `runops context --json` | Agent 向け project context を JSON で取得 |
 | `runops lint [PATH] [--scope ...]` | project state の health check |
@@ -21,7 +21,7 @@
 | `runops config add-launcher` | ランチャー追加 (対話型) |
 | `runops update` | シミュレータパッケージのアップグレード |
 | `runops update-harness` | ハーネスファイル再生成 |
-| `runops update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
+| `runops update-refs` | 任意 refs mirror 更新 + ナレッジインデックス再生成 |
 
 ## Case / Run 操作
 

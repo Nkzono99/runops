@@ -849,7 +849,7 @@ def validate_params(
 
 ### knowledge_sources()
 
-`refs/` 内でインデックス対象とするファイルパターンを返す:
+任意の `refs/` mirror がある場合に、インデックス対象とするファイルパターンを返す:
 
 ```python
 @classmethod

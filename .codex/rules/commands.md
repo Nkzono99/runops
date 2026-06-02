@@ -7,8 +7,8 @@
 
 | コマンド | 説明 |
 |---------|------|
-| `runo init [SIMS...] -y` | Project 初期化 (対話型がデフォルト) |
-| `runo setup [URL]` | 既存プロジェクトを clone + 環境セットアップ |
+| `runo init [SIMS...] -y [--with-refs]` | Project 初期化 (対話型がデフォルト、refs mirror は opt-in) |
+| `runo setup [URL] [--with-refs]` | 既存プロジェクトを clone + 環境セットアップ (refs mirror は opt-in) |
 | `runo doctor` | 環境検査 |
 | `runo context --json` | Agent 向け project context を JSON で取得 |
 | `runo lint [PATH] [--scope ...]` | project state の health check |
@@ -22,7 +22,7 @@
 | `runo config add-launcher` | ランチャー追加 (対話型) |
 | `runo update` | シミュレータパッケージのアップグレード |
 | `runo update-harness` | ハーネスファイル再生成 |
-| `runo update-refs` | refs/ リポジトリ更新 + ナレッジインデックス再生成 |
+| `runo update-refs` | 任意 refs mirror 更新 + ナレッジインデックス再生成 |
 
 ## Case / Run 操作
 

@@ -8,7 +8,7 @@ runops の知識層は 4 つのドメインで構成される:
 
 | ドメイン | 内容 | 管理場所 | 更新契機 |
 |----------|------|----------|---------|
-| **シミュレータ知識** | パラメータスキーマ、物理的制約、安定性条件 | `refs/`, `.runops/knowledge/` | `runo update-refs` |
+| **シミュレータ知識** | パラメータスキーマ、物理的制約、安定性条件、長文 Agent context | simulator/environment plugin, Adapter metadata, `.runops/knowledge/`, 任意の `refs/` mirror | plugin install/update, Adapter 更新, `runo update-refs` (任意 mirror) |
 | **外部共有知識** | ラボ共通の解析手法・知識、シミュレータ汎用知識 | `refs/knowledge/` | `runo knowledge source sync` |
 | **実行環境知識** | クラスタ構成、パーティション、モジュール | `.runops/environment.toml` | `runo doctor` |
 | **研究意図** | 仮説、実験設計、変数定義、観測量 | `campaign.toml` | ユーザーが記述 |
@@ -45,7 +45,7 @@ project/
     agenda.md
     proposals/                   # 高コスト・方向転換前の任意 proposal
     reviews/                     # agenda checkpoint の snapshot
-  refs/                          # シミュレータリファレンスリポジトリ
+  refs/                          # 任意のローカル mirror / 外部知識 mount
     MPIEMSES3D/
       cookbook/                   # simulator cookbook (入力例・設定カタログ)
         COOKBOOK.md
@@ -61,7 +61,7 @@ project/
         analysis/
   .runops/
     knowledge/                   # 自動生成 Agent context (gitignore 対象)
-      emses.md                   # refs/ 内のドキュメント一覧 + 変更ログ
+      emses.md                   # 任意 refs mirror のドキュメント一覧 + 変更ログ
       beach.md
       enabled/                   # 有効 profile の展開結果
         imports.md               # CLAUDE.md から @import される
@@ -86,26 +86,33 @@ project/
 
 ## シミュレータ知識
 
-### refs/ — リファレンスリポジトリ
+### refs/ — 任意のリファレンスミラー
 
-`runo init` 時に各 Adapter の `doc_repos()` で指定されたリポジトリを `refs/` にクローンする。シミュレータのソースコード、ドキュメント、スキーマが含まれる。
+シミュレータ固有の長文 Agent context は、各シミュレータや解析ライブラリの
+Codex plugin、または `runo knowledge source attach` で接続する明示的な知識ソースを
+優先する。`refs/` は `runo init --with-refs` や手動 clone で用意する任意の
+ローカル mirror であり、private repo や開発中 checkout を近くに置きたい場合の
+fallback として扱う。
 
 ```bash
 # 更新
-runo update-refs          # 全シミュレータ
+runo init --with-refs     # adapter の doc_repos() を refs/ に clone
+runo update-refs          # 全シミュレータの任意 refs mirror
 runo update-refs emses    # 特定のシミュレータのみ
 runo update-refs --dry-run
 ```
 
 `update-refs` は:
-1. `refs/` 以下の各リポジトリを `git fetch --depth 1` + `git reset` で最新化
+1. `refs/` 以下に存在する任意 mirror を `git fetch --depth 1` + `git reset` で最新化
 2. 変更を検出 (コミットハッシュ比較)
-3. `.runops/knowledge/{simulator}.md` にインデックスを再生成
+3. `.runops/knowledge/{simulator}.md` に mirror インデックスを再生成
 
 ### knowledge/ — 生成済み Agent context
 
-各シミュレータについて、`refs/` 内のドキュメントの所在一覧と変更ログを自動生成する。
-AI エージェントはまずこのインデックスを読み、必要に応じて `refs/` の実ファイルを直接参照する。
+`.runops/knowledge/` は package-provided guide、外部 knowledge source、任意
+`refs/` mirror から作る生成済み context である。AI エージェントは
+`.runops/knowledge/enabled/imports.md` や plugin skill を先に読み、必要に応じて
+`refs/` の実ファイルを fallback として参照する。
 `.runops/knowledge/enabled/imports.md` も同じく、外部 source profile を
 Agent が読みやすい形へレンダリングした派生物であり、手で編集する正本ではない。
 
