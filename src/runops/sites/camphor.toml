@@ -20,6 +20,18 @@ modules = [
 [site.simulators.beach]
 # No additional modules needed
 
+[site.codex_plugins.kudpc-hpc-codex-plugin]
+display_name = "KUDPC HPC"
+visibility = "private-or-gated"
+reason = "KUDPC host role routing, login/application/compute node safety, Slurm tssrun/sbatch/srun workflows, --rsc resources, Modules, and compile guidance."
+install_hint = """
+gh auth status
+gh auth setup-git
+codex plugin marketplace add Nkzono99/kudpc-hpc-codex-plugin --ref v0.3.8
+codex plugin add kudpc-hpc-codex-plugin@kudpc-hpc-marketplace
+"""
+activation_hint = "Start a new Codex thread and confirm `KUDPC HPC` is installed/enabled in /plugins. If the private repo is not available, use a local checkout marketplace or create a local environment skill for the target site."
+
 # Launcher defaults for this site.
 # Copied into launchers.toml during `runops init`.
 [launcher]

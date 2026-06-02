@@ -872,6 +872,36 @@ simulator repo 側で `cookbook/` を提供する場合は、
 この glob に含めることを推奨する。
 cookbook の規約は `docs/simulator-kb-spec.md` を参照。
 
+### codex_plugins()
+
+simulator 固有の長文 context や解析 workflow を外部 Codex plugin に置く場合、
+Adapter は plugin の導入導線だけを返す。runops は plugin を自動 install せず、
+`runo init` / `runo setup` の出力と生成 harness に推奨として表示する:
+
+```python
+from runops.core.codex_plugin import CodexPluginRecommendation
+
+@classmethod
+def codex_plugins(cls) -> list[CodexPluginRecommendation]:
+    return [
+        CodexPluginRecommendation(
+            name="my-simulator-context",
+            display_name="My Simulator Context",
+            reason="Input review, parameter design, run diagnosis, and output analysis.",
+            install_hint=(
+                "codex plugin marketplace add owner/my-simulator --ref main "
+                "--sparse .agents/plugins --sparse plugins/my-simulator-context\n"
+                "codex plugin add my-simulator-context@my-simulator"
+            ),
+            activation_hint="Restart Codex or start a new thread after installing.",
+        )
+    ]
+```
+
+private repo や site-local plugin の場合は `visibility="private-or-gated"` とし、
+`install_hint` に GitHub 認証、ローカル checkout marketplace、または利用者が環境
+skill を自作する fallback を書く。
+
 ### campaign.toml との連携
 
 `campaign.toml` の `[variables]` セクションと `parameter_schema()` を組み合わせることで、AI エージェントはパラメータの妥当性を自動検証し、survey.toml を自動生成できます。

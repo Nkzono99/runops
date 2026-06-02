@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.site import (
     MOCK_SITE,
     STANDARD_SITE,
@@ -104,6 +105,31 @@ class TestLoadSiteProfile:
         assert profile.env == {"FOO": "bar"}
         assert profile.simulator_modules == {"emses": ["hdf5/1.12"]}
 
+    def test_loads_codex_plugin_recommendations(self, tmp_path: Path) -> None:
+        """site.toml may recommend external Codex plugins."""
+        site_toml = tmp_path / "site.toml"
+        site_toml.write_text(
+            "[site]\n"
+            'name = "testsite"\n'
+            "\n"
+            "[site.codex_plugins.test-plugin]\n"
+            'display_name = "Test Plugin"\n'
+            'visibility = "private-or-gated"\n'
+            'reason = "Site-specific workflow guidance."\n'
+            'install_hint = "codex plugin add test-plugin@test-marketplace"\n'
+            'activation_hint = "Start a new Codex thread."\n',
+            encoding="utf-8",
+        )
+
+        profile = load_site_profile(tmp_path)
+
+        assert len(profile.codex_plugins) == 1
+        plugin = profile.codex_plugins[0]
+        assert plugin.name == "test-plugin"
+        assert plugin.display_name == "Test Plugin"
+        assert plugin.visibility == "private-or-gated"
+        assert "codex plugin add" in plugin.install_hint
+
     def test_fallback_to_launchers_toml(self, tmp_path: Path) -> None:
         """Legacy: extract site config from launchers.toml if no site.toml."""
         launchers_toml = tmp_path / "launchers.toml"
@@ -183,6 +209,17 @@ class TestSaveSiteProfile:
             extra_sbatch=["--mail-type=END"],
             env={"OMP_PROC_BIND": "spread"},
             setup_commands=["ulimit -s unlimited"],
+            codex_plugins=[
+                CodexPluginRecommendation(
+                    name="kudpc-hpc-codex-plugin",
+                    display_name="KUDPC HPC",
+                    reason="Site workflow guidance.",
+                    install_hint="codex plugin add kudpc-hpc-codex-plugin@test",
+                    activation_hint="Start a new Codex thread.",
+                    visibility="private-or-gated",
+                    source="site:camphor3",
+                )
+            ],
         )
         save_site_profile(tmp_path, original)
 
@@ -196,6 +233,7 @@ class TestSaveSiteProfile:
         assert loaded.extra_sbatch == original.extra_sbatch
         assert loaded.env == original.env
         assert loaded.setup_commands == original.setup_commands
+        assert loaded.codex_plugins == original.codex_plugins
 
     def test_minimal_profile(self, tmp_path: Path) -> None:
         """Saving a minimal profile works."""

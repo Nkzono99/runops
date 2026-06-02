@@ -31,6 +31,10 @@ from runops.cli.init.serialization import (
 from runops.core.discovery import validate_uniqueness
 from runops.core.exceptions import DuplicateRunIdError, ProjectConfigError
 from runops.core.project import load_project
+from runops.harness._plugins import (
+    collect_plugin_recommendations,
+    echo_plugin_recommendations,
+)
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -216,6 +220,10 @@ def init(
         login=gh_auth_login,
         skip=skip_github_auth_check,
         include_refs=with_refs,
+    )
+    codex_plugin_recommendations = collect_plugin_recommendations(
+        sim_names,
+        extra_plugins=site_profile.codex_plugins if site_profile else None,
     )
 
     if not project_dir.exists():
@@ -409,6 +417,7 @@ def init(
         upstream_feedback=upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
         include_reference_repos=with_refs,
+        codex_plugin_recommendations=codex_plugin_recommendations,
     )
     for rel_path, content in sorted(harness.files.items()):
         full_path = project_dir / rel_path
@@ -492,6 +501,7 @@ def init(
         typer.echo("  Skipped (already exist):")
         for item in skipped:
             typer.echo(f"    {item}")
+    echo_plugin_recommendations(codex_plugin_recommendations)
 
 
 def doctor(

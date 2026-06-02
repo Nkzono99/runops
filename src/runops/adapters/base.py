@@ -12,6 +12,7 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.validation import ValidationIssue
 
 
@@ -142,6 +143,16 @@ class SimulatorAdapter(ABC):
             to a list of glob patterns relative to the repo root.
         """
         return {}
+
+    @classmethod
+    def codex_plugins(cls) -> list[CodexPluginRecommendation]:
+        """Return external Codex plugins recommended for this simulator.
+
+        These plugins provide long-form simulator or analysis context for
+        agents.  runops only recommends them; installation remains user-local
+        and outside project state.
+        """
+        return []
 
     @classmethod
     def parameter_schema(cls) -> dict[str, dict[str, Any]]:

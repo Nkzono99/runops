@@ -86,6 +86,21 @@ project/
 
 ## シミュレータ知識
 
+### Codex plugin recommendation
+
+Adapter や site profile は、選択内容に応じて外部 Codex plugin を推薦できる。
+`runo init` / `runo setup` は推薦 plugin と導入手順を表示し、project harness
+(`AGENTS.md` / `CLAUDE.md`) にも同じ導線を残す。plugin の install / enable は
+ユーザーの Codex 環境に対する操作なので、runops project state には含めない。
+
+例:
+
+- `emses`: `MPIEMSES3D Context`, `emout Context`
+- `camphor` site profile: `KUDPC HPC`
+
+private repo の plugin は GitHub 認証済み環境、local checkout marketplace、または
+利用者が自作する environment skill のいずれかで扱う。
+
 ### refs/ — 任意のリファレンスミラー
 
 シミュレータ固有の長文 Agent context は、各シミュレータや解析ライブラリの

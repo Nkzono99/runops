@@ -15,6 +15,11 @@ interface です。人間は研究意図、制約、確認、解釈に集中し�
 2. **ベース入力の方針** — 既存の入力テンプレート、plugin/knowledge source、手元の資料のどれを起点に組み立てるか
 
 `runo init` では通常、simulator や launcher の設定を対話的に選ぶため、最初の依頼でそれらを毎回書き直す必要はありません。
+選んだ simulator / site に外部 Codex plugin がある場合、`runo init` と
+生成される `AGENTS.md` / `CLAUDE.md` に推奨 plugin と導入手順が表示されます。
+たとえば `emses` では MPIEMSES3D / emout の plugin、`camphor` site profile では
+KUDPC HPC plugin が案内されます。runops は plugin を自動 install せず、
+ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
 一方で、まだベースを決めていない場合でも、Agent は simulator/environment plugin、

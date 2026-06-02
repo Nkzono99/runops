@@ -648,6 +648,7 @@ adapter.required_outputs() ← analysis-ready に必要な成果物
 ```
 
 - simulator/environment plugin: 長文の Agent context、環境スキル、解析ライブラリ利用法
+- `codex_plugins()`: simulator に推奨する外部 Codex plugin の導入導線
 - `refs/`: `runo init --with-refs` または手動 clone で使う任意のローカル mirror
 - `doc_repos()` / `knowledge_sources()`: 任意 mirror を使う場合の clone 先とインデックス対象
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式

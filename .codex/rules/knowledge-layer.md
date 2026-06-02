@@ -28,6 +28,10 @@ AI エージェントがシミュレーションを自律的に行うための�
 
 複数プロジェクト間で共有する知識を外部リポジトリとして管理し、project に接続できる。
 
+Simulator / site が外部 Codex plugin を推薦する場合、`runo init` / `runo setup`
+と生成 harness に導線を出す。plugin install / enable はユーザー local な Codex
+環境の操作であり、runops project state には含めない。
+
 ```bash
 runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
 runo knowledge source attach path local-kb ../hpc-knowledge

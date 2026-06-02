@@ -149,6 +149,9 @@ def test_setup_runs_auth_for_simulator_packages_without_refs(
 
     assert result.exit_code == 0
     assert auth_calls == [(["emses"], False)]
+    assert "Recommended Codex plugins" in result.output
+    assert "MPIEMSES3D Context" in result.output
+    assert "emout Context" in result.output
 
 
 def test_setup_with_refs_clones_reference_mirrors(

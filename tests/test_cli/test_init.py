@@ -11,6 +11,7 @@ import typer
 from typer.testing import CliRunner
 
 from runops.cli.main import app
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.environment import EnvironmentInfo
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 from runops.harness.harnessops import HarnessOpsResult
@@ -408,13 +409,23 @@ class TestInit:
 
     def test_init_claude_md_with_simulators(self, tmp_path: Path) -> None:
         """CLAUDE.md defaults to plugin/knowledge guidance without refs."""
-        runner.invoke(app, ["init", "emses", "beach", "-y", "--path", str(tmp_path)])
+        result = runner.invoke(
+            app,
+            ["init", "emses", "beach", "-y", "--path", str(tmp_path)],
+        )
+        assert result.exit_code == 0
+        assert "Recommended Codex plugins" in result.output
+        assert "MPIEMSES3D Context" in result.output
+        assert "emout Context" in result.output
         content = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
         # Simulator details are via imports.md, not inline
         assert "シミュレータ固有知識" not in content
         assert "Agent ガイド" not in content
         assert "runo context" in content
         assert "campaign.toml" in content
+        assert "推奨 Codex plugins" in content
+        assert "MPIEMSES3D Context" in content
+        assert "emout Context" in content
         assert "任意のリファレンスミラー" not in content
         cookbook_rule = tmp_path / ".claude" / "rules" / "cookbook.md"
         assert not cookbook_rule.exists()
@@ -706,6 +717,16 @@ class TestInit:
             launcher={"type": "srun", "use_slurm_ntasks": True},
             source_path=site_dir / "camphor.toml",
             docs_path=site_dir / "camphor.md",
+            codex_plugins=[
+                CodexPluginRecommendation(
+                    name="kudpc-hpc-codex-plugin",
+                    display_name="KUDPC HPC",
+                    reason="KUDPC site workflow guidance.",
+                    install_hint="codex plugin add kudpc-hpc-codex-plugin@test",
+                    activation_hint="Start a new Codex thread.",
+                    visibility="private-or-gated",
+                )
+            ],
         )
 
         monkeypatch.setattr("runops.cli.init._prompt_simulators", lambda: ([], {}))
@@ -726,6 +747,8 @@ class TestInit:
         site_md = tmp_path / "SITE.md"
         assert site_md.exists()
         assert "Camphor3" in site_md.read_text(encoding="utf-8")
+        assert "KUDPC HPC" in result.output
+        assert "KUDPC HPC" in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
 
     def test_init_renders_imports_after_bootstrap(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -117,6 +117,9 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "runs/AGENTS.md" in bundle.files
     agents = bundle.files["AGENTS.md"]
     assert "性質ごとに書き先を分ける" in agents
+    assert "推奨 Codex plugins" in agents
+    assert "MPIEMSES3D Context" in agents
+    assert "emout Context" in agents
     assert "$research-agenda" in agents
     assert "$summarize-script" in agents
     assert "$patch-runops" in agents

@@ -14,6 +14,11 @@ from runops.cli.init.github_auth import ensure_github_auth_for_simulators
 from runops.core.exceptions import ProjectConfigError
 from runops.core.project import ProjectConfig, load_project
 from runops.core.repository import repo_name_from_url
+from runops.harness._plugins import (
+    collect_plugin_recommendations,
+    echo_plugin_recommendations,
+    load_site_profile_for_recommendations,
+)
 
 _DEFAULT_RUNOPS_PACKAGE = f"runops=={__version__}"
 
@@ -153,6 +158,11 @@ def setup(
         skip=skip_github_auth_check,
         include_refs=with_refs,
     )
+    site_profile = load_site_profile_for_recommendations(project_dir)
+    codex_plugin_recommendations = collect_plugin_recommendations(
+        sim_names,
+        site_profile=site_profile,
+    )
 
     created: list[str] = []
     skipped: list[str] = []
@@ -222,6 +232,7 @@ def setup(
         typer.echo("  Skipped (already exist):")
         for item in skipped:
             typer.echo(f"    {item}")
+    echo_plugin_recommendations(codex_plugin_recommendations)
 
     typer.echo(f"\n  Next: cd {project_dir.name} && uvx --from runops runo doctor")
     if sys.platform == "win32":
