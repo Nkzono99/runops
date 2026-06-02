@@ -7,6 +7,13 @@
 - **正式名称**: camphor3 (Fujitsu PRIMEHPC FX1000 / CX2550)
 - **ジョブスケジューラ**: Slurm (Fujitsu 拡張)
 - **リソース指定方式**: `--rsc` (Fujitsu 独自拡張)
+- **推奨 Codex plugin**: `KUDPC HPC` (`kudpc-hpc-codex-plugin`)
+
+`runo init` で camphor site profile を選ぶと、KUDPC の host role routing、
+ログインノード/アプリケーションサーバ/計算ノードの使い分け、`tssrun` /
+`sbatch` / `srun`、`--rsc`、Modules、コンパイル確認を扱う `KUDPC HPC`
+plugin の導入導線が `AGENTS.md` / `CLAUDE.md` に残る。private repo のため、
+利用環境で GitHub 認証またはローカル checkout marketplace が必要になる。
 
 ## リソース指定 (--rsc)
 
@@ -114,4 +121,3 @@ runops runs submit --qos gr10451a
 - `srun` 使用時、`--ntasks` は省略可能 (Slurm が `--rsc` の `p` 値を `SLURM_NTASKS` に自動設定)
 - ジョブ名 (`-J`) には run_id が自動設定される
 - stdout/stderr は `stdout.<JOB_ID>.log` / `stderr.<JOB_ID>.log` 形式
-

@@ -201,9 +201,11 @@ runo runs delete             # 確認あり
 runo runs delete --yes       # 確認スキップ
 ```
 
-## Cookbook を参照する
+## 任意の refs cookbook を参照する
 
-`refs/` 以下のシミュレータリポジトリに `cookbook/` がある場合:
+通常は simulator / environment plugin skill、enabled knowledge、`materials/` を先に参照する。
+`runo init --with-refs` などで `refs/` mirror を用意している project だけ、
+次の cookbook を fallback として参照できる:
 
 ```bash
 # entry 一覧 (index.toml)
@@ -230,6 +232,6 @@ fragment は `[merge]` と `[compatibility]` を確認してから使う。
 ```bash
 runo doctor             # 環境検査
 runo lint               # project state / Agent context の health check
-runo update-refs        # refs/ 更新 + cookbook/ナレッジ再生成
+runo update-refs        # opt-in refs mirror の更新 + ナレッジ再生成
 runo config show        # 設定表示
 ```

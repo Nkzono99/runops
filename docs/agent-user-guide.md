@@ -178,7 +178,7 @@ completed → archived → purged
 | source material | `materials/` | 設計・読解・解析時 |
 | 構造化 fact (制約・依存性) | `.runops/facts.toml` | 必要な場合のパラメータ設計・検証時 |
 | 実験知見 (Markdown) | `.runops/insights/` | 必要な場合の作業開始時・解析後 |
-| シミュレータドキュメント | `.runops/knowledge/`, `refs/` | パラメータ設計時 |
+| シミュレータドキュメント | simulator/environment plugin, `.runops/knowledge/`, 任意の `refs/` mirror | パラメータ設計時 |
 | 実行環境 | `.runops/environment.toml` | job 設定・launcher 選択時 |
 | 外部共有知識 | `refs/knowledge/` | 必要に応じて |
 
@@ -205,6 +205,7 @@ runo knowledge add-fact "<claim>" -t <type> -s <simulator> -c <confidence>
 
 ## Simulator Adapter のガイド
 
-各シミュレータは `refs/<repo>/docs/agent-*.md` に固有のガイドを置く。
-CLAUDE.md から `@import` で参照されるため、シミュレータ固有のパラメータ設定・
-トラブルシューティング・ベストプラクティスはそちらを参照すること。
+各シミュレータ固有のガイドは、まず simulator/environment plugin と
+`.runops/knowledge/enabled/imports.md` を参照する。`runo init --with-refs` などで
+`refs/<repo>/docs/agent-*.md` が存在する場合は、ローカル mirror の fallback として
+参照する。

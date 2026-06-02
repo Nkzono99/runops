@@ -4,10 +4,10 @@
 #
 # This template is a small working starting point — enough to launch a
 # 1D test plasma run without external boundaries.  Adjust species, grid,
-# boundary conditions, and ptcond to match your problem.  See
-# `refs/MPIEMSES3D/docs/Parameters.md` (or the project's CLAUDE.md) for
-# the full parameter reference, or run `runo case new ... ` without
-# `--minimal` to drop in the full reference template via refs/.
+# boundary conditions, and ptcond to match your problem.  Prefer the
+# MPIEMSES3D / emout plugin skills, enabled knowledge, or project materials
+# for detailed parameter guidance.  If this project has an optional refs
+# mirror, refs/MPIEMSES3D/docs/Parameters.md can also be used as a fallback.
 
 [meta]
 format_version = 2

@@ -122,6 +122,7 @@ def test_contract_metadata_methods_return_expected_types(
     assert isinstance(spec.adapter_cls.knowledge_sources(), dict)
     assert isinstance(spec.adapter_cls.doc_repos(), list)
     assert isinstance(spec.adapter_cls.pip_packages(), list)
+    assert isinstance(spec.adapter_cls.codex_plugins(), list)
     assert isinstance(spec.adapter_cls.case_template(), dict)
     assert isinstance(spec.adapter_cls.agent_guide(), str)
 

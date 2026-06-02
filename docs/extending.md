@@ -12,9 +12,11 @@ Simulator Adapter は、シミュレータ固有の処理を吸収するため�
 
 ### ステップ 1: Adapter クラスの作成
 
-`src/runops/adapters/` に新しい Python ファイルを作成します。
+runops 本体に同梱する場合は `src/runops/adapters/contrib/<name>/` に新しい
+Python モジュールを作成します。外部 package として配布する場合は、その package
+内に Adapter クラスを置き、後述の entry point で公開します。
 
-例: `src/runops/adapters/my_solver.py`
+例: `src/runops/adapters/contrib/my_solver/adapter.py`
 
 ```python
 """Adapter for my_solver simulator."""
@@ -26,10 +28,6 @@ from pathlib import Path
 from typing import Any
 
 from runops.adapters.base import SimulatorAdapter
-from runops.adapters.registry import register
-
-
-@register
 class MySolverAdapter(SimulatorAdapter):
     """Adapter for the my_solver particle simulation code.
 
@@ -81,6 +79,19 @@ class MySolverAdapter(SimulatorAdapter):
     ) -> dict[str, Any]:
         ...
 ```
+
+同梱 adapter として有効化する場合は `runops.adapters.bundled.BUNDLED_ADAPTERS`
+に追加します。外部 package の場合は runops 本体を編集せず、`pyproject.toml` に
+entry point を追加します。
+
+```toml
+[project.entry-points."runops.adapters"]
+my_solver = "my_solver_runops.adapter:MySolverAdapter"
+```
+
+entry point 名 (`my_solver`) が `simulators.toml` の `adapter` 値です。runops は
+`simulators.toml` 読み込み時にこの entry point を探し、見つからない場合だけ
+同梱 contrib module の import 規約へ fallback します。
 
 ### ステップ 2: 7 つのメソッドの実装
 
@@ -838,7 +849,7 @@ def validate_params(
 
 ### knowledge_sources()
 
-`refs/` 内でインデックス対象とするファイルパターンを返す:
+任意の `refs/` mirror がある場合に、インデックス対象とするファイルパターンを返す:
 
 ```python
 @classmethod
@@ -860,6 +871,36 @@ simulator repo 側で `cookbook/` を提供する場合は、
 少なくとも `COOKBOOK.md`、`index.toml`、各 entry の `meta.toml` を
 この glob に含めることを推奨する。
 cookbook の規約は `docs/simulator-kb-spec.md` を参照。
+
+### codex_plugins()
+
+simulator 固有の長文 context や解析 workflow を外部 Codex plugin に置く場合、
+Adapter は plugin の導入導線だけを返す。runops は plugin を自動 install せず、
+`runo init` / `runo setup` の出力と生成 harness に推奨として表示する:
+
+```python
+from runops.core.codex_plugin import CodexPluginRecommendation
+
+@classmethod
+def codex_plugins(cls) -> list[CodexPluginRecommendation]:
+    return [
+        CodexPluginRecommendation(
+            name="my-simulator-context",
+            display_name="My Simulator Context",
+            reason="Input review, parameter design, run diagnosis, and output analysis.",
+            install_hint=(
+                "codex plugin marketplace add owner/my-simulator --ref main "
+                "--sparse .agents/plugins --sparse plugins/my-simulator-context\n"
+                "codex plugin add my-simulator-context@my-simulator"
+            ),
+            activation_hint="Restart Codex or start a new thread after installing.",
+        )
+    ]
+```
+
+private repo や site-local plugin の場合は `visibility="private-or-gated"` とし、
+`install_hint` に GitHub 認証、ローカル checkout marketplace、または利用者が環境
+skill を自作する fallback を書く。
 
 ### campaign.toml との連携
 

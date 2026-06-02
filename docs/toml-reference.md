@@ -122,6 +122,14 @@ the active adapters; if a target package is currently editable-installed, it
 warns before replacing that editable install. Use `runo update --yes` or
 `runo update --force` only when that replacement is intentional.
 
+Adapter 名は runops 同梱 adapter または外部 Python package が公開する
+`runops.adapters` entry point に対応する。外部化された simulator adapter を使う
+場合は、runops CLI と同じ Python environment にその package を入れる。例:
+
+```bash
+uvx --from runops --with my-solver-runops runo runs create
+```
+
 ---
 
 ## launchers.toml
@@ -204,6 +212,13 @@ OMP_PROC_BIND = "spread"
 
 [site.simulators.emses]
 modules = ["hdf5/1.12.2_intel-2023.2-impi", "fftw/3.3.10_intel-2022.3-impi"]
+
+[site.codex_plugins.kudpc-hpc-codex-plugin]
+display_name = "KUDPC HPC"
+visibility = "private-or-gated"
+reason = "KUDPC host routing and Slurm workflow guidance."
+install_hint = "codex plugin marketplace add ..."
+activation_hint = "Start a new Codex thread after installing."
 ```
 
 ### `[site]`
@@ -227,6 +242,21 @@ modules = ["hdf5/1.12.2_intel-2023.2-impi", "fftw/3.3.10_intel-2022.3-impi"]
 | Field | Type | Description |
 |-------|------|-------------|
 | `modules` | string[] | シミュレータ固有の追加モジュール (サイト共通モジュールとマージされる) |
+
+### `[site.codex_plugins.<name>]`
+
+サイト選択に応じて推奨する外部 Codex plugin。`runo init` / `runo setup` の
+出力と生成 harness に導入導線として表示される。runops は plugin を自動 install
+せず、ユーザー local な Codex 環境で `/plugins` または `codex plugin ...` により
+有効化する。
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string | 表示名 |
+| `visibility` | string | `"public"` または `"private-or-gated"` |
+| `reason` | string | 推奨理由 |
+| `install_hint` | string | 導入コマンドまたは手順 |
+| `activation_hint` | string | install 後の有効化・再起動手順 |
 
 ---
 

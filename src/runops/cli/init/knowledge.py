@@ -20,7 +20,7 @@ def _clone_doc_repos(
     project_dir: Path,
     simulator_names: list[str],
 ) -> tuple[list[str], list[str]]:
-    """Clone documentation repos into project_dir/refs/."""
+    """Clone optional documentation mirrors into project_dir/refs/."""
     repos = _collect_doc_repos(simulator_names)
     if not repos:
         return [], []
@@ -58,7 +58,7 @@ def _discover_agent_docs(
     project_dir: Path,
     doc_repos: list[tuple[str, str]],
 ) -> list[str]:
-    """Discover manifest-declared agent doc imports from cloned doc repos."""
+    """Discover manifest-declared agent doc imports from existing refs mirrors."""
     from runops.core.knowledge_source import discover_repo_imports
 
     refs_dir = project_dir / "refs"

@@ -64,7 +64,9 @@ shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
 HarnessOps CLI (`hops`) は `.venv` に常駐 install せず、`uvx --from harnessops hops ...` で実行する。
 診断は `$hops-diagnose` または `uvx --from harnessops hops doctor --check-overlay --check-records`。
 ハーネス摩擦や上流改善候補は `$harnessops-bridge` / `$hops-add-failure` で記録し、lab 評価は `$hops-run-lab`、更新は `$hops-update-harness` を使う。
-`.harnessops/`, `harness-feedback/`, `harness-lab/` は手で組み替えず、更新は `uvx --refresh-package harnessops --from harnessops hops update-harness ...` に委譲する。
+この checkout の upstream lab overlay は repo 外の `../runops-harness-lab` に置く。
+repo 内 `harness-lab/` は再作成・Git 管理しない。
+`.harnessops/`, `harness-feedback/`, HarnessOps overlay は手で組み替えず、更新は `uvx --refresh-package harnessops --from harnessops hops update-harness ...` に委譲する。
 
 ## 主要ディレクトリ
 

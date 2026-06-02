@@ -167,16 +167,39 @@ lab notebook の entry が積み上がってストーリーになったら、
 {%- else -%}
 プロジェクト root の `SITE.md` を参照してください (サイト固有の partition / module / queue 情報)。
 {%- endif %}
+{% if codex_plugin_recommendations %}
+
+## 推奨 Codex plugins
+
+この project の simulator / site 選択に基づく推奨 plugin。runops は project state を
+作るだけで、plugin の install / enable はユーザーの Codex 環境で行う。
+
+{% for plugin in codex_plugin_recommendations -%}
+- **{{ plugin.display_name }}** (`{{ plugin.name }}`{% if plugin.visibility != "public" %}, {{ plugin.visibility }}{% endif %}) — {{ plugin.reason }}
+
+  導入:
+  ```bash
+{{ plugin.install_hint | indent(2, true) }}
+  ```
+
+  有効化: {{ plugin.activation_hint }}
+{% endfor %}
+{% endif %}
 
 ## 情報源の優先順位
 
-1. `{{ skills_dir }}` → enabled knowledge (`.runops/knowledge/enabled/imports.md`) → simulator docs (`refs/`)
-2. `uvx --from runops runo --help` / `uvx --from runops runo <command> --help`
+1. `{{ skills_dir }}` と有効な simulator / environment plugin skill
+2. enabled knowledge (`.runops/knowledge/enabled/imports.md`) と `materials/`
+3. local reference mirrors (`refs/`) が存在する場合のみ、その cookbook / docs
+4. `uvx --from runops runo --help` / `uvx --from runops runo <command> --help`
    (`runops` alias でも同じ)
-3. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
+5. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
 {% if doc_repos %}
 
-## リファレンスリポジトリ
+## 任意のリファレンスミラー
+
+この project は `refs/` mirror を有効にしている。`refs/` は simulator plugin /
+明示的な knowledge source を補う local fallback であり、正本として編集しない。
 
 {% for url, dest in doc_repos -%}
 - `refs/{{ dest }}/` — cookbook: `refs/{{ dest }}/cookbook/`, docs: `refs/{{ dest }}/docs/`

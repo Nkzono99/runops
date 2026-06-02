@@ -232,6 +232,8 @@ ManifestData は以下のセクションで構成されます:
 SimulatorAdapter (ABC)     ← 抽象基底クラス
   |
   +-- GenericAdapter       ← 汎用実装（組み込み）
+  +-- BundledAdapter       ← runops 同梱 contrib adapter
+  +-- ExternalAdapter      ← Python entry point で配布
   +-- YourCustomAdapter    ← ユーザー定義
 ```
 
@@ -292,7 +294,15 @@ get(name)                 # 名前で Adapter クラスを取得
 load_from_config(config)  # simulators.toml から自動登録
 ```
 
-自動登録の規約: `simulators.toml` の `adapter` フィールドの値を使い、`runops.adapters.<adapter_name>` モジュールを `importlib` で読み込みます。
+自動登録の順序:
+
+1. `runops.adapters` entry point group にある外部 Python package の Adapter
+2. runops 同梱 `runops.adapters.contrib.<adapter_name>`
+3. 互換用 `runops.adapters.<adapter_name>`
+
+現在の `emses` / `beach` は runops 同梱 contrib adapter として登録される。将来外部
+package へ切り出す場合は、同じ adapter 名を entry point として公開すれば
+`simulators.toml` の表面は維持できる。
 
 ---
 
@@ -626,20 +636,28 @@ AI エージェントがシミュレーションを自律的に実行するた�
 ### シミュレータ知識
 
 ```
-refs/{repo}/docs/          ← シミュレータ開発者が管理
-    ↓ runo update-refs
-.runops/knowledge/{sim}.md ← インデックス (自動生成)
+simulator/environment plugin ← シミュレータ開発者・環境管理者が管理
+    ↓ Codex plugin install / explicit knowledge source
+.runops/knowledge/enabled/imports.md ← Agent context bundle (自動生成)
+    ↓ 任意: runo init --with-refs / runo update-refs
+refs/{repo}/docs/          ← ローカル mirror fallback
     ↓ AI が参照
 adapter.parameter_schema() ← 構造化メタデータ
 adapter.validate_params()  ← 物理的バリデーション
 adapter.required_outputs() ← analysis-ready に必要な成果物
 ```
 
-- `refs/`: `runo init` 時に `doc_repos()` からクローン
-- `knowledge_sources()`: インデックス対象のファイルパターン
+- simulator/environment plugin: 長文の Agent context、環境スキル、解析ライブラリ利用法
+- `codex_plugins()`: simulator に推奨する外部 Codex plugin の導入導線
+- `refs/`: `runo init --with-refs` または手動 clone で使う任意のローカル mirror
+- `doc_repos()` / `knowledge_sources()`: 任意 mirror を使う場合の clone 先とインデックス対象
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
 - `validate_params()`: CFL 条件、Debye 長解像度など
 - `required_outputs()`: completed run を analysis-ready とみなす前に必要な出力カテゴリ
+
+シミュレータ固有の Agent 向け長文コンテキストは、runops adapter ではなく各
+シミュレータや解析ライブラリの Codex plugin に置く。runops adapter は実行管理に
+必要なテンプレート、検証、入出力検出、provenance に責務を限定する。
 
 ### 実行環境知識
 

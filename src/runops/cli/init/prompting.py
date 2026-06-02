@@ -10,6 +10,8 @@ from typing import Any
 
 import typer
 
+from runops.core.codex_plugin import CodexPluginRecommendation
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
@@ -213,6 +215,7 @@ class _BundledSiteProfile:
     launcher: dict[str, Any]
     source_path: Path
     docs_path: Path | None = None
+    codex_plugins: list[CodexPluginRecommendation] | None = None
 
 
 SiteProfile = _BundledSiteProfile
@@ -229,6 +232,9 @@ def _load_site_profiles() -> dict[str, _BundledSiteProfile]:
             data = tomllib.load(f)
         if "site" not in data and "launcher" not in data:
             continue
+        from runops.core.site.profile import _load_site_toml
+
+        site_profile = _load_site_toml(toml_file)
         launcher_data = dict(data.get("launcher", {}))
         docs_file = toml_file.with_suffix(".md")
         profiles[toml_file.stem] = _BundledSiteProfile(
@@ -236,6 +242,7 @@ def _load_site_profiles() -> dict[str, _BundledSiteProfile]:
             launcher=launcher_data,
             source_path=toml_file,
             docs_path=docs_file if docs_file.is_file() else None,
+            codex_plugins=site_profile.codex_plugins,
         )
     return profiles
 

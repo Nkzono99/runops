@@ -25,6 +25,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from runops.core.codex_plugin import (
+    CodexPluginRecommendation,
+    codex_plugin_from_mapping,
+)
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
@@ -56,6 +61,7 @@ class SiteProfile:
         extra_sbatch: Additional raw ``#SBATCH`` directive lines.
         env: Environment variables to ``export`` in job scripts.
         setup_commands: Shell commands to run before the main execution.
+        codex_plugins: External Codex plugins recommended for this site.
     """
 
     name: str = ""
@@ -67,6 +73,7 @@ class SiteProfile:
     extra_sbatch: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     setup_commands: list[str] = field(default_factory=list)
+    codex_plugins: list[CodexPluginRecommendation] = field(default_factory=list)
 
     def modules_for(self, simulator_name: str) -> list[str]:
         """Return combined modules for a specific simulator.
@@ -165,6 +172,11 @@ def _load_site_toml(path: Path) -> SiteProfile:
         [site.simulators.emses]
         modules = ["hdf5/1.12.2_intel-2023.2-impi"]
 
+        [site.codex_plugins.kudpc-hpc-codex-plugin]
+        display_name = "KUDPC HPC"
+        reason = "KUDPC host routing and Slurm workflows."
+        install_hint = "codex plugin marketplace add ..."
+
     Args:
         path: Path to site.toml.
 
@@ -203,6 +215,20 @@ def _load_site_toml(path: Path) -> SiteProfile:
     extra_raw = site.get("extra_sbatch", [])
     extra_sbatch = [str(d) for d in extra_raw] if isinstance(extra_raw, list) else []
 
+    # Parse Codex plugin recommendations.
+    plugins_raw = site.get("codex_plugins", {})
+    codex_plugins: list[CodexPluginRecommendation] = []
+    if isinstance(plugins_raw, dict):
+        for plugin_name, plugin_data in plugins_raw.items():
+            if isinstance(plugin_data, dict):
+                codex_plugins.append(
+                    codex_plugin_from_mapping(
+                        str(plugin_name),
+                        plugin_data,
+                        source=f"site:{site.get('name', path.stem)}",
+                    )
+                )
+
     return SiteProfile(
         name=str(site.get("name", path.stem)),
         resource_style=str(site.get("resource_style", "standard")),
@@ -213,6 +239,7 @@ def _load_site_toml(path: Path) -> SiteProfile:
         extra_sbatch=extra_sbatch,
         env=env,
         setup_commands=setup_commands,
+        codex_plugins=codex_plugins,
     )
 
 
@@ -329,6 +356,18 @@ def save_site_profile(project_root: Path, profile: SiteProfile) -> Path:
         for sim_name, mods in profile.simulator_modules.items():
             sims[sim_name] = {"modules": list(mods)}
         site["simulators"] = sims
+
+    if profile.codex_plugins:
+        plugins: dict[str, Any] = {}
+        for plugin in profile.codex_plugins:
+            plugins[plugin.name] = {
+                "display_name": plugin.display_name,
+                "visibility": plugin.visibility,
+                "reason": plugin.reason,
+                "install_hint": plugin.install_hint,
+                "activation_hint": plugin.activation_hint,
+            }
+        site["codex_plugins"] = plugins
 
     site_file = project_root / _SITE_FILE
     with open(site_file, "wb") as f:

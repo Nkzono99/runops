@@ -1,4 +1,4 @@
-"""GitHub authentication preflight for ``runo init``."""
+"""GitHub authentication preflight for GitHub-backed simulator resources."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import subprocess
 
 import typer
 
-from runops.harness._adapters import collect_doc_repos
+from runops.harness._adapters import collect_doc_repos, collect_pip_packages
 
 _GITHUB_HOST = "github.com"
 
@@ -18,19 +18,24 @@ def ensure_github_auth_for_simulators(
     interactive: bool,
     login: bool,
     skip: bool,
+    include_refs: bool = False,
 ) -> None:
-    """Ensure GitHub CLI auth is ready for simulator documentation repos."""
+    """Ensure GitHub CLI auth is ready for simulator package/ref access."""
     if skip:
         return
 
-    github_repos = _github_doc_repos(simulator_names)
-    if not github_repos:
+    github_resources = _github_resources(
+        simulator_names,
+        include_refs=include_refs,
+    )
+    if not github_resources:
         return
 
     if shutil.which("gh") is None:
         typer.echo(
-            "GitHub authentication is required before initializing this project, "
-            "but the `gh` command was not found.",
+            "GitHub authentication is required before installing or cloning "
+            "GitHub-backed simulator resources, but the `gh` command was not "
+            "found.",
             err=True,
         )
         typer.echo(
@@ -44,8 +49,8 @@ def ensure_github_auth_for_simulators(
         return
 
     typer.echo(
-        "GitHub authentication is required to fetch simulator documentation "
-        f"for: {', '.join(sorted(github_repos))}",
+        "GitHub authentication is required to access simulator GitHub "
+        f"resources for: {', '.join(sorted(github_resources))}",
         err=True,
     )
 
@@ -76,12 +81,32 @@ def ensure_github_auth_for_simulators(
     raise typer.Exit(code=1)
 
 
-def _github_doc_repos(simulator_names: list[str]) -> set[str]:
-    repos: set[str] = set()
-    for url, dest in collect_doc_repos(simulator_names):
-        if _GITHUB_HOST in url:
-            repos.add(dest)
-    return repos
+def _github_resources(
+    simulator_names: list[str],
+    *,
+    include_refs: bool,
+) -> set[str]:
+    resources: set[str] = set()
+    for package in collect_pip_packages(simulator_names):
+        if _is_github_resource(package):
+            resources.add(_display_package(package))
+
+    if include_refs:
+        for url, dest in collect_doc_repos(simulator_names):
+            if _is_github_resource(url):
+                resources.add(f"refs/{dest}")
+    return resources
+
+
+def _is_github_resource(value: str) -> bool:
+    return _GITHUB_HOST in value.lower()
+
+
+def _display_package(package: str) -> str:
+    name, separator, _source = package.partition(" @ ")
+    if separator and name.strip():
+        return f"package {name.strip()}"
+    return f"package {package}"
 
 
 def _gh_auth_ok() -> bool:

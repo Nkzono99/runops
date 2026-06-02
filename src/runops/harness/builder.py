@@ -25,6 +25,8 @@ from pathlib import Path
 from typing import Any
 
 from runops import __version__
+from runops.core.codex_plugin import CodexPluginRecommendation
+from runops.harness._adapters import collect_codex_plugins as _collect_codex_plugins
 from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 from runops.harness._skills import render_skill_files as _render_skill_files
 
@@ -214,6 +216,7 @@ def _render_agent_md(
     doc_name: str,
     project_name: str,
     doc_repos: list[tuple[str, str]],
+    codex_plugin_recommendations: list[CodexPluginRecommendation],
     *,
     knowledge_imports_path: str,
     supports_import: bool,
@@ -238,6 +241,7 @@ def _render_agent_md(
         doc_name=doc_name,
         project_name=project_name,
         doc_repos=doc_repos,
+        codex_plugin_recommendations=codex_plugin_recommendations,
         include_cookbook_rule=include_cookbook_rule,
         include_upstream_feedback=include_upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
@@ -259,6 +263,8 @@ def build_harness_bundle(
     *,
     upstream_feedback: bool = True,
     knowledge_imports_path: str = "",
+    include_reference_repos: bool = False,
+    codex_plugin_recommendations: list[CodexPluginRecommendation] | None = None,
 ) -> HarnessBundle:
     """Render every harness file into an in-memory bundle.
 
@@ -269,6 +275,12 @@ def build_harness_bundle(
             rule.  ``runops init --no-upstream-feedback`` sets this to False.
         knowledge_imports_path: Relative path to the rendered imports file,
             or empty string if knowledge imports are not configured.
+        include_reference_repos: Include adapter-declared ``refs/`` repository
+            guidance.  This is opt-in because simulator long-form context is
+            normally provided by Codex plugins or explicit knowledge sources.
+        codex_plugin_recommendations: External Codex plugin recommendations to
+            show in generated project docs.  If omitted, adapter-declared
+            recommendations are collected from ``simulator_names``.
 
     Returns:
         Bundle keyed by project-relative path; consumers iterate it to write
@@ -283,14 +295,24 @@ def build_harness_bundle(
     from runops.templates import load_static, render
 
     files: dict[str, str] = {}
-    doc_repos = _collect_doc_repos(simulator_names) if simulator_names else []
+    doc_repos = (
+        _collect_doc_repos(simulator_names)
+        if include_reference_repos and simulator_names
+        else []
+    )
     include_cookbook_rule = bool(simulator_names and doc_repos)
+    plugin_recommendations = (
+        _collect_codex_plugins(simulator_names)
+        if codex_plugin_recommendations is None
+        else codex_plugin_recommendations
+    )
 
     files[CLAUDE_MD] = _render_agent_md(
         _CLAUDE_MD_TEMPLATE,
         CLAUDE_MD,
         project_name,
         doc_repos,
+        plugin_recommendations,
         knowledge_imports_path=knowledge_imports_path,
         supports_import=True,
         skills_dir=".claude/skills/",
@@ -302,6 +324,7 @@ def build_harness_bundle(
         AGENTS_MD,
         project_name,
         doc_repos,
+        plugin_recommendations,
         knowledge_imports_path=knowledge_imports_path,
         supports_import=False,
         skills_dir=AGENTS_SKILLS_PREFIX,

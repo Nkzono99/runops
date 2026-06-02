@@ -12,12 +12,19 @@ interface です。人間は研究意図、制約、確認、解釈に集中し�
 エージェントに渡す前に、主に次の 2 点を決めておいてください。
 
 1. **研究の方向性** — テーマ、仮説、探索したい変数、注目する観測量
-2. **ベース入力の方針** — 既存の入力テンプレートを使うか、simulator repo の `cookbook/` を起点に組み立てるか
+2. **ベース入力の方針** — 既存の入力テンプレート、plugin/knowledge source、手元の資料のどれを起点に組み立てるか
 
 `runo init` では通常、simulator や launcher の設定を対話的に選ぶため、最初の依頼でそれらを毎回書き直す必要はありません。
+選んだ simulator / site に外部 Codex plugin がある場合、`runo init` と
+生成される `AGENTS.md` / `CLAUDE.md` に推奨 plugin と導入手順が表示されます。
+たとえば `emses` では MPIEMSES3D / emout の plugin、`camphor` site profile では
+KUDPC HPC plugin が案内されます。runops は plugin を自動 install せず、
+ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
-一方で、まだベースを決めていない場合でも、Agent は `refs/` 以下の simulator docs や `cookbook/` を探索して、入力例や推奨パラメータをもとに case の叩き台を作れます。
+一方で、まだベースを決めていない場合でも、Agent は simulator/environment plugin、
+`.runops/knowledge/enabled/imports.md`、`materials/`、任意の `refs/` mirror にある
+docs/cookbook を順に確認し、入力例や推奨パラメータをもとに case の叩き台を作れます。
 
 あとはエージェントが campaign 設計、case 作成、survey 展開、run 生成・投入・解析・知見整理を進めます。
 人間が CLI の全体を覚える必要はありません。

@@ -8,7 +8,8 @@ This directory is different from generated runops state:
 
 - `materials/`, `notes/`, and `research/` are human/agent shared workspace.
 - `.runops/knowledge/` is generated agent context such as `enabled/imports.md`.
-- `refs/` contains mirrored external repositories managed by runops commands.
+- `refs/` may contain optional mirrored external repositories when enabled with
+  `runo init --with-refs` or managed manually.
 
 ## Suggested layout
 

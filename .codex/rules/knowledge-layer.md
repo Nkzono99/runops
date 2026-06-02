@@ -7,7 +7,7 @@ AI エージェントがシミュレーションを自律的に行うための�
 
 | 種類 | 保存先 | 更新方法 |
 |------|--------|----------|
-| シミュレータ知識 | `refs/` + `.runops/knowledge/` | `runo update-refs` |
+| シミュレータ知識 | simulator/environment plugin + `.runops/knowledge/` + 任意の `refs/` mirror | plugin install/update, `runo knowledge source sync`, `runo update-refs` |
 | 外部共有知識 | `runops.toml` の `[knowledge]` | `knowledge source attach/sync` |
 | 実行環境 | `.runops/environment.toml` | `runo doctor` |
 | 研究意図 | `campaign.toml` | ユーザーが記述 |
@@ -27,6 +27,10 @@ AI エージェントがシミュレーションを自律的に行うための�
 ## 外部知識ソース
 
 複数プロジェクト間で共有する知識を外部リポジトリとして管理し、project に接続できる。
+
+Simulator / site が外部 Codex plugin を推薦する場合、`runo init` / `runo setup`
+と生成 harness に導線を出す。plugin install / enable はユーザー local な Codex
+環境の操作であり、runops project state には含めない。
 
 ```bash
 runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git

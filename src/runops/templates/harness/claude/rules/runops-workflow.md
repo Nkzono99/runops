@@ -20,7 +20,7 @@
 - `.runops/insights/` と `.runops/facts.toml` は直接編集せず、
   `runo knowledge save` / `runo knowledge add-fact` を使う
 - `SITE.md` は site profile 由来の生成ドキュメントとして直接編集しない
-- `refs/` 配下は外部リポジトリのミラーなので書き込まない
+- `refs/` がある場合は任意の外部リポジトリ mirror として扱い、書き込まない
 - `runs/**/input/*` を緊急修正した場合は、同じ修正を上流の case へ戻す
 
 ## runops 本体の編集

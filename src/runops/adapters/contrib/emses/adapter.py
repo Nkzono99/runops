@@ -43,6 +43,7 @@ from runops.adapters.contrib.emses.validation import (
 from runops.adapters.contrib.emses.validation import (
     validate_params as validate_emses_params,
 )
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -165,6 +166,50 @@ class EmseAdapter(SimulatorAdapter):
                 "docs/agent-user-guide.md",
             ],
         }
+
+    @classmethod
+    def codex_plugins(cls) -> list[CodexPluginRecommendation]:
+        """Return Codex plugins recommended for EMSES projects."""
+        return [
+            CodexPluginRecommendation(
+                name="mpiemses3d-context",
+                display_name="MPIEMSES3D Context",
+                reason=(
+                    "MPIEMSES3D input review, parameter design, run diagnosis, "
+                    "output analysis, and simulator learning guides."
+                ),
+                install_hint=(
+                    "pip install mpiemses3d-tools\nmpiemses-codex-plugin install"
+                ),
+                activation_hint=(
+                    "Open Codex /plugins, install `MPIEMSES3D Context`, then "
+                    "start a new Codex thread."
+                ),
+                visibility="private-or-gated",
+                source="simulator:emses",
+            ),
+            CodexPluginRecommendation(
+                name="emout-context",
+                display_name="emout Context",
+                reason=(
+                    "EMSES output loading, visualization script generation, "
+                    "unit conversion, remote_figure workflows, and emout "
+                    "troubleshooting."
+                ),
+                install_hint=(
+                    "codex plugin marketplace add Nkzono99/emout "
+                    "--ref main "
+                    "--sparse .agents/plugins "
+                    "--sparse plugins/emout-context\n"
+                    "codex plugin add emout-context@emout"
+                ),
+                activation_hint=(
+                    "Restart Codex or start a new Codex thread after installing."
+                ),
+                visibility="public",
+                source="simulator:emses",
+            ),
+        ]
 
     @classmethod
     def parameter_schema(cls) -> dict[str, dict[str, Any]]:

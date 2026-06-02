@@ -26,13 +26,20 @@ def _mock_harnessops(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
-def _make_existing_project(project_dir: Path) -> None:
+def _make_existing_project(project_dir: Path, simulator: str | None = None) -> None:
     project_dir.mkdir(parents=True, exist_ok=True)
     (project_dir / "runops.toml").write_text(
         '[project]\nname = "setup-project"\n',
         encoding="utf-8",
     )
-    (project_dir / "simulators.toml").write_text("[simulators]\n", encoding="utf-8")
+    simulators = "[simulators]\n"
+    if simulator is not None:
+        simulators = (
+            f"[simulators.{simulator}]\n"
+            f'adapter = "{simulator}"\n'
+            'resolver_mode = "package"\n'
+        )
+    (project_dir / "simulators.toml").write_text(simulators, encoding="utf-8")
     (project_dir / "launchers.toml").write_text("[launchers]\n", encoding="utf-8")
 
 
@@ -99,6 +106,101 @@ def test_setup_invokes_harnessops(
     assert result.exit_code == 0
     assert calls == [project_dir.resolve()]
     assert "HarnessOps initialized" in result.output
+
+
+def test_setup_runs_auth_for_simulator_packages_without_refs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setup preflights private package installs but leaves refs opt-in."""
+    project_dir = tmp_path / "setup-project"
+    _make_existing_project(project_dir, simulator="emses")
+
+    auth_calls: list[tuple[list[str], bool]] = []
+
+    def _record_auth(
+        sim_names: list[str],
+        *,
+        interactive: bool,
+        login: bool,
+        skip: bool,
+        include_refs: bool,
+    ) -> None:
+        assert interactive is False
+        assert login is False
+        assert skip is False
+        auth_calls.append((sim_names, include_refs))
+
+    monkeypatch.setattr(
+        "runops.cli.setup.ensure_github_auth_for_simulators", _record_auth
+    )
+    monkeypatch.setattr(
+        "runops.cli.init._bootstrap_environment",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        "runops.cli.init._clone_doc_repos",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            AssertionError("refs should not be cloned by default")
+        ),
+    )
+
+    result = runner.invoke(app, ["setup", "--path", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert auth_calls == [(["emses"], False)]
+    assert "Recommended Codex plugins" in result.output
+    assert "MPIEMSES3D Context" in result.output
+    assert "emout Context" in result.output
+
+
+def test_setup_with_refs_clones_reference_mirrors(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """--with-refs opts setup into adapter-declared refs mirrors."""
+    project_dir = tmp_path / "setup-project"
+    _make_existing_project(project_dir, simulator="emses")
+
+    auth_calls: list[bool] = []
+    clone_calls: list[list[str]] = []
+
+    def _record_auth(
+        _sim_names: list[str],
+        *,
+        interactive: bool,
+        login: bool,
+        skip: bool,
+        include_refs: bool,
+    ) -> None:
+        del interactive, login, skip
+        auth_calls.append(include_refs)
+
+    def _record_clone(
+        _project_dir: Path,
+        sim_names: list[str],
+    ) -> tuple[list[str], list[str]]:
+        clone_calls.append(sim_names)
+        return ["refs/MPIEMSES3D"], []
+
+    monkeypatch.setattr(
+        "runops.cli.setup.ensure_github_auth_for_simulators", _record_auth
+    )
+    monkeypatch.setattr(
+        "runops.cli.init._bootstrap_environment",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr("runops.cli.init._clone_doc_repos", _record_clone)
+
+    result = runner.invoke(
+        app,
+        ["setup", "--with-refs", "--path", str(project_dir)],
+    )
+
+    assert result.exit_code == 0
+    assert auth_calls == [True]
+    assert clone_calls == [["emses"]]
+    assert "refs/MPIEMSES3D" in result.output
 
 
 def test_setup_smoke_with_knowledge_attach_render_and_doctor(

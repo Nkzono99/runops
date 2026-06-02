@@ -215,6 +215,7 @@ __marimo__/
 
 # HarnessOps local runtime cache
 .harnessops/cache/
+harness-lab/
 
 # HPC simulation heavy run outputs
 runs/**/work/outputs/
