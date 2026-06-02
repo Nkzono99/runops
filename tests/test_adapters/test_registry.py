@@ -9,7 +9,11 @@ from typing import Any
 import pytest
 
 from runops.adapters.base import SimulatorAdapter
-from runops.adapters.registry import AdapterImportError, AdapterRegistry
+from runops.adapters.registry import (
+    ADAPTER_ENTRY_POINT_GROUP,
+    AdapterImportError,
+    AdapterRegistry,
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -55,6 +59,19 @@ class _NoNameAdapter(_StubAdapter):
     """Adapter without adapter_name for error-path testing."""
 
     adapter_name = ""
+
+
+class _FakeEntryPoint:
+    """Small test double for importlib.metadata.EntryPoint."""
+
+    def __init__(self, name: str, loaded: object) -> None:
+        self.name = name
+        self._loaded = loaded
+
+    def load(self) -> object:
+        if isinstance(self._loaded, Exception):
+            raise self._loaded
+        return self._loaded
 
 
 # ---------------------------------------------------------------------------
@@ -141,6 +158,105 @@ def test_load_from_config_unknown_module(registry: AdapterRegistry) -> None:
     # Should not raise, just warn
     registry.load_from_config(config)
     assert "totally_fake_adapter" not in registry.list_adapters()
+
+
+def test_load_entry_points_registers_external_adapter(
+    registry: AdapterRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Installed entry points can register adapters outside runops.contrib."""
+
+    def fake_entry_points() -> dict[str, list[_FakeEntryPoint]]:
+        return {ADAPTER_ENTRY_POINT_GROUP: [_FakeEntryPoint("external", _StubAdapter)]}
+
+    monkeypatch.setattr(
+        "runops.adapters.registry.importlib_metadata.entry_points",
+        fake_entry_points,
+    )
+
+    registry.load_entry_points()
+
+    assert registry.get("external") is _StubAdapter
+
+
+def test_load_from_config_prefers_matching_entry_point(
+    registry: AdapterRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Config loading checks entry points before bundled module conventions."""
+    config = {
+        "simulators": {
+            "external_sim": {
+                "adapter": "external",
+                "resolver_mode": "package",
+            }
+        }
+    }
+
+    def fake_entry_points() -> dict[str, list[_FakeEntryPoint]]:
+        return {ADAPTER_ENTRY_POINT_GROUP: [_FakeEntryPoint("external", _StubAdapter)]}
+
+    monkeypatch.setattr(
+        "runops.adapters.registry.importlib_metadata.entry_points",
+        fake_entry_points,
+    )
+
+    registry.load_from_config(config)
+
+    assert registry.get("external") is _StubAdapter
+
+
+def test_load_from_config_raises_for_broken_entry_point(
+    registry: AdapterRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A configured external entry point that fails to load is not swallowed."""
+    config = {
+        "simulators": {
+            "broken_sim": {
+                "adapter": "broken_external",
+                "resolver_mode": "package",
+            }
+        }
+    }
+
+    def fake_entry_points() -> dict[str, list[_FakeEntryPoint]]:
+        return {
+            ADAPTER_ENTRY_POINT_GROUP: [
+                _FakeEntryPoint("broken_external", ImportError("missing dependency"))
+            ]
+        }
+
+    monkeypatch.setattr(
+        "runops.adapters.registry.importlib_metadata.entry_points",
+        fake_entry_points,
+    )
+
+    with pytest.raises(AdapterImportError, match="broken_external"):
+        registry.load_from_config(config)
+
+
+def test_load_entry_points_can_skip_broken_adapters(
+    registry: AdapterRegistry,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Global discovery can skip broken optional adapters during package import."""
+
+    def fake_entry_points() -> dict[str, list[_FakeEntryPoint]]:
+        return {
+            ADAPTER_ENTRY_POINT_GROUP: [
+                _FakeEntryPoint("broken_external", ImportError("missing dependency"))
+            ]
+        }
+
+    monkeypatch.setattr(
+        "runops.adapters.registry.importlib_metadata.entry_points",
+        fake_entry_points,
+    )
+
+    registry.load_entry_points(fail_on_error=False)
+
+    assert "broken_external" not in registry.list_adapters()
 
 
 def test_load_from_config_raises_for_broken_adapter_module(

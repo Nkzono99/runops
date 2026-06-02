@@ -12,9 +12,11 @@ Simulator Adapter は、シミュレータ固有の処理を吸収するため�
 
 ### ステップ 1: Adapter クラスの作成
 
-`src/runops/adapters/` に新しい Python ファイルを作成します。
+runops 本体に同梱する場合は `src/runops/adapters/contrib/<name>/` に新しい
+Python モジュールを作成します。外部 package として配布する場合は、その package
+内に Adapter クラスを置き、後述の entry point で公開します。
 
-例: `src/runops/adapters/my_solver.py`
+例: `src/runops/adapters/contrib/my_solver/adapter.py`
 
 ```python
 """Adapter for my_solver simulator."""
@@ -26,10 +28,6 @@ from pathlib import Path
 from typing import Any
 
 from runops.adapters.base import SimulatorAdapter
-from runops.adapters.registry import register
-
-
-@register
 class MySolverAdapter(SimulatorAdapter):
     """Adapter for the my_solver particle simulation code.
 
@@ -81,6 +79,19 @@ class MySolverAdapter(SimulatorAdapter):
     ) -> dict[str, Any]:
         ...
 ```
+
+同梱 adapter として有効化する場合は `runops.adapters.bundled.BUNDLED_ADAPTERS`
+に追加します。外部 package の場合は runops 本体を編集せず、`pyproject.toml` に
+entry point を追加します。
+
+```toml
+[project.entry-points."runops.adapters"]
+my_solver = "my_solver_runops.adapter:MySolverAdapter"
+```
+
+entry point 名 (`my_solver`) が `simulators.toml` の `adapter` 値です。runops は
+`simulators.toml` 読み込み時にこの entry point を探し、見つからない場合だけ
+同梱 contrib module の import 規約へ fallback します。
 
 ### ステップ 2: 7 つのメソッドの実装
 

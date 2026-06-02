@@ -122,6 +122,14 @@ the active adapters; if a target package is currently editable-installed, it
 warns before replacing that editable install. Use `runo update --yes` or
 `runo update --force` only when that replacement is intentional.
 
+Adapter 名は runops 同梱 adapter または外部 Python package が公開する
+`runops.adapters` entry point に対応する。外部化された simulator adapter を使う
+場合は、runops CLI と同じ Python environment にその package を入れる。例:
+
+```bash
+uvx --from runops --with my-solver-runops runo runs create
+```
+
 ---
 
 ## launchers.toml

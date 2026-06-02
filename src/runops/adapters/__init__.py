@@ -7,15 +7,22 @@ Importing this package automatically registers the built-in adapters
 from __future__ import annotations
 
 from runops.adapters.base import SimulatorAdapter
+from runops.adapters.bundled import register_bundled_adapters
 from runops.adapters.contrib.beach import BeachAdapter
 from runops.adapters.contrib.emses import EmseAdapter
 from runops.adapters.generic import GenericAdapter
-from runops.adapters.registry import get, get_global_registry, list_adapters, register
+from runops.adapters.registry import (
+    get,
+    get_global_registry,
+    list_adapters,
+    load_entry_points,
+    register,
+)
 
-# Register built-in adapters on import
-register(GenericAdapter)
-register(EmseAdapter)
-register(BeachAdapter)
+# Register bundled adapters first.  External packages can provide additional
+# adapters through the `runops.adapters` Python entry point group.
+register_bundled_adapters()
+load_entry_points(fail_on_error=False)
 
 __all__ = [
     "BeachAdapter",
@@ -25,5 +32,6 @@ __all__ = [
     "get",
     "get_global_registry",
     "list_adapters",
+    "load_entry_points",
     "register",
 ]

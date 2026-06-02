@@ -10,12 +10,15 @@ from __future__ import annotations
 import importlib
 import importlib.util
 import logging
-from typing import TYPE_CHECKING, Any
+from collections.abc import Iterable
+from importlib import metadata as importlib_metadata
+from typing import Any, cast
 
-if TYPE_CHECKING:
-    from runops.adapters.base import SimulatorAdapter
+from runops.adapters.base import SimulatorAdapter
 
 logger = logging.getLogger(__name__)
+
+ADAPTER_ENTRY_POINT_GROUP = "runops.adapters"
 
 
 class AdapterImportError(RuntimeError):
@@ -107,6 +110,54 @@ class AdapterRegistry:
     # Config loading
     # ------------------------------------------------------------------
 
+    def load_entry_points(
+        self,
+        names: Iterable[str] | None = None,
+        *,
+        fail_on_error: bool = True,
+    ) -> None:
+        """Load adapter classes from installed Python entry points.
+
+        External simulator packages can expose adapters through the
+        ``runops.adapters`` entry point group.  The entry point name is the
+        adapter key used in ``simulators.toml``.
+        """
+        requested = set(names) if names is not None else None
+        for entry_point in _adapter_entry_points():
+            adapter_name = entry_point.name
+            if requested is not None and adapter_name not in requested:
+                continue
+            if adapter_name in self._entries:
+                continue
+            try:
+                loaded = entry_point.load()
+                if not isinstance(loaded, type) or not issubclass(
+                    loaded, SimulatorAdapter
+                ):
+                    msg = (
+                        f"Adapter entry point '{adapter_name}' did not load a "
+                        "SimulatorAdapter subclass"
+                    )
+                    raise TypeError(msg)
+                self.register(loaded, name=adapter_name)
+                logger.debug(
+                    "Loaded adapter entry point '%s' -> %s",
+                    adapter_name,
+                    loaded.__name__,
+                )
+            except Exception as exc:
+                if fail_on_error:
+                    raise AdapterImportError(
+                        "Failed to load adapter entry point "
+                        f"'{adapter_name}' from group "
+                        f"'{ADAPTER_ENTRY_POINT_GROUP}': {exc}"
+                    ) from exc
+                logger.warning(
+                    "Skipping adapter entry point '%s': %s",
+                    adapter_name,
+                    exc,
+                )
+
     def load_from_config(self, simulators_config: dict[str, Any]) -> None:
         """Auto-register adapters referenced in a simulators.toml config.
 
@@ -114,8 +165,10 @@ class AdapterRegistry:
         method attempts to import and register the adapter module.  Entries
         whose adapter is already registered are silently skipped.
 
-        The import convention is::
+        Discovery checks external Python entry points first, then falls back to
+        the bundled module conventions::
 
+            runops.adapters.contrib.<adapter_name>
             runops.adapters.<adapter_name>
 
         Args:
@@ -123,6 +176,14 @@ class AdapterRegistry:
                 ``simulators.toml``.
         """
         simulators = simulators_config.get("simulators", simulators_config)
+        adapter_names = {
+            str(sim_cfg.get("adapter", ""))
+            for sim_cfg in simulators.values()
+            if isinstance(sim_cfg, dict)
+        }
+        adapter_names.discard("")
+        self.load_entry_points(adapter_names, fail_on_error=True)
+
         for sim_name, sim_cfg in simulators.items():
             if not isinstance(sim_cfg, dict):
                 continue
@@ -195,6 +256,16 @@ class AdapterRegistry:
         raise AttributeError(msg)
 
 
+def _adapter_entry_points() -> list[importlib_metadata.EntryPoint]:
+    """Return installed entry points that advertise runops adapters."""
+    raw_entry_points: Any = importlib_metadata.entry_points()
+    if hasattr(raw_entry_points, "select"):
+        selected = raw_entry_points.select(group=ADAPTER_ENTRY_POINT_GROUP)
+    else:  # pragma: no cover - compatibility with older importlib.metadata APIs
+        selected = raw_entry_points.get(ADAPTER_ENTRY_POINT_GROUP, [])
+    return list(cast("Iterable[importlib_metadata.EntryPoint]", selected))
+
+
 # ------------------------------------------------------------------
 # Global registry and module-level convenience functions
 # ------------------------------------------------------------------
@@ -238,6 +309,15 @@ def list_adapters() -> list[str]:
         Sorted list of adapter names.
     """
     return _global_registry.list_adapters()
+
+
+def load_entry_points(
+    names: Iterable[str] | None = None,
+    *,
+    fail_on_error: bool = True,
+) -> None:
+    """Load installed adapter entry points into the global registry."""
+    _global_registry.load_entry_points(names, fail_on_error=fail_on_error)
 
 
 def load_from_config(simulators_config: dict[str, Any]) -> None:
