@@ -29,13 +29,13 @@ project 側では `.runops/knowledge/runops/agent-user-guide.md` と
 | 全 run 一括投入 | `runo runs submit --all` (`--yes` で確認省略) |
 | キュー上書き / QOS / 依存ジョブ | `runo runs submit -qn <queue>` / `--qos <qos>` / `--afterok <job_id>` |
 | 状態確認 (単一/複数/survey 一括) | `runo runs status [RUNS...]` |
-| Slurm 同期 (単一/複数/survey 一括) | `runo runs sync [RUNS...]` (bulk: created + terminal state は silent skip) |
+| scheduler 同期 (単一/複数/survey 一括) | `runo runs sync [RUNS...]` (bulk: created + terminal state は silent skip) |
 | ログ確認 | `runo runs log` |
 | エラーログ | `runo runs log -e` |
 | 実行中ジョブ一覧 / 自動更新 | `runo runs jobs` / `runo runs jobs -w 30` |
 | 複数 run の進捗ダッシュボード | `runo runs dashboard runs/<survey>` (`-w 30`, `--all` 対応) |
 | run 一覧 (複数 PATH 可) | `runo runs list [PATHS...]` |
-| run 停止 (scancel + sync) | `runo runs cancel` |
+| run 停止 (scheduler cancel + sync) | `runo runs cancel` |
 | run のハード削除 (created/failed/cancelled) | `runo runs delete` |
 | 解析 | `runo analyze summarize` |
 | 集計 | `runo analyze collect` |
@@ -159,7 +159,7 @@ submitted/running → cancelled
 completed → archived → purged
 ```
 
-`runo runs cancel` は `submitted` / `running` の run に対して `scancel` と
+`runo runs cancel` は `submitted` / `running` の run に対して scheduler cancel と
 `runo runs sync` をまとめて実行し、`cancelled` 状態に遷移させる安全な経路。
 `runo runs archive` は `completed` run を `archived` にし、既定で
 `runs/_archive/` に移動する。パスを保ちたい場合は `--keep-in-place` を使う。

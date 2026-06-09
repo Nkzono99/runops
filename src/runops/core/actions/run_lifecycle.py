@@ -110,6 +110,23 @@ def create_survey(project_root: Path, survey_dir: Path) -> ActionResult:
     )
 
 
+def _scheduler_from_manifest_job(job: dict[str, Any]) -> str:
+    """Return the normalized scheduler name from a manifest job section."""
+    return str(job.get("scheduler", "slurm")).lower()
+
+
+def _scheduler_state_updates(scheduler: str, state: str) -> dict[str, str]:
+    updates = {
+        "last_scheduler_state": state,
+        f"last_{scheduler}_state": state,
+    }
+    if scheduler == "slurm":
+        updates["last_slurm_state"] = state
+    elif scheduler == "pbs":
+        updates["last_slurm_state"] = ""
+    return updates
+
+
 @logged_action("submit_run")
 def submit_run(
     run_dir: Path,
@@ -117,16 +134,12 @@ def submit_run(
     queue_name: str = "",
     qos: str = "",
     afterok: str = "",
+    group_name: str = "",
 ) -> ActionResult:
-    """Submit a run to Slurm via sbatch."""
+    """Submit a run to the scheduler recorded in manifest.toml."""
     from runops.core.manifest import read_manifest, update_manifest
     from runops.core.retry import get_attempt_count
     from runops.core.state import update_state
-    from runops.slurm.submit import (
-        SlurmNotFoundError,
-        SlurmSubmitError,
-        sbatch_submit,
-    )
 
     state_str, err = _require_state(run_dir, RunState.CREATED)
     if err:
@@ -148,13 +161,22 @@ def submit_run(
     except OSError as e:
         return _error("submit_run", f"Failed to read job script: {e}")
 
-    if "#SBATCH" not in job_content:
+    manifest = read_manifest(run_dir)
+    scheduler = _scheduler_from_manifest_job(manifest.job)
+    expected_directive = "#PBS" if scheduler == "pbs" else "#SBATCH"
+
+    if scheduler not in {"slurm", "pbs"}:
         return _precondition_fail(
             "submit_run",
-            "job.sh does not contain expected #SBATCH directives",
+            f"Unsupported scheduler in manifest: {scheduler!r}",
         )
 
-    manifest = read_manifest(run_dir)
+    if expected_directive not in job_content:
+        return _precondition_fail(
+            "submit_run",
+            f"job.sh does not contain expected {expected_directive} directives",
+        )
+
     run_id = manifest.run.get("id", run_dir.name)
     warnings: list[str] = []
     tags = manifest.classification.get("tags", [])
@@ -166,25 +188,60 @@ def submit_run(
         work_dir = run_dir
 
     extra_args: list[str] = []
-    if queue_name:
-        extra_args.append(f"--partition={queue_name}")
-    if qos:
-        extra_args.append(f"--qos={qos}")
-
-    try:
-        job_id = sbatch_submit(
-            job_script,
-            work_dir,
-            extra_args=extra_args or None,
-            afterok=afterok or None,
+    if scheduler == "slurm":
+        from runops.slurm.submit import (
+            SlurmNotFoundError,
+            SlurmSubmitError,
+            sbatch_submit,
         )
-    except (SlurmNotFoundError, SlurmSubmitError, FileNotFoundError, RuntimeError) as e:
-        return _error("submit_run", f"sbatch failed: {e}")
+
+        if queue_name:
+            extra_args.append(f"--partition={queue_name}")
+        if qos:
+            extra_args.append(f"--qos={qos}")
+
+        try:
+            job_id = sbatch_submit(
+                job_script,
+                work_dir,
+                extra_args=extra_args or None,
+                afterok=afterok or None,
+            )
+        except (
+            SlurmNotFoundError,
+            SlurmSubmitError,
+            FileNotFoundError,
+            RuntimeError,
+        ) as e:
+            return _error("submit_run", f"sbatch failed: {e}")
+    else:
+        from runops.pbs.submit import PbsNotFoundError, PbsSubmitError, qsub_submit
+
+        if qos:
+            return _precondition_fail(
+                "submit_run",
+                "qos is Slurm-only; use --queue-name and --group for PBS",
+            )
+        if queue_name:
+            extra_args.extend(["-q", queue_name])
+        if group_name:
+            extra_args.extend(["-W", f"group_list={group_name}"])
+
+        try:
+            job_id = qsub_submit(
+                job_script,
+                run_dir,
+                extra_args=extra_args or None,
+                afterok=afterok or None,
+            )
+        except (PbsNotFoundError, PbsSubmitError, FileNotFoundError, RuntimeError) as e:
+            return _error("submit_run", f"qsub failed: {e}")
 
     now = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
     attempt = get_attempt_count(manifest.job) + 1
     existing_attempts: list[dict[str, str]] = list(manifest.job.get("attempts", []))
     attempt_record = {
+        "scheduler": scheduler,
         "job_id": job_id,
         "submitted_at": now,
         "attempt": str(attempt),
@@ -196,8 +253,11 @@ def submit_run(
         attempt_record["qos"] = qos
     if afterok:
         attempt_record["afterok"] = afterok
+    if group_name:
+        attempt_record["group"] = group_name
     existing_attempts.append(attempt_record)
     job_updates: dict[str, Any] = {
+        "scheduler": scheduler,
         "job_id": job_id,
         "submitted_at": now,
         "attempt": attempt,
@@ -206,17 +266,18 @@ def submit_run(
     }
     if queue_name:
         job_updates["partition"] = queue_name
+        job_updates["queue"] = queue_name
     if qos:
         job_updates["qos"] = qos
     if afterok:
         job_updates["afterok"] = afterok
+    if group_name:
+        job_updates["group"] = group_name
 
     update_manifest(
         run_dir,
         {
-            "run": {
-                "last_slurm_state": "",
-            },
+            "run": _scheduler_state_updates(scheduler, ""),
             "job": job_updates,
         },
     )
@@ -231,6 +292,7 @@ def submit_run(
         message=f"Submitted job {job_id} (attempt {attempt})",
         data={
             "job_id": job_id,
+            "scheduler": scheduler,
             "attempt": attempt,
             "run_id": run_id,
             "warnings": warnings,
@@ -242,14 +304,14 @@ def submit_run(
 
 @logged_action("sync_run")
 def sync_run(run_dir: Path) -> ActionResult:
-    """Synchronize run state with Slurm."""
+    """Synchronize run state with the recorded scheduler."""
     from runops.core.manifest import read_manifest, update_manifest
     from runops.core.state import update_state
-    from runops.slurm.query import SlurmQueryError, query_job_status
 
     manifest = read_manifest(run_dir)
     run_id = manifest.run.get("id", run_dir.name)
     job_id = manifest.job.get("job_id", "")
+    scheduler = _scheduler_from_manifest_job(manifest.job)
     if not job_id:
         return _precondition_fail("sync_run", "No job_id recorded in manifest")
 
@@ -257,17 +319,49 @@ def sync_run(run_dir: Path) -> ActionResult:
     if err:
         return _precondition_fail("sync_run", err)
 
-    try:
-        job_status = query_job_status(job_id)
-    except (SlurmQueryError, RuntimeError) as e:
-        return _error("sync_run", f"Slurm query failed: {e}")
+    if scheduler == "slurm":
+        from runops.slurm.query import (
+            SlurmQueryError,
+        )
+        from runops.slurm.query import (
+            query_job_status as query_slurm_job_status,
+        )
 
-    new_state = job_status.run_state
+        try:
+            slurm_status = query_slurm_job_status(job_id)
+            scheduler_state = slurm_status.slurm_state
+            new_state = slurm_status.run_state
+            failure_reason = slurm_status.failure_reason
+            exit_code = slurm_status.exit_code
+        except (SlurmQueryError, RuntimeError) as e:
+            return _error("sync_run", f"Slurm query failed: {e}")
+    elif scheduler == "pbs":
+        from runops.pbs.query import (
+            PbsQueryError,
+        )
+        from runops.pbs.query import (
+            query_job_status as query_pbs_job_status,
+        )
+
+        try:
+            pbs_status = query_pbs_job_status(job_id)
+            scheduler_state = pbs_status.pbs_state
+            new_state = pbs_status.run_state
+            failure_reason = pbs_status.failure_reason
+            exit_code = pbs_status.exit_code
+        except (PbsQueryError, RuntimeError) as e:
+            return _error("sync_run", f"PBS query failed: {e}")
+    else:
+        return _precondition_fail(
+            "sync_run",
+            f"Unsupported scheduler in manifest: {scheduler!r}",
+        )
+
     if new_state.value == state_str:
         try:
             update_manifest(
                 run_dir,
-                {"run": {"last_slurm_state": job_status.slurm_state}},
+                {"run": _scheduler_state_updates(scheduler, scheduler_state)},
             )
         except SimctlError as e:
             return _error("sync_run", f"State update failed: {e}")
@@ -276,7 +370,13 @@ def sync_run(run_dir: Path) -> ActionResult:
             action="sync_run",
             status=ActionStatus.SUCCESS,
             message=f"State unchanged: {state_str}",
-            data={"run_id": run_id, "slurm_state": job_status.slurm_state},
+            data={
+                "run_id": run_id,
+                "scheduler": scheduler,
+                "scheduler_state": scheduler_state,
+                "slurm_state": scheduler_state if scheduler == "slurm" else "",
+                "pbs_state": scheduler_state if scheduler == "pbs" else "",
+            },
             state_before=state_str,
             state_after=state_str,
         )
@@ -286,8 +386,12 @@ def sync_run(run_dir: Path) -> ActionResult:
             run_dir,
             new_state,
             reconcile=True,
-            reason=job_status.failure_reason,
-            slurm_state=job_status.slurm_state,
+            reason=failure_reason,
+            slurm_state=scheduler_state,
+        )
+        update_manifest(
+            run_dir,
+            {"run": _scheduler_state_updates(scheduler, scheduler_state)},
         )
     except SimctlError as e:
         return _error("sync_run", f"State update failed: {e}")
@@ -298,9 +402,12 @@ def sync_run(run_dir: Path) -> ActionResult:
         message=f"State: {state_str} -> {new_state.value}",
         data={
             "run_id": run_id,
-            "slurm_state": job_status.slurm_state,
-            "failure_reason": job_status.failure_reason,
-            "exit_code": job_status.exit_code,
+            "scheduler": scheduler,
+            "scheduler_state": scheduler_state,
+            "slurm_state": scheduler_state if scheduler == "slurm" else "",
+            "pbs_state": scheduler_state if scheduler == "pbs" else "",
+            "failure_reason": failure_reason,
+            "exit_code": exit_code,
         },
         state_before=state_str,
         state_after=new_state.value,

@@ -24,6 +24,11 @@ def is_rsc_site(site: SiteProfile | None) -> bool:
     return site is not None and site.resource_style == "rsc"
 
 
+def is_pbs_site(site: SiteProfile | None) -> bool:
+    """Return True when the active site emits PBS directives."""
+    return site is not None and site.scheduler == "pbs"
+
+
 def build_job_config(
     job: JobData,
     site: SiteProfile | None,
@@ -43,6 +48,18 @@ def build_job_config(
             config["memory"] = job.memory
         if job.gpus:
             config["gpus"] = job.gpus
+    elif is_pbs_site(site):
+        config["nodes"] = job.nodes
+        config["ntasks"] = job.ntasks
+        config["sockets"] = job.sockets
+        if job.mpiprocs:
+            config["mpiprocs"] = job.mpiprocs
+        if job.ompthreads:
+            config["ompthreads"] = job.ompthreads
+        if job.group:
+            config["group"] = job.group
+        if job.gpus:
+            config["gpus"] = job.gpus
     else:
         config["nodes"] = job.nodes
         config["ntasks"] = job.ntasks
@@ -60,8 +77,9 @@ def build_manifest_job(
     site: SiteProfile | None,
 ) -> dict[str, Any]:
     """Build the [job] section recorded in ``manifest.toml``."""
+    scheduler = site.scheduler if site is not None else "slurm"
     result: dict[str, Any] = {
-        "scheduler": "slurm",
+        "scheduler": scheduler,
         "job_id": "",
         "partition": job.partition,
         "walltime": job.walltime,
@@ -73,6 +91,19 @@ def build_manifest_job(
         result["cores"] = job.cores
         if job.memory:
             result["memory"] = job.memory
+        if job.gpus:
+            result["gpus"] = job.gpus
+    elif scheduler == "pbs":
+        result["queue"] = job.partition
+        result["nodes"] = job.nodes
+        result["ntasks"] = job.ntasks
+        result["sockets"] = job.sockets
+        if job.mpiprocs:
+            result["mpiprocs"] = job.mpiprocs
+        if job.ompthreads:
+            result["ompthreads"] = job.ompthreads
+        if job.group:
+            result["group"] = job.group
         if job.gpus:
             result["gpus"] = job.gpus
     else:
@@ -156,6 +187,7 @@ def merge_site_modules(
     merged_sim_modules[simulator_name] = existing
     return SiteProfile(
         name=site.name,
+        scheduler=site.scheduler,
         resource_style=site.resource_style,
         modules=list(site.modules),
         simulator_modules=merged_sim_modules,
@@ -164,6 +196,9 @@ def merge_site_modules(
         extra_sbatch=list(site.extra_sbatch),
         env=dict(site.env),
         setup_commands=list(site.setup_commands),
+        extra_pbs=list(site.extra_pbs),
+        pbs_group=site.pbs_group,
+        codex_plugins=list(site.codex_plugins),
     )
 
 

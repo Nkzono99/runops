@@ -106,7 +106,7 @@ runo runs submit --all --yes       # 会話上で確認済みの場合のみ
 runo runs status                    # cwd の run の状態 (manifest 更新なし)
 runo runs status R20260330-0001 R20260330-0002  # 複数を一気に
 runo runs status runs/sheath/angle_scan         # survey 配下を一括で
-runo runs sync                      # Slurm 状態を manifest に反映
+runo runs sync                      # scheduler 状態を manifest に反映
 runo runs sync runs/sheath/angle_scan           # survey 一括 sync
                                                   # (created な run は silent skip)
 ```
@@ -183,7 +183,7 @@ runo knowledge source sync -s emses
 ## 停止・整理・削除
 
 ```bash
-# 実行中の run を安全に停止 (scancel + sync を一回で)
+# 実行中の run を安全に停止 (scheduler cancel + sync を一回で)
 runo runs cancel             # submitted/running の run を停止
 runo runs cancel --yes       # 確認スキップ
 

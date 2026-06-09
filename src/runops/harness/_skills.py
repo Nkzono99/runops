@@ -7,6 +7,7 @@ from pathlib import Path
 from runops.harness._adapters import collect_pip_packages
 
 _SKILL_RESOURCE_SKIP_NAMES = {"README.md", "manifest.txt"}
+_SKILL_RESOURCE_SKIP_SUFFIXES = {".pyc", ".pyo"}
 
 
 def render_skill_files(
@@ -46,7 +47,11 @@ def render_skill_files(
         for resource_path in sorted(skill_path.rglob("*")):
             if not resource_path.is_file():
                 continue
+            if "__pycache__" in resource_path.parts:
+                continue
             if resource_path.name in _SKILL_RESOURCE_SKIP_NAMES:
+                continue
+            if resource_path.suffix in _SKILL_RESOURCE_SKIP_SUFFIXES:
                 continue
 
             rel_path = resource_path.relative_to(skill_path).as_posix()

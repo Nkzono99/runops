@@ -8,7 +8,7 @@ Experiment Layer が「何を走らせるか」を決めるのに対し、Execut
 ## 目的
 
 - run を一意な実行単位として管理する。
-- Slurm job の投入・同期・キャンセルを run state に反映する。
+- scheduler job の投入・同期・キャンセルを run state に反映する。
 - `manifest.toml` を run の正本として保つ。
 - 入力、job script、runtime output、status、provenance を同じ run directory に束ねる。
 - Agent / 人間が同じ run state から再開できるようにする。
@@ -55,10 +55,10 @@ completed -> archived -> purged
 状態操作の原則:
 
 - `runo runs create` / `runo runs sweep` が `created` run を作る。
-- `runo runs submit` が Slurm に投入し、job id と submit history を記録する。
-- `runo runs status` は状態を表示する。live Slurm query を含む場合でも正本は更新しない。
-- `runo runs sync` が Slurm 状態を `manifest.toml` / `status/` に反映する。
-- `runo runs cancel` は `scancel` と sync を同時に行う。
+- `runo runs submit` が scheduler に投入し、job id と submit history を記録する。
+- `runo runs status` は状態を表示する。live scheduler query を含む場合でも正本は更新しない。
+- `runo runs sync` が scheduler 状態を `manifest.toml` / `status/` に反映する。
+- `runo runs cancel` は scheduler cancel と sync を同時に行う。
 - `runo runs archive` / `purge-work` / `delete` はライフサイクル操作として扱う。
 
 ## Provenance
@@ -92,7 +92,7 @@ Execution Kernel は run 生成時・投入時・同期時に、再現性に必�
 
 - `manifest.toml` を手で編集しない。
 - `input/`, `submit/job.sh`, `status/` を手で作らない。
-- Slurm job id や state を note / research agenda だけに残して正本化しない。
+- scheduler job id や state を note / research agenda だけに残して正本化しない。
 - `work/` の大容量 output を Git 管理しない。
 - completed / archived run を `rm -rf` で消さない。runops lifecycle command を使う。
 

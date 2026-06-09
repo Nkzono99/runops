@@ -750,6 +750,93 @@ class TestInit:
         assert "KUDPC HPC" in result.output
         assert "KUDPC HPC" in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
 
+    def test_init_creates_site_md_for_profile_without_launcher(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Guidance-only site profiles create SITE.md without a launcher preset."""
+        from runops.cli.init import _BundledSiteProfile
+
+        repo_root = Path(__file__).resolve().parents[2]
+        site_dir = repo_root / "src" / "runops" / "sites"
+        profile = _BundledSiteProfile(
+            name="grand",
+            launcher={},
+            source_path=site_dir / "grand.toml",
+            docs_path=site_dir / "grand.md",
+            codex_plugins=[
+                CodexPluginRecommendation(
+                    name="grand-hpc-codex-plugin",
+                    display_name="GRAND HPC",
+                    reason="GRAND PBS workflow guidance.",
+                    install_hint="codex plugin add grand-hpc-codex-plugin@test",
+                    activation_hint="Start a new Codex thread.",
+                    visibility="private-or-gated",
+                )
+            ],
+        )
+
+        monkeypatch.setattr("runops.cli.init._prompt_simulators", lambda: ([], {}))
+        monkeypatch.setattr(
+            "runops.cli.init._prompt_launchers",
+            lambda: ({}, profile),
+        )
+        monkeypatch.setattr(
+            "runops.cli.init._prompt_knowledge_sources",
+            lambda _project_dir: [],
+        )
+
+        result = runner.invoke(
+            app,
+            ["init", "--path", str(tmp_path), "--name", "grand-project"],
+        )
+
+        assert result.exit_code == 0
+        assert "GRAND HPC" in result.output
+        assert "GRAND HPC" in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        assert "PBS Professional" in (tmp_path / "SITE.md").read_text(encoding="utf-8")
+        assert "[launchers.grand]" not in (tmp_path / "launchers.toml").read_text(
+            encoding="utf-8"
+        )
+
+    def test_init_site_option_uses_bundled_profile_noninteractively(
+        self, tmp_path: Path
+    ) -> None:
+        """--site selects a bundled site profile even with --yes."""
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                "-y",
+                "--site",
+                "grand",
+                "--path",
+                str(tmp_path),
+                "--name",
+                "grand-project",
+                "emses",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "GRAND HPC" in result.output
+        assert "PBS Professional" in (tmp_path / "SITE.md").read_text(encoding="utf-8")
+        assert 'scheduler = "pbs"' in (tmp_path / "site.toml").read_text(
+            encoding="utf-8"
+        )
+        assert "[launchers.grand]" in (tmp_path / "launchers.toml").read_text(
+            encoding="utf-8"
+        )
+
+    def test_init_site_option_rejects_unknown_profile(self, tmp_path: Path) -> None:
+        result = runner.invoke(
+            app,
+            ["init", "-y", "--site", "unknown-site", "--path", str(tmp_path)],
+        )
+
+        assert result.exit_code == 2
+        assert "unknown site profile" in result.output
+        assert "grand" in result.output
+
     def test_init_renders_imports_after_bootstrap(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
@@ -926,6 +1013,31 @@ class TestDoctor:
 
         assert result.exit_code == 1
         assert "[FAIL] sbatch not found in PATH" in result.output
+
+    def test_doctor_uses_pbs_commands_for_pbs_site(self, tmp_path: Path) -> None:
+        """Doctor checks qsub/qstat/qdel for PBS projects instead of sbatch."""
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
+        (tmp_path / "simulators.toml").write_text("[simulators]\n")
+        (tmp_path / "launchers.toml").write_text("[launchers]\n")
+        (tmp_path / "runs").mkdir()
+        (tmp_path / "site.toml").write_text(
+            '[site]\nname = "grand"\nscheduler = "pbs"\n',
+            encoding="utf-8",
+        )
+
+        def fake_which(command: str) -> str | None:
+            if command in {"qsub", "qstat", "qdel"}:
+                return f"/usr/bin/{command}"
+            return None
+
+        with patch("runops.cli.init.shutil.which", side_effect=fake_which):
+            result = runner.invoke(app, ["doctor", str(tmp_path)])
+
+        assert result.exit_code == 0, result.output
+        assert "[PASS] qsub is available" in result.output
+        assert "[PASS] qstat is available" in result.output
+        assert "[PASS] qdel is available" in result.output
+        assert "sbatch" not in result.output
 
     def test_doctor_duplicate_run_ids(self, tmp_path: Path) -> None:
         """Doctor fails if duplicate run_ids exist."""

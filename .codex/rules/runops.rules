@@ -53,7 +53,7 @@ prefix_rule(
 prefix_rule(
     pattern = ["runo", "runs", "submit"],
     decision = "allow",
-    justification = "Agents may submit Slurm jobs after dry-run review and explicit chat confirmation.",
+    justification = "Agents may submit scheduler jobs after dry-run review and explicit chat confirmation.",
     match = [
         "runo runs submit R20260419-0001",
         "runo runs submit --all runs/survey",
@@ -64,7 +64,7 @@ prefix_rule(
 prefix_rule(
     pattern = ["runops", "runs", "submit"],
     decision = "allow",
-    justification = "Agents may submit Slurm jobs after dry-run review and explicit chat confirmation.",
+    justification = "Agents may submit scheduler jobs after dry-run review and explicit chat confirmation.",
     match = [
         "runops runs submit R20260419-0001",
         "runops runs submit --all runs/survey",
@@ -75,7 +75,7 @@ prefix_rule(
 prefix_rule(
     pattern = ["uv", "run", "runo", "runs", "submit"],
     decision = "allow",
-    justification = "Agents may submit Slurm jobs after dry-run review and explicit chat confirmation.",
+    justification = "Agents may submit scheduler jobs after dry-run review and explicit chat confirmation.",
     match = [
         "uv run runo runs submit R20260419-0001",
         "uv run runo runs submit --all runs/survey",
@@ -86,7 +86,7 @@ prefix_rule(
 prefix_rule(
     pattern = ["uv", "run", "runops", "runs", "submit"],
     decision = "allow",
-    justification = "Agents may submit Slurm jobs after dry-run review and explicit chat confirmation.",
+    justification = "Agents may submit scheduler jobs after dry-run review and explicit chat confirmation.",
     match = [
         "uv run runops runs submit R20260419-0001",
         "uv run runops runs submit --all runs/survey",

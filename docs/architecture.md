@@ -30,10 +30,13 @@ runops/
     |                         MPI 起動方式の抽象化
     |
     +----> jobgen/     -----> Job Script 生成
-    |                         Slurm batch script のテンプレート生成
+    |                         Slurm / PBS batch script のテンプレート生成
     |
     +----> slurm/      -----> Slurm 連携層
-                              sbatch / squeue / sacct のラッパー
+    |                         sbatch / squeue / sacct のラッパー
+    |
+    +----> pbs/        -----> PBS 連携層
+                              qsub / qstat / qdel のラッパー
 ```
 
 ### モジュール依存関係
@@ -53,6 +56,7 @@ cli/
  +--> launchers/      (Launcher 取得・使用)
  +--> jobgen/         (job.sh 生成)
  +--> slurm/          (Slurm 連携)
+ +--> pbs/            (PBS 連携)
 
 core/
  +--> core/exceptions (共通例外)
@@ -67,7 +71,7 @@ launchers/
 
 重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では
 `core/actions/` と `core/run_creation/` が orchestration 層として
-`adapters/`、`launchers/`、`core/site/`、`jobgen/`、`slurm/` を接続しています。
+`adapters/`、`launchers/`、`core/site/`、`jobgen/`、`slurm/`、`pbs/` を接続しています。
 
 特に run 生成時は `core/run_creation/` が project、case、survey override を読み、
 simulator entry から Adapter を解決し、launcher profile と site profile を組み合わせて
@@ -508,10 +512,10 @@ CLI: runo runs status RUN
   |      manifest.toml の run.status を表示
   |
   +--> query_job_status(job_id)  (job_id がある場合のみ best-effort)
-         live Slurm state を表示するが、manifest.toml と state.json は更新しない
+         live scheduler state を表示するが、manifest.toml と state.json は更新しない
 ```
 
-### sync (Slurm 状態同期)
+### sync (scheduler 状態同期)
 
 ```
 CLI: runo runs sync RUN
@@ -520,9 +524,9 @@ CLI: runo runs sync RUN
   |      job_id を取得
   |
   +--> query_job_status(job_id)
-  |      1. squeue で照会 (アクティブ job)
-  |      2. 見つからなければ sacct で照会 (完了 job)
-  |      3. Slurm 状態を RunState にマッピング
+  |      1. job.scheduler に応じて Slurm または PBS backend を選ぶ
+  |      2. active / historical job state を照会
+  |      3. scheduler 状態を RunState にマッピング
   |
   +--> update_state(new_state)
          manifest.toml と status/state.json を更新
@@ -530,15 +534,21 @@ CLI: runo runs sync RUN
 
 ---
 
-## Slurm 連携
+## Scheduler 連携
 
-### sbatch 投入 (`slurm/submit.py`)
+runops は `manifest.toml` の `job.scheduler` で backend を切り替える。
+現在は Slurm (`sbatch` / `squeue` / `sacct` / `scancel`) と PBS Professional
+(`qsub` / `qstat` / `qdel`) に対応する。
+
+### Slurm (`slurm/`)
+
+#### sbatch 投入 (`slurm/submit.py`)
 
 - `sbatch_submit(job_script, working_dir)` が `sbatch --chdir=... job.sh` を実行
 - 出力の `Submitted batch job 12345` をパースして job_id を返す
 - テスト用に `CommandRunner` 型を注入可能（モック対応）
 
-### 状態照会 (`slurm/query.py`)
+#### 状態照会 (`slurm/query.py`)
 
 - `squeue_status(job_id)`: アクティブ job の状態を照会
 - `sacct_status(job_id)`: 完了 job の状態と exit code を照会
@@ -555,11 +565,29 @@ Slurm 状態のマッピング:
 | FAILED, NODE_FAIL, OUT_OF_MEMORY, TIMEOUT, PREEMPTED | failed |
 | CANCELLED | cancelled |
 
+### PBS Professional (`pbs/`)
+
+- `qsub_submit(job_script, working_dir)` が `qsub -d ... job.sh` を実行し、PBS job id を返す
+- `qstat_status(job_id)`: active job を `qstat -f`、historical job を `qstat -x -f` で照会
+- `query_job_status(job_id)`: PBS の `job_state` / `exit_status` を RunState にマッピング
+- `qdel_job(job_id)`: PBS job を cancel
+
+PBS 状態のマッピング:
+
+| PBS 状態 | runops RunState |
+|----------|-----------------|
+| Q, H, W, T | submitted |
+| R, E, S | running |
+| C, F + exit_status=0 | completed |
+| C, F + exit_status!=0 | failed |
+| C + exit_status=271 | cancelled |
+
 ---
 
 ## job.sh 生成 (`jobgen/generator.py`)
 
-`generate_job_script()` は以下の構造の Slurm batch script を生成します:
+`generate_job_script()` は Slurm または PBS の batch script を生成します。
+Slurm script は概ね以下の構造になる:
 
 ```bash
 #!/bin/bash

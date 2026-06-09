@@ -7,7 +7,7 @@
 `SPEC.md` に分ける。AGENTS.md は 150 行程度を上限目安に保ち、長い表や手順を
 ここへ戻さない。
 
-runops は HPC 環境における Slurm ベースのシミュレーション実行管理 CLI。
+runops は HPC 環境における scheduler ベース (Slurm / PBS) のシミュレーション実行管理 CLI。
 run ディレクトリを日常運用の主単位とし、パラメータサーベイ展開、job 投入、
 状態追跡、provenance 記録、解析補助を一貫して管理する。
 
@@ -78,11 +78,12 @@ src/runops/
   launchers/  Launcher Profile
   jobgen/     job.sh 生成
   slurm/      sbatch / squeue / sacct 連携
+  pbs/        qsub / qstat / qdel 連携
   mcp/        Ops MCP provider
   harness/    project 側 harness 生成 / 更新
   templates/  project / case / survey 用テンプレート
 tests/
-  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/
+  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/ test_pbs/
 ```
 
 ## ビルドと検証

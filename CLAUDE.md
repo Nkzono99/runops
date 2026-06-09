@@ -2,7 +2,7 @@
 
 ## プロジェクト概要
 
-HPC 環境における Slurm ベースのシミュレーション実行管理 CLI ツール。
+HPC 環境における scheduler ベース (Slurm / PBS) のシミュレーション実行管理 CLI ツール。
 run ディレクトリを日常運用の主単位とし、パラメータサーベイ展開・job 投入・状態追跡・provenance 記録・解析補助を一貫して管理する。
 
 仕様書: `SPEC.md`
@@ -69,12 +69,13 @@ src/runops/
   launchers/     # Launcher Profile (srun / mpirun / mpiexec)
   jobgen/        # job.sh 生成
   slurm/         # Slurm 連携 (sbatch / squeue / sacct)
+  pbs/           # PBS Professional 連携 (qsub / qstat / qdel)
   mcp/           # Ops MCP provider (FastMCP / envelope / registry)
   sites/         # bundled site preset
   harness/       # project 側 harness 生成 / 更新 (builder / claude / codex)
   templates/     # project / case / survey 用 静的テンプレート
 tests/
-  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/
+  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/ test_pbs/
   fixtures/      # テスト用 TOML ファイル等
 ```
 

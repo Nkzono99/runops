@@ -105,8 +105,13 @@
         "scheduler": { "type": "string" },
         "job_id": { "type": "string" },
         "partition": { "type": "string" },
+        "queue": { "type": "string" },
         "nodes": { "type": "integer" },
         "ntasks": { "type": "integer" },
+        "sockets": { "type": "integer" },
+        "mpiprocs": { "type": "integer" },
+        "ompthreads": { "type": "integer" },
+        "group": { "type": "string" },
         "processes": { "type": "integer" },
         "threads": { "type": "integer" },
         "cores": { "type": "integer" },
@@ -116,7 +121,6 @@
         "walltime": { "type": "string" },
         "submitted_at": { "type": "string" },
         "attempt": { "type": "integer" },
-        "queue": { "type": "string" },
         "attempts": {
           "type": "array",
           "items": {

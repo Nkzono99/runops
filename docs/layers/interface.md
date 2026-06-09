@@ -89,9 +89,9 @@ uvx --from runops runo doctor
 
 | コマンド | 説明 |
 |---------|------|
-| `runo init [SIMS...] [-y] [--with-refs]` | プロジェクトの初期化。対話型がデフォルト、refs mirror は opt-in |
+| `runo init [SIMS...] [-y] [--site SITE] [--with-refs]` | プロジェクトの初期化。対話型がデフォルト、`--site grand` などで bundled site profile を指定、refs mirror は opt-in |
 | `runo setup [URL] [--with-refs]` | 既存 runops project の clone + セットアップ。refs mirror は opt-in |
-| `runo doctor [PATH]` | 環境検査。設定、sbatch、run_id 一意性、環境検出を確認 |
+| `runo doctor [PATH]` | 環境検査。設定、scheduler command、run_id 一意性、環境検出を確認 |
 | `runo context [DIR]` | Agent 向け project context の要約を表示 |
 | `runo context --json` | Agent 向け context を JSON で取得 |
 | `runo lint [PATH] [--scope ...] [--json]` | project state の health check |
@@ -117,7 +117,7 @@ MCP provider は Agent / host 向けの edge interface です。read / inspect /
 | `runo case new CASE [--minimal] [--survey]` | 新規 case のスキャフォールド生成 |
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | `survey.toml` からパラメータ直積で run を一括生成 |
-| `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
+| `runo runs submit [RUN]` | run を scheduler へ投入 (`-qn`, `--qos`, `--group`, `--afterok` 対応) |
 | `runo runs submit --all [DIR] [--yes]` | created な run を確認付きで一括投入 (`--yes` で確認省略) |
 | `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
 | `runo runs extend` | スナップショットから継続 run を生成 |
@@ -132,7 +132,7 @@ Agent との会話上で対象 run、queue、資源量を確認済みの場合�
 | コマンド | 説明 |
 |---------|------|
 | `runo runs status [RUNS...]` | run の状態確認。run_id / run dir / survey dir を複数渡せる |
-| `runo runs sync [RUNS...]` | Slurm 状態を `manifest.toml` に反映 |
+| `runo runs sync [RUNS...]` | scheduler 状態を `manifest.toml` に反映 |
 | `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
 | `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 |
 | `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗を 1 つの表で表示 |
@@ -151,7 +151,7 @@ bulk sync では created run と terminal state の run は silent skip され�
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 |
 | `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace を作成 |
-| `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
+| `runo runs cancel [RUN]` | submitted/running な run を scheduler cancel + `sync` で停止 |
 | `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | completed run を archived にし、既定で `runs/_archive/` へ移動 |
 | `runo runs purge-work [RUN]` | archived run の `work/` 内不要ファイル削除 |
 | `runo runs delete [RUN]` | created / cancelled / failed run を削除 |

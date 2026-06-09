@@ -1,12 +1,14 @@
 """Job script (job.sh) generation.
 
-Generates Slurm batch scripts from run configuration, launcher profile,
+Generates scheduler batch scripts from run configuration, launcher profile,
 and site profile (HPC environment abstraction).
 
-Supports two resource specification modes:
+Supports Slurm resource specification modes:
 
 - **Standard mode**: ``#SBATCH --nodes`` / ``#SBATCH --ntasks``
 - **RSC mode**: ``#SBATCH --rsc p=N:t=T:c=C`` (custom Slurm environments)
+
+For PBS sites, emits ``#PBS`` directives with ``select=...`` resources.
 """
 
 from __future__ import annotations
@@ -39,17 +41,19 @@ def generate_job_script(
     extra_setup_commands: list[str] | None = None,
     # --- Legacy kwargs (used when site is None) ---
     extra_sbatch: list[str] | None = None,
+    extra_pbs: list[str] | None = None,
     extra_env: dict[str, str] | None = None,
     modules: list[str] | None = None,
     setup_commands: list[str] | None = None,
     version_commands: list[str] | None = None,
     post_commands: list[str] | None = None,
     script_run_dir: Path | None = None,
+    scheduler: str = "slurm",
     resource_style: str = "standard",
     stdout_format: str | None = None,
     stderr_format: str | None = None,
 ) -> Path:
-    """Generate a ``job.sh`` script for Slurm submission.
+    """Generate a ``job.sh`` script for scheduler submission.
 
     The script is written to ``<run_dir>/submit/job.sh`` and made executable.
 
@@ -67,6 +71,7 @@ def generate_job_script(
         site: Site profile supplying environment-dependent settings.
         simulator_name: Simulator name (for per-simulator module lookup
             in *site*).
+        extra_pbs: (Legacy) Additional ``#PBS`` lines.
         extra_setup_commands: Additional setup commands to prepend
             (e.g. venv activation).  These are prepended before
             site/job_config setup commands.
@@ -80,6 +85,7 @@ def generate_job_script(
         script_run_dir: Run directory path embedded in the generated script.
             Defaults to *run_dir*. Used when writing into a staging directory
             before atomically moving the completed run into place.
+        scheduler: (Legacy) Scheduler backend (``"slurm"`` or ``"pbs"``).
         resource_style: (Legacy) ``"standard"`` or ``"rsc"``.
         stdout_format: (Legacy) Custom stdout format.
         stderr_format: (Legacy) Custom stderr format.
@@ -94,18 +100,22 @@ def generate_job_script(
 
     # Resolve settings from SiteProfile or legacy kwargs
     if site is not None:
+        effective_scheduler = site.scheduler
         effective_resource_style = site.resource_style
         effective_modules = site.modules_for(simulator_name)
         effective_extra_sbatch = list(site.extra_sbatch)
+        effective_extra_pbs = list(site.extra_pbs)
         effective_env = dict(site.env)
         effective_stdout = site.stdout_format
         effective_stderr = site.stderr_format
         effective_setup: list[str] = list(extra_setup_commands or [])
         effective_setup.extend(site.setup_commands)
     else:
+        effective_scheduler = scheduler
         effective_resource_style = resource_style
         effective_modules = list(modules or [])
         effective_extra_sbatch = list(extra_sbatch or [])
+        effective_extra_pbs = list(extra_pbs or [])
         effective_env = dict(extra_env or {})
         effective_stdout = stdout_format
         effective_stderr = stderr_format
@@ -118,6 +128,10 @@ def generate_job_script(
         for m in config_modules:
             if m not in effective_modules:
                 effective_modules.append(m)
+
+    if site is not None and site.pbs_group and not job_config.get("group"):
+        job_config = dict(job_config)
+        job_config["group"] = site.pbs_group
 
     # Merge setup/post commands from job_config
     config_pre = job_config.get("pre_commands", job_config.get("setup_commands", []))
@@ -133,7 +147,9 @@ def generate_job_script(
         exec_line=exec_line,
         run_dir=script_run_dir or run_dir,
         run_id=run_id,
+        scheduler=effective_scheduler,
         extra_sbatch=effective_extra_sbatch,
+        extra_pbs=effective_extra_pbs,
         extra_env=effective_env,
         modules=effective_modules,
         setup_commands=effective_setup,
@@ -209,7 +225,9 @@ def _render_script(
     exec_line: str,
     run_dir: Path,
     run_id: str,
+    scheduler: str,
     extra_sbatch: list[str],
+    extra_pbs: list[str],
     extra_env: dict[str, str],
     modules: list[str],
     setup_commands: list[str],
@@ -220,6 +238,58 @@ def _render_script(
     stderr_format: str | None = None,
 ) -> str:
     """Render the complete job script as a string."""
+    normalized_scheduler = scheduler.lower()
+    if normalized_scheduler == "slurm":
+        return _render_slurm_script(
+            job_config=job_config,
+            exec_line=exec_line,
+            run_dir=run_dir,
+            run_id=run_id,
+            extra_sbatch=extra_sbatch,
+            extra_env=extra_env,
+            modules=modules,
+            setup_commands=setup_commands,
+            version_commands=version_commands,
+            post_commands=post_commands,
+            resource_style=resource_style,
+            stdout_format=stdout_format,
+            stderr_format=stderr_format,
+        )
+    if normalized_scheduler == "pbs":
+        return _render_pbs_script(
+            job_config=job_config,
+            exec_line=exec_line,
+            run_dir=run_dir,
+            run_id=run_id,
+            extra_pbs=extra_pbs,
+            extra_env=extra_env,
+            modules=modules,
+            setup_commands=setup_commands,
+            version_commands=version_commands,
+            post_commands=post_commands,
+            stdout_format=stdout_format,
+            stderr_format=stderr_format,
+        )
+    raise JobScriptError(f"Unsupported scheduler: {scheduler!r}")
+
+
+def _render_slurm_script(
+    *,
+    job_config: dict[str, Any],
+    exec_line: str,
+    run_dir: Path,
+    run_id: str,
+    extra_sbatch: list[str],
+    extra_env: dict[str, str],
+    modules: list[str],
+    setup_commands: list[str],
+    version_commands: list[str],
+    post_commands: list[str],
+    resource_style: str = "standard",
+    stdout_format: str | None = None,
+    stderr_format: str | None = None,
+) -> str:
+    """Render a Slurm job script as a string."""
     lines: list[str] = ["#!/bin/bash"]
 
     # --- SBATCH directives ---
@@ -273,6 +343,127 @@ def _render_script(
     for directive in extra_sbatch:
         lines.append(f"#SBATCH {directive}")
 
+    _append_script_body(
+        lines,
+        run_dir=run_dir,
+        exec_line=exec_line,
+        extra_env=extra_env,
+        modules=modules,
+        setup_commands=setup_commands,
+        version_commands=version_commands,
+        post_commands=post_commands,
+    )
+
+    return "\n".join(lines)
+
+
+def _pbs_select_value(job_config: dict[str, Any]) -> str:
+    """Render a PBS ``select=`` resource value."""
+    nodes = int(job_config.get("nodes", 1))
+    if nodes < 1:
+        raise JobScriptError("PBS nodes must be >= 1")
+
+    chunks: list[str] = []
+    gpus = int(job_config.get("gpus", 0) or 0)
+    if gpus:
+        chunks.append(f"ngpus={gpus}")
+    else:
+        sockets = int(job_config.get("sockets", 1))
+        if sockets < 1:
+            raise JobScriptError("PBS sockets must be >= 1")
+        chunks.append(f"nsockets={sockets}")
+
+    mpiprocs = int(job_config.get("mpiprocs", 0) or 0)
+    if not mpiprocs:
+        ntasks = int(job_config.get("ntasks", 0) or 0)
+        if ntasks:
+            if ntasks % nodes != 0:
+                raise JobScriptError(
+                    "PBS ntasks must be divisible by nodes, or set mpiprocs"
+                )
+            mpiprocs = ntasks // nodes
+    if mpiprocs:
+        chunks.append(f"mpiprocs={mpiprocs}")
+
+    ompthreads = int(job_config.get("ompthreads", 0) or 0)
+    if ompthreads:
+        chunks.append(f"ompthreads={ompthreads}")
+
+    return f"{nodes}:{':'.join(chunks)}"
+
+
+def _render_pbs_script(
+    *,
+    job_config: dict[str, Any],
+    exec_line: str,
+    run_dir: Path,
+    run_id: str,
+    extra_pbs: list[str],
+    extra_env: dict[str, str],
+    modules: list[str],
+    setup_commands: list[str],
+    version_commands: list[str],
+    post_commands: list[str],
+    stdout_format: str | None = None,
+    stderr_format: str | None = None,
+) -> str:
+    """Render a PBS Professional job script as a string."""
+    lines: list[str] = ["#!/bin/bash -l"]
+
+    queue = job_config.get("queue") or job_config.get("partition", "")
+    if queue:
+        lines.append(f"#PBS -q {queue}")
+
+    lines.append(f"#PBS -l select={_pbs_select_value(job_config)}")
+    lines.append(f"#PBS -l walltime={job_config['walltime']}")
+
+    group = job_config.get("group", "")
+    if group:
+        lines.append(f"#PBS -W group_list={group}")
+
+    if stdout_format:
+        lines.append(f"#PBS -o {stdout_format}")
+    if stderr_format:
+        lines.append(f"#PBS -e {stderr_format}")
+    if not stderr_format:
+        lines.append("#PBS -j oe")
+
+    job_name = job_config.get("job_name", run_id or "runops-job")
+    if job_name:
+        lines.append(f"#PBS -N {job_name}")
+
+    for directive in extra_pbs:
+        lines.append(f"#PBS {directive}")
+
+    lines.append("")
+    lines.append("set -euo pipefail")
+
+    _append_script_body(
+        lines,
+        run_dir=run_dir,
+        exec_line=exec_line,
+        extra_env=extra_env,
+        modules=modules,
+        setup_commands=setup_commands,
+        version_commands=version_commands,
+        post_commands=post_commands,
+    )
+
+    return "\n".join(lines)
+
+
+def _append_script_body(
+    lines: list[str],
+    *,
+    run_dir: Path,
+    exec_line: str,
+    extra_env: dict[str, str],
+    modules: list[str],
+    setup_commands: list[str],
+    version_commands: list[str],
+    post_commands: list[str],
+) -> None:
+    """Append common shell body shared by Slurm and PBS scripts."""
     lines.append("")
 
     # --- Module loads ---
@@ -287,7 +478,7 @@ def _render_script(
         lines.append("")
 
     # --- Change to run directory ---
-    # Use absolute path so the script works regardless of sbatch cwd.
+    # Use absolute path so the script works regardless of scheduler cwd.
     # Simulators refer to input/ and work/ relative to the run root.
     lines.append(f"cd {shlex.quote(str(run_dir))}")
     lines.append("")
@@ -320,5 +511,3 @@ def _render_script(
         for cmd in post_commands:
             lines.append(cmd)
         lines.append("")
-
-    return "\n".join(lines)

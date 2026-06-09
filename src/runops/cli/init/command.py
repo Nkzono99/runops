@@ -58,6 +58,10 @@ _CLAUDE_SETTINGS = ".claude/settings.json"
 
 _SCHEMA_BASE_URL = "https://raw.githubusercontent.com/Nkzono99/runops/main/schemas"
 _DEFAULT_RUNOPS_PACKAGE = f"runops=={__version__}"
+_SCHEDULER_COMMANDS = {
+    "slurm": ("sbatch",),
+    "pbs": ("qsub", "qstat", "qdel"),
+}
 
 
 def _safe_echo(message: str, *, err: bool = False) -> None:
@@ -91,6 +95,13 @@ def init(
         bool,
         typer.Option("--yes", "-y", help="Skip interactive prompts, use defaults."),
     ] = False,
+    site: Annotated[
+        Optional[str],
+        typer.Option(
+            "--site",
+            help="Use a bundled site profile such as camphor or grand.",
+        ),
+    ] = None,
     no_upstream_feedback: Annotated[
         bool,
         typer.Option(
@@ -203,7 +214,25 @@ def init(
         sim_content = "[simulators]\n"
 
     site_profile: _BundledSiteProfile | None = None
-    if interactive:
+    if site is not None:
+        from runops.cli.init.prompting import _load_site_profiles
+
+        site_profiles = _load_site_profiles()
+        site_profile = site_profiles.get(site)
+        if site_profile is None:
+            choices = ", ".join(sorted(site_profiles)) or "(none)"
+            typer.echo(
+                f"Error: unknown site profile '{site}'. Available: {choices}",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        launcher_configs = (
+            {site_profile.name: dict(site_profile.launcher)}
+            if site_profile.launcher
+            else {}
+        )
+        launcher_content = _build_launchers_toml(launcher_configs)
+    elif interactive:
         import runops.cli.init as init_facade
 
         launcher_configs, site_profile = init_facade._prompt_launchers()
@@ -541,12 +570,26 @@ def doctor(
         typer.echo("[FAIL] launchers.toml not found")
         failures.append(_LAUNCHERS_FILE)
 
-    # Check sbatch availability
-    if shutil.which("sbatch") is not None:
-        typer.echo("[PASS] sbatch is available")
-    else:
-        typer.echo("[FAIL] sbatch not found in PATH")
-        failures.append("sbatch")
+    # Check scheduler command availability
+    try:
+        from runops.core.site import load_site_profile
+
+        scheduler = load_site_profile(project_dir).scheduler
+    except Exception as e:
+        typer.echo(f"[FAIL] site.toml: {e}")
+        failures.append("site.toml")
+        scheduler = ""
+
+    scheduler_commands = _SCHEDULER_COMMANDS.get(scheduler, ())
+    if scheduler and not scheduler_commands:
+        typer.echo(f"[FAIL] unsupported scheduler: {scheduler}")
+        failures.append(f"scheduler:{scheduler}")
+    for command in scheduler_commands:
+        if shutil.which(command) is not None:
+            typer.echo(f"[PASS] {command} is available")
+        else:
+            typer.echo(f"[FAIL] {command} not found in PATH")
+            failures.append(command)
 
     # Check simulator adapters from simulators.toml
     simulators_path = project_dir / _SIMULATORS_FILE

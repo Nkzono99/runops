@@ -145,6 +145,13 @@ def test_load_site_profiles_reads_bundled_site_files() -> None:
     assert profiles["camphor"].source_path.name == "camphor.toml"
     assert profiles["camphor"].codex_plugins
     assert profiles["camphor"].codex_plugins[0].name == "kudpc-hpc-codex-plugin"
+    assert "grand" in profiles
+    assert profiles["grand"].source_path.name == "grand.toml"
+    assert profiles["grand"].docs_path is not None
+    assert profiles["grand"].docs_path.name == "grand.md"
+    assert profiles["grand"].launcher == {"type": "mpiexec"}
+    assert profiles["grand"].codex_plugins
+    assert profiles["grand"].codex_plugins[0].name == "grand-hpc-codex-plugin"
 
 
 def test_prompt_launchers_supports_site_and_manual_launchers(
@@ -190,6 +197,33 @@ def test_prompt_launchers_supports_site_and_manual_launchers(
     assert manual_profile is None
     assert invalid_launchers == {}
     assert invalid_profile is None
+
+
+def test_prompt_launchers_supports_site_without_launcher(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    """A site profile may provide SITE.md/plugin guidance without a launcher."""
+    profile = prompting_mod._BundledSiteProfile(
+        name="grand",
+        launcher={},
+        source_path=tmp_path / "grand.toml",
+        docs_path=tmp_path / "grand.md",
+    )
+    monkeypatch.setattr(
+        prompting_mod,
+        "_load_site_profiles",
+        lambda: {"grand": profile},
+    )
+    monkeypatch.setattr(
+        "runops.cli.init.prompting.typer.prompt",
+        lambda *args, **kwargs: "grand",
+    )
+
+    launchers, selected_profile = prompting_mod._prompt_launchers()
+
+    assert launchers == {}
+    assert selected_profile == profile
 
 
 def test_build_simulators_toml_and_campaign(

@@ -9,6 +9,7 @@ from typer.testing import CliRunner
 
 from runops.cli.main import app
 from runops.core.state import RunState
+from runops.pbs.query import PbsJobStatus
 from runops.slurm.query import JobStatus
 from tests.factories import create_minimal_project, create_run_manifest, write_toml
 
@@ -97,6 +98,32 @@ def test_status_slurm_unavailable(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "not available" in result.output
+
+
+def test_status_queries_pbs_for_pbs_run(tmp_path: Path) -> None:
+    """status should use qstat when manifest records a PBS scheduler."""
+    create_minimal_project(tmp_path, name="test")
+    run_dir = tmp_path / "runs" / "R20260609-0001"
+    create_run_manifest(
+        run_dir,
+        status="submitted",
+        job_id="12345.grand2",
+        extra={"job": {"scheduler": "pbs"}},
+    )
+
+    with (
+        patch("runops.cli.status.Path.cwd", return_value=tmp_path),
+        patch(
+            "runops.pbs.query.query_job_status",
+            return_value=PbsJobStatus(run_state=RunState.RUNNING, pbs_state="R"),
+        ),
+    ):
+        result = runner.invoke(app, ["runs", "status", str(run_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "Job ID: 12345.grand2" in result.output
+    assert "PBS:    R" in result.output
+    assert "Slurm:" not in result.output
 
 
 def test_status_run_not_found(tmp_path: Path) -> None:

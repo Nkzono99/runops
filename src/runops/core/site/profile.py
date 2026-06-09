@@ -1,8 +1,8 @@
 """Site profile: HPC environment abstraction.
 
 A SiteProfile encapsulates all HPC-site-specific configuration that
-affects job script generation — resource styles, module systems,
-SBATCH customisations, environment variables, etc.
+affects job script generation — scheduler backend, resource styles,
+batch-script customisations, environment variables, etc.
 
 This cleanly separates environment concerns from:
 - **Launcher** (pure MPI launch command: srun/mpirun/mpiexec)
@@ -51,6 +51,7 @@ class SiteProfile:
 
     Attributes:
         name: Site identifier (e.g. ``"camphor3"``).
+        scheduler: Job scheduler backend (``"slurm"`` or ``"pbs"``).
         resource_style: Resource specification style
             (``"standard"`` or ``"rsc"``).
         modules: Site-wide module names to ``module load``.
@@ -61,10 +62,13 @@ class SiteProfile:
         extra_sbatch: Additional raw ``#SBATCH`` directive lines.
         env: Environment variables to ``export`` in job scripts.
         setup_commands: Shell commands to run before the main execution.
+        extra_pbs: Additional raw ``#PBS`` directive lines.
+        pbs_group: PBS group name emitted as ``#PBS -W group_list=...``.
         codex_plugins: External Codex plugins recommended for this site.
     """
 
     name: str = ""
+    scheduler: str = "slurm"
     resource_style: str = "standard"
     modules: list[str] = field(default_factory=list)
     simulator_modules: dict[str, list[str]] = field(default_factory=dict)
@@ -73,6 +77,8 @@ class SiteProfile:
     extra_sbatch: list[str] = field(default_factory=list)
     env: dict[str, str] = field(default_factory=dict)
     setup_commands: list[str] = field(default_factory=list)
+    extra_pbs: list[str] = field(default_factory=list)
+    pbs_group: str = ""
     codex_plugins: list[CodexPluginRecommendation] = field(default_factory=list)
 
     def modules_for(self, simulator_name: str) -> list[str]:
@@ -161,6 +167,7 @@ def _load_site_toml(path: Path) -> SiteProfile:
 
         [site]
         name = "camphor3"
+        scheduler = "slurm"
         resource_style = "rsc"
         modules = ["intel/2023.2", "intelmpi/2023.2"]
         stdout = "stdout.%J.log"
@@ -215,6 +222,10 @@ def _load_site_toml(path: Path) -> SiteProfile:
     extra_raw = site.get("extra_sbatch", [])
     extra_sbatch = [str(d) for d in extra_raw] if isinstance(extra_raw, list) else []
 
+    # Parse extra_pbs
+    pbs_raw = site.get("extra_pbs", [])
+    extra_pbs = [str(d) for d in pbs_raw] if isinstance(pbs_raw, list) else []
+
     # Parse Codex plugin recommendations.
     plugins_raw = site.get("codex_plugins", {})
     codex_plugins: list[CodexPluginRecommendation] = []
@@ -231,6 +242,7 @@ def _load_site_toml(path: Path) -> SiteProfile:
 
     return SiteProfile(
         name=str(site.get("name", path.stem)),
+        scheduler=str(site.get("scheduler", "slurm")).lower(),
         resource_style=str(site.get("resource_style", "standard")),
         modules=[str(m) for m in site.get("modules", [])],
         simulator_modules=sim_modules,
@@ -239,6 +251,8 @@ def _load_site_toml(path: Path) -> SiteProfile:
         extra_sbatch=extra_sbatch,
         env=env,
         setup_commands=setup_commands,
+        extra_pbs=extra_pbs,
+        pbs_group=str(site.get("pbs_group", site.get("group", ""))),
         codex_plugins=codex_plugins,
     )
 
@@ -265,8 +279,12 @@ def _load_from_launchers_toml(path: Path) -> SiteProfile | None:
         "stdout",
         "stderr",
         "extra_sbatch",
+        "extra_pbs",
         "env",
         "setup_commands",
+        "scheduler",
+        "pbs_group",
+        "group",
     }
 
     # Check each launcher profile for site-related keys
@@ -294,6 +312,8 @@ def _load_from_launchers_toml(path: Path) -> SiteProfile | None:
         extra_sbatch = (
             [str(d) for d in extra_raw] if isinstance(extra_raw, list) else []
         )
+        pbs_raw = profile.get("extra_pbs", [])
+        extra_pbs = [str(d) for d in pbs_raw] if isinstance(pbs_raw, list) else []
 
         logger.debug(
             "Extracted site profile from launchers.toml profile '%s' "
@@ -302,6 +322,7 @@ def _load_from_launchers_toml(path: Path) -> SiteProfile | None:
         )
         return SiteProfile(
             name=f"legacy:{_name}",
+            scheduler=str(profile.get("scheduler", "slurm")).lower(),
             resource_style=str(profile.get("resource_style", "standard")),
             modules=[str(m) for m in profile.get("modules", [])],
             stdout_format=profile.get("stdout") or None,
@@ -309,6 +330,8 @@ def _load_from_launchers_toml(path: Path) -> SiteProfile | None:
             extra_sbatch=extra_sbatch,
             env=env,
             setup_commands=setup_commands,
+            extra_pbs=extra_pbs,
+            pbs_group=str(profile.get("pbs_group", profile.get("group", ""))),
         )
 
     return None
@@ -332,6 +355,7 @@ def save_site_profile(project_root: Path, profile: SiteProfile) -> Path:
     data: dict[str, Any] = {
         "site": {
             "name": profile.name,
+            "scheduler": profile.scheduler,
             "resource_style": profile.resource_style,
         },
     }
@@ -346,6 +370,10 @@ def save_site_profile(project_root: Path, profile: SiteProfile) -> Path:
         site["stderr"] = profile.stderr_format
     if profile.extra_sbatch:
         site["extra_sbatch"] = list(profile.extra_sbatch)
+    if profile.extra_pbs:
+        site["extra_pbs"] = list(profile.extra_pbs)
+    if profile.pbs_group:
+        site["pbs_group"] = profile.pbs_group
     if profile.env:
         site["env"] = dict(profile.env)
     if profile.setup_commands:

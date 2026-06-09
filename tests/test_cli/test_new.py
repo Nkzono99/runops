@@ -136,6 +136,36 @@ class TestCaseNewMinimal:
         assert "ntasks = 1" in case_toml
         assert "processes = 1" not in case_toml
 
+    def test_pbs_site_profile_uses_pbs_job_fields(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """PBS site profiles generate a PBS-oriented case.toml skeleton."""
+        project_root = _make_emses_project(tmp_path)
+        (project_root / "launchers.toml").write_text(
+            '[launchers.grand]\ntype = "mpiexec"\n',
+            encoding="utf-8",
+        )
+        (project_root / "site.toml").write_text(
+            '[site]\nname = "grand"\nscheduler = "pbs"\n',
+            encoding="utf-8",
+        )
+
+        monkeypatch.chdir(project_root)
+        result = runner.invoke(
+            app, ["case", "new", "grand_case", "-s", "emses", "--minimal"]
+        )
+
+        assert result.exit_code == 0, result.output
+        case_toml = (
+            project_root / "cases" / "emses" / "grand_case" / "case.toml"
+        ).read_text(encoding="utf-8")
+        assert 'launcher = "grand"' in case_toml
+        assert 'partition = "sc"' in case_toml
+        assert "sockets = 2" in case_toml
+        assert "mpiprocs = 56" in case_toml
+        assert '# group = "<groupname>"' in case_toml
+        assert "ntasks = 1" not in case_toml
+
 
 class TestCaseNewEmuAutoRun:
     """Tests for the auto-call to `emu generate -u` after EMSES case creation."""

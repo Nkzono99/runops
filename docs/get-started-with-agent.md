@@ -18,7 +18,8 @@ interface です。人間は研究意図、制約、確認、解釈に集中し�
 選んだ simulator / site に外部 Codex plugin がある場合、`runo init` と
 生成される `AGENTS.md` / `CLAUDE.md` に推奨 plugin と導入手順が表示されます。
 たとえば `emses` では MPIEMSES3D / emout の plugin、`camphor` site profile では
-KUDPC HPC plugin が案内されます。runops は plugin を自動 install せず、
+KUDPC HPC plugin、`grand` site profile では GRAND HPC plugin が案内されます。
+runops は plugin を自動 install せず、
 ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
@@ -35,6 +36,13 @@ docs/cookbook を順に確認し、入力例や推奨パラメータをもとに
 
 ```bash
 uvx --from runops runo init
+uvx --from runops runo doctor
+```
+
+GRAND/HUCC で非対話に PBS profile を選ぶ場合:
+
+```bash
+uvx --from runops runo init emses -y --site grand
 uvx --from runops runo doctor
 ```
 

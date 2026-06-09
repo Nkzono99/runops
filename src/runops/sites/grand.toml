@@ -1,0 +1,32 @@
+# GRAND / HUCC (PBS Professional)
+#
+# Selecting this profile during `runo init` copies grand.md to SITE.md,
+# recommends the GRAND HPC Codex plugin, and installs a PBS/mpiexec launcher
+# preset for runops-generated GRAND jobs.
+
+[site]
+name = "grand"
+scheduler = "pbs"
+resource_style = "standard"
+modules = [
+    "intel",
+    "impi",
+]
+
+[site.simulators.emses]
+# Use `show_module -k hdf5` / `show_module -k fftw` on GRAND before pinning
+# simulator-specific library modules.
+modules = []
+
+[site.codex_plugins.grand-hpc-codex-plugin]
+display_name = "GRAND HPC"
+visibility = "private-or-gated"
+reason = "GRAND/HUCC host role routing, login-node safety, PBS Professional qsub/qstat/qdel workflows, queue and select resource syntax, Modules, storage quotas, and container guidance."
+install_hint = """
+codex plugin marketplace add Nkzono99/grand-hpc-codex-plugin --ref v0.1.1
+codex plugin add grand-hpc-codex-plugin@grand-hpc-marketplace
+"""
+activation_hint = "Start a new Codex thread and confirm `GRAND HPC` is installed/enabled in /plugins. Use the plugin when creating or submitting GRAND/PBS job scripts."
+
+[launcher]
+type = "mpiexec"

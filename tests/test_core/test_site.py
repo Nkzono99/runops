@@ -23,6 +23,7 @@ class TestSiteProfile:
 
     def test_standard_site_defaults(self) -> None:
         assert STANDARD_SITE.name == "standard"
+        assert STANDARD_SITE.scheduler == "slurm"
         assert STANDARD_SITE.resource_style == "standard"
         assert STANDARD_SITE.modules == []
         assert STANDARD_SITE.stdout_format is None
@@ -82,10 +83,13 @@ class TestLoadSiteProfile:
         site_toml.write_text(
             "[site]\n"
             'name = "testsite"\n'
+            'scheduler = "pbs"\n'
             'resource_style = "rsc"\n'
             'modules = ["mod/a", "mod/b"]\n'
             'stdout = "stdout.%J.log"\n'
             'stderr = "stderr.%J.log"\n'
+            'extra_pbs = ["-j oe"]\n'
+            'pbs_group = "testgrp"\n'
             "\n"
             "[site.env]\n"
             'FOO = "bar"\n'
@@ -98,10 +102,13 @@ class TestLoadSiteProfile:
 
         profile = load_site_profile(tmp_path)
         assert profile.name == "testsite"
+        assert profile.scheduler == "pbs"
         assert profile.resource_style == "rsc"
         assert profile.modules == ["mod/a", "mod/b"]
         assert profile.stdout_format == "stdout.%J.log"
         assert profile.stderr_format == "stderr.%J.log"
+        assert profile.extra_pbs == ["-j oe"]
+        assert profile.pbs_group == "testgrp"
         assert profile.env == {"FOO": "bar"}
         assert profile.simulator_modules == {"emses": ["hdf5/1.12"]}
 
@@ -201,12 +208,15 @@ class TestSaveSiteProfile:
         """Save and reload should produce equivalent profile."""
         original = SiteProfile(
             name="camphor3",
+            scheduler="pbs",
             resource_style="rsc",
             modules=["intel/2023.2", "intelmpi/2023.2"],
             simulator_modules={"emses": ["hdf5/1.12"]},
             stdout_format="stdout.%J.log",
             stderr_format="stderr.%J.log",
             extra_sbatch=["--mail-type=END"],
+            extra_pbs=["-j oe"],
+            pbs_group="testgrp",
             env={"OMP_PROC_BIND": "spread"},
             setup_commands=["ulimit -s unlimited"],
             codex_plugins=[
@@ -225,12 +235,15 @@ class TestSaveSiteProfile:
 
         loaded = load_site_profile(tmp_path)
         assert loaded.name == original.name
+        assert loaded.scheduler == original.scheduler
         assert loaded.resource_style == original.resource_style
         assert loaded.modules == original.modules
         assert loaded.simulator_modules == original.simulator_modules
         assert loaded.stdout_format == original.stdout_format
         assert loaded.stderr_format == original.stderr_format
         assert loaded.extra_sbatch == original.extra_sbatch
+        assert loaded.extra_pbs == original.extra_pbs
+        assert loaded.pbs_group == original.pbs_group
         assert loaded.env == original.env
         assert loaded.setup_commands == original.setup_commands
         assert loaded.codex_plugins == original.codex_plugins

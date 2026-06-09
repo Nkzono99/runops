@@ -239,6 +239,8 @@ def reset_state_for_retry(
         "status": RunState.CREATED.value,
         "failure_reason": "",
         "last_slurm_state": "",
+        "last_pbs_state": "",
+        "last_scheduler_state": "",
     }
     if run_updates:
         merged_run_updates.update(run_updates)

@@ -1,6 +1,6 @@
 # runops
 
-runops は、HPC / Slurm 上のシミュレーション研究を **AI エージェントと進める**
+runops は、HPC scheduler (Slurm / PBS) 上のシミュレーション研究を **AI エージェントと進める**
 ための実行基盤です。
 
 人間が多数の CLI コマンドを覚えて日々叩くための道具ではありません。CLI は
@@ -15,7 +15,7 @@ execution kernel です。人間は研究意図、制約、判断、確認を与
 HPC シミュレーション研究では、研究そのものよりも周辺の運用が重くなりがちです。
 
 - 入力ファイルと投入スクリプトがどの仮説から来たのか分からなくなる
-- survey のパラメータ、run directory、Slurm job、解析結果がばらける
+- survey のパラメータ、run directory、scheduler job、解析結果がばらける
 - 失敗 run の retry や continuation の由来が追えなくなる
 - ノート、知見、論文用 export、共有知識が別々の場所で腐る
 - AI Agent に任せようとしても、どこを触ってよくてどこが正本か伝わらない
@@ -68,7 +68,7 @@ runops の中心にある思想は、以下の分離です。
   すべての実行、状態、解析、履歴は `runs/.../RYYYYMMDD-NNNN/` を基点に扱う。
 
 - **`manifest.toml` が run の正本**
-  run id、状態、由来、job id、Slurm 状態、provenance、parameter snapshot を
+  run id、状態、由来、job id、scheduler 状態、provenance、parameter snapshot を
   manifest に記録する。notes や会話ログは補助情報であり、正本ではない。
 
 - **不変と可変を分ける**
@@ -131,6 +131,13 @@ Agent は確認前に、対象 run、queue、資源量、想定 core-hour、変�
 
 ```bash
 uvx --from runops runo init
+uvx --from runops runo doctor
+```
+
+GRAND/HUCC など bundled site profile を使う場合:
+
+```bash
+uvx --from runops runo init emses -y --site grand
 uvx --from runops runo doctor
 ```
 

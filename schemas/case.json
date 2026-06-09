@@ -43,11 +43,15 @@
     },
     "job": {
       "type": "object",
-      "description": "Slurm job parameters for runs created from this case",
+      "description": "Scheduler job parameters for runs created from this case",
       "properties": {
         "partition": { "type": "string" },
         "nodes": { "type": "integer" },
         "ntasks": { "type": "integer" },
+        "sockets": { "type": "integer" },
+        "mpiprocs": { "type": "integer" },
+        "ompthreads": { "type": "integer" },
+        "group": { "type": "string" },
         "walltime": { "type": "string" },
         "processes": { "type": "integer" },
         "threads": { "type": "integer" },

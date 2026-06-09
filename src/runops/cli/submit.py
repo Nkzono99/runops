@@ -44,6 +44,7 @@ def _submit_single_run(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    group_name: str = "",
 ) -> str | None:
     """Submit a single run and return the job_id, or None on skip/error.
 
@@ -52,7 +53,7 @@ def _submit_single_run(
         quiet: If True, suppress per-run output (used in --all mode).
 
     Returns:
-        The Slurm job ID string on success, or None if skipped or failed.
+        The scheduler job ID string on success, or None if skipped or failed.
 
     Raises:
         typer.Exit: On fatal errors (only in single-run mode, not --all).
@@ -62,6 +63,7 @@ def _submit_single_run(
         queue_name=queue_name,
         qos=qos,
         afterok=afterok or "",
+        group_name=group_name,
     )
 
     if result.status is not ActionStatus.SUCCESS:
@@ -104,6 +106,10 @@ def run_cmd(
         Optional[str],
         typer.Option("--qos", help="Override Slurm QOS name."),
     ] = None,
+    group_name: Annotated[
+        Optional[str],
+        typer.Option("--group", help="Override PBS group_list name."),
+    ] = None,
     afterok_id: Annotated[
         Optional[str],
         typer.Option(
@@ -116,7 +122,7 @@ def run_cmd(
         typer.Option("--yes", "-y", help="Submit all created runs without prompting."),
     ] = False,
 ) -> None:
-    """Submit a run or all runs via sbatch.
+    """Submit a run or all runs via the run's configured scheduler.
 
     Examples:
       cd runs/experiment/R0001 && runo runs submit
@@ -133,6 +139,7 @@ def run_cmd(
             queue_name=queue_name or "",
             qos=qos or "",
             afterok=afterok_id,
+            group_name=group_name or "",
             yes=yes,
         )
     elif run is None:
@@ -141,6 +148,7 @@ def run_cmd(
             queue_name=queue_name or "",
             qos=qos or "",
             afterok=afterok_id,
+            group_name=group_name or "",
         )
     else:
         _submit_single(
@@ -149,6 +157,7 @@ def run_cmd(
             queue_name=queue_name or "",
             qos=qos or "",
             afterok=afterok_id,
+            group_name=group_name or "",
         )
 
 
@@ -158,6 +167,7 @@ def _submit_single_cwd(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    group_name: str = "",
 ) -> None:
     """Submit the run in the current directory."""
     cwd = Path.cwd().resolve()
@@ -187,7 +197,11 @@ def _submit_single_cwd(
         return
 
     result = _submit_single_run(
-        run_dir, queue_name=queue_name, qos=qos, afterok=afterok
+        run_dir,
+        queue_name=queue_name,
+        qos=qos,
+        afterok=afterok,
+        group_name=group_name,
     )
     if result is None:
         raise typer.Exit(code=1)
@@ -200,6 +214,7 @@ def _submit_all_cwd(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    group_name: str = "",
     yes: bool = False,
 ) -> None:
     """Submit all runs in the given directory or cwd."""
@@ -211,6 +226,7 @@ def _submit_all_cwd(
         queue_name=queue_name,
         qos=qos,
         afterok=afterok,
+        group_name=group_name,
         yes=yes,
     )
 
@@ -222,6 +238,7 @@ def _submit_single(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    group_name: str = "",
 ) -> None:
     """Handle single-run submission."""
     if run_arg is None:
@@ -238,7 +255,11 @@ def _submit_single(
         return
 
     result = _submit_single_run(
-        run_dir, queue_name=queue_name, qos=qos, afterok=afterok
+        run_dir,
+        queue_name=queue_name,
+        qos=qos,
+        afterok=afterok,
+        group_name=group_name,
     )
     if result is None:
         raise typer.Exit(code=1)
@@ -252,6 +273,7 @@ def _submit_all(
     queue_name: str = "",
     qos: str = "",
     afterok: str | None = None,
+    group_name: str = "",
     yes: bool = False,
 ) -> None:
     """Handle batch submission of all runs in a directory.
@@ -331,7 +353,12 @@ def _submit_all(
 
     for rd, run_id in created_runs:
         job_id = _submit_single_run(
-            rd, quiet=True, queue_name=queue_name, qos=qos, afterok=afterok
+            rd,
+            quiet=True,
+            queue_name=queue_name,
+            qos=qos,
+            afterok=afterok,
+            group_name=group_name,
         )
         if job_id is not None:
             typer.echo(f"  Submitted {run_id}: job_id={job_id}")

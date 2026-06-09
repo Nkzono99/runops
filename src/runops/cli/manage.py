@@ -264,11 +264,11 @@ def cancel(
         typer.Option("--yes", "-y", help="Skip confirmation prompt."),
     ] = False,
 ) -> None:
-    """Cancel active Slurm jobs (scancel) and sync run states.
+    """Cancel active scheduler jobs and sync run states.
 
-    Combines ``scancel <job_id>`` and ``runo runs sync`` so each manifest is
-    updated automatically.  Use this instead of bare ``scancel`` so run states
-    end up consistent.
+    Combines scheduler cancellation and ``runo runs sync`` so each manifest is
+    updated automatically.  Use this instead of bare scheduler commands so run
+    states end up consistent.
 
     Multiple targets and recursive survey directories are supported — any
     non-cancellable run (not submitted/running, or missing job_id) is reported
@@ -327,7 +327,7 @@ def cancel(
     if not yes:
         if len(cancellable) == 1:
             _, run_id, job_id = cancellable[0]
-            prompt = f"Cancel run {run_id} (Slurm job {job_id})?"
+            prompt = f"Cancel run {run_id} (job {job_id})?"
         else:
             ids = ", ".join(r[1] for r in cancellable[:5])
             if len(cancellable) > 5:

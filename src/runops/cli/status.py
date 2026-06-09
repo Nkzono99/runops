@@ -1,4 +1,4 @@
-"""CLI commands for status checking and Slurm state synchronization."""
+"""CLI commands for status checking and scheduler state synchronization."""
 
 from __future__ import annotations
 
@@ -52,15 +52,15 @@ def status(
 ) -> None:
     """Show the current status of one or more runs.
 
-    Displays the run state from manifest.toml. If a Slurm job_id is
-    recorded, also queries Slurm for the live job state. Does NOT
+    Displays the run state from manifest.toml. If a scheduler job_id is
+    recorded, also queries the scheduler for the live job state. Does NOT
     update the manifest (use ``runo runs sync`` for that).
 
     Multi-target form: pass a survey directory (e.g. ``runs/series_A``)
     or several run_ids; status is printed for each.
 
     Use ``--short`` for a compact 1-line-per-run view, or ``--summary``
-    for a per-case aggregate. These modes skip the (slower) live Slurm
+    for a per-case aggregate. These modes skip the (slower) live scheduler
     query and rely on manifest state only.
     """
     if short and summary:
@@ -166,6 +166,7 @@ def _print_status_one(run_dir: Path) -> None:
     run_id = manifest.run.get("id", run_dir.name)
     current_status = manifest.run.get("status", "unknown")
     job_id = manifest.job.get("job_id", "")
+    scheduler = str(manifest.job.get("scheduler", "slurm")).lower()
 
     typer.echo(f"Run:    {run_id}")
     typer.echo(f"Path:   {run_dir}")
@@ -194,19 +195,41 @@ def _print_status_one(run_dir: Path) -> None:
 
     if job_id:
         typer.echo(f"Job ID: {job_id}")
+        _print_live_job_status(str(job_id), scheduler)
+    else:
+        typer.echo("Job ID: (not submitted)")
 
-        # Query Slurm for live status (best-effort)
+
+def _print_live_job_status(job_id: str, scheduler: str) -> None:
+    """Print best-effort live scheduler status for a recorded job."""
+    if scheduler == "slurm":
         try:
-            job_status = query_job_status(job_id)
-            typer.echo(f"Slurm:  {job_status.slurm_state}")
-            if job_status.failure_reason:
-                typer.echo(f"Slurm reason: {job_status.failure_reason}")
+            slurm_status = query_job_status(job_id)
+            typer.echo(f"Slurm:  {slurm_status.slurm_state}")
+            if slurm_status.failure_reason:
+                typer.echo(f"Slurm reason: {slurm_status.failure_reason}")
         except SlurmNotFoundError:
             typer.echo("Slurm:  (Slurm commands not available)")
         except SlurmQueryError as e:
             typer.echo(f"Slurm:  (query failed: {e})")
-    else:
-        typer.echo("Job ID: (not submitted)")
+        return
+
+    if scheduler == "pbs":
+        from runops.pbs import query as pbs_query
+        from runops.pbs.submit import PbsNotFoundError
+
+        try:
+            pbs_status = pbs_query.query_job_status(job_id)
+            typer.echo(f"PBS:    {pbs_status.pbs_state}")
+            if pbs_status.failure_reason:
+                typer.echo(f"PBS reason: {pbs_status.failure_reason}")
+        except PbsNotFoundError:
+            typer.echo("PBS:    (PBS commands not available)")
+        except pbs_query.PbsQueryError as e:
+            typer.echo(f"PBS:    (query failed: {e})")
+        return
+
+    typer.echo(f"Scheduler: (unsupported scheduler: {scheduler})")
 
 
 def _readiness_for_display(
@@ -231,9 +254,9 @@ def sync(
         ),
     ] = None,
 ) -> None:
-    """Synchronize Slurm job state into one or more run manifests.
+    """Synchronize scheduler job state into one or more run manifests.
 
-    Queries Slurm for the current job state of each target and updates
+    Queries the configured scheduler for each target and updates
     both manifest.toml and status/state.json if the state has changed.
 
     When passed a survey directory (e.g. ``runo runs sync runs/series_A``)
@@ -253,7 +276,7 @@ def sync(
     targets = resolve_run_targets(runs, search_dir=Path.cwd())
     multi = len(targets) > 1
 
-    # Terminal states that no longer need (or accept) Slurm reconciliation.
+    # Terminal states that no longer need (or accept) scheduler reconciliation.
     terminal_states = {
         RunState.COMPLETED.value,
         RunState.FAILED.value,

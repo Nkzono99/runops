@@ -30,6 +30,7 @@ from runops.core.actions import (
 )
 from runops.core.knowledge import list_insights, load_facts
 from runops.core.state import RunState
+from runops.pbs.query import PbsJobStatus
 from runops.slurm.query import JobStatus
 
 ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
@@ -666,6 +667,66 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
     assert (run_dir / "status" / "state.json").exists()
 
 
+def test_execute_action_submit_run_uses_pbs_for_pbs_scheduler(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260330-0001",
+                "status": "created",
+            },
+            "job": {
+                "scheduler": "pbs",
+                "queue": "sc",
+            },
+        },
+    )
+    (run_dir / "submit").mkdir(parents=True, exist_ok=True)
+    (run_dir / "submit" / "job.sh").write_text(
+        "#!/bin/bash -l\n#PBS -q sc\necho hello\n",
+        encoding="utf-8",
+    )
+    (run_dir / "input").mkdir(parents=True, exist_ok=True)
+    (run_dir / "input" / "params.json").write_text("{}", encoding="utf-8")
+
+    with patch("runops.pbs.submit.qsub_submit", return_value="12345.grand2") as mock:
+        result = execute_action(
+            "submit_run",
+            run_dir=run_dir,
+            queue_name="ec",
+            group_name="testgrp",
+            afterok="11111",
+        )
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["job_id"] == "12345.grand2"
+    assert result.data["scheduler"] == "pbs"
+    mock.assert_called_once()
+    assert mock.call_args.args[0] == run_dir / "submit" / "job.sh"
+    assert mock.call_args.args[1] == run_dir
+    assert mock.call_args.kwargs["extra_args"] == [
+        "-q",
+        "ec",
+        "-W",
+        "group_list=testgrp",
+    ]
+    assert mock.call_args.kwargs["afterok"] == "11111"
+
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["status"] == "submitted"
+    assert updated.run["last_pbs_state"] == ""
+    assert updated.run["last_scheduler_state"] == ""
+    assert updated.job["scheduler"] == "pbs"
+    assert updated.job["job_id"] == "12345.grand2"
+    assert updated.job["queue"] == "ec"
+    assert updated.job["group"] == "testgrp"
+    assert updated.job["afterok"] == "11111"
+    assert updated.job["attempts"][0]["scheduler"] == "pbs"
+
+
 def test_execute_action_sync_run_updates_manifest_and_state_file(
     tmp_path: Path,
 ) -> None:
@@ -699,6 +760,44 @@ def test_execute_action_sync_run_updates_manifest_and_state_file(
     updated = read_manifest(run_dir)
     assert updated.run["status"] == "running"
     assert updated.run["last_slurm_state"] == "RUNNING"
+    assert (run_dir / "status" / "state.json").exists()
+
+
+def test_execute_action_sync_run_uses_pbs_for_pbs_scheduler(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260330-0001",
+                "status": "submitted",
+            },
+            "job": {
+                "scheduler": "pbs",
+                "job_id": "12345.grand2",
+            },
+        },
+    )
+
+    with patch(
+        "runops.pbs.query.query_job_status",
+        return_value=PbsJobStatus(run_state=RunState.RUNNING, pbs_state="R"),
+    ):
+        result = execute_action("sync_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_before == "submitted"
+    assert result.state_after == "running"
+    assert result.data["scheduler"] == "pbs"
+    assert result.data["scheduler_state"] == "R"
+    assert result.data["pbs_state"] == "R"
+
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["status"] == "running"
+    assert updated.run["last_pbs_state"] == "R"
+    assert updated.run["last_scheduler_state"] == "R"
     assert (run_dir / "status" / "state.json").exists()
 
 
@@ -776,6 +875,50 @@ def test_execute_action_cancel_run_scancels_and_syncs_manifest(tmp_path: Path) -
     assert updated.run["status"] == "cancelled"
     assert updated.run["last_slurm_state"] == "CANCELLED"
     assert (run_dir / "status" / "state.json").exists()
+
+
+def test_execute_action_cancel_run_qdels_pbs_job(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {
+                "id": "R20260330-0001",
+                "status": "running",
+            },
+            "job": {
+                "scheduler": "pbs",
+                "job_id": "98765.grand2",
+            },
+        },
+    )
+
+    with (
+        patch("runops.pbs.submit.qdel_job") as mock_qdel,
+        patch(
+            "runops.pbs.query.query_job_status",
+            return_value=PbsJobStatus(
+                run_state=RunState.CANCELLED,
+                pbs_state="C",
+                exit_code="271",
+            ),
+        ),
+    ):
+        result = execute_action("cancel_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_before == "running"
+    assert result.state_after == "cancelled"
+    assert result.data["scheduler"] == "pbs"
+    assert result.data["pbs_state"] == "C"
+    mock_qdel.assert_called_once_with("98765.grand2")
+
+    from runops.core.manifest import read_manifest
+
+    updated = read_manifest(run_dir)
+    assert updated.run["status"] == "cancelled"
+    assert updated.run["last_pbs_state"] == "C"
+    assert updated.run["last_scheduler_state"] == "C"
 
 
 def test_execute_action_delete_run_removes_directory(tmp_path: Path) -> None:

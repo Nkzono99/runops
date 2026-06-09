@@ -198,10 +198,14 @@ modules = ["openmpi/4.1"]
 
 HPC サイト固有の環境設定。`runo init` でサイトプロファイル選択時に自動生成される。
 Launcher (MPI 起動方式) とは独立に、ジョブスクリプト生成に影響する環境設定を管理する。
+bundled site profile は companion docs (`src/runops/sites/<name>.md`) を持つ場合があり、
+選択時に project root の `SITE.md` としてコピーされる。`scheduler = "pbs"` の
+site profile では PBS `#PBS` script と `qsub` / `qstat` / `qdel` backend を使う。
 
 ```toml
 [site]
 name = "camphor"
+scheduler = "slurm"
 resource_style = "rsc"
 modules = ["intel/2023.2", "intelmpi/2023.2"]
 stdout = "stdout.%J.log"
@@ -226,11 +230,14 @@ activation_hint = "Start a new Codex thread after installing."
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `name` | string | No | サイト名 |
+| `scheduler` | string | No | `"slurm"` or `"pbs"` |
 | `resource_style` | string | No | `"standard"` or `"rsc"` |
 | `modules` | string[] | No | サイト共通モジュール |
 | `stdout` | string | No | カスタム stdout ファイル名 |
 | `stderr` | string | No | カスタム stderr ファイル名 |
 | `extra_sbatch` | string[] | No | 追加 `#SBATCH` ディレクティブ |
+| `extra_pbs` | string[] | No | 追加 `#PBS` ディレクティブ |
+| `pbs_group` | string | No | PBS `group_list` の site default |
 | `setup_commands` | string[] | No | 実行前セットアップコマンド |
 
 ### `[site.env]`
@@ -331,7 +338,8 @@ Optional metadata for organizing runs.
 
 ### `[job]`
 
-Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
+Scheduler job parameters. Slurm sites render `#SBATCH` directives, PBS sites
+render `#PBS` directives.
 
 #### Standard mode (`resource_style = "standard"`)
 
@@ -341,6 +349,21 @@ Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
 | `qos` | string | No | Slurm QOS name. Emits `#SBATCH --qos=<value>`. Can be overridden with `runo runs submit --qos <name>`. Note: camphor では使用不可 (partition 経由で暗黙決定) |
 | `nodes` | integer | No | Number of nodes |
 | `ntasks` | integer | No | Number of MPI tasks |
+| `walltime` | string | Yes | Wall time limit (HH:MM:SS) |
+
+#### PBS mode (`scheduler = "pbs"`, GRAND 等)
+
+`site.toml` で `scheduler = "pbs"` の場合、`runo case new` は以下のフィールドを生成する:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `partition` | string | No | PBS queue name (`sc`, `ec` など)。`runo runs submit -qn <name>` で override 可能 |
+| `nodes` | integer | No | PBS `select=<nodes>` |
+| `sockets` | integer | No | CPU job の `nsockets` |
+| `mpiprocs` | integer | No | node あたり MPI process 数。未指定時は `ntasks / nodes` から導出 |
+| `ompthreads` | integer | No | process あたり OpenMP thread 数 |
+| `gpus` | integer | No | GPU job の `ngpus`。指定時は `nsockets` の代わりに使う |
+| `group` | string | No | PBS `group_list`。submit 時は `--group <name>` でも override 可能 |
 | `walltime` | string | Yes | Wall time limit (HH:MM:SS) |
 
 #### RSC mode (`resource_style = "rsc"`, camphor 等)
@@ -617,7 +640,7 @@ Frozen parameter snapshot at run creation time.
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `job_id` | string | Slurm job ID |
+| `job_id` | string | Scheduler job ID |
 | `submitted_at` | datetime | Submission timestamp |
 
 ### `[provenance]`
@@ -641,7 +664,7 @@ R20260329-0001/
   input/               # Simulator input files (frozen at creation)
     plasma.toml
   submit/
-    job.sh             # Generated Slurm batch script
+    job.sh             # Generated scheduler batch script
   work/                # Execution directory (cd here before srun)
     stdout.12345.log   # Job stdout
     stderr.12345.log   # Job stderr

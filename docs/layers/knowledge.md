@@ -97,6 +97,7 @@ Adapter や site profile は、選択内容に応じて外部 Codex plugin を�
 
 - `emses`: `MPIEMSES3D Context`, `emout Context`
 - `camphor` site profile: `KUDPC HPC`
+- `grand` site profile: `GRAND HPC`
 
 private repo の plugin は GitHub 認証済み環境、local checkout marketplace、または
 利用者が自作する environment skill のいずれかで扱う。

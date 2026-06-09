@@ -43,10 +43,11 @@ def _try_find_project_root(start: Path) -> Path | None:
         return None
 
 
-def _load_case_defaults(project_root: Path) -> tuple[str, str]:
+def _load_case_defaults(project_root: Path) -> tuple[str, str, str]:
     """Load launcher and site defaults, warning when config is invalid."""
     default_launcher = "srun"
     site_resource_style = "standard"
+    site_scheduler = "slurm"
 
     from runops.core.site import load_site_profile
 
@@ -71,8 +72,9 @@ def _load_case_defaults(project_root: Path) -> tuple[str, str]:
         )
     else:
         site_resource_style = site.resource_style
+        site_scheduler = site.scheduler
 
-    return default_launcher, site_resource_style
+    return default_launcher, site_resource_style, site_scheduler
 
 
 def _discover_ref_templates(
@@ -221,9 +223,12 @@ def new(
     # Resolve project root (used for launcher, site profile, and ref templates)
     default_launcher = "srun"
     site_resource_style = "standard"
+    site_scheduler = "slurm"
     project_root = _try_find_project_root(target_dir)
     if project_root is not None:
-        default_launcher, site_resource_style = _load_case_defaults(project_root)
+        default_launcher, site_resource_style, site_scheduler = _load_case_defaults(
+            project_root
+        )
 
     # Look for rich template files in refs/<repo>/.  Skipped under
     # ``--minimal`` so the user always gets the small bundled adapter
@@ -245,7 +250,17 @@ def new(
                 'launcher = "default"', f'launcher = "{default_launcher}"', 1
             )
             # Replace job fields based on site resource style
-            if site_resource_style == "rsc":
+            if site_scheduler == "pbs":
+                content = content.replace(
+                    'partition = ""\nnodes = 1\nntasks = 1\nwalltime = "01:00:00"\n',
+                    'partition = "sc"\n'
+                    "nodes = 1\n"
+                    "sockets = 2\n"
+                    "mpiprocs = 56\n"
+                    '# group = "<groupname>"\n'
+                    'walltime = "01:00:00"\n',
+                )
+            elif site_resource_style == "rsc":
                 content = content.replace(
                     'partition = ""\nnodes = 1\nntasks = 1\nwalltime = "01:00:00"\n',
                     'partition = ""\nprocesses = 1\nthreads = 1\n'
@@ -279,6 +294,7 @@ def new(
             sim_name,
             default_launcher,
             project_root=project_root,
+            scheduler=site_scheduler,
             resource_style=site_resource_style,
         )
 
@@ -333,6 +349,7 @@ def _generate_survey_stub(
     launcher: str,
     *,
     project_root: Path | None = None,
+    scheduler: str = "slurm",
     resource_style: str = "standard",
 ) -> None:
     """Generate a survey.toml stub under runs/<case_name>/.
@@ -342,6 +359,7 @@ def _generate_survey_stub(
         simulator: Simulator name.
         launcher: Launcher profile name.
         project_root: Project root directory (if already resolved).
+        scheduler: Site scheduler backend ("slurm" or "pbs").
         resource_style: Site resource style ("standard" or "rsc").
     """
     if project_root is None:
@@ -354,7 +372,16 @@ def _generate_survey_stub(
     # Build the case reference path: <sim>/<case_name> for multi-sim layout
     base_case_ref = f"{simulator}/{case_name}"
 
-    if resource_style == "rsc":
+    if scheduler == "pbs":
+        job_comment = (
+            '# partition = "sc"\n'
+            "# nodes = 1\n"
+            "# sockets = 2\n"
+            "# mpiprocs = 56\n"
+            '# group = "<groupname>"\n'
+            '# walltime = "01:00:00"'
+        )
+    elif resource_style == "rsc":
         job_comment = (
             '# partition = ""\n'
             "# processes = 1\n"

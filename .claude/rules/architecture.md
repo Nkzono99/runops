@@ -4,10 +4,11 @@
 
 ```
 cli/          ← 薄い入口。typer + 引数パース + echo のみ
-core/         ← ドメインロジック。CLI / Slurm に依存しない
+core/         ← ドメインロジック。CLI / scheduler CLI に依存しない
 adapters/     ← Simulator 固有処理の抽象化
 launchers/    ← MPI 起動方式の抽象化
 slurm/        ← Slurm CLI (sbatch, squeue, sacct) のラッパー
+pbs/          ← PBS CLI (qsub, qstat, qdel) のラッパー
 harness/      ← project 側 Agent harness 生成 (builder, claude, codex)
 jobgen/       ← job.sh テンプレート生成
 templates/    ← Jinja2 + 静的テンプレート (init が scaffold に使う)

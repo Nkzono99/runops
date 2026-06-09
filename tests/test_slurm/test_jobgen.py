@@ -578,6 +578,75 @@ class TestPrePostCommands:
 
 
 # ---------------------------------------------------------------------------
+# PBS mode tests
+# ---------------------------------------------------------------------------
+
+
+class TestPbsJobScript:
+    """Tests for generate_job_script in PBS mode."""
+
+    def test_pbs_mpi_script(self, run_dir: Path) -> None:
+        path = generate_job_script(
+            run_dir,
+            {
+                "partition": "sc",
+                "nodes": 1,
+                "sockets": 2,
+                "mpiprocs": 56,
+                "group": "testgrp",
+                "walltime": "01:00:00",
+            },
+            "mpiexec -n 56 ./mpiemses3D -o work/latest input/plasma.toml",
+            run_id="R0003",
+            scheduler="pbs",
+            modules=["intel", "impi"],
+        )
+
+        content = path.read_text()
+        assert content.startswith("#!/bin/bash -l\n")
+        assert "#PBS -q sc" in content
+        assert "#PBS -l select=1:nsockets=2:mpiprocs=56" in content
+        assert "#PBS -l walltime=01:00:00" in content
+        assert "#PBS -W group_list=testgrp" in content
+        assert "#PBS -j oe" in content
+        assert "#PBS -N R0003" in content
+        assert "#SBATCH" not in content
+        assert "module load intel impi" in content
+        assert "mpiexec -n 56 ./mpiemses3D" in content
+
+    def test_pbs_derives_mpiprocs_from_ntasks(self, run_dir: Path) -> None:
+        path = generate_job_script(
+            run_dir,
+            {
+                "partition": "sc",
+                "nodes": 2,
+                "sockets": 2,
+                "ntasks": 112,
+                "ompthreads": 1,
+                "walltime": "01:00:00",
+            },
+            "mpiexec -n 112 ./solver",
+            scheduler="pbs",
+        )
+
+        content = path.read_text()
+        assert "#PBS -l select=2:nsockets=2:mpiprocs=56:ompthreads=1" in content
+
+    def test_pbs_rejects_nondivisible_ntasks(self, run_dir: Path) -> None:
+        with pytest.raises(JobScriptError, match="divisible"):
+            generate_job_script(
+                run_dir,
+                {
+                    "nodes": 2,
+                    "ntasks": 3,
+                    "walltime": "01:00:00",
+                },
+                "mpiexec -n 3 ./solver",
+                scheduler="pbs",
+            )
+
+
+# ---------------------------------------------------------------------------
 # write_job_script
 # ---------------------------------------------------------------------------
 

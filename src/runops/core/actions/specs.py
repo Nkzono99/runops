@@ -94,9 +94,9 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     ),
     "submit_run": ActionSpec(
         name="submit_run",
-        description="Submit a run to Slurm via sbatch.",
+        description="Submit a run to its configured scheduler.",
         required_params=("run_dir",),
-        optional_params=("queue_name", "qos", "afterok"),
+        optional_params=("queue_name", "qos", "afterok", "group_name"),
         preconditions=("run state == created", "job.sh exists"),
         state_change="created -> submitted",
         risk_level="high",
@@ -110,7 +110,7 @@ ACTION_SPECS: dict[str, ActionSpec] = {
     ),
     "sync_run": ActionSpec(
         name="sync_run",
-        description="Synchronize run state with Slurm.",
+        description="Synchronize run state with its configured scheduler.",
         required_params=("run_dir",),
         preconditions=("run state in {submitted, running}", "job_id recorded"),
         state_change="submitted/running -> completed/failed/cancelled",

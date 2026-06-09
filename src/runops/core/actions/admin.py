@@ -221,23 +221,18 @@ def purge_work(run_dir: Path) -> ActionResult:
 
 @logged_action("cancel_run")
 def cancel_run(run_dir: Path) -> ActionResult:
-    """Cancel an active Slurm job (scancel) and sync the run state.
+    """Cancel an active scheduler job and sync the run state.
 
-    Wraps ``scancel <job_id>`` followed by ``sync_run`` so the manifest is
-    updated atomically once Slurm reports the cancellation.  Use this instead
-    of bare ``scancel`` so the run state ends up consistent.
+    Wraps scheduler cancellation followed by ``sync_run`` so the manifest is
+    updated once the scheduler reports the cancellation.
     """
     from runops.core import actions as action_registry
     from runops.core.manifest import read_manifest
-    from runops.slurm.submit import (
-        SlurmCancelError,
-        SlurmNotFoundError,
-        scancel_job,
-    )
 
     manifest = read_manifest(run_dir)
     run_id = manifest.run.get("id", run_dir.name)
     job_id = manifest.job.get("job_id", "")
+    scheduler = str(manifest.job.get("scheduler", "slurm")).lower()
     if not job_id:
         return _precondition_fail("cancel_run", "No job_id recorded in manifest")
 
@@ -245,15 +240,38 @@ def cancel_run(run_dir: Path) -> ActionResult:
     if err:
         return _precondition_fail("cancel_run", err)
 
-    try:
-        scancel_job(job_id)
-    except SlurmNotFoundError as e:
-        return _error("cancel_run", str(e))
-    except SlurmCancelError as e:
-        return _error("cancel_run", str(e))
+    if scheduler == "slurm":
+        from runops.slurm.submit import (
+            SlurmCancelError,
+            SlurmNotFoundError,
+            scancel_job,
+        )
 
-    # Slurm typically takes a moment to mark the job as cancelled.  Run
-    # sync_run so the manifest reflects whatever Slurm reports right now;
+        try:
+            scancel_job(job_id)
+        except SlurmNotFoundError as e:
+            return _error("cancel_run", str(e))
+        except SlurmCancelError as e:
+            return _error("cancel_run", str(e))
+        cancel_command = "scancel"
+    elif scheduler == "pbs":
+        from runops.pbs.submit import PbsCancelError, PbsNotFoundError, qdel_job
+
+        try:
+            qdel_job(job_id)
+        except PbsNotFoundError as e:
+            return _error("cancel_run", str(e))
+        except PbsCancelError as e:
+            return _error("cancel_run", str(e))
+        cancel_command = "qdel"
+    else:
+        return _precondition_fail(
+            "cancel_run",
+            f"Unsupported scheduler in manifest: {scheduler!r}",
+        )
+
+    # Schedulers can take a moment to mark the job as cancelled.  Run
+    # sync_run so the manifest reflects whatever the scheduler reports now;
     # the caller can re-sync later if needed.
     sync_result = action_registry.sync_run(run_dir)
 
@@ -262,7 +280,7 @@ def cancel_run(run_dir: Path) -> ActionResult:
             action="cancel_run",
             status=ActionStatus.SUCCESS,
             message=(
-                f"scancel sent for job {job_id}; sync did not complete "
+                f"{cancel_command} sent for job {job_id}; sync did not complete "
                 f"({sync_result.message}).  Re-run `runops runs sync` shortly."
             ),
             data={"run_id": run_id, "job_id": job_id},
@@ -276,8 +294,11 @@ def cancel_run(run_dir: Path) -> ActionResult:
         message=f"Cancelled job {job_id}; {sync_result.message}",
         data={
             "run_id": run_id,
+            "scheduler": scheduler,
             "job_id": job_id,
+            "scheduler_state": sync_result.data.get("scheduler_state", ""),
             "slurm_state": sync_result.data.get("slurm_state", ""),
+            "pbs_state": sync_result.data.get("pbs_state", ""),
         },
         state_before=state_str,
         state_after=sync_result.state_after or state_str,

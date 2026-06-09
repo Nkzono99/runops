@@ -38,18 +38,24 @@ class ClassificationData:
 
 @dataclass(frozen=True)
 class JobData:
-    """Slurm job configuration.
+    """Scheduler job configuration.
 
     Supports both standard Slurm (nodes/ntasks) and the camphor-style
     ``--rsc p=N:t=T:c=C`` directive.  Which directive is emitted is decided
     by the active site profile (``site.toml`` ``resource_style``), not by
     fields stored on this dataclass.  Both groups of fields can be set in
     ``case.toml``; the ones unused by the active site are ignored.
+    PBS sites use ``nodes`` with ``sockets``/``mpiprocs``/``ompthreads`` to
+    render ``#PBS -l select=...``.
 
     Attributes:
-        partition: Slurm partition name.
-        nodes: Number of nodes (standard mode).
-        ntasks: Number of MPI tasks (standard mode).
+        partition: Slurm partition name or PBS queue name.
+        nodes: Number of nodes (standard Slurm / PBS mode).
+        ntasks: Number of MPI tasks (standard Slurm mode, or total PBS ranks).
+        sockets: PBS CPU sockets per node (``nsockets``).
+        mpiprocs: PBS MPI processes per node. 0 means derive from ntasks/nodes.
+        ompthreads: PBS OpenMP threads per MPI process. 0 means not specified.
+        group: PBS group name emitted as ``group_list``.
         walltime: Wall-clock time limit string (HH:MM:SS or H:MM:SS).
         processes: Number of MPI processes (rsc mode, ``p``).
         threads: Threads per process (rsc mode, ``t``). Must be <= cores.
@@ -66,6 +72,10 @@ class JobData:
     partition: str = ""
     nodes: int = 1
     ntasks: int = 1
+    sockets: int = 1
+    mpiprocs: int = 0
+    ompthreads: int = 0
+    group: str = ""
     walltime: str = "01:00:00"
     processes: int = 1
     threads: int = 1
@@ -149,6 +159,10 @@ def _parse_job(data: dict[str, Any]) -> JobData:
         partition=str(data.get("partition", "")),
         nodes=int(data.get("nodes", 1)),
         ntasks=int(data.get("ntasks", 1)),
+        sockets=int(data.get("sockets", 1)),
+        mpiprocs=int(data.get("mpiprocs", 0)),
+        ompthreads=int(data.get("ompthreads", 0)),
+        group=str(data.get("group", data.get("group_list", ""))),
         walltime=str(data.get("walltime", "01:00:00")),
         processes=int(data.get("processes", 1)),
         threads=int(data.get("threads", 1)),

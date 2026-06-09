@@ -150,11 +150,12 @@ def create_prepared_run(
             )
 
             effective_site = _merge_site_modules(site, case_data.simulator, sim_config)
-            ntasks = (
-                case_data.job.processes
-                if _is_rsc_site(effective_site)
-                else case_data.job.ntasks
-            )
+            if _is_rsc_site(effective_site):
+                ntasks = case_data.job.processes
+            elif effective_site.scheduler == "pbs" and case_data.job.mpiprocs:
+                ntasks = case_data.job.nodes * case_data.job.mpiprocs
+            else:
+                ntasks = case_data.job.ntasks
             exec_line = launcher.build_exec_line(program_cmd, ntasks)
             job_config = _build_job_config(case_data.job, effective_site)
 

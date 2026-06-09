@@ -2,11 +2,11 @@
 
 ## 1. 目的
 
-本ツールは、HPC 環境において `sbatch` を用いて投入する各種シミュレーションについて、以下を一貫して管理するための実行管理基盤を提供する。
+本ツールは、HPC 環境において scheduler (`sbatch` / `qsub`) を用いて投入する各種シミュレーションについて、以下を一貫して管理するための実行管理基盤を提供する。
 
 * run ディレクトリ生成
 * パラメータサーベイ展開
-* Slurm job script 生成
+* scheduler job script 生成
 * job 投入
 * 状態追跡
 * run 単位の解析補助
@@ -21,7 +21,7 @@
 
 本仕様は、以下のような運用を主対象とする。
 
-* `sbatch` により HPC 上でジョブ投入する
+* `sbatch` または `qsub` により HPC 上でジョブ投入する
 * 複数種類のシミュレータを扱う
 * シミュレータごとにパラメータファイル形式や命名規則が異なる
 * MPI 並列実行を行う
@@ -787,7 +787,7 @@ submitted/running -> cancelled
 completed -> archived -> purged
 ```
 
-`runops runs cancel` は `submitted` / `running` の run に対して `scancel` と
+`runops runs cancel` は `submitted` / `running` の run に対して scheduler cancel と
 `sync` を組み合わせて発行し、`cancelled` 状態に遷移させる。
 
 ライフサイクル外操作として、`runops runs delete` は `created` /
@@ -1065,7 +1065,7 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 * `runops runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
 * `runops runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
 * `runops runs purge-work <run_dir or run_id>` — archived → purged
-* `runops runs cancel <run_dir or run_id>` — submitted/running → cancelled (`scancel` と `sync` をまとめて実行する安全経路)
+* `runops runs cancel <run_dir or run_id>` — submitted/running → cancelled (scheduler cancel と `sync` をまとめて実行する安全経路)
 * `runops runs delete <run_dir or run_id>` — created / cancelled / failed の run ディレクトリをハード削除 (ライフサイクル外、completed/archived には不可)
 
 ---
@@ -1135,7 +1135,7 @@ curated layer との関係:
 
 * submit 対象 run を特定
 * 必要な provenance を取得
-* `sbatch submit/job.sh` を実行
+* scheduler backend に応じて `sbatch submit/job.sh` または `qsub submit/job.sh` を実行
 * job_id を manifest に記録
 * 状態を `submitted` にする
 
@@ -1148,15 +1148,15 @@ curated layer との関係:
 ### `status`
 
 * manifest の `run.status` を表示する
-* `job_id` がある場合は `squeue` / `sacct` で live Slurm state を best-effort 表示する
+* `job_id` がある場合は scheduler backend に応じて live state を best-effort 表示する
 * manifest と `status/state.json` は更新しない
-* `--short` / `--summary` では live Slurm query を行わず、manifest のみを読む
+* `--short` / `--summary` では live scheduler query を行わず、manifest のみを読む
 
 ### `sync`
 
-* `squeue` / `sacct` により Slurm 状態を RunState に変換する
+* scheduler backend に応じて scheduler 状態を RunState に変換する
 * `status/state.json` を更新する
-* manifest の `run.status` と `run.last_slurm_state` を同期する
+* manifest の `run.status` と scheduler state fields を同期する
 * bulk モード (survey dir または複数 RUNS) では `job_id` 未記録 / terminal
   state な run を silent skip し、残りのみを処理する
 
@@ -1268,7 +1268,7 @@ Agent による主要操作:
 * Project 設定妥当性
 * simulator 解決可否
 * launcher 定義妥当性
-* `sbatch` 利用可否
+* scheduler command (`sbatch` / `qsub`) 利用可否
 * build command 存在
 * template 未解決変数
 * `run_id` 重複

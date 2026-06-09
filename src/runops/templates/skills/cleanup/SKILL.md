@@ -27,7 +27,7 @@ runo runs purge-work
 ## 実行中 job の停止
 
 ```bash
-# scancel + sync を一回で。submitted/running の run を cancelled に遷移
+# scheduler cancel + sync を一回で。submitted/running の run を cancelled に遷移
 runo runs cancel
 ```
 

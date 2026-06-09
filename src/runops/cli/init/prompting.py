@@ -255,7 +255,8 @@ def _prompt_launchers() -> tuple[dict[str, dict[str, Any]], _BundledSiteProfile 
     typer.echo("  Site profiles (preconfigured):")
     site_names = list(site_profiles.keys())
     for i, sname in enumerate(site_names, start=1):
-        typer.echo(f"    {i}. {sname}")
+        suffix = "" if site_profiles[sname].launcher else " (site docs/plugin only)"
+        typer.echo(f"    {i}. {sname}{suffix}")
     offset = len(site_names)
     typer.echo("  Launcher types:")
     typer.echo(f"    {offset + 1}. srun (Slurm)")
@@ -275,10 +276,12 @@ def _prompt_launchers() -> tuple[dict[str, dict[str, Any]], _BundledSiteProfile 
     if sel in site_map:
         profile_name = site_map[sel]
         profile = site_profiles[profile_name]
-        return {profile_name: dict(profile.launcher)}, profile
+        launchers = {profile_name: dict(profile.launcher)} if profile.launcher else {}
+        return launchers, profile
     if sel in site_profiles:
         profile = site_profiles[sel]
-        return {sel: dict(profile.launcher)}, profile
+        launchers = {sel: dict(profile.launcher)} if profile.launcher else {}
+        return launchers, profile
 
     launcher_map = {
         str(offset + 1): "srun",
