@@ -89,7 +89,7 @@ uvx --from runops runo doctor
 
 | コマンド | 説明 |
 |---------|------|
-| `runo init [SIMS...] [-y] [--site SITE] [--with-refs]` | プロジェクトの初期化。対話型がデフォルト、`--site grand` などで bundled site profile を指定、refs mirror は opt-in |
+| `runo init [SIMS...] [-y] [--site SITE] [--install-codex-plugins] [--with-refs]` | プロジェクトの初期化。対話型がデフォルト、`--site grand` などで bundled site profile を指定、対話時は推奨 Codex plugin install を確認、refs mirror は opt-in |
 | `runo setup [URL] [--with-refs]` | 既存 runops project の clone + セットアップ。refs mirror は opt-in |
 | `runo doctor [PATH]` | 環境検査。設定、scheduler command、run_id 一意性、環境検出を確認 |
 | `runo context [DIR]` | Agent 向け project context の要約を表示 |

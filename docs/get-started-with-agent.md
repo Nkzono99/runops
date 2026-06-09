@@ -19,8 +19,10 @@ interface です。人間は研究意図、制約、確認、解釈に集中し�
 生成される `AGENTS.md` / `CLAUDE.md` に推奨 plugin と導入手順が表示されます。
 たとえば `emses` では MPIEMSES3D / emout の plugin、`camphor` site profile では
 KUDPC HPC plugin、`grand` site profile では GRAND HPC plugin が案内されます。
-runops は plugin を自動 install せず、
-ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
+対話型 `runo init` は `codex` CLI が見つかれば、推奨 plugin の
+`codex plugin ...` 導入コマンドを実行するか確認します (default は yes)。
+`-y` など非対話では自動実行せず、必要なら `--install-codex-plugins` を付けます。
+`/plugins` での有効化や新しい Codex thread の開始は引き続きユーザー側で行います。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
 一方で、まだベースを決めていない場合でも、Agent は simulator/environment plugin、

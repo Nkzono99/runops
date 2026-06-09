@@ -875,8 +875,9 @@ cookbook の規約は `docs/simulator-kb-spec.md` を参照。
 ### codex_plugins()
 
 simulator 固有の長文 context や解析 workflow を外部 Codex plugin に置く場合、
-Adapter は plugin の導入導線だけを返す。runops は plugin を自動 install せず、
-`runo init` / `runo setup` の出力と生成 harness に推奨として表示する:
+Adapter は plugin の導入導線を返す。`runo init` / `runo setup` は出力と生成
+harness に推奨として表示し、対話型 `runo init` では `install_hint` 内の
+`codex plugin ...` 行だけを自動実行候補にする:
 
 ```python
 from runops.core.codex_plugin import CodexPluginRecommendation

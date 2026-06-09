@@ -156,7 +156,7 @@ class TestInteractiveInit:
                 "",  # launcher (skip)
                 "",  # skip knowledge repo selection
                 "",  # skip manual knowledge source entry
-                "",  # extra line for safety
+                "n",  # skip Codex plugin auto-install
             ]
         )
         result = runner.invoke(

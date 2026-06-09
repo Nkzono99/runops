@@ -90,7 +90,10 @@ project/
 
 Adapter や site profile は、選択内容に応じて外部 Codex plugin を推薦できる。
 `runo init` / `runo setup` は推薦 plugin と導入手順を表示し、project harness
-(`AGENTS.md` / `CLAUDE.md`) にも同じ導線を残す。plugin の install / enable は
+(`AGENTS.md` / `CLAUDE.md`) にも同じ導線を残す。対話型 `runo init` は
+`codex` CLI が見つかる場合、`install_hint` のうち安全に判定できる
+`codex plugin ...` 行だけを実行するか確認する (default yes)。非対話では
+`--install-codex-plugins` を明示した場合だけ実行する。plugin enable は
 ユーザーの Codex 環境に対する操作なので、runops project state には含めない。
 
 例:

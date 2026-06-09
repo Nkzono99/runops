@@ -10,9 +10,10 @@ from typing import Any
 class CodexPluginRecommendation:
     """Recommendation for an external Codex plugin.
 
-    The recommendation is advisory.  runops does not install Codex plugins as
-    part of project bootstrap because plugin activation may require user-local
-    Codex state, GitHub authentication, and a new Codex session.
+    The recommendation is advisory.  ``runo init`` may offer to run safe
+    ``codex plugin ...`` install commands, but final activation can still
+    require user-local Codex state, GitHub authentication, and a new Codex
+    session.
     """
 
     name: str

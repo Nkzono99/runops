@@ -28,12 +28,14 @@ from runops.cli.init.serialization import (
     _build_simulators_toml,
     _build_simulators_toml_from_configs,
 )
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.discovery import validate_uniqueness
 from runops.core.exceptions import DuplicateRunIdError, ProjectConfigError
 from runops.core.project import load_project
 from runops.harness._plugins import (
     collect_plugin_recommendations,
     echo_plugin_recommendations,
+    install_codex_plugin_recommendations,
 )
 
 if sys.version_info >= (3, 11):
@@ -147,6 +149,16 @@ def init(
             ),
         ),
     ] = False,
+    install_codex_plugins: Annotated[
+        Optional[bool],
+        typer.Option(
+            "--install-codex-plugins/--no-install-codex-plugins",
+            help=(
+                "Install recommended Codex plugins with safe `codex plugin ...` "
+                "commands. Interactive init asks by default."
+            ),
+        ),
+    ] = None,
     runops_package: Annotated[
         str,
         typer.Option(
@@ -531,6 +543,38 @@ def init(
         for item in skipped:
             typer.echo(f"    {item}")
     echo_plugin_recommendations(codex_plugin_recommendations)
+    _maybe_install_codex_plugins(
+        codex_plugin_recommendations,
+        interactive=interactive,
+        requested=install_codex_plugins,
+    )
+
+
+def _maybe_install_codex_plugins(
+    recommendations: list[CodexPluginRecommendation],
+    *,
+    interactive: bool,
+    requested: bool | None,
+) -> None:
+    """Offer or run best-effort Codex plugin installation."""
+    if not recommendations:
+        return
+    if requested is False:
+        return
+    if requested is None:
+        if not interactive:
+            return
+        if shutil.which("codex") is None:
+            typer.echo("\nCodex CLI not found; skipping automatic plugin installation.")
+            return
+        requested = typer.confirm(
+            "\nInstall recommended Codex plugins now with `codex plugin ...`?",
+            default=True,
+        )
+    if requested:
+        summary = install_codex_plugin_recommendations(recommendations)
+        if summary.skipped_reason:
+            typer.echo(f"\nCodex plugin installation skipped: {summary.skipped_reason}")
 
 
 def doctor(

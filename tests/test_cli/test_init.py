@@ -741,7 +741,14 @@ class TestInit:
 
         result = runner.invoke(
             app,
-            ["init", "--path", str(tmp_path), "--name", "site-project"],
+            [
+                "init",
+                "--path",
+                str(tmp_path),
+                "--name",
+                "site-project",
+                "--no-install-codex-plugins",
+            ],
         )
         assert result.exit_code == 0
         site_md = tmp_path / "SITE.md"
@@ -787,7 +794,14 @@ class TestInit:
 
         result = runner.invoke(
             app,
-            ["init", "--path", str(tmp_path), "--name", "grand-project"],
+            [
+                "init",
+                "--path",
+                str(tmp_path),
+                "--name",
+                "grand-project",
+                "--no-install-codex-plugins",
+            ],
         )
 
         assert result.exit_code == 0
@@ -836,6 +850,61 @@ class TestInit:
         assert result.exit_code == 2
         assert "unknown site profile" in result.output
         assert "grand" in result.output
+
+    def test_init_explicit_codex_plugin_install_runs_installer(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """--install-codex-plugins triggers best-effort installer."""
+        calls: list[list[CodexPluginRecommendation]] = []
+
+        def fake_install(
+            recommendations: list[CodexPluginRecommendation],
+        ) -> object:
+            calls.append(recommendations)
+
+            class Summary:
+                skipped_reason = ""
+
+            return Summary()
+
+        monkeypatch.setattr(
+            "runops.cli.init.command.install_codex_plugin_recommendations",
+            fake_install,
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "init",
+                "emses",
+                "-y",
+                "--install-codex-plugins",
+                "--path",
+                str(tmp_path),
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert len(calls) == 1
+        assert {plugin.name for plugin in calls[0]} == {
+            "mpiemses3d-context",
+            "emout-context",
+        }
+
+    def test_init_noninteractive_does_not_install_plugins_by_default(
+        self, tmp_path: Path
+    ) -> None:
+        """-y prints recommendations but does not mutate user-local Codex state."""
+        with patch(
+            "runops.cli.init.command.install_codex_plugin_recommendations"
+        ) as mock_install:
+            result = runner.invoke(
+                app, ["init", "emses", "-y", "--path", str(tmp_path)]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Recommended Codex plugins" in result.output
+        mock_install.assert_not_called()
 
     def test_init_renders_imports_after_bootstrap(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -253,9 +253,11 @@ activation_hint = "Start a new Codex thread after installing."
 ### `[site.codex_plugins.<name>]`
 
 サイト選択に応じて推奨する外部 Codex plugin。`runo init` / `runo setup` の
-出力と生成 harness に導入導線として表示される。runops は plugin を自動 install
-せず、ユーザー local な Codex 環境で `/plugins` または `codex plugin ...` により
-有効化する。
+出力と生成 harness に導入導線として表示される。対話型 `runo init` は
+`codex` CLI が見つかる場合、`install_hint` のうち `codex plugin ...` として
+parse できる行だけを実行するか確認する (default yes)。非対話では
+`--install-codex-plugins` を明示した場合だけ実行する。`/plugins` での有効化や
+新しい Codex thread の開始はユーザー local な Codex 環境で行う。
 
 | Field | Type | Description |
 |-------|------|-------------|
