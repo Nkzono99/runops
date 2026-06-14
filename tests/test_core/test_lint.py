@@ -186,3 +186,70 @@ def test_project_lint_reports_agenda_without_evidence_path(tmp_path: Path) -> No
         issue.issue_id == "knowledge.next_actions_evidence_missing"
         for issue in report.issues
     )
+
+
+def test_project_lint_reports_incomplete_codex_plugin_metadata(
+    tmp_path: Path,
+) -> None:
+    """Plugin recommendation metadata errors are project health errors."""
+    _write_project(tmp_path)
+    (tmp_path / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.incomplete]\n"
+        'display_name = "Incomplete Plugin"\n',
+        encoding="utf-8",
+    )
+
+    report = run_project_lint(tmp_path, scopes=("plugins",))
+
+    assert report.status == "fail"
+    assert report.error_count == 2
+    assert [issue.issue_id for issue in report.issues] == [
+        "plugins.metadata_error",
+        "plugins.metadata_error",
+    ]
+    assert all(issue.path == tmp_path / "site.toml" for issue in report.issues)
+
+
+def test_project_lint_reports_codex_plugin_metadata_warnings(
+    tmp_path: Path,
+) -> None:
+    """Plugin recommendation metadata warnings remain non-fatal by default."""
+    _write_project(tmp_path)
+    (tmp_path / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.site-context]\n"
+        'display_name = "Site Context"\n'
+        'reason = "Site-local workflow guidance."\n'
+        'install_hint = "codex plugin add site-context@test"\n'
+        'visibility = "private"\n',
+        encoding="utf-8",
+    )
+
+    report = run_project_lint(tmp_path, scopes=("plugins",))
+
+    assert report.status == "warning"
+    assert report.error_count == 0
+    assert report.warning_count == 1
+    issue = report.issues[0]
+    assert issue.issue_id == "plugins.metadata_warning"
+    assert issue.path == tmp_path / "site.toml"
+
+
+def test_project_lint_points_project_plugin_issues_to_runops_toml(
+    tmp_path: Path,
+) -> None:
+    """Project-level plugin metadata issues point users back to runops.toml."""
+    _write_project(tmp_path)
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "demo"\ncodex_plugins = ["broken"]\n',
+        encoding="utf-8",
+    )
+
+    report = run_project_lint(tmp_path, scopes=("plugins",))
+
+    assert report.status == "warning"
+    assert report.warning_count == 1
+    issue = report.issues[0]
+    assert issue.issue_id == "plugins.metadata_warning"
+    assert issue.path == tmp_path / "runops.toml"

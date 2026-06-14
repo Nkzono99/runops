@@ -152,6 +152,37 @@ def test_setup_runs_auth_for_simulator_packages_without_refs(
     assert "Recommended Codex plugins" in result.output
     assert "MPIEMSES3D Context" in result.output
     assert "emout Context" in result.output
+    assert "Capabilities: input-review, parameter-design" in result.output
+
+
+def test_setup_outputs_project_config_plugin_recommendations(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Setup shows project-wide plugin recommendations from runops.toml."""
+    project_dir = tmp_path / "setup-project"
+    _make_existing_project(project_dir)
+    (project_dir / "runops.toml").write_text(
+        '[project]\nname = "setup-project"\n'
+        "\n[project.codex_plugins.analysis-context]\n"
+        'display_name = "Analysis Context"\n'
+        'reason = "Team analysis workflow guidance."\n'
+        'install_hint = "codex plugin add analysis-context@project"\n'
+        'capabilities = ["analysis-workflow", "handoff"]\n',
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "runops.cli.init._bootstrap_environment",
+        lambda *_args, **_kwargs: None,
+    )
+
+    result = runner.invoke(app, ["setup", "--path", str(project_dir)])
+
+    assert result.exit_code == 0
+    assert "Analysis Context" in result.output
+    assert "`analysis-context`" in result.output
+    assert "Capabilities: analysis-workflow, handoff" in result.output
 
 
 def test_setup_with_refs_clones_reference_mirrors(

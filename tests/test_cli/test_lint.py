@@ -91,3 +91,20 @@ def test_lint_cli_rejects_unknown_scope(tmp_path: Path) -> None:
 
     assert result.exit_code == 1
     assert "Unknown lint scope" in result.output
+
+
+def test_lint_cli_reports_plugin_metadata_errors(tmp_path: Path) -> None:
+    """The plugins scope exposes Codex plugin recommendation metadata errors."""
+    _write_project(tmp_path)
+    (tmp_path / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.incomplete]\n"
+        'display_name = "Incomplete Plugin"\n',
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(app, ["lint", str(tmp_path), "--scope", "plugins"])
+
+    assert result.exit_code == 1
+    assert "plugins.metadata_error" in result.output
+    assert "incomplete.reason" in result.output

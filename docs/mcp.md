@@ -47,6 +47,26 @@ write / external / destructive tool は registry 上に disabled metadata とし
 将来 expose する場合も、`confirm=true`、`dry_run=false`、server policy enable、
 audit record を必須にする。
 
+Codex plugin については provider metadata と capabilities の
+`codex_plugin_policy` に境界を載せる。runops は plugin を自動 install / enable
+せず、project 側の推薦 metadata だけを検査する。install 済み状態はユーザー local な
+Codex 環境の責務として扱う。`inventory_schema_version` は
+`runops.project.plugins` / `runo plugins --json` が返す推薦 payload の schema を示す。
+`inventory_schema` と `check_result_schema` は、それぞれ
+`schemas/codex-plugin-inventory.json` と `schemas/codex-plugin-check-result.json`
+を指し、`runo plugins --json` / `runops.project.plugins` の JSON payload 自身も
+`$schema` に同じ値を含める。
+`inventory_fields`、`check_result_fields`、`recommendation_fields`、
+`source_fields`、`delegated_capabilities_field` は外部 client が期待できる field
+contract を示す。
+検査 payload は `ok`、warning を失敗扱いする `strict_ok`、`summary`、`issues` を
+返し、外部 tool は plugin 導入状態ではなく metadata 健全性だけを判断する。
+各推薦の `capabilities` は plugin へ委譲する役割ラベルで、install 状態ではない。
+各推薦は互換用の `source` 文字列に加えて、parse 済みの `sources` 配列を返す。
+`delegated_capabilities` は role label から推薦 plugin 名へ引くための index として
+返す。`capabilities` が文字列または非空文字列の配列として読めない場合は
+metadata warning になり、壊れた role index を静かに生成しない。
+
 ## Result Envelope
 
 すべての tool は `structuredContent` に Ops MCP envelope を返す。
@@ -99,7 +119,8 @@ error / blocked も JSON-RPC protocol error ではなく、通常の tool result
 | `runops.capabilities` | read | tool registry と safety metadata |
 | `runops.project.list` | read | server cwd から発見できる local project |
 | `runops.project.status` | read | compact project status |
-| `runops.project.inspect` | inspect | `runo context` 相当の詳細 context |
+| `runops.project.inspect` | inspect | `runo context` 相当の詳細 context。推奨 Codex plugins も含む |
+| `runops.project.plugins` | read | 推奨 Codex plugins と推薦メタデータ検査結果 |
 | `runops.project.doctor` | read | project diagnostics。環境保存などの mutation はしない |
 
 ### run / Slurm tools
@@ -193,6 +214,7 @@ enabled_tools = [
   "runops.project.list",
   "runops.project.status",
   "runops.project.inspect",
+  "runops.project.plugins",
   "runops.project.doctor",
   "runops.publication.exports.list",
   "runops.publication.export.inspect",

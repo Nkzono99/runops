@@ -15,11 +15,18 @@ interface です。人間は研究意図、制約、確認、解釈に集中し�
 2. **ベース入力の方針** — 既存の入力テンプレート、plugin/knowledge source、手元の資料のどれを起点に組み立てるか
 
 `runo init` では通常、simulator や launcher の設定を対話的に選ぶため、最初の依頼でそれらを毎回書き直す必要はありません。
-選んだ simulator / site に外部 Codex plugin がある場合、`runo init` と
+project / simulator / site に外部 Codex plugin 推薦がある場合、`runo init` と
 生成される `AGENTS.md` / `CLAUDE.md` に推奨 plugin と導入手順が表示されます。
 たとえば `emses` では MPIEMSES3D / emout の plugin、`camphor` site profile では
-KUDPC HPC plugin が案内されます。runops は plugin を自動 install せず、
+KUDPC HPC plugin、`beach` では BEACH Context plugin が案内されます。
+既存 project では `runo setup` の出力と `runo update-harness` が
+`[project.codex_plugins]` も含めた同じ推薦 inventory を使うため、project 固有の
+解析 workflow や handoff plugin も生成 harness に反映できます。
+runops は plugin を自動 install せず、
 ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
+既存 project で推薦を確認したい場合は `runo plugins`、agent や外部 tool から
+読む場合は `runo plugins --json` を使います。`runo plugins --check` は推薦
+メタデータの欠落を検査しますが、user-local な plugin install 状態は検査しません。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
 一方で、まだベースを決めていない場合でも、Agent は simulator/environment plugin、
@@ -36,6 +43,7 @@ docs/cookbook を順に確認し、入力例や推奨パラメータをもとに
 ```bash
 uvx --from runops runo init
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 既存プロジェクトをセットアップする場合:
@@ -44,6 +52,7 @@ uvx --from runops runo doctor
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 `runo init` がディレクトリ構造と初期ファイルを作ります。

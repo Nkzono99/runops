@@ -1,39 +1,42 @@
-### EMSES (Electromagnetic Particle-in-Cell Simulator)
+### EMSES runops fallback guide
 
-#### 概要
-EMSES は 3D 電磁粒子シミュレーション (PIC) コード。
-MPI 並列で実行し、電磁場と荷電粒子の自己無撞着な時間発展を計算する。
+This generated guide is intentionally small. MPIEMSES3D-specific input review,
+parameter design, run diagnosis, HDF5 output analysis, emout usage, and
+visualization should come from the recommended external Codex plugins
+`MPIEMSES3D Context` (`mpiemses3d-context`) and `emout Context`
+(`emout-context`) when they are available.
 
-#### 入力ファイル
-- **`input/plasma.toml`** — メイン設定ファイル (TOML 形式)
-  - `[jobcon]`: `nstep` (総ステップ数) が最重要パラメータ
-  - `[tmgrid]`: `nx`, `ny`, `nz` (グリッド数), `dt` (時間刻み)
-  - `[[species]]`: 粒子種の定義 (質量比, 温度, 密度 etc.)
-  - `[emfield]`: 外部磁場・電場の設定
-  - `[[ptcond.objects]]`: 境界条件・導体オブジェクト
+Before using this fallback, run:
 
-#### 出力ファイル (`work/latest/` 以下)
-- `*.h5` — HDF5 形式の電磁場データ (ex, ey, ez, bx, by, bz, etc.)
-- `energy` — エネルギー時系列 (ASCII)。最終行のステップ番号で完了判定
-- `SNAPSHOT1/esdat*.h5` — リスタート用スナップショット
-- 各種診断ファイル: `ewave`, `chgacm1`, `influx`, `icur` 等
-
-#### 完了判定
-- `work/latest/energy` の最終行のステップ番号 ≥ `nstep` → completed
-- stderr に "error", "segmentation fault", "killed" → failed
-
-#### パラメータサーベイでよく変えるパラメータ
-- `tmgrid.dt`, `tmgrid.nx/ny/nz`
-- `species[0].temperature`, `species[0].density`
-- `emfield.ex0`, `emfield.bx0` (外部場)
-- `jobcon.nstep`
-
-#### ドキュメント・参考
-- EMSES ソースリポジトリの README / docs/
-- `plasma.toml` のスキーマは `format_version = 2` (structured TOML)
-- パラメータの dot 記法例: `tmgrid.nx=128`, `species.0.temperature=1.0e6`
-
-#### 実行コマンド
+```bash
+uvx --from runops runo plugins --check
+uvx --from runops runo plugins --json
 ```
-srun mpiemses3D input/plasma.toml -o work/latest
-```
+
+Use the `delegated_capabilities` index to route work such as `input-review`,
+`parameter-design`, `run-diagnose`, `output-analysis`, and
+`visualization-script` to the relevant plugin. runops does not install or
+enable plugins; that remains user-local Codex state.
+
+#### runops responsibilities
+
+- Treat the run directory and `manifest.toml` as the source of truth.
+- Let the EMSES adapter render `input/plasma.toml` and detect required outputs.
+- Keep `work/`, `input/`, `submit/`, and `manifest.toml` under runops control.
+- Keep MPI launch behavior in launcher/job.sh layers. Python should not become
+  a rank wrapper.
+- Use `runo create`, `runo submit`, `runo status`, `runo summarize`, and
+  `runo collect` instead of ad hoc file movement.
+
+#### Minimal fallback facts
+
+- Main rendered input: `input/plasma.toml`.
+- Common output categories: stdout/stderr logs, `energy`, HDF5 diagnostics, and
+  restart snapshots. Use adapter-required output metadata for exact project
+  checks.
+- For namelist meaning, numerical stability, physical interpretation, emout
+  APIs, and plotting details, prefer `MPIEMSES3D Context`, `emout Context`,
+  enabled knowledge imports, project materials, or upstream documentation.
+
+Do not treat this file as a full MPIEMSES3D manual. It is only the runops-side
+handoff point when richer simulator context has not been installed or mounted.

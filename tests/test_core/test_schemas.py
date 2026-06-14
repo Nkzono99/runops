@@ -23,8 +23,75 @@ def test_runops_schema_is_the_project_schema() -> None:
 
     assert schema["title"] == "runops.toml"
     assert "project" in schema["properties"]
+    project_props = schema["properties"]["project"]["properties"]
+    assert "codex_plugins" in project_props
+    plugin_schema = project_props["codex_plugins"]["additionalProperties"]
+    assert plugin_schema["$ref"] == "codex-plugin-recommendation.json"
     assert "harness" in schema["properties"]
     assert "upstream_feedback" in schema["properties"]["harness"]["properties"]
+
+
+def test_codex_plugin_recommendation_schema_defines_shared_contract() -> None:
+    """Plugin recommendation metadata is defined once for all TOML schemas."""
+    schema = _load_schema("codex-plugin-recommendation.json")
+
+    assert schema["title"] == "Codex plugin recommendation"
+    assert schema["required"] == ["display_name", "reason", "install_hint"]
+    assert "capabilities" in schema["properties"]
+
+
+def test_codex_plugin_inventory_schema_defines_json_output_contract() -> None:
+    """Plugin inventory JSON output has a schema for external clients."""
+    schema = _load_schema("codex-plugin-inventory.json")
+    recommendation = schema["definitions"]["recommendation"]
+
+    assert schema["title"] == "Codex plugin inventory"
+    assert "$schema" in schema["required"]
+    assert schema["properties"]["$schema"]["const"] == (
+        "schemas/codex-plugin-inventory.json"
+    )
+    assert schema["properties"]["schema_version"]["const"] == 1
+    assert "delegated_capabilities" in schema["required"]
+    assert "sources" in recommendation["required"]
+    assert "capabilities" in recommendation["required"]
+
+
+def test_codex_plugin_check_result_schema_wraps_inventory_contract() -> None:
+    """Plugin check JSON output references the inventory schema."""
+    schema = _load_schema("codex-plugin-check-result.json")
+
+    assert schema["title"] == "Codex plugin check result"
+    assert "$schema" in schema["required"]
+    assert schema["properties"]["$schema"]["const"] == (
+        "schemas/codex-plugin-check-result.json"
+    )
+    assert schema["properties"]["schema_version"]["const"] == 1
+    assert schema["properties"]["inventory"]["$ref"] == ("codex-plugin-inventory.json")
+    assert schema["properties"]["issues"]["items"]["$ref"] == (
+        "codex-plugin-inventory.json#/definitions/issue"
+    )
+
+
+def test_simulators_schema_includes_plugin_recommendation_metadata() -> None:
+    """simulators.toml schema exposes simulator-scoped plugin metadata."""
+    schema = _load_schema("simulators.json")
+    simulator_schema = schema["properties"]["simulators"]["additionalProperties"]
+    plugin_schema = simulator_schema["properties"]["codex_plugins"][
+        "additionalProperties"
+    ]
+
+    assert plugin_schema["$ref"] == "codex-plugin-recommendation.json"
+
+
+def test_site_schema_includes_plugin_recommendation_metadata() -> None:
+    """site.toml schema exposes site-scoped plugin metadata."""
+    schema = _load_schema("site.json")
+    site_props = schema["properties"]["site"]["properties"]
+    plugin_schema = site_props["codex_plugins"]["additionalProperties"]
+
+    assert schema["title"] == "site.toml"
+    assert "simulators" in site_props
+    assert plugin_schema["$ref"] == "codex-plugin-recommendation.json"
 
 
 def test_case_schema_matches_current_case_sections() -> None:

@@ -14,7 +14,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 0. **runops CLI は uvx で呼ぶ** — 例: `uvx --from runops runo context --json`
    `.venv/` は必要な runtime tool を直接実行するときだけ activate する。
 1. `uvx --from runops runo context --json` で project の現在地を把握する
-2. 必要なら `uvx --from runops runo lint --scope structure,analysis,knowledge` で読み入口と成果物索引を確認する
+2. 必要なら `uvx --from runops runo lint --scope structure,analysis,knowledge,plugins` で読み入口、成果物索引、推奨 plugin metadata を確認する
 3. `campaign.toml` を読む
 4. `research/agenda.md` があれば読む
 5. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
@@ -171,11 +171,16 @@ lab notebook の entry が積み上がってストーリーになったら、
 
 ## 推奨 Codex plugins
 
-この project の simulator / site 選択に基づく推奨 plugin。runops は project state を
+この project / simulator / site 選択に基づく推奨 plugin。runops は project state を
 作るだけで、plugin の install / enable はユーザーの Codex 環境で行う。
+作業を始める前に `uvx --from runops runo plugins --check` で推薦 metadata を確認する。
+この check は install 済み状態ではなく、project が持つ推薦情報だけを検査する。
 
 {% for plugin in codex_plugin_recommendations -%}
 - **{{ plugin.display_name }}** (`{{ plugin.name }}`{% if plugin.visibility != "public" %}, {{ plugin.visibility }}{% endif %}) — {{ plugin.reason }}
+{% if plugin.capabilities %}
+  委譲役割: {{ plugin.capabilities | join(", ") }}
+{% endif %}
 
   導入:
   ```bash

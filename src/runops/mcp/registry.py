@@ -7,6 +7,12 @@ from dataclasses import dataclass
 from typing import Any
 
 from runops.core.actions.specs import ACTION_SPECS
+from runops.core.codex_plugin import (
+    CODEX_PLUGIN_ACTIVATION_SCOPE,
+    CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,
+    CODEX_PLUGIN_INVENTORY_SCHEMA_PATH,
+    CODEX_PLUGIN_INVENTORY_SCHEMA_VERSION,
+)
 from runops.mcp.safety import (
     DESTRUCTIVE_DISABLED,
     EXTERNAL_DISABLED,
@@ -72,6 +78,11 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         "runops.project.inspect",
         "Return detailed local project metadata and agent context.",
         INSPECT,
+    ),
+    ToolSpec(
+        "runops.project.plugins",
+        "Return advisory Codex plugin recommendations and metadata checks.",
+        READ,
     ),
     ToolSpec(
         "runops.project.doctor",
@@ -159,6 +170,55 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
 )
 
+CODEX_PLUGIN_POLICY: dict[str, Any] = {
+    "recommendations_advisory": True,
+    "metadata_checks_supported": True,
+    "installs_plugins": False,
+    "enables_plugins": False,
+    "inspects_user_install_state": False,
+    "activation_scope": CODEX_PLUGIN_ACTIVATION_SCOPE,
+    "inventory_schema_version": CODEX_PLUGIN_INVENTORY_SCHEMA_VERSION,
+    "inventory_schema": CODEX_PLUGIN_INVENTORY_SCHEMA_PATH,
+    "check_result_schema": CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,
+    "project_tool": "runops.project.plugins",
+    "inventory_fields": [
+        "$schema",
+        "schema_version",
+        "project",
+        "simulators",
+        "site",
+        "management",
+        "recommendations",
+        "delegated_capabilities",
+        "collection_issues",
+    ],
+    "check_result_fields": [
+        "$schema",
+        "schema_version",
+        "ok",
+        "strict_ok",
+        "summary",
+        "inventory",
+        "issues",
+    ],
+    "recommendation_fields": [
+        "name",
+        "display_name",
+        "reason",
+        "install_hint",
+        "activation_hint",
+        "visibility",
+        "source",
+        "sources",
+        "capabilities",
+    ],
+    "source_fields": {
+        "source": "legacy comma-separated source label string",
+        "sources": "machine-readable source label list",
+    },
+    "delegated_capabilities_field": "delegated_capabilities",
+}
+
 REQUIRED_COMMON_TOOLS = {
     "runops.health",
     "runops.provider.info",
@@ -175,6 +235,7 @@ REQUIRED_RUNOPS_TOOLS = REQUIRED_COMMON_TOOLS | {
     "runops.paper.request.draft",
     "runops.paper.request.plan",
     "runops.paper.requests.list",
+    "runops.project.plugins",
     "runops.publication.export.inspect",
     "runops.publication.exports.list",
     "runops.run.list",
@@ -218,6 +279,7 @@ def capabilities_payload() -> dict[str, Any]:
         },
         "tools": [spec.to_dict() for spec in TOOL_SPECS],
         "transports": ["stdio", "streamable-http"],
+        "codex_plugin_policy": CODEX_PLUGIN_POLICY,
     }
 
 

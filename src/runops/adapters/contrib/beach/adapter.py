@@ -40,6 +40,7 @@ from runops.adapters.contrib.beach.validation import (
 from runops.adapters.contrib.beach.validation import (
     validate_params as validate_beach_params,
 )
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -162,6 +163,43 @@ class BeachAdapter(SimulatorAdapter):
                 "cookbook/**/*.md",
             ],
         }
+
+    @classmethod
+    def codex_plugins(cls) -> list[CodexPluginRecommendation]:
+        """Return Codex plugins recommended for BEACH projects."""
+        return [
+            CodexPluginRecommendation(
+                name="beach-context",
+                display_name="BEACH Context",
+                reason=(
+                    "BEACH configuration review, run diagnosis, case design, "
+                    "output analysis, simulator learning, method summaries, "
+                    "and issue report drafting."
+                ),
+                install_hint=(
+                    "codex plugin marketplace add Nkzono99/BEACH "
+                    "--ref main "
+                    "--sparse .agents/plugins "
+                    "--sparse plugins/beach-context"
+                ),
+                activation_hint=(
+                    "Open Codex /plugins, install `BEACH Context`, then "
+                    "restart Codex or start a new Codex thread."
+                ),
+                visibility="public",
+                source="simulator:beach",
+                capabilities=(
+                    "config-review",
+                    "case-design",
+                    "run-diagnose",
+                    "output-analysis",
+                    "method-summary",
+                    "simulator-guide",
+                    "cookbook",
+                    "issue-report",
+                ),
+            )
+        ]
 
     @classmethod
     def parameter_schema(cls) -> dict[str, dict[str, Any]]:

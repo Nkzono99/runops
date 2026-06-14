@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from runops.core.codex_plugin import CodexPluginRecommendation
+from runops.core.plugins import collect_adapter_codex_plugins
 
 
 def collect_doc_repos(simulator_names: list[str]) -> list[tuple[str, str]]:
@@ -49,22 +52,11 @@ def collect_pip_packages(simulator_names: list[str]) -> list[str]:
 
 def collect_codex_plugins(
     simulator_names: list[str],
+    *,
+    simulator_configs: dict[str, dict[str, Any]] | None = None,
 ) -> list[CodexPluginRecommendation]:
     """Return unique Codex plugins recommended by the given adapters."""
-    import runops.adapters  # noqa: F401
-    from runops.adapters.registry import get_global_registry
-
-    registry = get_global_registry()
-    seen: set[str] = set()
-    plugins: list[CodexPluginRecommendation] = []
-    for sim_name in simulator_names:
-        try:
-            adapter_cls = registry.get(sim_name)
-        except KeyError:
-            continue
-        for plugin in adapter_cls.codex_plugins():
-            if plugin.name in seen:
-                continue
-            seen.add(plugin.name)
-            plugins.append(plugin)
-    return plugins
+    return collect_adapter_codex_plugins(
+        simulator_names,
+        simulator_configs=simulator_configs,
+    )

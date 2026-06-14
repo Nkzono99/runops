@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from runops.mcp.registry import (
+    CODEX_PLUGIN_POLICY,
     REQUIRED_RUNOPS_TOOLS,
     all_tool_specs,
+    capabilities_payload,
     conformance_report,
     exposed_tool_specs,
 )
@@ -34,3 +36,27 @@ def test_unsafe_action_tools_remain_disabled_by_default() -> None:
         assert spec.exposed is False
         assert spec.safety.requires_confirmation is True
         assert spec.safety.confirmation_field == "confirm"
+
+
+def test_capabilities_payload_exposes_codex_plugin_policy() -> None:
+    payload = capabilities_payload()
+    exposed = {spec.name for spec in exposed_tool_specs()}
+
+    assert payload["codex_plugin_policy"] == CODEX_PLUGIN_POLICY
+    assert payload["codex_plugin_policy"]["inventory_schema_version"] == 1
+    assert payload["codex_plugin_policy"]["inventory_schema"] == (
+        "schemas/codex-plugin-inventory.json"
+    )
+    assert payload["codex_plugin_policy"]["check_result_schema"] == (
+        "schemas/codex-plugin-check-result.json"
+    )
+    assert CODEX_PLUGIN_POLICY["project_tool"] in exposed
+    assert "recommendations" in payload["codex_plugin_policy"]["inventory_fields"]
+    assert "$schema" in payload["codex_plugin_policy"]["inventory_fields"]
+    assert "strict_ok" in payload["codex_plugin_policy"]["check_result_fields"]
+    assert "$schema" in payload["codex_plugin_policy"]["check_result_fields"]
+    assert "sources" in payload["codex_plugin_policy"]["recommendation_fields"]
+    assert (
+        payload["codex_plugin_policy"]["delegated_capabilities_field"]
+        == "delegated_capabilities"
+    )

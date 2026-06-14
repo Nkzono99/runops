@@ -214,17 +214,19 @@ class SimulatorAdapter(ABC):
 
     @classmethod
     def agent_guide(cls) -> str:
-        """Return AI agent guide for this simulator as markdown.
+        """Return a minimal AI agent fallback guide as markdown.
 
-        Override in subclasses to provide simulator-specific knowledge
-        including input/output formats, key parameters, typical
-        workflows, and documentation references.
+        Override in subclasses to point agents at recommended plugins,
+        explicit knowledge sources, and the runops-side adapter boundary.
+        Long-form simulator knowledge, analysis workflows, and environment
+        procedures belong in external plugins or project-local knowledge
+        sources, not in package-bundled adapter guides.
 
         Returns:
-            Markdown string for inclusion in CLAUDE.md / AGENTS.md.
+            Markdown string for inclusion in generated agent harness files.
         """
         name = getattr(cls, "adapter_name", cls.__name__)
-        return f"### {name}\n\nNo detailed guide available.\n"
+        return f"### {name}\n\nNo package-bundled fallback guide available.\n"
 
     @property
     @abstractmethod

@@ -145,6 +145,7 @@ def test_load_site_profiles_reads_bundled_site_files() -> None:
     assert profiles["camphor"].source_path.name == "camphor.toml"
     assert profiles["camphor"].codex_plugins
     assert profiles["camphor"].codex_plugins[0].name == "kudpc-hpc-codex-plugin"
+    assert "slurm-jobs" in profiles["camphor"].codex_plugins[0].capabilities
 
 
 def test_prompt_launchers_supports_site_and_manual_launchers(

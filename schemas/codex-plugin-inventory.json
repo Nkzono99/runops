@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Codex plugin inventory",
+  "description": "Machine-readable advisory Codex plugin inventory emitted by runops",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schema_version",
+    "project",
+    "simulators",
+    "site",
+    "management",
+    "recommendations",
+    "delegated_capabilities",
+    "collection_issues"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "schemas/codex-plugin-inventory.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "project": {
+      "type": "object",
+      "required": ["name", "root"],
+      "properties": {
+        "name": { "type": "string" },
+        "root": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "simulators": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "site": {
+      "type": "string"
+    },
+    "management": {
+      "type": "object",
+      "required": [
+        "runops_installs_plugins",
+        "runops_enables_plugins",
+        "runops_inspects_user_install_state",
+        "activation_scope"
+      ],
+      "properties": {
+        "runops_installs_plugins": { "type": "boolean" },
+        "runops_enables_plugins": { "type": "boolean" },
+        "runops_inspects_user_install_state": { "type": "boolean" },
+        "activation_scope": { "type": "string" }
+      },
+      "additionalProperties": true
+    },
+    "recommendations": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/recommendation" }
+    },
+    "delegated_capabilities": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "collection_issues": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/issue" }
+    }
+  },
+  "additionalProperties": true,
+  "definitions": {
+    "recommendation": {
+      "type": "object",
+      "required": [
+        "name",
+        "display_name",
+        "reason",
+        "install_hint",
+        "activation_hint",
+        "visibility",
+        "source",
+        "sources",
+        "capabilities"
+      ],
+      "properties": {
+        "name": { "type": "string" },
+        "display_name": { "type": "string" },
+        "reason": { "type": "string" },
+        "install_hint": { "type": "string" },
+        "activation_hint": { "type": "string" },
+        "visibility": { "type": "string" },
+        "source": { "type": "string" },
+        "sources": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "capabilities": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": true
+    },
+    "issue": {
+      "type": "object",
+      "required": ["severity", "plugin_name", "field", "message", "source"],
+      "properties": {
+        "severity": {
+          "type": "string",
+          "enum": ["error", "warning"]
+        },
+        "plugin_name": { "type": "string" },
+        "field": { "type": "string" },
+        "message": { "type": "string" },
+        "source": { "type": "string" }
+      },
+      "additionalProperties": true
+    }
+  }
+}

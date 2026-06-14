@@ -91,10 +91,10 @@ uvx --from runops runo doctor
 |---------|------|
 | `runo init [SIMS...] [-y] [--with-refs]` | プロジェクトの初期化。対話型がデフォルト、refs mirror は opt-in |
 | `runo setup [URL] [--with-refs]` | 既存 runops project の clone + セットアップ。refs mirror は opt-in |
-| `runo doctor [PATH]` | 環境検査。設定、sbatch、run_id 一意性、環境検出を確認 |
+| `runo doctor [PATH]` | 環境検査。設定、sbatch、run_id 一意性、環境検出、推奨 plugin metadata を確認 |
 | `runo context [DIR]` | Agent 向け project context の要約を表示 |
 | `runo context --json` | Agent 向け context を JSON で取得 |
-| `runo lint [PATH] [--scope ...] [--json]` | project state の health check |
+| `runo lint [PATH] [--scope ...] [--json]` | project state と推奨 plugin metadata の health check |
 | `runo migrate list/show/apply` | project-state migration を確認・適用 |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 |

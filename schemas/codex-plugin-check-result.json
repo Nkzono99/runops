@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Codex plugin check result",
+  "description": "Metadata validation result emitted by runo plugins --check and runops.project.plugins",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schema_version",
+    "ok",
+    "strict_ok",
+    "summary",
+    "inventory",
+    "issues"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "schemas/codex-plugin-check-result.json"
+    },
+    "schema_version": {
+      "const": 1
+    },
+    "ok": {
+      "type": "boolean"
+    },
+    "strict_ok": {
+      "type": "boolean"
+    },
+    "summary": {
+      "type": "object",
+      "required": ["recommendations", "errors", "warnings"],
+      "properties": {
+        "recommendations": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "errors": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    },
+    "inventory": {
+      "$ref": "codex-plugin-inventory.json"
+    },
+    "issues": {
+      "type": "array",
+      "items": {
+        "$ref": "codex-plugin-inventory.json#/definitions/issue"
+      }
+    }
+  },
+  "additionalProperties": true
+}

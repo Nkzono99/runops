@@ -94,6 +94,17 @@ def _register_tools(mcp: FastMCP) -> None:
         return tools.project_inspect(project_root=project_root)
 
     @mcp.tool(
+        name="runops.project.plugins",
+        description="Return advisory Codex plugin recommendations and metadata checks.",
+        structured_output=True,
+    )
+    def project_plugins(
+        project_root: str | None = None,
+        strict: bool = False,
+    ) -> dict[str, Any]:
+        return tools.project_plugins(project_root=project_root, strict=strict)
+
+    @mcp.tool(
         name="runops.project.doctor",
         description="Diagnose project configuration without mutating files.",
         structured_output=True,

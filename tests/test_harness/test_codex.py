@@ -120,6 +120,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "推奨 Codex plugins" in agents
     assert "MPIEMSES3D Context" in agents
     assert "emout Context" in agents
+    assert "委譲役割: input-review, parameter-design" in agents
     assert "$research-agenda" in agents
     assert "$summarize-script" in agents
     assert "$patch-runops" in agents
@@ -177,6 +178,25 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "状態確認だけで応答を終えない" in claude_setup
     assert 'git commit -m "chore: scaffold runops project"' in claude_setup
     assert "{{ skill_prefix }}" not in codex_setup
+
+
+def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:
+    """Direct harness generation keeps simulator names decoupled from adapters."""
+    bundle = build_harness_bundle(
+        "demo",
+        ["production"],
+        simulator_configs={
+            "production": {
+                "adapter": "emses",
+                "resolver_mode": "package",
+                "executable": "mpiemses3D",
+            }
+        },
+    )
+
+    agents = bundle.files["AGENTS.md"]
+    assert "MPIEMSES3D Context" in agents
+    assert "`mpiemses3d-context`" in agents
 
 
 def test_bundle_does_not_emit_project_local_codex_prompts() -> None:

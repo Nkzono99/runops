@@ -16,6 +16,13 @@
         "description": {
           "type": "string",
           "description": "Project description"
+        },
+        "codex_plugins": {
+          "type": "object",
+          "description": "Project-wide external Codex plugin recommendations",
+          "additionalProperties": {
+            "$ref": "codex-plugin-recommendation.json"
+          }
         }
       }
     },

@@ -30,6 +30,7 @@ from runops.cli.init.serialization import (
 )
 from runops.core.discovery import validate_uniqueness
 from runops.core.exceptions import DuplicateRunIdError, ProjectConfigError
+from runops.core.plugins import check_project_codex_plugins
 from runops.core.project import load_project
 from runops.harness._plugins import (
     collect_plugin_recommendations,
@@ -223,6 +224,7 @@ def init(
     )
     codex_plugin_recommendations = collect_plugin_recommendations(
         sim_names,
+        simulator_configs=sim_configs or None,
         extra_plugins=site_profile.codex_plugins if site_profile else None,
     )
 
@@ -276,6 +278,7 @@ def init(
                 site_only["site"] = bundled_data["site"]
             if site_only and tomli_w is not None:
                 with open(site_file, "wb") as f:
+                    f.write(f"#:schema {_SCHEMA_BASE_URL}/site.json\n".encode())
                     tomli_w.dump(site_only, f)
                 created.append("site.toml")
             elif site_only:
@@ -667,6 +670,37 @@ def doctor(
             failures.append("campaign.toml")
     else:
         typer.echo("[INFO] No campaign.toml (optional)")
+
+    # Codex plugin recommendation metadata. This does not inspect user-local
+    # plugin installation state; it only validates project-side recommendations.
+    try:
+        plugin_check = check_project_codex_plugins(project_dir)
+        errors = [issue for issue in plugin_check.issues if issue.severity == "error"]
+        warnings = [
+            issue for issue in plugin_check.issues if issue.severity == "warning"
+        ]
+        if errors:
+            typer.echo(
+                "[FAIL] Codex plugin recommendation metadata: "
+                f"{len(errors)} error(s), {len(warnings)} warning(s)"
+            )
+            failures.append("codex_plugins")
+        elif warnings:
+            typer.echo(
+                "[WARN] Codex plugin recommendation metadata: "
+                f"0 error(s), {len(warnings)} warning(s)"
+            )
+        else:
+            typer.echo("[PASS] Codex plugin recommendation metadata OK")
+        for issue in plugin_check.issues:
+            source = f" source={issue.source}" if issue.source else ""
+            typer.echo(
+                f"       [{issue.severity}] {issue.plugin_name}.{issue.field}:"
+                f"{source} {issue.message}"
+            )
+    except Exception as e:
+        typer.echo(f"[FAIL] Codex plugin recommendation metadata: {e}")
+        failures.append("codex_plugins")
 
     # Final verdict
     if failures:

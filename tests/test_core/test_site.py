@@ -116,6 +116,7 @@ class TestLoadSiteProfile:
             'display_name = "Test Plugin"\n'
             'visibility = "private-or-gated"\n'
             'reason = "Site-specific workflow guidance."\n'
+            'capabilities = ["host-role-routing", "safe-workflows"]\n'
             'install_hint = "codex plugin add test-plugin@test-marketplace"\n'
             'activation_hint = "Start a new Codex thread."\n',
             encoding="utf-8",
@@ -128,6 +129,7 @@ class TestLoadSiteProfile:
         assert plugin.name == "test-plugin"
         assert plugin.display_name == "Test Plugin"
         assert plugin.visibility == "private-or-gated"
+        assert plugin.capabilities == ("host-role-routing", "safe-workflows")
         assert "codex plugin add" in plugin.install_hint
 
     def test_fallback_to_launchers_toml(self, tmp_path: Path) -> None:
@@ -218,10 +220,15 @@ class TestSaveSiteProfile:
                     activation_hint="Start a new Codex thread.",
                     visibility="private-or-gated",
                     source="site:camphor3",
+                    capabilities=("host-role-routing", "slurm-jobs"),
                 )
             ],
         )
         save_site_profile(tmp_path, original)
+
+        content = (tmp_path / "site.toml").read_text(encoding="utf-8")
+        assert content.startswith("#:schema ")
+        assert "/schemas/site.json" in content
 
         loaded = load_site_profile(tmp_path)
         assert loaded.name == original.name

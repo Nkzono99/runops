@@ -187,6 +187,16 @@ class EmseAdapter(SimulatorAdapter):
                 ),
                 visibility="private-or-gated",
                 source="simulator:emses",
+                capabilities=(
+                    "input-review",
+                    "parameter-design",
+                    "run-diagnose",
+                    "output-analysis",
+                    "method-summary",
+                    "simulator-guide",
+                    "cookbook",
+                    "issue-report",
+                ),
             ),
             CodexPluginRecommendation(
                 name="emout-context",
@@ -208,6 +218,15 @@ class EmseAdapter(SimulatorAdapter):
                 ),
                 visibility="public",
                 source="simulator:emses",
+                capabilities=(
+                    "output-analysis",
+                    "visualization-script",
+                    "visualization-workflow",
+                    "script-review",
+                    "output-diagnose",
+                    "issue-report",
+                    "feedback-report",
+                ),
             ),
         ]
 

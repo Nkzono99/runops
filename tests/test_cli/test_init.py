@@ -417,6 +417,7 @@ class TestInit:
         assert "Recommended Codex plugins" in result.output
         assert "MPIEMSES3D Context" in result.output
         assert "emout Context" in result.output
+        assert "Capabilities: input-review, parameter-design" in result.output
         content = (tmp_path / "CLAUDE.md").read_text(encoding="utf-8")
         # Simulator details are via imports.md, not inline
         assert "シミュレータ固有知識" not in content
@@ -747,6 +748,10 @@ class TestInit:
         site_md = tmp_path / "SITE.md"
         assert site_md.exists()
         assert "Camphor3" in site_md.read_text(encoding="utf-8")
+        site_toml = (tmp_path / "site.toml").read_text(encoding="utf-8")
+        assert "#:schema" in site_toml
+        assert "/schemas/site.json" in site_toml
+        assert "[site.codex_plugins.kudpc-hpc-codex-plugin]" in site_toml
         assert "KUDPC HPC" in result.output
         assert "KUDPC HPC" in (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
 
@@ -969,3 +974,51 @@ class TestDoctor:
 
         assert result.exit_code == 1
         assert "check(s) failed" in result.output
+
+    def test_doctor_fails_on_incomplete_codex_plugin_metadata(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Doctor treats incomplete project-side plugin metadata as a failure."""
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
+        (tmp_path / "simulators.toml").write_text("[simulators]\n")
+        (tmp_path / "launchers.toml").write_text("[launchers]\n")
+        (tmp_path / "site.toml").write_text(
+            '[site]\nname = "test-site"\n'
+            "[site.codex_plugins.incomplete]\n"
+            'display_name = "Incomplete Plugin"\n',
+            encoding="utf-8",
+        )
+
+        with patch("runops.cli.init.shutil.which", return_value="/usr/bin/sbatch"):
+            result = runner.invoke(app, ["doctor", str(tmp_path)])
+
+        assert result.exit_code == 1
+        assert "[FAIL] Codex plugin recommendation metadata" in result.output
+        assert "incomplete.reason" in result.output
+        assert "incomplete.install_hint" in result.output
+
+    def test_doctor_warns_on_codex_plugin_metadata_warnings(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Doctor surfaces warning-only plugin metadata without failing."""
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
+        (tmp_path / "simulators.toml").write_text("[simulators]\n")
+        (tmp_path / "launchers.toml").write_text("[launchers]\n")
+        (tmp_path / "site.toml").write_text(
+            '[site]\nname = "test-site"\n'
+            "[site.codex_plugins.site-context]\n"
+            'display_name = "Site Context"\n'
+            'reason = "Site-local workflow guidance."\n'
+            'install_hint = "codex plugin add site-context@test"\n'
+            'visibility = "private"\n',
+            encoding="utf-8",
+        )
+
+        with patch("runops.cli.init.shutil.which", return_value="/usr/bin/sbatch"):
+            result = runner.invoke(app, ["doctor", str(tmp_path)])
+
+        assert result.exit_code == 0
+        assert "[WARN] Codex plugin recommendation metadata" in result.output
+        assert "site-context.visibility" in result.output

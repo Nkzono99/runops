@@ -17,7 +17,8 @@ Current layout:
 - `scaffold/` — generic project scaffold files that are not primarily agent
   harness files, such as `.gitignore`, `campaign.toml`, `notes/`,
   `materials/`, `research/`, and editor settings.
-- `adapters/` — simulator-specific case/input templates and adapter guides.
+- `adapters/` — simulator-specific case/input templates and minimal
+  plugin-first adapter fallback guides.
 - Root-level templates are legacy convenience paths. Avoid adding new files at
   the root; place them in the domain-specific directory instead.
 

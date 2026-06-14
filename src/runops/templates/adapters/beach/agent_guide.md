@@ -1,50 +1,39 @@
-### BEACH (BEM + Accumulated CHarge Simulator)
+### BEACH runops fallback guide
 
-#### 概要
-BEACH は境界要素法 (BEM) ベースの表面帯電シミュレーション。
-MPI + OpenMP ハイブリッド並列で実行し、宇宙機表面の帯電現象を計算する。
+This generated guide is intentionally small. BEACH-specific parameter design,
+configuration review, run diagnosis, output analysis, and visualization should
+come from the recommended external Codex plugin `BEACH Context`
+(`beach-context`) when it is available.
 
-#### 入力ファイル
-- **`input/beach.toml`** — メイン設定ファイル (TOML 形式)
-  - `[sim]`: `dt`, `max_step`, `batch_count`, `field_solver`
-  - `[mesh]`: `obj_path` (OBJ メッシュファイルパス)
-  - `[environment]`: プラズマ環境パラメータ (密度, 温度, etc.)
-  - `[output]`: `dir` (出力ディレクトリ)
+Before using this fallback, run:
 
-#### 出力ファイル (`work/latest/` 以下)
-- `summary.txt` — 計算結果サマリー (完了時に生成)
-- `charges.csv` — 表面電荷分布
-- `charge_history.csv` — 電荷時間履歴
-- `potential_history.csv` — 電位時間履歴
-- `mesh_triangles.csv`, `mesh_sources.csv` — メッシュ情報
-- `performance_profile.csv` — 性能プロファイル
-
-#### 完了判定
-- `work/latest/summary.txt` が存在 → completed
-- stderr に "error", "fatal", "killed" → failed
-- `charges.csv` のみ存在 → running (途中)
-
-#### パラメータサーベイでよく変えるパラメータ
-- `sim.dt`, `sim.max_step`, `sim.batch_count`
-- `environment.electron_density`, `environment.electron_temperature`
-- `environment.ion_density`, `environment.ion_temperature`
-- `mesh.obj_path` (異なるジオメトリの比較)
-
-#### ドキュメント・参考
-- BEACH ソースリポジトリの README / docs/
-- OBJ メッシュファイルは Blender 等で作成
-- パラメータの dot 記法例: `sim.dt=1.0e-6`, `environment.electron_density=1.0e12`
-
-#### 実行コマンド
-```
-srun beach input/beach.toml
+```bash
+uvx --from runops runo plugins --check
+uvx --from runops runo plugins --json
 ```
 
-`beach.toml` の `output.dir` は `work/latest` に自動設定される。
+Use the `delegated_capabilities` index to route BEACH work such as
+`config-review`, `case-design`, `run-diagnose`, `output-analysis`, and
+`visualization-script` to the plugin. runops does not install or enable the
+plugin; that remains user-local Codex state.
 
-#### 環境変数 (OpenMP)
-```
-OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-1}
-OMP_PROC_BIND=spread
-OMP_PLACES=cores
-```
+#### runops responsibilities
+
+- Treat the run directory and `manifest.toml` as the source of truth.
+- Let the BEACH adapter render `input/beach.toml` and detect required outputs.
+- Keep `work/`, `input/`, `submit/`, and `manifest.toml` under runops control.
+- Use `runo create`, `runo submit`, `runo status`, `runo summarize`, and
+  `runo collect` instead of ad hoc file movement.
+
+#### Minimal fallback facts
+
+- Main rendered input: `input/beach.toml`.
+- Primary completion / summary file: `work/latest/summary.txt`.
+- Common output categories: charge CSVs, mesh CSVs, history CSVs, and summary
+  text. Use adapter-required output metadata for exact project checks.
+- For parameter meaning, numerical stability, physical interpretation, and
+  plotting details, prefer `BEACH Context`, enabled knowledge imports, project
+  materials, or BEACH upstream documentation.
+
+Do not treat this file as a full BEACH manual. It is only the runops-side
+handoff point when richer simulator context has not been installed or mounted.
