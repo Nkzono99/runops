@@ -11,7 +11,8 @@
 | `runo setup [URL] [--with-refs]` | 既存プロジェクトを clone + 環境セットアップ (refs mirror は opt-in) |
 | `runo doctor` | 環境検査 |
 | `runo context --json` | Agent 向け project context を JSON で取得 |
-| `runo lint [PATH] [--scope ...]` | project state の health check |
+| `runo plugins [--json] [--check] [--strict]` | project / simulator / site に基づく推奨 Codex plugins を表示・メタデータ検査 |
+| `runo lint [PATH] [--scope ...]` | project state と推奨 plugin metadata の health check |
 | `runo migrate list/show/apply` | project-state migration の確認・適用 |
 | `runo mcp serve --transport stdio` | MCP provider を stdio で起動 |
 | `runo mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |

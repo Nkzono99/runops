@@ -31,6 +31,10 @@ AI エージェントがシミュレーションを自律的に行うための�
 Simulator / site が外部 Codex plugin を推薦する場合、`runo init` / `runo setup`
 と生成 harness に導線を出す。plugin install / enable はユーザー local な Codex
 環境の操作であり、runops project state には含めない。
+開発ハーネス内の `.agents/skills/emses`, `.agents/skills/beach`,
+`.codex/agents/emses.toml`, `.codex/agents/beach.toml` は runops 側の薄い
+橋渡しに保ち、シミュレータ固有の長文 context は MPIEMSES3D / emout / BEACH
+などの外部 plugin へ委譲する。
 
 ```bash
 runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git

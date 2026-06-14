@@ -9,6 +9,7 @@ from unittest.mock import patch
 import tomli_w
 
 from runops.core.context import (
+    _collect_codex_plugins,
     _collect_facts_summary,
     _collect_knowledge_paths,
     _collect_notes_summary,
@@ -149,6 +150,177 @@ def test_context_includes_knowledge_integration_details(tmp_path: Path) -> None:
         "name",
         "content",
     ]
+
+
+def test_context_includes_codex_plugin_recommendations(tmp_path: Path) -> None:
+    """Agent context includes advisory external Codex plugin inventory."""
+    _write_toml(
+        tmp_path / "runops.toml",
+        {
+            "project": {
+                "name": "plugin-context",
+                "codex_plugins": {
+                    "analysis-context": {
+                        "display_name": "Analysis Context",
+                        "reason": "Team analysis workflow guidance.",
+                        "install_hint": "codex plugin add analysis-context@project",
+                    }
+                },
+            },
+        },
+    )
+    _write_toml(
+        tmp_path / "simulators.toml",
+        {
+            "simulators": {
+                "production": {
+                    "adapter": "emses",
+                    "resolver_mode": "package",
+                    "executable": "mpiemses3D",
+                }
+            }
+        },
+    )
+    _write_toml(
+        tmp_path / "site.toml",
+        {
+            "site": {
+                "name": "test-site",
+                "codex_plugins": {
+                    "site-context": {
+                        "display_name": "Site Context",
+                        "reason": "Site-local workflow guidance.",
+                        "install_hint": "codex plugin add site-context@test",
+                    }
+                },
+            }
+        },
+    )
+
+    ctx = build_project_context(tmp_path)
+
+    plugins = ctx["codex_plugins"]
+    assert plugins["schema_version"] == 1
+    assert plugins["inventory_schema"] == "schemas/codex-plugin-inventory.json"
+    assert plugins["check_result_schema"] == "schemas/codex-plugin-check-result.json"
+    assert plugins["ok"] is True
+    assert plugins["strict_ok"] is True
+    assert plugins["summary"] == {
+        "recommendations": 4,
+        "errors": 0,
+        "warnings": 0,
+    }
+    assert plugins["management"]["runops_installs_plugins"] is False
+    assert plugins["simulators"] == ["production"]
+    assert plugins["site"] == "test-site"
+    assert [plugin["name"] for plugin in plugins["recommendations"]] == [
+        "mpiemses3d-context",
+        "emout-context",
+        "analysis-context",
+        "site-context",
+    ]
+    assert plugins["recommendations"][0]["sources"] == [
+        "simulator:emses",
+        "simulator:production",
+    ]
+    assert "parameter-design" in plugins["recommendations"][0]["capabilities"]
+    assert plugins["delegated_capabilities"]["parameter-design"] == [
+        "mpiemses3d-context"
+    ]
+    assert plugins["delegated_capabilities"]["output-analysis"] == [
+        "mpiemses3d-context",
+        "emout-context",
+    ]
+    assert plugins["collection_issues"] == []
+    assert plugins["issues"] == []
+    assert ctx["section_status"]["codex_plugins"] == "ok"
+
+
+def test_context_surfaces_codex_plugin_metadata_warnings(tmp_path: Path) -> None:
+    """Agent context keeps plugin collection warnings visible."""
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "plugin-context"}})
+    (tmp_path / "site.toml").write_text(
+        '[site]\nname = "test-site"\ncodex_plugins = ["broken"]\n',
+        encoding="utf-8",
+    )
+
+    ctx = build_project_context(tmp_path)
+
+    plugins = ctx["codex_plugins"]
+    assert ctx["status"] == "degraded"
+    assert ctx["section_status"]["codex_plugins"] == "warning"
+    assert plugins["ok"] is True
+    assert plugins["strict_ok"] is False
+    assert plugins["summary"] == {
+        "recommendations": 0,
+        "errors": 0,
+        "warnings": 1,
+    }
+    assert plugins["collection_issues"][0]["source"] == "site:test-site"
+    assert plugins["issues"][0]["field"] == "codex_plugins"
+    assert any(
+        "runo plugins --check" in diagnostic["message"]
+        for diagnostic in ctx["diagnostics"]
+        if diagnostic["section"] == "codex_plugins"
+    )
+
+
+def test_context_surfaces_codex_plugin_metadata_errors(tmp_path: Path) -> None:
+    """Agent context marks incomplete plugin metadata as an error."""
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "plugin-context"}})
+    (tmp_path / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.incomplete]\n"
+        'display_name = "Incomplete Plugin"\n',
+        encoding="utf-8",
+    )
+
+    ctx = build_project_context(tmp_path)
+
+    plugins = ctx["codex_plugins"]
+    assert ctx["status"] == "degraded"
+    assert ctx["section_status"]["codex_plugins"] == "error"
+    assert plugins["ok"] is False
+    assert plugins["strict_ok"] is False
+    assert plugins["summary"] == {
+        "recommendations": 1,
+        "errors": 2,
+        "warnings": 0,
+    }
+    assert [issue["field"] for issue in plugins["issues"]] == [
+        "reason",
+        "install_hint",
+    ]
+
+
+def test_collect_codex_plugins_reports_warning_on_broken_project(
+    tmp_path: Path,
+) -> None:
+    """Broken project config degrades context instead of hiding other sections."""
+    diagnostics: list[dict[str, str]] = []
+    section_status: dict[str, str] = {}
+
+    plugins = _collect_codex_plugins(tmp_path, diagnostics, section_status)
+
+    assert plugins["schema_version"] == 1
+    assert plugins["inventory_schema"] == "schemas/codex-plugin-inventory.json"
+    assert plugins["check_result_schema"] == "schemas/codex-plugin-check-result.json"
+    assert plugins["ok"] is False
+    assert plugins["strict_ok"] is False
+    assert plugins["summary"] == {
+        "recommendations": 0,
+        "errors": 0,
+        "warnings": 1,
+    }
+    assert plugins["simulators"] == []
+    assert plugins["site"] == ""
+    assert plugins["management"]["runops_installs_plugins"] is False
+    assert plugins["recommendations"] == []
+    assert plugins["delegated_capabilities"] == {}
+    assert plugins["collection_issues"] == []
+    assert plugins["issues"] == []
+    assert section_status["codex_plugins"] == "warning"
+    assert diagnostics[0]["section"] == "codex_plugins"
 
 
 def test_context_includes_research_agenda_and_latest_note(tmp_path: Path) -> None:

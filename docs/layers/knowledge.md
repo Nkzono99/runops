@@ -88,18 +88,61 @@ project/
 
 ### Codex plugin recommendation
 
-Adapter や site profile は、選択内容に応じて外部 Codex plugin を推薦できる。
+Adapter、simulator config、project config、site profile は、選択内容に応じて
+外部 Codex plugin を推薦できる。
 `runo init` / `runo setup` は推薦 plugin と導入手順を表示し、project harness
 (`AGENTS.md` / `CLAUDE.md`) にも同じ導線を残す。plugin の install / enable は
 ユーザーの Codex 環境に対する操作なので、runops project state には含めない。
+既存 project では `runo plugins` または `runo plugins --json` で、現在の
+project / simulator / site 設定から同じ推薦一覧を後から確認できる。Agent が最初に読む
+`runo context --json` と MCP `runops.project.inspect` にも同じ推薦を載せる。
+`runo context --json` は推薦一覧に加えて `delegated_capabilities`、`ok` /
+`strict_ok` / `summary` / `issues` / `collection_issues` も載せ、metadata warning /
+error があれば `codex_plugins` section を degraded にする。
+この context 内の `codex_plugins` は agent 向けの要約 shape なので、
+完全版 contract への参照として `inventory_schema` と `check_result_schema` を持つ。
+MCP `runops.project.plugins` は推薦一覧と同じメタデータ検査結果を返す。
+JSON payload には `schema_version` を含め、外部 agent / tool は field 追加に備えて
+未知 field を無視する。
+MCP capabilities の `codex_plugin_policy` は、`inventory_fields`、
+`check_result_fields`、`recommendation_fields`、`delegated_capabilities_field` により
+外部 client が使える field contract を広告する。
+`inventory_schema` と `check_result_schema` は JSON 出力 schema の場所を示し、
+JSON payload 自身の `$schema` にも同じ schema path を入れる。
+各推薦は互換用の `source` 文字列と、外部 tool が文字列を parse せずに使える
+`sources` 配列を返す。simulator key が adapter 名と異なる場合は、adapter 側の
+source と project 側の simulator source の両方を載せる。
+各推薦の `capabilities` は、runops 本体から外部 plugin へ委譲する役割ラベルであり、
+plugin の install 済み状態や実行許可を意味しない。
+`delegated_capabilities` は role label から推薦 plugin 名へ引くための index で、
+外部 agent / tool が `reason` 文字列を parse せずに委譲先を選ぶための補助である。
+同じ plugin 名が複数レイヤから推薦された場合、表示名、理由、導入手順などの実体
+metadata は最初の推薦を使い、`source` と `capabilities` は統合する。site や
+project は adapter package を変更せずに追加の委譲役割だけを載せられる。
+`runo plugins --check` は推薦名、理由、導入手順などのメタデータを検査する。
+`capabilities` は文字列または非空文字列の配列として読み、TOML table など
+machine-readable な role label にできない値は warning として返す。
+`simulators.toml` が外部 adapter を指しているが、その adapter が未導入で推薦を
+収集できない場合も warning として返す。
+`project.codex_plugins` / `simulators.<name>.codex_plugins` /
+`site.codex_plugins` の table 形が不正な場合も warning として返し、壊れた推薦を
+静かに無視しない。
+user-local な Codex plugin の install / enable 状態までは runops の管理対象にしない。
 
 例:
 
 - `emses`: `MPIEMSES3D Context`, `emout Context`
+- `beach`: `BEACH Context`
 - `camphor` site profile: `KUDPC HPC`
 
 private repo の plugin は GitHub 認証済み環境、local checkout marketplace、または
 利用者が自作する environment skill のいずれかで扱う。
+runops 開発ハーネス内の simulator skill / agent は、外部 plugin が利用できない時の
+最小 fallback と runops workflow の橋渡しに限定し、長文の simulator context を
+再び本体側へ戻さない。
+生成 project に materialize される adapter `agent_guide()` も同じく最小 fallback とし、
+完全な simulator manual や解析 cookbook ではなく plugin/knowledge source への導線に
+留める。
 
 ### refs/ — 任意のリファレンスミラー
 
@@ -253,6 +296,11 @@ surface_potential = { source = "work/volt", column = 1, description = "表面電
 
 simulator repo 側に `cookbook/` ディレクトリを置き、
 Agent がパラメータ生成の出発点として使える入力例・設定フラグメントを提供する。
+plugin-first な運用では、simulator 側 Codex plugin がこの cookbook を skill/context
+として提供する。runops 本体は cookbook 本文を内包せず、adapter / simulator config
+の `capabilities = ["cookbook"]` と plugin 推薦 metadata で導線だけを管理する。
+`refs/` は offline 利用、private repo、開発中 checkout を近くに置くための fallback
+mirror として扱う。
 
 - `cookbook/COOKBOOK.md` — この cookbook の概要と管理ガイド
 - `cookbook/index.toml` — 全 entry の目録

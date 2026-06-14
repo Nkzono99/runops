@@ -92,6 +92,12 @@ my_solver = "my_solver_runops.adapter:MySolverAdapter"
 entry point 名 (`my_solver`) が `simulators.toml` の `adapter` 値です。runops は
 `simulators.toml` 読み込み時にこの entry point を探し、見つからない場合だけ
 同梱 contrib module の import 規約へ fallback します。
+外部 adapter が未導入の project では、`runo plugins --check` と
+MCP `runops.project.plugins` が plugin 推薦を収集できなかったことを warning として
+返します。runops は adapter や Codex plugin を自動 install しません。
+project 固有の plugin 推薦だけを足したい場合は、adapter package を変更せず
+simulator に紐づくものは `[simulators.<name>.codex_plugins.<plugin>]`、project
+全体に紐づくものは `[project.codex_plugins.<plugin>]` に metadata を書けます。
 
 ### ステップ 2: 7 つのメソッドの実装
 
@@ -876,7 +882,9 @@ cookbook の規約は `docs/simulator-kb-spec.md` を参照。
 
 simulator 固有の長文 context や解析 workflow を外部 Codex plugin に置く場合、
 Adapter は plugin の導入導線だけを返す。runops は plugin を自動 install せず、
-`runo init` / `runo setup` の出力と生成 harness に推奨として表示する:
+`runo init` / `runo setup` の出力、`runo plugins`、生成 harness に推奨として表示する。
+既存 project の harness 更新では adapter / simulator config / project config / site
+profile から組み立てた同じ plugin inventory を使う:
 
 ```python
 from runops.core.codex_plugin import CodexPluginRecommendation
@@ -888,6 +896,12 @@ def codex_plugins(cls) -> list[CodexPluginRecommendation]:
             name="my-simulator-context",
             display_name="My Simulator Context",
             reason="Input review, parameter design, run diagnosis, and output analysis.",
+            capabilities=(
+                "input-review",
+                "parameter-design",
+                "run-diagnose",
+                "output-analysis",
+            ),
             install_hint=(
                 "codex plugin marketplace add owner/my-simulator --ref main "
                 "--sparse .agents/plugins --sparse plugins/my-simulator-context\n"
@@ -901,6 +915,28 @@ def codex_plugins(cls) -> list[CodexPluginRecommendation]:
 private repo や site-local plugin の場合は `visibility="private-or-gated"` とし、
 `install_hint` に GitHub 認証、ローカル checkout marketplace、または利用者が環境
 skill を自作する fallback を書く。
+Adapter の `codex_plugins()` は project context がなくても利用できる完全な
+`CodexPluginRecommendation` を返す。`name`, `display_name`, `reason`,
+`install_hint` を空にせず、`visibility` は `"public"` または
+`"private-or-gated"` を使い、`source` には `simulator:<name>` を入れる。
+`capabilities` には `"input-review"`、`"run-diagnose"`、`"output-analysis"`、
+`"cookbook"` など、runops 本体から plugin へ委譲する役割ラベルを入れる。
+project / simulator / site の TOML では配列を推奨し、単一 role は文字列でもよい。
+TOML table や空文字列配列など、role label として読めない値は warning になる。
+組み込み Adapter は contract test でこの metadata を検査する。
+同じ plugin 名を Adapter / simulator config / project config / site profile の複数
+レイヤから推薦する場合、表示名、導入手順、visibility などの実体メタデータは最初の
+推薦を使い、`source` と `capabilities` は統合する。これにより adapter package を
+変更せず、site や project 側で委譲役割だけを追加できる。JSON payload では互換用の
+`source` 文字列に加えて、parse 済みの `sources` 配列も返す。`runo plugins --check`
+と MCP `runops.project.plugins` は、表示名や導入手順などが食い違う重複推薦を
+warning として報告する。
+
+`agent_guide()` を実装する場合も、plugin や明示的 knowledge source が使えない時の
+最小 fallback に留める。parameter design、input review、run diagnosis、output
+analysis、visualization などの長文 workflow は plugin 側へ置き、`agent_guide()` は
+runops の run directory / manifest / adapter boundary と推薦 plugin の確認手順を
+示す程度にする。
 
 ### campaign.toml との連携
 

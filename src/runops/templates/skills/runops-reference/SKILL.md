@@ -17,7 +17,7 @@ project 側で実行するときの標準形は `uvx --from runops runo <command
 ```bash
 runo context --json      # project / campaign / runs / failures の概要
 runo lint                # project state の health check
-runo lint --scope structure,analysis,knowledge
+runo lint --scope structure,analysis,knowledge,plugins
 runo runs list           # run 一覧
 runo runs list runs/a runs/b  # 複数 PATH 指定
 runo runs jobs           # submitted/running のジョブ一覧
@@ -231,7 +231,7 @@ fragment は `[merge]` と `[compatibility]` を確認してから使う。
 
 ```bash
 runo doctor             # 環境検査
-runo lint               # project state / Agent context の health check
+runo lint               # project state / Agent context / plugin metadata の health check
 runo update-refs        # opt-in refs mirror の更新 + ナレッジ再生成
 runo config show        # 設定表示
 ```

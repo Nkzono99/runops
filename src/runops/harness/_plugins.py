@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
-from runops.core.codex_plugin import (
-    CodexPluginRecommendation,
-    unique_codex_plugins,
+from runops.core.codex_plugin import CodexPluginRecommendation
+from runops.core.plugins import (
+    collect_codex_plugin_recommendations,
 )
 from runops.core.site import SiteProfile, load_site_profile
-from runops.harness._adapters import collect_codex_plugins
 
 
 def load_site_profile_for_recommendations(project_dir: Path) -> SiteProfile | None:
@@ -23,18 +23,17 @@ def load_site_profile_for_recommendations(project_dir: Path) -> SiteProfile | No
 def collect_plugin_recommendations(
     simulator_names: list[str],
     *,
+    simulator_configs: dict[str, dict[str, Any]] | None = None,
     site_profile: SiteProfile | None = None,
     extra_plugins: list[CodexPluginRecommendation] | None = None,
 ) -> list[CodexPluginRecommendation]:
     """Collect unique plugin recommendations for simulator and site choices."""
-    recommendations: list[CodexPluginRecommendation] = []
-    if simulator_names:
-        recommendations.extend(collect_codex_plugins(simulator_names))
-    if site_profile is not None:
-        recommendations.extend(site_profile.codex_plugins)
-    if extra_plugins:
-        recommendations.extend(extra_plugins)
-    return unique_codex_plugins(recommendations)
+    return collect_codex_plugin_recommendations(
+        simulator_names,
+        simulator_configs=simulator_configs,
+        site_profile=site_profile,
+        extra_plugins=extra_plugins,
+    )
 
 
 def echo_plugin_recommendations(
@@ -56,6 +55,8 @@ def echo_plugin_recommendations(
         typer.echo(f"  - {plugin.display_name} (`{plugin.name}`){visibility}")
         if plugin.reason:
             typer.echo(f"    Why: {plugin.reason}")
+        if plugin.capabilities:
+            typer.echo(f"    Capabilities: {', '.join(plugin.capabilities)}")
         if plugin.install_hint:
             typer.echo("    Install:")
             for line in plugin.install_hint.strip().splitlines():

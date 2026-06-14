@@ -648,7 +648,9 @@ adapter.required_outputs() ← analysis-ready に必要な成果物
 ```
 
 - simulator/environment plugin: 長文の Agent context、環境スキル、解析ライブラリ利用法
-- `codex_plugins()`: simulator に推奨する外部 Codex plugin の導入導線
+- `codex_plugins()`: simulator に推奨する外部 Codex plugin の導入導線と委譲役割 (`capabilities`)
+- `runo plugins`: project / simulator / site から推薦 plugin を再表示・JSON 出力し、推薦メタデータを検査する監査入口
+- `runo doctor`: 推薦メタデータの error も project 健全性として検出するが、plugin の install 状態は管理しない
 - `refs/`: `runo init --with-refs` または手動 clone で使う任意のローカル mirror
 - `doc_repos()` / `knowledge_sources()`: 任意 mirror を使う場合の clone 先とインデックス対象
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
@@ -658,6 +660,8 @@ adapter.required_outputs() ← analysis-ready に必要な成果物
 シミュレータ固有の Agent 向け長文コンテキストは、runops adapter ではなく各
 シミュレータや解析ライブラリの Codex plugin に置く。runops adapter は実行管理に
 必要なテンプレート、検証、入出力検出、provenance に責務を限定する。
+adapter が返す package-bundled `agent_guide()` は、plugin や明示的 knowledge source が
+ない場合の runops 側 fallback に限定し、完全な simulator manual にしない。
 
 ### 実行環境知識
 

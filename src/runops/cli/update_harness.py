@@ -34,6 +34,7 @@ from runops.cli.init.scaffold import (
     _create_research_skeleton,
 )
 from runops.core.exceptions import SimctlError
+from runops.core.plugins import build_project_codex_plugin_inventory
 from runops.core.project import find_project_root, load_project
 from runops.core.upgrade_chain import (
     UpgradePlan,
@@ -42,10 +43,6 @@ from runops.core.upgrade_chain import (
     latest_version_in_versions,
 )
 from runops.harness._adapters import collect_doc_repos
-from runops.harness._plugins import (
-    collect_plugin_recommendations,
-    load_site_profile_for_recommendations,
-)
 from runops.harness.builder import (
     GITIGNORE_PATH,
     applied_harness_runops_version,
@@ -516,7 +513,9 @@ def update_harness(
     project = load_project(project_dir)
     project_name = project.name
     simulator_names = list(project.simulators.keys())
-    site_profile = load_site_profile_for_recommendations(project_dir)
+    codex_plugin_recommendations = list(
+        build_project_codex_plugin_inventory(project).recommendations
+    )
 
     # Read [harness] settings
     upstream_feedback = read_upstream_feedback_setting(project_dir)
@@ -539,10 +538,7 @@ def update_harness(
         upstream_feedback=upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
         include_reference_repos=_has_reference_repos(project_dir, simulator_names),
-        codex_plugin_recommendations=collect_plugin_recommendations(
-            simulator_names,
-            site_profile=site_profile,
-        ),
+        codex_plugin_recommendations=codex_plugin_recommendations,
     )
 
     # Filter by --only

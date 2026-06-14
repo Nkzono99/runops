@@ -7,7 +7,7 @@ project state の整合性を確認します。
 ```bash
 runo lint
 runo lint --json
-runo lint --scope structure,analysis,knowledge
+runo lint --scope structure,analysis,knowledge,plugins
 runo lint --strict
 ```
 
@@ -15,9 +15,9 @@ runo lint --strict
 
 | Command | 役割 |
 |---------|------|
-| `runo doctor` | Python 環境、Slurm、site preset、`.runops/environment.toml` など実行環境を確認する |
-| `runo context --json` | Agent が最初に読む project context を要約する |
-| `runo lint` | project state が再開・解析・handoff 可能かを検査する |
+| `runo doctor` | Python 環境、Slurm、site preset、`.runops/environment.toml`、推奨 Codex plugin metadata などを確認する |
+| `runo context --json` | Agent が最初に読む project context、推奨 Codex plugins、読む入口を要約する |
+| `runo lint` | project state と推奨 plugin metadata が再開・解析・handoff 可能かを検査する |
 | `runo migrate apply <id>` | migration guide に登録された定型修復を適用する |
 
 `runo lint` は layer そのものではなく、Experiment / Execution / Analysis /
@@ -34,12 +34,13 @@ Research / Knowledge / Harness / Upstream の各 layer を横断して見る hea
 | `provenance` | completed run の `git_commit`, executable hash, simulator version |
 | `analysis` | completed run の `analysis/summary.json`, artifact index, legacy `figures_index.json` |
 | `knowledge` | `research/agenda.md` の template 状態、Next Actions の evidence path、`.runops/facts.toml` の source |
+| `plugins` | project / simulator / site 由来の推奨 Codex plugin metadata と委譲 role index。install 済み状態は見ない |
 
 `--scope` は comma-separated です。
 
 ```bash
 runo lint --scope structure
-runo lint --scope analysis,knowledge
+runo lint --scope analysis,knowledge,plugins
 ```
 
 ## Exit Code
@@ -70,6 +71,6 @@ CLI で修復できない finding は、手作業で直すか、汎用化でき�
 Agent が project に入ったときの標準動線:
 
 1. `runo context --json` で現在地を把握する。
-2. 必要なら `runo lint --scope structure,analysis,knowledge` で読む入口と成果物索引を確認する。
+2. 必要なら `runo lint --scope structure,analysis,knowledge,plugins` で読む入口、成果物索引、推奨 plugin metadata を確認する。
 3. migration finding があれば `runo migrate apply <id> --dry-run` で確認する。
 4. 直したこと、skip したこと、保留したことを `notes/YYYY-MM-DD.md` に残す。

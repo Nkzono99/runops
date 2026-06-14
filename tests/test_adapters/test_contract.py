@@ -16,6 +16,11 @@ from runops.adapters import (
     list_adapters,
 )
 from runops.adapters.base import SimulatorAdapter
+from runops.core.codex_plugin import CodexPluginRecommendation
+from runops.core.plugins import (
+    detect_codex_plugin_conflicts,
+    validate_codex_plugin_recommendation,
+)
 from tests.factories import write_toml
 
 
@@ -125,6 +130,63 @@ def test_contract_metadata_methods_return_expected_types(
     assert isinstance(spec.adapter_cls.codex_plugins(), list)
     assert isinstance(spec.adapter_cls.case_template(), dict)
     assert isinstance(spec.adapter_cls.agent_guide(), str)
+
+
+@pytest.mark.parametrize(
+    ("adapter_cls", "expected_plugins", "forbidden_phrases"),
+    [
+        (
+            BeachAdapter,
+            ("BEACH Context", "beach-context"),
+            (
+                "パラメータサーベイでよく変えるパラメータ",
+                "environment.electron_density",
+            ),
+        ),
+        (
+            EmseAdapter,
+            ("MPIEMSES3D Context", "emout Context", "delegated_capabilities"),
+            ("主要な namelist", "species[0].temperature"),
+        ),
+    ],
+    ids=["beach", "emses"],
+)
+def test_builtin_agent_guides_are_plugin_first_fallbacks(
+    adapter_cls: type[SimulatorAdapter],
+    expected_plugins: tuple[str, ...],
+    forbidden_phrases: tuple[str, ...],
+) -> None:
+    """Bundled agent guides should not become long simulator manuals again."""
+    guide = adapter_cls.agent_guide()
+
+    for expected in expected_plugins:
+        assert expected in guide
+    for phrase in forbidden_phrases:
+        assert phrase not in guide
+
+
+@pytest.mark.parametrize(
+    "spec",
+    ADAPTER_CONTRACT_SPECS,
+    ids=lambda spec: spec.name,
+)
+def test_contract_codex_plugin_recommendations_are_complete(
+    spec: AdapterContractSpec,
+) -> None:
+    """Adapter plugin recommendations must be usable without project context."""
+    recommendations = spec.adapter_cls.codex_plugins()
+
+    assert all(
+        isinstance(recommendation, CodexPluginRecommendation)
+        for recommendation in recommendations
+    )
+    issues = [
+        issue
+        for recommendation in recommendations
+        for issue in validate_codex_plugin_recommendation(recommendation)
+    ]
+    issues.extend(detect_codex_plugin_conflicts(recommendations))
+    assert [issue.to_dict() for issue in issues] == []
 
 
 @pytest.mark.parametrize(

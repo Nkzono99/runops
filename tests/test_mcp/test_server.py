@@ -48,6 +48,7 @@ _TOOL_ATTRS = {
     "runops.project.list": "project_list",
     "runops.project.status": "project_status",
     "runops.project.inspect": "project_inspect",
+    "runops.project.plugins": "project_plugins",
     "runops.project.doctor": "project_doctor",
     "runops.publication.exports.list": "publication_exports_list",
     "runops.publication.export.inspect": "publication_export_inspect",
@@ -100,6 +101,13 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
     assert fake.tools["runops.project.list"]["callback"](project_root="root") == {
         "stub": "runops.project.list",
         "kwargs": {"project_root": "root"},
+    }
+    assert fake.tools["runops.project.plugins"]["callback"](
+        project_root="root",
+        strict=True,
+    ) == {
+        "stub": "runops.project.plugins",
+        "kwargs": {"project_root": "root", "strict": True},
     }
     assert fake.tools["runops.publication.exports.list"]["callback"](
         project_root="root",
@@ -283,6 +291,7 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         "runops.paper.request.plan",
         "runops.paper.requests.list",
         "runops.project.list",
+        "runops.project.plugins",
         "runops.publication.export.inspect",
         "runops.publication.exports.list",
         "runops.run.list",

@@ -12,6 +12,7 @@ import typer
 from runops import __version__
 from runops.cli.init.github_auth import ensure_github_auth_for_simulators
 from runops.core.exceptions import ProjectConfigError
+from runops.core.plugins import build_project_codex_plugin_inventory
 from runops.core.project import ProjectConfig, load_project
 from runops.core.repository import repo_name_from_url
 from runops.harness._plugins import (
@@ -158,11 +159,16 @@ def setup(
         skip=skip_github_auth_check,
         include_refs=with_refs,
     )
-    site_profile = load_site_profile_for_recommendations(project_dir)
-    codex_plugin_recommendations = collect_plugin_recommendations(
-        sim_names,
-        site_profile=site_profile,
-    )
+    if project is not None:
+        codex_plugin_recommendations = list(
+            build_project_codex_plugin_inventory(project).recommendations
+        )
+    else:
+        site_profile = load_site_profile_for_recommendations(project_dir)
+        codex_plugin_recommendations = collect_plugin_recommendations(
+            sim_names,
+            site_profile=site_profile,
+        )
 
     created: list[str] = []
     skipped: list[str] = []

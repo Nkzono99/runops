@@ -107,6 +107,39 @@ def test_health_returns_contract_envelope() -> None:
     assert result["data"]["healthy"] is True
 
 
+def test_provider_info_exposes_codex_plugin_policy() -> None:
+    result = tools.provider_info()
+
+    policy = result["data"]["codex_plugin_policy"]
+    assert policy["recommendations_advisory"] is True
+    assert policy["metadata_checks_supported"] is True
+    assert policy["installs_plugins"] is False
+    assert policy["enables_plugins"] is False
+    assert policy["inspects_user_install_state"] is False
+    assert policy["inventory_schema_version"] == 1
+    assert policy["inventory_schema"] == "schemas/codex-plugin-inventory.json"
+    assert policy["check_result_schema"] == "schemas/codex-plugin-check-result.json"
+    assert policy["project_tool"] == "runops.project.plugins"
+    assert "recommendations" in policy["inventory_fields"]
+    assert "$schema" in policy["inventory_fields"]
+    assert "strict_ok" in policy["check_result_fields"]
+    assert "$schema" in policy["check_result_fields"]
+    assert "sources" in policy["recommendation_fields"]
+    assert policy["source_fields"]["sources"] == "machine-readable source label list"
+
+
+def test_capabilities_exposes_codex_plugin_policy() -> None:
+    result = tools.capabilities()
+
+    policy = result["data"]["codex_plugin_policy"]
+    assert policy["recommendations_advisory"] is True
+    assert policy["metadata_checks_supported"] is True
+    assert policy["installs_plugins"] is False
+    assert policy["activation_scope"] == "user-local Codex environment"
+    assert policy["inventory_schema_version"] == 1
+    assert policy["delegated_capabilities_field"] == "delegated_capabilities"
+
+
 def test_project_status_summarizes_project(tmp_path: Path) -> None:
     project_root = _make_project(tmp_path)
     _make_run(project_root)
@@ -116,6 +149,156 @@ def test_project_status_summarizes_project(tmp_path: Path) -> None:
     assert result["status"] == "ok"
     assert result["project"]["id"] == "mcp-demo"
     assert result["data"]["runs"]["total"] == 1
+
+
+def test_project_inspect_includes_codex_plugin_context(tmp_path: Path) -> None:
+    """Detailed MCP project context exposes advisory plugin recommendations."""
+    project_root = _make_project(tmp_path)
+    (project_root / "simulators.toml").write_text(
+        "[simulators.emses]\n"
+        'adapter = "emses"\n'
+        'resolver_mode = "package"\n'
+        'executable = "mpiemses3D"\n',
+        encoding="utf-8",
+    )
+
+    result = tools.project_inspect(project_root=str(project_root))
+
+    assert result["status"] == "ok"
+    plugins = result["data"]["context"]["codex_plugins"]
+    assert plugins["management"]["runops_installs_plugins"] is False
+    assert [plugin["name"] for plugin in plugins["recommendations"]] == [
+        "mpiemses3d-context",
+        "emout-context",
+    ]
+    assert plugins["recommendations"][0]["sources"] == ["simulator:emses"]
+
+
+def test_project_plugins_returns_advisory_check_result(tmp_path: Path) -> None:
+    """MCP exposes plugin recommendations and metadata checks directly."""
+    project_root = _make_project(tmp_path)
+    (project_root / "simulators.toml").write_text(
+        "[simulators.emses]\n"
+        'adapter = "emses"\n'
+        'resolver_mode = "package"\n'
+        'executable = "mpiemses3D"\n',
+        encoding="utf-8",
+    )
+
+    result = tools.project_plugins(project_root=str(project_root))
+
+    assert result["status"] == "ok"
+    assert result["tool"] == "runops.project.plugins"
+    assert result["data"]["$schema"] == "schemas/codex-plugin-check-result.json"
+    assert result["data"]["schema_version"] == 1
+    assert result["data"]["ok"] is True
+    assert result["data"]["strict_ok"] is True
+    assert result["data"]["inventory"]["$schema"] == (
+        "schemas/codex-plugin-inventory.json"
+    )
+    assert result["data"]["inventory"]["management"]["runops_installs_plugins"] is False
+    assert result["data"]["inventory"]["delegated_capabilities"][
+        "parameter-design"
+    ] == ["mpiemses3d-context"]
+    assert [
+        plugin["name"] for plugin in result["data"]["inventory"]["recommendations"]
+    ] == [
+        "mpiemses3d-context",
+        "emout-context",
+    ]
+    assert result["data"]["inventory"]["recommendations"][0]["sources"] == [
+        "simulator:emses"
+    ]
+
+
+def test_project_plugins_reports_metadata_errors(tmp_path: Path) -> None:
+    """Incomplete plugin metadata is surfaced as MCP errors."""
+    project_root = _make_project(tmp_path)
+    (project_root / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.incomplete]\n"
+        'display_name = "Incomplete Plugin"\n',
+        encoding="utf-8",
+    )
+
+    result = tools.project_plugins(project_root=str(project_root))
+
+    assert result["status"] == "error"
+    assert result["data"]["ok"] is False
+    assert result["data"]["summary"]["errors"] == 2
+    assert [item["code"] for item in result["errors"]] == [
+        "codex_plugin_metadata_error",
+        "codex_plugin_metadata_error",
+    ]
+
+
+def test_project_plugins_strict_reports_warning_only_checks(
+    tmp_path: Path,
+) -> None:
+    """Strict mode keeps warning-only checks visible for MCP clients."""
+    project_root = _make_project(tmp_path)
+    (project_root / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.site-context]\n"
+        'display_name = "Site Context"\n'
+        'reason = "Site-local workflow guidance."\n'
+        'install_hint = "codex plugin add site-context@test"\n'
+        'visibility = "private"\n',
+        encoding="utf-8",
+    )
+
+    result = tools.project_plugins(project_root=str(project_root), strict=True)
+
+    assert result["status"] == "warning"
+    assert result["data"]["ok"] is True
+    assert result["data"]["strict_ok"] is False
+    assert result["data"]["strict"] is True
+    assert result["warnings"][0]["severity"] == "high"
+
+
+def test_project_plugins_warns_when_adapter_recommendations_cannot_be_collected(
+    tmp_path: Path,
+) -> None:
+    """MCP surfaces missing external adapters as advisory collection warnings."""
+    project_root = _make_project(tmp_path)
+    (project_root / "simulators.toml").write_text(
+        "[simulators.production]\n"
+        'adapter = "missing_external"\n'
+        'resolver_mode = "package"\n'
+        'executable = "missing-solver"\n',
+        encoding="utf-8",
+    )
+
+    result = tools.project_plugins(project_root=str(project_root))
+
+    assert result["status"] == "warning"
+    assert result["data"]["ok"] is True
+    assert result["data"]["strict_ok"] is False
+    assert result["data"]["issues"][0]["field"] == "adapter"
+    assert result["warnings"][0]["code"] == "codex_plugin_metadata_warning"
+    assert "missing_external.adapter" in result["warnings"][0]["message"]
+
+
+def test_project_doctor_reports_codex_plugin_metadata_errors(
+    tmp_path: Path,
+    monkeypatch: Any,
+) -> None:
+    """MCP doctor includes project-side Codex plugin recommendation checks."""
+    project_root = _make_project(tmp_path)
+    (project_root / "site.toml").write_text(
+        '[site]\nname = "test-site"\n'
+        "[site.codex_plugins.incomplete]\n"
+        'display_name = "Incomplete Plugin"\n',
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(tools.shutil, "which", lambda _cmd: "/usr/bin/sbatch")
+
+    result = tools.project_doctor(project_root=str(project_root))
+
+    assert result["status"] == "warning"
+    checks = {check["name"]: check for check in result["data"]["checks"]}
+    assert checks["codex_plugins"]["ok"] is False
+    assert "2 error(s)" in checks["codex_plugins"]["message"]
 
 
 def test_run_list_filters_by_status_and_tag(tmp_path: Path) -> None:

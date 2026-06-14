@@ -26,7 +26,7 @@ from typing import Any
 
 from runops import __version__
 from runops.core.codex_plugin import CodexPluginRecommendation
-from runops.harness._adapters import collect_codex_plugins as _collect_codex_plugins
+from runops.core.plugins import collect_adapter_codex_plugins
 from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 from runops.harness._skills import render_skill_files as _render_skill_files
 
@@ -261,6 +261,7 @@ def build_harness_bundle(
     project_name: str,
     simulator_names: list[str],
     *,
+    simulator_configs: dict[str, dict[str, Any]] | None = None,
     upstream_feedback: bool = True,
     knowledge_imports_path: str = "",
     include_reference_repos: bool = False,
@@ -271,6 +272,9 @@ def build_harness_bundle(
     Args:
         project_name: Project name used in CLAUDE.md / AGENTS.md headers.
         simulator_names: Simulator adapter names (e.g. ``["emses", "beach"]``).
+        simulator_configs: Optional project simulator config keyed by simulator
+            name.  When present, ``adapter = "..."`` aliases are used for
+            adapter-declared fallback recommendations.
         upstream_feedback: Include the ``.claude/rules/upstream-feedback.md``
             rule.  ``runops init --no-upstream-feedback`` sets this to False.
         knowledge_imports_path: Relative path to the rendered imports file,
@@ -302,7 +306,10 @@ def build_harness_bundle(
     )
     include_cookbook_rule = bool(simulator_names and doc_repos)
     plugin_recommendations = (
-        _collect_codex_plugins(simulator_names)
+        collect_adapter_codex_plugins(
+            simulator_names,
+            simulator_configs=simulator_configs,
+        )
         if codex_plugin_recommendations is None
         else codex_plugin_recommendations
     )

@@ -36,6 +36,13 @@
             "type": "array",
             "items": { "type": "string" },
             "description": "HPC module names to load"
+          },
+          "codex_plugins": {
+            "type": "object",
+            "description": "Simulator-scoped external Codex plugin recommendations",
+            "additionalProperties": {
+              "$ref": "codex-plugin-recommendation.json"
+            }
           }
         }
       }

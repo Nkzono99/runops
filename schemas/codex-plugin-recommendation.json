@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Codex plugin recommendation",
+  "description": "Advisory external Codex plugin recommendation metadata",
+  "type": "object",
+  "required": ["display_name", "reason", "install_hint"],
+  "properties": {
+    "display_name": {
+      "type": "string",
+      "description": "Human-readable plugin name"
+    },
+    "visibility": {
+      "type": "string",
+      "enum": ["public", "private-or-gated"],
+      "description": "Plugin visibility"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Why this plugin is recommended"
+    },
+    "capabilities": {
+      "description": "Delegated role labels handled by this plugin",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
+    "install_hint": {
+      "type": "string",
+      "description": "Manual installation command or procedure"
+    },
+    "activation_hint": {
+      "type": "string",
+      "description": "How to activate the plugin after installation"
+    }
+  },
+  "additionalProperties": true
+}

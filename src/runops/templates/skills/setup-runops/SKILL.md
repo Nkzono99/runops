@@ -56,6 +56,7 @@ project root にいるか、または親 directory に `runops.toml` がある�
 ```bash
 uvx --from runops runo context --no-json
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 `runops.toml` が見つからない場合は、まず cwd が project root から外れていないか確認する。
@@ -100,7 +101,8 @@ submit はまだしない。
 この場合:
 
 1. `uvx --from runops runo context --no-json` と
-   `uvx --from runops runo doctor` で project の現在状態を読む
+   `uvx --from runops runo doctor`、`uvx --from runops runo plugins --check`
+   で project の現在状態を読む
 2. simulator / site / launcher の不足があれば修復方針を出す
 3. `{{ skill_prefix }}setup-campaign` / `{{ skill_prefix }}new-case` /
    `{{ skill_prefix }}survey-design` を必要に応じて使う
@@ -194,7 +196,7 @@ project で `runo notes append` が使えるなら、準備段階の判断を
 
 ## 完了条件
 
-- `runo doctor` の結果を確認した
+- `runo doctor` と `runo plugins --check` の結果を確認した
 - project root と次に編集すべきファイルが明確
 - campaign / case / survey / run 生成のどこまで進めたかを説明した
 - init / setup 生成物の baseline commit が必要かどうかを案内した

@@ -18,8 +18,9 @@ description: Set up campaign.toml from a research theme description. Use after r
 # プロジェクトの現状を把握
 uvx --from runops runo context --no-json
 
-# シミュレータ固有のガイド（パラメータ名・物理的意味）
-cat CLAUDE.md   # agent_guide セクションにシミュレータ知識がある
+# 推奨 plugin と委譲 role を確認
+uvx --from runops runo plugins --check
+uvx --from runops runo plugins --json
 
 # campaign.toml のスキーマ
 uvx --from runops runo context --json
@@ -105,6 +106,9 @@ EOF
 ## 注意
 
 - 既存の `campaign.toml` の `name` と `simulator` は上書きしない（ユーザーが明示的に変更を指示した場合を除く）
-- シミュレータの agent_guide に記載されたパラメータ名を優先的に使う
+- パラメータ名・物理的意味・観測量の設計は simulator/environment plugin、
+  `.runops/knowledge/enabled/imports.md`、project materials を優先する
+- adapter の agent guide は runops 側の最小 fallback であり、完全な simulator manual
+  として扱わない
 - 物理単位は必ず `unit` に記入する
 - `reason` は将来の自分や共同研究者が読んで意図がわかるように書く

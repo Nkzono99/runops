@@ -38,6 +38,9 @@ else:
 logger = logging.getLogger(__name__)
 
 _SITE_FILE = "site.toml"
+_SITE_SCHEMA_URL = (
+    "https://raw.githubusercontent.com/Nkzono99/runops/main/schemas/site.json"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -360,17 +363,12 @@ def save_site_profile(project_root: Path, profile: SiteProfile) -> Path:
     if profile.codex_plugins:
         plugins: dict[str, Any] = {}
         for plugin in profile.codex_plugins:
-            plugins[plugin.name] = {
-                "display_name": plugin.display_name,
-                "visibility": plugin.visibility,
-                "reason": plugin.reason,
-                "install_hint": plugin.install_hint,
-                "activation_hint": plugin.activation_hint,
-            }
+            plugins[plugin.name] = plugin.to_site_mapping()
         site["codex_plugins"] = plugins
 
     site_file = project_root / _SITE_FILE
     with open(site_file, "wb") as f:
+        f.write(f"#:schema {_SITE_SCHEMA_URL}\n".encode())
         tomli_w.dump(data, f)
 
     return site_file

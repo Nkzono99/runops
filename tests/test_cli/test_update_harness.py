@@ -125,6 +125,41 @@ class TestUpdateHarnessBasic:
         assert result.exit_code == 0
         assert "HarnessOps skipped (disabled)" in result.output
 
+    def test_update_harness_includes_project_config_plugin_recommendations(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """Generated agent docs include project-wide Codex plugin recommendations."""
+        _init_project(tmp_path)
+        (tmp_path / "runops.toml").write_text(
+            '[project]\nname = "plugin-project"\n'
+            "\n[project.codex_plugins.analysis-context]\n"
+            'display_name = "Analysis Context"\n'
+            'reason = "Team analysis workflow guidance."\n'
+            'install_hint = "codex plugin add analysis-context@project"\n'
+            'capabilities = ["analysis-workflow", "handoff"]\n'
+            "\n[harness]\nupstream_feedback = true\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--force",
+                "--only",
+                "AGENTS.md",
+            ],
+        )
+
+        assert result.exit_code == 0
+        agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
+        assert "Analysis Context" in agents
+        assert "`analysis-context`" in agents
+        assert "委譲役割: analysis-workflow, handoff" in agents
+
     def test_creates_harness_lock(self, tmp_path: Path) -> None:
         """init creates .runops/harness.lock with template hashes."""
         _init_project(tmp_path)

@@ -32,6 +32,7 @@ from runops.cli.notes import append as notes_append
 from runops.cli.notes import archive as notes_archive
 from runops.cli.notes import list_notes as notes_list
 from runops.cli.notes import show as notes_show
+from runops.cli.plugins import plugins
 from runops.cli.regenerate import regenerate
 from runops.cli.retry import retry
 from runops.cli.setup import setup
@@ -174,6 +175,7 @@ def _build_app(name: str) -> typer.Typer:
     cli_app.add_typer(knowledge_app, name="knowledge")
     cli_app.add_typer(mcp_app, name="mcp")
     cli_app.command("context")(context)
+    cli_app.command("plugins")(plugins)
     cli_app.command("lint")(lint)
     cli_app.add_typer(case_app, name="case")
     cli_app.add_typer(runs_app, name="runs")

@@ -14,6 +14,12 @@ from pathlib import Path
 from typing import Any
 
 import runops
+from runops.core.codex_plugin import (
+    CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,
+    CODEX_PLUGIN_INVENTORY_SCHEMA_PATH,
+    CODEX_PLUGIN_INVENTORY_SCHEMA_VERSION,
+    codex_plugin_management_policy,
+)
 from runops.core.exceptions import SimctlError
 
 logger = logging.getLogger(__name__)
@@ -88,6 +94,11 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
         project_root, diagnostics, section_status
     )
 
+    # -- External Codex plugins --
+    ctx["codex_plugins"] = _collect_codex_plugins(
+        project_root, diagnostics, section_status
+    )
+
     # -- Available actions --
     try:
         from runops.core.actions import list_actions
@@ -117,6 +128,7 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
             "recent_failures",
             "facts",
             "knowledge",
+            "codex_plugins",
             "available_actions",
         )
     }
@@ -548,3 +560,79 @@ def _collect_knowledge_paths(
         logger.debug("Failed to collect knowledge integration details", exc_info=True)
 
     return result
+
+
+def _collect_codex_plugins(
+    root: Path,
+    diagnostics: list[dict[str, str]],
+    section_status: dict[str, str],
+) -> dict[str, Any]:
+    """Collect advisory Codex plugin recommendations for the project."""
+    try:
+        from runops.core.plugins import (
+            build_project_codex_plugin_inventory,
+            check_codex_plugin_inventory,
+        )
+        from runops.core.project import load_project
+
+        inventory = build_project_codex_plugin_inventory(load_project(root))
+        check_result = check_codex_plugin_inventory(inventory)
+        payload = check_result.to_dict()
+        issue_level = "error" if not check_result.ok else "warning"
+        if check_result.issues:
+            _record_diagnostic(
+                diagnostics,
+                section_status,
+                section="codex_plugins",
+                level=issue_level,
+                message=(
+                    "Codex plugin metadata has "
+                    f"{payload['summary']['errors']} error(s) and "
+                    f"{payload['summary']['warnings']} warning(s); "
+                    "inspect runo plugins --check."
+                ),
+            )
+        inventory_payload = payload["inventory"]
+        return {
+            "schema_version": payload["schema_version"],
+            "inventory_schema": inventory_payload["$schema"],
+            "check_result_schema": payload["$schema"],
+            "ok": payload["ok"],
+            "strict_ok": payload["strict_ok"],
+            "summary": payload["summary"],
+            "simulators": inventory_payload["simulators"],
+            "site": inventory_payload["site"],
+            "management": inventory_payload["management"],
+            "recommendations": inventory_payload["recommendations"],
+            "delegated_capabilities": inventory_payload["delegated_capabilities"],
+            "collection_issues": inventory_payload["collection_issues"],
+            "issues": payload["issues"],
+        }
+    except Exception as exc:
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="codex_plugins",
+            message=f"Failed to collect Codex plugin recommendations: {exc}",
+            level="warning",
+        )
+        logger.debug("Failed to collect Codex plugin recommendations", exc_info=True)
+        return {
+            "schema_version": CODEX_PLUGIN_INVENTORY_SCHEMA_VERSION,
+            "inventory_schema": CODEX_PLUGIN_INVENTORY_SCHEMA_PATH,
+            "check_result_schema": CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,
+            "ok": False,
+            "strict_ok": False,
+            "summary": {
+                "recommendations": 0,
+                "errors": 0,
+                "warnings": 1,
+            },
+            "simulators": [],
+            "site": "",
+            "management": codex_plugin_management_policy(),
+            "recommendations": [],
+            "delegated_capabilities": {},
+            "collection_issues": [],
+            "issues": [],
+        }

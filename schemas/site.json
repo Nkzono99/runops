@@ -1,0 +1,80 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "site.toml",
+  "description": "HPC site profile and external Codex plugin recommendations",
+  "type": "object",
+  "required": ["site"],
+  "properties": {
+    "site": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Site identifier"
+        },
+        "resource_style": {
+          "type": "string",
+          "enum": ["standard", "rsc"],
+          "description": "SBATCH resource directive style"
+        },
+        "modules": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Site-wide HPC modules"
+        },
+        "stdout": {
+          "type": "string",
+          "description": "SBATCH stdout path format"
+        },
+        "stderr": {
+          "type": "string",
+          "description": "SBATCH stderr path format"
+        },
+        "extra_sbatch": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Additional raw SBATCH directives"
+        },
+        "setup_commands": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shell commands run before the simulator command"
+        },
+        "env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Environment variables exported in job scripts"
+        },
+        "simulators": {
+          "type": "object",
+          "description": "Per-simulator site settings",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "modules": {
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "Additional modules for this simulator"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "codex_plugins": {
+          "type": "object",
+          "description": "Site-scoped external Codex plugin recommendations",
+          "additionalProperties": {
+            "$ref": "codex-plugin-recommendation.json"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "launcher": {
+      "type": "object",
+      "description": "Bundled site launcher defaults used by runo init",
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

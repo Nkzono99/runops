@@ -31,6 +31,10 @@ AI エージェントがシミュレーションを自律的に行うための�
 Simulator / site が外部 Codex plugin を推薦する場合、`runops init` / `runops setup`
 と生成 harness に導線を出す。plugin install / enable はユーザー local な Codex
 環境の操作であり、runops project state には含めない。
+開発ハーネス内の `.claude/agents/emses.md`, `.claude/agents/beach.md`,
+`.agents/skills/emses`, `.agents/skills/beach` は runops 側の薄い橋渡しに保ち、
+シミュレータ固有の長文 context は MPIEMSES3D / emout / BEACH などの外部 plugin
+へ委譲する。
 
 ```bash
 runops knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git

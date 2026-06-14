@@ -10,6 +10,7 @@ from runops.core.exceptions import SimctlError
 from runops.core.lint.analysis import check_analysis
 from runops.core.lint.knowledge import check_knowledge
 from runops.core.lint.models import LintContext, LintIssue, LintReport
+from runops.core.lint.plugins import check_plugins
 from runops.core.lint.runs import check_provenance, check_runs
 from runops.core.lint.structure import check_structure
 
@@ -54,6 +55,11 @@ _CHECKS: tuple[RegisteredLintCheck, ...] = (
         scope="knowledge",
         description="Research agenda and curated knowledge auditability.",
         check=check_knowledge,
+    ),
+    RegisteredLintCheck(
+        scope="plugins",
+        description="Codex plugin recommendation metadata.",
+        check=check_plugins,
     ),
 )
 

@@ -13,6 +13,13 @@ Project-level configuration. One per project root.
 name = "emses-sheath"           # Required. Project name
 description = "EMSES sheath simulations"  # Optional.
 version = "1.0"                 # Optional.
+
+[project.codex_plugins.analysis-context]
+display_name = "Analysis Context"
+visibility = "private-or-gated"
+reason = "Project-specific analysis and handoff workflow guidance."
+capabilities = ["analysis-workflow", "handoff"]
+install_hint = "codex plugin add analysis-context@project"
 ```
 
 | Field | Type | Required | Description |
@@ -20,6 +27,29 @@ version = "1.0"                 # Optional.
 | `project.name` | string | Yes | Project identifier |
 | `project.description` | string | No | Human-readable description |
 | `project.version` | string | No | Project version |
+| `project.codex_plugins` | table | No | Project-wide Codex plugin recommendations not tied to one simulator or site. |
+
+### `[project.codex_plugins.<plugin>]`
+
+project 全体に紐づく外部 Codex plugin 推薦。解析 workflow、チーム内
+handoff、project 固有の reference plugin など、simulator / site どちらにも
+属さない導線を置く。runops は plugin を自動 install / enable しない。
+`runo plugins`、`runo setup` の出力、`runo update-harness` で再生成される
+`AGENTS.md` / `CLAUDE.md` はこの project-wide 推薦を同じ inventory として扱う。
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string | 表示名 |
+| `visibility` | string | `"public"` または `"private-or-gated"` |
+| `reason` | string | 推奨理由 |
+| `capabilities` | string[] / string | plugin に委譲する役割ラベル。配列を推奨し、単一 role は文字列でも可。例: `"input-review"`, `"run-diagnose"` |
+| `install_hint` | string | 導入コマンドまたは手順 |
+| `activation_hint` | string | install 後の有効化・再起動手順 |
+
+同じ plugin 名が adapter、simulator、project、site の複数スコープから推薦された場合、
+表示名、理由、導入手順、visibility は最初の推薦を使い、`source` と
+`capabilities` は統合される。project / site 側は adapter を編集せずに追加の委譲
+役割だけを載せられる。
 
 ### `[knowledge]` section (optional)
 
@@ -108,6 +138,23 @@ executable = "beach"
 | `source_repo` | string | No | Source repository path (`local_source` mode only) |
 | `build_command` | string | No | Build command (`local_source` mode only) |
 | `modules` | string[] | No | Simulator-specific HPC modules (e.g. hdf5, fftw). Site-common modules (intel, intelmpi) are defined in `launchers.toml`. Both are merged in job.sh. |
+| `codex_plugins` | table | No | Project-side Codex plugin recommendations for this simulator. Used when workflow guidance lives outside runops / adapter packages. |
+
+### `[simulators.<name>.codex_plugins.<plugin>]`
+
+simulator 設定に紐づく外部 Codex plugin 推薦。Adapter の `codex_plugins()` を
+変更できない project 固有 workflow や、外部 adapter package が未導入の時にも、
+推薦 metadata を project 側で明示できる。runops は plugin を自動 install / enable
+しない。
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `display_name` | string | 表示名 |
+| `visibility` | string | `"public"` または `"private-or-gated"` |
+| `reason` | string | 推奨理由 |
+| `capabilities` | string[] / string | plugin に委譲する役割ラベル。配列を推奨し、単一 role は文字列でも可。例: `"parameter-design"`, `"output-analysis"`, `"cookbook"` |
+| `install_hint` | string | 導入コマンドまたは手順 |
+| `activation_hint` | string | install 後の有効化・再起動手順 |
 
 ### resolver_mode
 
@@ -255,6 +302,7 @@ activation_hint = "Start a new Codex thread after installing."
 | `display_name` | string | 表示名 |
 | `visibility` | string | `"public"` または `"private-or-gated"` |
 | `reason` | string | 推奨理由 |
+| `capabilities` | string[] / string | plugin に委譲する役割ラベル。配列を推奨し、単一 role は文字列でも可。例: `"host-role-routing"`, `"slurm-jobs"` |
 | `install_hint` | string | 導入コマンドまたは手順 |
 | `activation_hint` | string | install 後の有効化・再起動手順 |
 
@@ -1028,7 +1076,15 @@ All TOML files support schema validation via `#:schema` comments:
 ...
 ```
 
-Schema files: `schemas/runops.json`, `schemas/simulators.json`, `schemas/launchers.json`, `schemas/case.json`, `schemas/survey.json`, `schemas/manifest.json`, `schemas/campaign.json`
+Schema files: `schemas/runops.json`, `schemas/simulators.json`,
+`schemas/launchers.json`, `schemas/site.json`, `schemas/case.json`,
+`schemas/survey.json`, `schemas/manifest.json`, `schemas/campaign.json`.
+Codex plugin 推薦 metadata は共通 sub-schema
+`schemas/codex-plugin-recommendation.json` を参照する。
+`runo plugins --json` / MCP `runops.project.plugins` の JSON 出力 contract は
+`schemas/codex-plugin-inventory.json` と
+`schemas/codex-plugin-check-result.json` に定義する。JSON payload は `$schema`
+field に対応する schema path を含む。
 
 ---
 

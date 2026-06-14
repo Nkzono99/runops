@@ -10,7 +10,8 @@
 | `runops setup [URL] [--with-refs]` | 既存プロジェクトを clone + 環境セットアップ (refs mirror は opt-in) |
 | `runops doctor` | 環境検査 |
 | `runops context --json` | Agent 向け project context を JSON で取得 |
-| `runops lint [PATH] [--scope ...]` | project state の health check |
+| `runops plugins [--json] [--check] [--strict]` | project / simulator / site に基づく推奨 Codex plugins を表示・メタデータ検査 |
+| `runops lint [PATH] [--scope ...]` | project state と推奨 plugin metadata の health check |
 | `runops migrate list/show/apply` | project-state migration の確認・適用 |
 | `runops mcp serve --transport stdio` | MCP provider を stdio で起動 |
 | `runops mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |
