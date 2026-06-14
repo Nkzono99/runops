@@ -507,6 +507,7 @@ class TestInit:
         codex_skills_dir = tmp_path / ".agents" / "skills"
         assert (skills_dir / "setup-env" / "SKILL.md").exists()
         assert (skills_dir / "setup-runops" / "SKILL.md").exists()
+        assert (skills_dir / "setup-plugins" / "SKILL.md").exists()
         assert (skills_dir / "survey-design" / "SKILL.md").exists()
         assert (skills_dir / "check-status" / "SKILL.md").exists()
         assert (skills_dir / "analyze" / "SKILL.md").exists()
@@ -514,6 +515,7 @@ class TestInit:
         assert (skills_dir / "runops-reference" / "SKILL.md").exists()
         assert (codex_skills_dir / "setup-env" / "SKILL.md").exists()
         assert (codex_skills_dir / "setup-runops" / "SKILL.md").exists()
+        assert (codex_skills_dir / "setup-plugins" / "SKILL.md").exists()
         assert (codex_skills_dir / "summarize-script" / "SKILL.md").exists()
         assert (codex_skills_dir / "runops-reference" / "SKILL.md").exists()
         setup_content = (skills_dir / "setup-env" / "SKILL.md").read_text(
@@ -524,6 +526,7 @@ class TestInit:
             codex_skills_dir / "setup-runops" / "SKILL.md"
         ).read_text(encoding="utf-8")
         assert "$setup-env" in setup_runops_content
+        assert "$setup-plugins" in setup_runops_content
         assert "$setup-campaign" in setup_runops_content
         assert "project は生成済み" in setup_runops_content
         assert "状態確認だけで応答を終えない" in setup_runops_content
@@ -532,6 +535,16 @@ class TestInit:
         assert 'git commit -m "chore: scaffold runops project"' in setup_runops_content
         assert "次に頼みやすい形で 2-4 個" in setup_runops_content
         assert "{{ skill_prefix }}" not in setup_runops_content
+        setup_plugins_content = (
+            codex_skills_dir / "setup-plugins" / "SKILL.md"
+        ).read_text(encoding="utf-8")
+        assert "runo plugins --check" in setup_plugins_content
+        assert "runo plugins --json" in setup_plugins_content
+        assert "Codex hooks は experimental" in setup_plugins_content
+        assert "plugin-provided hook" in setup_plugins_content
+        assert "runops project 側で hook を自作しない" in setup_plugins_content
+        assert "$setup-runops" in setup_plugins_content
+        assert "{{ skill_prefix }}" not in setup_plugins_content
         analyze_content = (skills_dir / "analyze" / "SKILL.md").read_text(
             encoding="utf-8"
         )

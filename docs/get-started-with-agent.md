@@ -24,6 +24,9 @@ KUDPC HPC plugin、`beach` では BEACH Context plugin が案内されます。
 解析 workflow や handoff plugin も生成 harness に反映できます。
 runops は plugin を自動 install せず、
 ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
+生成済み project では、Codex なら `$setup-plugins`、Claude Code なら
+`/setup-plugins` を使うと、Agent が `install_hint` / `activation_hint` を読み、
+可能な範囲で install / enable / plugin-provided hook 導線を整えます。
 既存 project で推薦を確認したい場合は `runo plugins`、agent や外部 tool から
 読む場合は `runo plugins --json` を使います。`runo plugins --check` は推薦
 メタデータの欠落を検査しますが、user-local な plugin install 状態は検査しません。
@@ -46,6 +49,8 @@ runops は plugin を自動 install せず、
 uvx --from runops runo init
 uvx --from runops runo doctor
 uvx --from runops runo plugins --check
+# Codex: $setup-plugins
+# Claude Code: /setup-plugins
 ```
 
 既存プロジェクトをセットアップする場合:
@@ -55,6 +60,8 @@ uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 uvx --from runops runo doctor
 uvx --from runops runo plugins --check
+# Codex: $setup-plugins
+# Claude Code: /setup-plugins
 ```
 
 `runo init` がディレクトリ構造と初期ファイルを作ります。
@@ -68,6 +75,9 @@ Experiment Layer の `campaign.toml`・`case.toml`・`survey.toml` と、
 Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴みやすくなります。
 
 ## 最初の依頼の出し方
+
+`setup-plugins` は推奨 plugin と plugin-provided hook 導線を整えるための任意ステップです。
+plugin が整ったら、次に `setup-runops` で project の聞き取りへ進みます。
 
 `setup-runops` は、**`runo init` / `runo setup` が終わった後**に使う
 開始時の聞き取り用 SKILL です。最初のプロンプトでは、細かい TOML や CLI

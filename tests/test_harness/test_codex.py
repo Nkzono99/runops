@@ -97,6 +97,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".codex/rules/runops.rules" in bundle.files
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
     assert ".agents/skills/setup-runops/SKILL.md" in bundle.files
+    assert ".agents/skills/setup-plugins/SKILL.md" in bundle.files
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
     assert ".agents/skills/summarize-script/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
@@ -128,6 +129,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "$migrate-runops" in agents
     assert "$python-package-refactor" in agents
     assert "$setup-runops" in agents
+    assert "$setup-plugins" in agents
     assert "active question、current decision、paused/killed" in agents
     # Skills share the same frontmatter, but use each agent's native
     # invocation syntax in the body.
@@ -165,19 +167,27 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "hops add-failure" in codex_feedback
     assert "hops feedback export --target runops --sanitize" in codex_feedback
     codex_setup = bundle.files[".agents/skills/setup-runops/SKILL.md"]
+    codex_setup_plugins = bundle.files[".agents/skills/setup-plugins/SKILL.md"]
     claude_setup = bundle.files[".claude/skills/setup-runops/SKILL.md"]
     assert "`$setup-env`" in codex_setup
     assert "`$setup-campaign`" in codex_setup
+    assert "`$setup-plugins`" in codex_setup
     assert "project は生成済み" in codex_setup
     assert "状態確認だけで応答を終えない" in codex_setup
     assert "必ず「セットアップ後に行うこと」" in codex_setup
     assert "project の状態はこちらで確認します" in codex_setup
     assert "doctor で未解決の項目はありますか" not in codex_setup
     assert 'git commit -m "chore: scaffold runops project"' in codex_setup
+    assert "runo plugins --json" in codex_setup_plugins
+    assert "Codex hooks は experimental" in codex_setup_plugins
+    assert "plugin-provided hook" in codex_setup_plugins
+    assert "runops project 側で hook を自作しない" in codex_setup_plugins
+    assert "`$setup-runops`" in codex_setup_plugins
     assert "`/setup-env`" in claude_setup
     assert "状態確認だけで応答を終えない" in claude_setup
     assert 'git commit -m "chore: scaffold runops project"' in claude_setup
     assert "{{ skill_prefix }}" not in codex_setup
+    assert "{{ skill_prefix }}" not in codex_setup_plugins
 
 
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:

@@ -59,6 +59,9 @@ uvx --from runops runo doctor
 uvx --from runops runo plugins --check
 ```
 
+推奨 plugin の導入・有効化・plugin-provided hook 設定まで整える必要がある場合は、
+`{{ skill_prefix }}setup-plugins` を使ってから campaign / case 設計へ進む。
+
 `runops.toml` が見つからない場合は、まず cwd が project root から外れていないか確認する。
 `uvx` が使えない、`.venv/` が壊れているなど実行環境の問題なら、短く状況を説明して
 `{{ skill_prefix }}setup-env` の内容に従って環境を修復する。
@@ -103,10 +106,11 @@ submit はまだしない。
 1. `uvx --from runops runo context --no-json` と
    `uvx --from runops runo doctor`、`uvx --from runops runo plugins --check`
    で project の現在状態を読む
-2. simulator / site / launcher の不足があれば修復方針を出す
-3. `{{ skill_prefix }}setup-campaign` / `{{ skill_prefix }}new-case` /
+2. 推奨 plugin / plugin-provided hooks の準備が必要なら `{{ skill_prefix }}setup-plugins` を使う
+3. simulator / site / launcher の不足があれば修復方針を出す
+4. `{{ skill_prefix }}setup-campaign` / `{{ skill_prefix }}new-case` /
    `{{ skill_prefix }}survey-design` を必要に応じて使う
-4. submit はしない
+5. submit はしない
 
 ## project として動かない場合
 
@@ -156,11 +160,12 @@ bootstrap が終わったら、この skill の主経路に戻り、project の�
 1. 現在の状態を短く要約する: project root、simulator、doctor 結果、未設定項目
 2. init / setup で生成された scaffold が未 commit なら、研究作業に入る前に
    baseline commit を提案する
-3. 研究テーマがあるなら `{{ skill_prefix }}setup-campaign` で `campaign.toml` を整える
-4. base input があるなら `{{ skill_prefix }}new-case` で case を作る
-5. independent variables が見えているなら `{{ skill_prefix }}survey-design` で survey を作る
-6. run 生成や submit は、対象・資源・確認条件を示してから進める
-7. runops 自体の不満点や改善案が出たら、`{{ skill_prefix }}feedback-runops`
+3. 推奨 plugin / plugin-provided hooks の準備が残っていれば `{{ skill_prefix }}setup-plugins` で整える
+4. 研究テーマがあるなら `{{ skill_prefix }}setup-campaign` で `campaign.toml` を整える
+5. base input があるなら `{{ skill_prefix }}new-case` で case を作る
+6. independent variables が見えているなら `{{ skill_prefix }}survey-design` で survey を作る
+7. run 生成や submit は、対象・資源・確認条件を示してから進める
+8. runops 自体の不満点や改善案が出たら、`{{ skill_prefix }}feedback-runops`
    で候補一覧、`{{ skill_prefix }}feedback-runops 不満点・改善案` で
    HarnessOps record と issue 下書きを作る
 
@@ -179,6 +184,7 @@ git commit -m "chore: scaffold runops project"
 ```text
 次はこの順で進めるとよいです。
 - campaign.toml を研究テーマから整理して。
+- {{ skill_prefix }}setup-plugins 推奨 plugin と plugin-provided hooks の導入状態を整えて。
 - この入力ファイルをベースに case を作って。
 - 照射角を振る survey.toml を作って。submit はまだしない。
 - {{ skill_prefix }}feedback-runops setup 中に気になった改善点
@@ -197,6 +203,7 @@ project で `runo notes append` が使えるなら、準備段階の判断を
 ## 完了条件
 
 - `runo doctor` と `runo plugins --check` の結果を確認した
+- 必要な場合は `{{ skill_prefix }}setup-plugins` で plugin / plugin-provided hook 導線を整理した
 - project root と次に編集すべきファイルが明確
 - campaign / case / survey / run 生成のどこまで進めたかを説明した
 - init / setup 生成物の baseline commit が必要かどうかを案内した
