@@ -1,7 +1,13 @@
 # Simulator Cookbook Spec (v0.2)
 
-シミュレーションリポジトリ側で、AI Agent や管理ツールが参照できる
+simulator 側の plugin / knowledge source / 任意 mirror が、AI Agent や管理ツールに
 ツール非依存の入力例・設定カタログを提供するための規約。
+
+plugin-first な運用では、cookbook の本文と長文 workflow は simulator 側 Codex plugin
+または明示的 knowledge source が提供する。runops 本体は cookbook 本文を内包せず、
+`runo plugins --json` の `delegated_capabilities["cookbook"]` と推薦 metadata で
+委譲先を案内する。`refs/` は offline 利用、private repo、開発中 checkout を近くに
+置くための fallback mirror として扱う。
 
 ## 目的
 
@@ -23,7 +29,7 @@
 ## ディレクトリ構成
 
 ```text
-repo/
+provider-repo/
   cookbook/
     COOKBOOK.md              # 管理ガイド (人間・保守 Agent 向け)
     index.toml              # discovery 用目録
@@ -59,10 +65,12 @@ repo/
 
 ### Agent / ツール
 
-1. `index.toml` で全 entry を一覧し、`tags` / `recommended_for` / `status` で候補を絞る
-2. 候補 entry の `meta.toml` で詳細を確認
-3. `input.toml` / `fragment.toml` の実ファイルを読む
-4. 必要なら `README.md` で注意事項を確認
+1. runops project では `runo plugins --json` の `delegated_capabilities["cookbook"]` で委譲先を確認する
+2. simulator/environment plugin、または明示的 knowledge source が提供する cookbook guide を読む
+3. raw cookbook tree を直接読む場合は `index.toml` で全 entry を一覧し、`tags` / `recommended_for` / `status` で候補を絞る
+4. 候補 entry の `meta.toml` で詳細を確認
+5. `input.toml` / `fragment.toml` の実ファイルを読む
+6. 必要なら `README.md` で注意事項を確認
 
 ### 人間 / 保守者
 
@@ -414,7 +422,8 @@ cookbook は「何をどう使うか」だけに集中する。
 
 ## COOKBOOK.md テンプレート
 
-以下は simulator repo の `cookbook/COOKBOOK.md` に置くテンプレート。
+以下は simulator repo、simulator plugin の context repository、または明示的
+knowledge source の `cookbook/COOKBOOK.md` に置くテンプレート。
 `{...}` はリポジトリに合わせて書き換える。
 
 ````markdown
@@ -437,10 +446,11 @@ cookbook/
 
 ### Agent / ツール
 
-1. `index.toml` を読んで、`tags` / `recommended_for` / `status` で候補を絞る
-2. 候補 entry の `meta.toml` で用途と適用条件を確認する
-3. `input.toml` (または `fragment.toml`) を読む
-4. 必要なら `README.md` で注意事項を確認する
+1. plugin / knowledge source の guide でこの cookbook の位置づけを確認する
+2. `index.toml` を読んで、`tags` / `recommended_for` / `status` で候補を絞る
+3. 候補 entry の `meta.toml` で用途と適用条件を確認する
+4. `input.toml` (または `fragment.toml`) を読む
+5. 必要なら `README.md` で注意事項を確認する
 
 ### 人間
 

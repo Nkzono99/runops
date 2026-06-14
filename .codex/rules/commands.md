@@ -18,11 +18,13 @@
 | `runo mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |
 | `runo mcp check` | MCP registry / safety contract の軽量検査 |
 | `runo mcp tools --json` | MCP tool metadata を JSON で表示 |
+| `runo mcp resources --json` | MCP resources metadata を JSON で表示 (現状は空) |
+| `runo mcp prompts --json` | MCP prompts metadata を JSON で表示 (現状は空) |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
 | `runo update` | シミュレータパッケージのアップグレード |
-| `runo update-harness` | ハーネスファイル再生成 |
+| `runo update-harness [--plan] [--apply-chain]` | ハーネスファイル再生成 / versioned chain 更新 |
 | `runo update-refs` | 任意 refs mirror 更新 + ナレッジインデックス再生成 |
 
 ## Case / Run 操作

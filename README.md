@@ -50,7 +50,8 @@ project state の全体像は [docs/layers/README.md](docs/layers/README.md) に
 
 Agent が主に行うこと:
 
-- project context、既存 notes、materials、refs、environment を読む
+- project context、推奨 plugin、既存 notes、materials、environment を読む
+- 必要な場合だけ、明示的 knowledge source や任意の `refs/` fallback mirror を参照する
 - `campaign.toml`、case、survey の草案を作る
 - run 生成、submit、sync、status、log、analysis を runops 経由で進める
 - `notes/YYYY-MM-DD.md`、`notes/reports/`、`research/agenda.md` を更新する
@@ -104,7 +105,7 @@ project/
   notes/                 # append-only lab notebook と refined reports
   research/agenda.md     # 現在の研究判断
   materials/             # papers, manuals, figures, snippets
-  refs/                  # simulator docs / external knowledge sources
+  refs/                  # optional fallback mirrors / external knowledge mounts
   .runops/               # environment, generated Agent context, facts
   .claude/ .agents/ .codex/
                          # Agent harness, skills, rules, permissions
@@ -132,6 +133,7 @@ Agent は確認前に、対象 run、queue、資源量、想定 core-hour、変�
 ```bash
 uvx --from runops runo init
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 既存 project:
@@ -140,6 +142,7 @@ uvx --from runops runo doctor
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 ここまで終わったら、CLI を順に叩くのではなく Agent に研究内容を渡します。
@@ -169,7 +172,7 @@ uv run mypy src/
 - [Execution Kernel](docs/layers/execution-kernel.md) — run / submit / sync / manifest
 - [解析層](docs/layers/analysis.md) — 解析・可視化成果物の運用
 - [研究判断層](docs/layers/research.md) — `research/agenda.md`
-- [知識層](docs/layers/knowledge.md) — notes / materials / refs / knowledge
+- [知識層](docs/layers/knowledge.md) — plugin / notes / materials / knowledge / refs fallback
 - [ハーネス層](docs/layers/harness.md) — Agent instructions / skills / rules
 - [Upstream 連携層](docs/layers/upstream.md) — local patch / feedback / PR
 - [Project health check](docs/project-health.md) — `runo lint` による検査

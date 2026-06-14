@@ -20,16 +20,18 @@ description: "Reflect code changes into documentation. Scan recent commits or st
 | `.claude/rules/architecture.md` | アーキテクチャ原則 | レイヤ構造変更時 |
 | `docs/toml-reference.md` | TOML 設定リファレンス | case.toml / survey.toml 等のフィールド追加時 |
 | `docs/extending.md` | 拡張ガイド | Adapter / Launcher の追加方法変更時 |
-| `docs/project-flow.md` | プロジェクトフロー | ワークフロー変更時 |
+| `docs/agent-user-guide.md` / `docs/get-started-with-agent.md` | Agent 向けワークフロー | plugin 委譲・初期導線変更時 |
+| `docs/layers/*.md` | レイヤ別設計・運用 | knowledge / harness / interface 変更時 |
 | `src/runops/sites/*.md` | サイト固有ドキュメント | サイト機能追加・制限事項更新時 |
 
 ### プロジェクト側ハーネス (runops ユーザー向け)
 
 | テンプレート | 内容 | 更新タイミング |
 |------------|------|---------------|
-| `src/runops/templates/agent.md` | プロジェクト側 CLAUDE.md | コマンド体系変更時 |
-| `src/runops/templates/scaffold/rules/runops-workflow.md` | ワークフロー rule | コマンド追加時 |
-| `src/runops/templates/scaffold/rules/cookbook.md` | cookbook | 頻出パターン追加時 |
+| `src/runops/templates/harness/codex/AGENTS.md.j2` | プロジェクト側 AGENTS.md | コマンド体系変更時 |
+| `src/runops/templates/harness/claude/CLAUDE.md.j2` | プロジェクト側 CLAUDE.md | コマンド体系変更時 |
+| `src/runops/templates/harness/shared/rules/*.md.j2` | 共通 rule | ワークフロー・cookbook 変更時 |
+| `src/runops/templates/skills/*/SKILL.md` | プロジェクト側スキル | 定型作業・コマンド変更時 |
 
 ## 手順
 
@@ -51,7 +53,7 @@ git diff --stat
 |-----------|---------|
 | CLI オプション追加・変更 | `commands.md`, `toml-reference.md` |
 | TOML フィールド追加 | `toml-reference.md` |
-| 新スキル追加 | プロジェクト側テンプレートの CLAUDE.md (スキル一覧があれば) |
+| 新スキル追加 | プロジェクト側テンプレートの AGENTS.md / CLAUDE.md (スキル一覧があれば) |
 | サイト固有の変更 | `src/runops/sites/<site>.md` |
 | Adapter / Launcher 追加 | `docs/extending.md` |
 | アーキテクチャ変更 | `architecture.md` |
@@ -70,5 +72,5 @@ git diff --stat
 
 - ドキュメントの書き方や文体は既存部分に合わせる
 - 日本語ドキュメントと英語ドキュメントの両方を更新する
-- ハーネス二重構造に注意: 開発者向け (`.claude/`) とプロジェクト側 (`src/runops/templates/`) は別物
+- ハーネス二重構造に注意: 開発者向け (`.claude/`, `.codex/`, `.agents/skills/`) とプロジェクト側 (`src/runops/templates/`) は別物
 - `AGENTS.md` / `CLAUDE.md` は 150 行程度を目安に短く保つ。長いコマンド表は rules、定型手順は skills に置く
