@@ -19,6 +19,7 @@ project 側では `.runops/knowledge/runops/agent-user-guide.md` と
 | version 確認 | `runo --version` |
 | プロジェクト状況把握 | `runo context --json` (`research_agenda` / latest note を含む) |
 | 推奨 plugin metadata 確認 | `runo plugins --check` / `runo plugins --json` |
+| 推奨 plugin 導入補助 | Codex: `$setup-plugins` / Claude Code: `/setup-plugins` |
 | project health check | `runo lint --scope structure,analysis,knowledge,plugins` |
 | case テンプレート生成 | `runo case new <name>` |
 | 最小 case テンプレート生成 | `runo case new <name> --minimal` |
@@ -138,8 +139,10 @@ runo notes show latest | head -100
 
 ## ハーネスのガード
 
-`runo init` は `.claude/settings.json` と `.claude/hooks/` も生成し、
-Claude Code 向けに project 内の保護ルールを設定する。
+`runo init` は `.claude/settings.json` と `.claude/rules/` を生成し、
+Claude Code 向けに project 内の保護ルールを設定する。PreToolUse hook script は
+既定では生成しない。plugin が hook を提供する場合だけ、その plugin の手順に従って
+別途有効化する。
 
 - 直接編集してよいのは主に `campaign.toml`、`cases/**`、`runs/**/survey.toml`、通常の docs
 - 直接編集してはいけないのは `runs/**/manifest.toml`、`input/**`、`submit/**`、`work/**`、`SITE.md`

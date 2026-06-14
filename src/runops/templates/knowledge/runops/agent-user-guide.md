@@ -33,6 +33,8 @@ project-local skill を参照する。
 - `.runops/knowledge/` は生成済み Agent context であり、手で整形しない
 - simulator cookbook や長文 workflow は推奨 Codex plugin / explicit knowledge
   source を優先し、`refs/` mirror は存在する場合だけ fallback として使う
+- 推奨 plugin の install / enable / plugin-provided hook 導線を整える必要があれば
+  `{{ skill_prefix }}setup-plugins` を使う
 
 ## runops 自体の確認
 

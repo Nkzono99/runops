@@ -173,6 +173,7 @@ class TestUpdateHarnessBasic:
         assert ".codex/config.toml" in lock
         assert ".codex/rules/runops.rules" in lock
         assert ".agents/skills/new-case/SKILL.md" in lock
+        assert ".agents/skills/setup-plugins/SKILL.md" in lock
         assert ".agents/skills/patch-runops/SKILL.md" in lock
         assert ".agents/skills/python-package-refactor/SKILL.md" in lock
         assert (
