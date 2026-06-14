@@ -73,10 +73,11 @@ Harness Layer に置くもの:
 
 1. project root の `AGENTS.md` / `CLAUDE.md`
 2. directory-specific `AGENTS.md` / `CLAUDE.md`
-3. relevant skill
-4. relevant layer doc under `docs/layers/`
-5. `.runops/knowledge/enabled/imports.md` と `.runops/knowledge/runops/`
-6. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
+3. `runo plugins --json` の `delegated_capabilities` と該当 simulator/environment plugin skill
+4. relevant project-local skill
+5. relevant layer doc under `docs/layers/`
+6. `.runops/knowledge/enabled/imports.md` と `.runops/knowledge/runops/`
+7. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
 
 ## 他レイヤとの関係
 

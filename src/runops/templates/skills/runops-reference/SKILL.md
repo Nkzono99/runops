@@ -16,6 +16,8 @@ project 側で実行するときの標準形は `uvx --from runops runo <command
 
 ```bash
 runo context --json      # project / campaign / runs / failures の概要
+runo plugins --check     # 推薦 plugin metadata と導入状態を確認
+runo plugins --json      # delegated_capabilities を含む plugin payload
 runo lint                # project state の health check
 runo lint --scope structure,analysis,knowledge,plugins
 runo runs list           # run 一覧

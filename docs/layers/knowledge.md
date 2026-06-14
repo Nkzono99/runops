@@ -4,11 +4,11 @@ AI エージェントがシミュレーション実行・解析を自律的に�
 
 ## 概要
 
-runops の知識層は 4 つのドメインで構成される:
+runops の知識層は 5 つのドメインで構成される:
 
 | ドメイン | 内容 | 管理場所 | 更新契機 |
 |----------|------|----------|---------|
-| **シミュレータ知識** | パラメータスキーマ、物理的制約、安定性条件、長文 Agent context | simulator/environment plugin, Adapter metadata, `.runops/knowledge/`, 任意の `refs/` mirror | plugin install/update, Adapter 更新, `runo update-refs` (任意 mirror) |
+| **シミュレータ知識** | パラメータスキーマ、物理的制約、安定性条件、長文 Agent context | simulator/environment plugin, Adapter metadata, `.runops/knowledge/`, 任意の `refs/` fallback mirror | plugin install/update, Adapter 更新, `runo update-refs` (任意 mirror) |
 | **外部共有知識** | ラボ共通の解析手法・知識、シミュレータ汎用知識 | `refs/knowledge/` | `runo knowledge source sync` |
 | **実行環境知識** | クラスタ構成、パーティション、モジュール | `.runops/environment.toml` | `runo doctor` |
 | **研究意図** | 仮説、実験設計、変数定義、観測量 | `campaign.toml` | ユーザーが記述 |
@@ -45,7 +45,7 @@ project/
     agenda.md
     proposals/                   # 高コスト・方向転換前の任意 proposal
     reviews/                     # agenda checkpoint の snapshot
-  refs/                          # 任意のローカル mirror / 外部知識 mount
+  refs/                          # 任意の fallback mirror / 外部知識 mount
     MPIEMSES3D/
       cookbook/                   # simulator cookbook (入力例・設定カタログ)
         COOKBOOK.md
@@ -309,11 +309,13 @@ mirror として扱う。
 
 Agent の利用順序:
 
-1. `cookbook/COOKBOOK.md` で概要を把握
-2. `cookbook/index.toml` で候補を選ぶ
-3. 各 entry の `meta.toml` で用途と適用条件を確認
-4. `input.toml` / `fragment.toml` の実ファイルを読む
-5. `README.md` で注意事項を確認
+1. `runo plugins --json` の `delegated_capabilities["cookbook"]` で委譲先 plugin を確認
+2. simulator/environment plugin skill、または明示的 knowledge source の cookbook guide を読む
+3. plugin / knowledge source が使えず `refs/` mirror がある場合だけ、fallback として `cookbook/COOKBOOK.md` で概要を把握
+4. `cookbook/index.toml` で候補を選ぶ
+5. 各 entry の `meta.toml` で用途と適用条件を確認
+6. `input.toml` / `fragment.toml` の実ファイルを読む
+7. `README.md` で注意事項を確認
 
 制約チェックは runops Adapter の `validate_params()` が担当する。
 cookbook は「何をどう使うか」に集中する。
@@ -407,13 +409,14 @@ repo/
 
 `entrypoints.toml` がある場合、`render_imports()` はそこに列挙された `imports` / `profiles.<name>.imports` だけを `imports.md` に載せる。manifest に無い profile は `profiles/<name>.md` へフォールバックする。`validate_source_structure()` は `entrypoints.toml` の parse、参照先ファイル、profile 内 `@...` import、`analysis/observables/*.toml` と `analysis/recipes/*.toml` も検査する。
 
-### CLAUDE.md 連携
+### Agent harness 連携
 
 `runo knowledge source render` が `.runops/knowledge/enabled/imports.md` を生成する。
-このファイルは有効な profile への `@import` 参照を含み、
-project の `CLAUDE.md` から `@.runops/knowledge/enabled/imports.md` で一括参照できる。
+このファイルは有効な profile への参照を含む。Claude Code では project の
+`CLAUDE.md` から `@.runops/knowledge/enabled/imports.md` で一括参照できる。
+Codex では `AGENTS.md` / project-local skill が同じ path を読む導線を持つ。
 
-`runo init` 時に CLAUDE.md テンプレートに自動挿入される。
+`runo init` 時に project harness テンプレートへ自動挿入される。
 
 ### init / setup での動作
 

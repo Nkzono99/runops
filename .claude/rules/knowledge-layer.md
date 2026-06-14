@@ -7,7 +7,7 @@ AI エージェントがシミュレーションを自律的に行うための�
 
 | 種類 | 保存先 | 更新方法 |
 |------|--------|----------|
-| シミュレータ知識 | simulator/environment plugin + `.runops/knowledge/` + 任意の `refs/` mirror | plugin install/update, `runops knowledge source sync`, `runops update-refs` |
+| シミュレータ知識 | simulator/environment plugin + `.runops/knowledge/` + 任意の `refs/` fallback mirror | plugin install/update, `runops knowledge source sync`, `runops update-refs` |
 | 外部共有知識 | `runops.toml` の `[knowledge]` | `knowledge source attach/sync` |
 | 実行環境 | `.runops/environment.toml` | `runops doctor` |
 | 研究意図 | `campaign.toml` | ユーザーが記述 |
@@ -43,5 +43,5 @@ runops knowledge source sync
 runops knowledge source render
 ```
 
-- `runops init` 時に GitHub の `*shared_knowledge*` リポジトリを自動検索し接続
+- `runops init` の対話時は GitHub の `*shared_knowledge*` リポジトリを候補表示し、選択されたものだけ接続
 - `runops setup` 時は `runops.toml` に設定された知識ソースを自動同期

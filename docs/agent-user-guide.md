@@ -18,6 +18,7 @@ project 側では `.runops/knowledge/runops/agent-user-guide.md` と
 |------|---------|
 | version 確認 | `runo --version` |
 | プロジェクト状況把握 | `runo context --json` (`research_agenda` / latest note を含む) |
+| 推奨 plugin metadata 確認 | `runo plugins --check` / `runo plugins --json` |
 | project health check | `runo lint --scope structure,analysis,knowledge,plugins` |
 | case テンプレート生成 | `runo case new <name>` |
 | 最小 case テンプレート生成 | `runo case new <name> --minimal` |
@@ -178,7 +179,7 @@ completed → archived → purged
 | source material | `materials/` | 設計・読解・解析時 |
 | 構造化 fact (制約・依存性) | `.runops/facts.toml` | 必要な場合のパラメータ設計・検証時 |
 | 実験知見 (Markdown) | `.runops/insights/` | 必要な場合の作業開始時・解析後 |
-| シミュレータドキュメント | simulator/environment plugin, `.runops/knowledge/`, 任意の `refs/` mirror | パラメータ設計時 |
+| シミュレータドキュメント | simulator/environment plugin, `runo plugins --json` の `delegated_capabilities`, `.runops/knowledge/`, 任意の `refs/` fallback mirror | パラメータ設計時 |
 | 実行環境 | `.runops/environment.toml` | job 設定・launcher 選択時 |
 | 外部共有知識 | `refs/knowledge/` | 必要に応じて |
 
@@ -205,7 +206,8 @@ runo knowledge add-fact "<claim>" -t <type> -s <simulator> -c <confidence>
 
 ## Simulator Adapter のガイド
 
-各シミュレータ固有のガイドは、まず simulator/environment plugin と
+各シミュレータ固有のガイドは、まず `runo plugins --json` の
+`delegated_capabilities` で委譲先 plugin を確認し、simulator/environment plugin と
 `.runops/knowledge/enabled/imports.md` を参照する。`runo init --with-refs` などで
 `refs/<repo>/docs/agent-*.md` が存在する場合は、ローカル mirror の fallback として
 参照する。

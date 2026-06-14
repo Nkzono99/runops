@@ -29,9 +29,11 @@ runops は plugin を自動 install せず、
 メタデータの欠落を検査しますが、user-local な plugin install 状態は検査しません。
 
 ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
-一方で、まだベースを決めていない場合でも、Agent は simulator/environment plugin、
-`.runops/knowledge/enabled/imports.md`、`materials/`、任意の `refs/` mirror にある
-docs/cookbook を順に確認し、入力例や推奨パラメータをもとに case の叩き台を作れます。
+一方で、まだベースを決めていない場合でも、Agent は `runo plugins --json` の
+`delegated_capabilities` から simulator/environment plugin を確認し、
+`.runops/knowledge/enabled/imports.md`、`materials/` を読んで case の叩き台を作れます。
+任意の `refs/` mirror にある docs/cookbook は、plugin や明示的 knowledge source が
+使えない場合の fallback として参照します。
 
 あとはエージェントが campaign 設計、case 作成、survey 展開、run 生成・投入・解析・知見整理を進めます。
 人間が CLI の全体を覚える必要はありません。

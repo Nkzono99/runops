@@ -631,7 +631,8 @@ CLI 層で `SimctlError` をキャッチし、ユーザーフレンドリーな�
 ## 知識層 (Knowledge Layer)
 
 AI エージェントがシミュレーションを自律的に実行するための知識管理アーキテクチャ。
-3 つのドメインで構成される:
+現行の Knowledge Layer は、シミュレータ知識、実行環境知識、研究意図、
+実験知見、lab notebook / materials などの見える作業場を分けて扱う。
 
 ### シミュレータ知識
 
@@ -651,7 +652,8 @@ adapter.required_outputs() ← analysis-ready に必要な成果物
 - `codex_plugins()`: simulator に推奨する外部 Codex plugin の導入導線と委譲役割 (`capabilities`)
 - `runo plugins`: project / simulator / site から推薦 plugin を再表示・JSON 出力し、推薦メタデータを検査する監査入口
 - `runo doctor`: 推薦メタデータの error も project 健全性として検出するが、plugin の install 状態は管理しない
-- `refs/`: `runo init --with-refs` または手動 clone で使う任意のローカル mirror
+- `runo lint --scope plugins`: plugin 推薦 metadata と委譲 role index を project health check として検査する
+- `refs/`: `runo init --with-refs` または手動 clone で使う任意のローカル fallback mirror
 - `doc_repos()` / `knowledge_sources()`: 任意 mirror を使う場合の clone 先とインデックス対象
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
 - `validate_params()`: CFL 条件、Debye 長解像度など

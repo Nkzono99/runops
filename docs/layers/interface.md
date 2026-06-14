@@ -66,6 +66,7 @@ drift を早期に検出します。
 ```bash
 uvx --from runops runo init
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 既存 project:
@@ -74,6 +75,7 @@ uvx --from runops runo doctor
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 uvx --from runops runo doctor
+uvx --from runops runo plugins --check
 ```
 
 ここまで終わったら、CLI を順番に叩くのではなく Agent に研究内容を渡します。
@@ -94,17 +96,21 @@ uvx --from runops runo doctor
 | `runo doctor [PATH]` | 環境検査。設定、sbatch、run_id 一意性、環境検出、推奨 plugin metadata を確認 |
 | `runo context [DIR]` | Agent 向け project context の要約を表示 |
 | `runo context --json` | Agent 向け context を JSON で取得 |
+| `runo plugins [DIR] [--json] [--check] [--strict]` | project / simulator / site 由来の推奨 Codex plugin inventory を表示・検査 |
 | `runo lint [PATH] [--scope ...] [--json]` | project state と推奨 plugin metadata の health check |
 | `runo migrate list/show/apply` | project-state migration を確認・適用 |
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 |
 | `runo config add-launcher` | ランチャー追加 |
 | `runo update` | シミュレータパッケージのアップグレード |
-| `runo update-harness --plan/apply-chain` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
+| `runo update-harness [--plan] [--apply-chain]` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
 | `runo update-refs [SIMS...]` | 任意 refs mirror 更新 + knowledge index 再生成 |
 | `runo mcp serve --transport stdio` | local MCP provider を stdio で起動 |
 | `runo mcp serve --transport streamable-http` | local MCP provider を HTTP で起動 |
 | `runo mcp check` | MCP tool registry / safety contract の軽量検査 |
+| `runo mcp tools --json` | MCP tool metadata を JSON で表示 |
+| `runo mcp resources --json` | MCP resources metadata を JSON で表示 (現状は空) |
+| `runo mcp prompts --json` | MCP prompts metadata を JSON で表示 (現状は空) |
 
 MCP provider は Agent / host 向けの edge interface です。read / inspect / plan tool
 だけを初期公開し、submit / cancel / delete などの external / destructive tool は

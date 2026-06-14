@@ -20,7 +20,8 @@ description: "Reflect code changes into documentation. Scan recent commits or st
 | `.codex/rules/architecture.md` | アーキテクチャ原則 | レイヤ構造変更時 |
 | `docs/toml-reference.md` | TOML 設定リファレンス | case.toml / survey.toml 等のフィールド追加時 |
 | `docs/extending.md` | 拡張ガイド | Adapter / Launcher の追加方法変更時 |
-| `docs/project-flow.md` | プロジェクトフロー | ワークフロー変更時 |
+| `docs/agent-user-guide.md` / `docs/get-started-with-agent.md` | Agent 向けワークフロー | plugin 委譲・初期導線変更時 |
+| `docs/layers/*.md` | レイヤ別設計・運用 | knowledge / harness / interface 変更時 |
 | `src/runops/sites/*.md` | サイト固有ドキュメント | サイト機能追加・制限事項更新時 |
 
 ### プロジェクト側ハーネス (runops ユーザー向け)
@@ -52,7 +53,7 @@ git diff --stat
 |-----------|---------|
 | CLI オプション追加・変更 | `commands.md`, `toml-reference.md` |
 | TOML フィールド追加 | `toml-reference.md` |
-| 新スキル追加 | プロジェクト側テンプレートの AGENTS.md (スキル一覧があれば) |
+| 新スキル追加 | プロジェクト側テンプレートの AGENTS.md / CLAUDE.md (スキル一覧があれば) |
 | サイト固有の変更 | `src/runops/sites/<site>.md` |
 | Adapter / Launcher 追加 | `docs/extending.md` |
 | アーキテクチャ変更 | `architecture.md` |

@@ -31,7 +31,7 @@ Experiment / Execution / Analysis / Research / Knowledge の各 Layer にある�
 | Execution Kernel | [execution-kernel.md](execution-kernel.md) | run / submit / sync / manifest / provenance の実行状態正本 |
 | Analysis Layer | [analysis.md](analysis.md) | 解析・可視化成果物、summary、survey 集計、cross-run 比較 |
 | Research Layer | [research.md](research.md) | `research/agenda.md` による現在判断の台帳 |
-| Knowledge Layer | [knowledge.md](knowledge.md) | Agent が再利用する知識、notes、materials、`.runops/insights/` |
+| Knowledge Layer | [knowledge.md](knowledge.md) | Agent が再利用する plugin 導線、notes、materials、`.runops/insights/`、refs fallback |
 | Harness Layer | [harness.md](harness.md) | Agent の手順、権限、skills、rules、project-local harness |
 | Upstream Integration Layer | [upstream.md](upstream.md) | runops local patch、feedback issue、PR、update / migration の境界 |
 

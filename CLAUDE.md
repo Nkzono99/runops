@@ -125,8 +125,8 @@ project-state に影響する breaking change は `docs/migrations/v0.md` に移
 | `runo --version` | version 確認 |
 | `runo init` / `setup` / `doctor` | プロジェクト管理 |
 | `runo context --json` / `runo lint` | project context と health check |
-| `runo mcp serve` / `mcp check` / `mcp tools --json` | MCP provider の起動・検査 |
-| `runo update-harness --plan/apply-chain` | project harness の versioned chain 更新 |
+| `runo mcp serve` / `mcp check` / `mcp tools/resources/prompts --json` | MCP provider の起動・検査 |
+| `runo update-harness --plan` / `--apply-chain` | project harness の versioned chain 更新 |
 | `runo migrate list/show/apply` | project-state migration |
 | `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
 | `runo runs submit [--all] [-qn] [--qos] [--afterok] [--yes]` | ジョブ投入 (`--all` は確認付き、`--yes` で省略) |

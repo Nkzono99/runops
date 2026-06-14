@@ -18,11 +18,12 @@ project-local skill を参照する。
 ## 最初に読むもの
 
 1. `uvx --from runops runo context --json`
-2. `campaign.toml`
-3. `research/agenda.md`
-4. 関連する `cases/**/case.toml` と `runs/**/survey.toml`
-5. `.runops/facts.toml` と `.runops/knowledge/candidates/facts/`
-6. 必要なら `runo runs status` / `runo runs log -e`
+2. `uvx --from runops runo plugins --check` と `uvx --from runops runo plugins --json`
+3. `campaign.toml`
+4. `research/agenda.md`
+5. 関連する `cases/**/case.toml` と `runs/**/survey.toml`
+6. `.runops/facts.toml` と `.runops/knowledge/candidates/facts/`
+7. 必要なら `runo runs status` / `runo runs log -e`
 
 ## 知識と記録
 
@@ -30,6 +31,8 @@ project-local skill を参照する。
 - 現在の高レベルな研究判断は `research/agenda.md` に残す
 - 整理済み知見は `runo knowledge save` / `runo knowledge add-fact` を使う
 - `.runops/knowledge/` は生成済み Agent context であり、手で整形しない
+- simulator cookbook や長文 workflow は推奨 Codex plugin / explicit knowledge
+  source を優先し、`refs/` mirror は存在する場合だけ fallback として使う
 
 ## runops 自体の確認
 

@@ -17,11 +17,13 @@
 | `runops mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |
 | `runops mcp check` | MCP registry / safety contract の軽量検査 |
 | `runops mcp tools --json` | MCP tool metadata を JSON で表示 |
+| `runops mcp resources --json` | MCP resources metadata を JSON で表示 (現状は空) |
+| `runops mcp prompts --json` | MCP prompts metadata を JSON で表示 (現状は空) |
 | `runops config show` | 設定表示 |
 | `runops config add-simulator` | シミュレータ追加 (対話型) |
 | `runops config add-launcher` | ランチャー追加 (対話型) |
 | `runops update` | シミュレータパッケージのアップグレード |
-| `runops update-harness` | ハーネスファイル再生成 |
+| `runops update-harness [--plan] [--apply-chain]` | ハーネスファイル再生成 / versioned chain 更新 |
 | `runops update-refs` | 任意 refs mirror 更新 + ナレッジインデックス再生成 |
 
 ## Case / Run 操作
