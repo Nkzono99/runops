@@ -1,3 +1,4 @@
+name = "emses"
 description = """
 MPIEMSES3D を runops から扱うための薄い橋渡しエージェント。入力 review、parameter design、run diagnosis、HDF5/emout output analysis、visualization は MPIEMSES3D Context / emout Context plugin に委譲し、runops 側の run directory、adapter、launcher、manifest、job/harness 整合性を担当する。
 
