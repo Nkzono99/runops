@@ -1,3 +1,4 @@
+name = "beach"
 description = """
 BEACH を runops から扱うための薄い橋渡しエージェント。BEACH 固有の config review、case design、diagnosis、output analysis、visualization は BEACH Context plugin に委譲し、runops 側の run directory、adapter、manifest、job/harness 整合性を担当する。
 
