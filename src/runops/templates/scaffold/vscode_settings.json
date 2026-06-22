@@ -16,7 +16,6 @@
         ".runops/environment.toml": true,
         "runs/**/status": true,
         "runs/**/input/plasma.inp": true,
-        "runs/**/submit": true,
         "runs/**/manifest.toml": true
     },
     "search.exclude": {
@@ -29,7 +28,6 @@
         "runs/**/work": true,
         "runs/**/status": true,
         "runs/**/input/plasma.inp": true,
-        "runs/**/submit": true,
         "runs/**/manifest.toml": true,
         "materials/**/*.pdf": true
     },
@@ -41,8 +39,7 @@
         "refs/**": true,
         ".runops/knowledge/**": true,
         "runs/**/work/**": true,
-        "runs/**/status/**": true,
-        "runs/**/submit/**": true
+        "runs/**/status/**": true
     },
     "python.analysis.exclude": [
         "**/node_modules",
@@ -55,7 +52,6 @@
         "refs",
         ".runops/knowledge",
         "runs/**/work",
-        "runs/**/status",
-        "runs/**/submit"
+        "runs/**/status"
     ]
 }

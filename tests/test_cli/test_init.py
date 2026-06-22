@@ -311,11 +311,11 @@ class TestInit:
         assert "!materials/index.toml" in content
         assert "AGENTS.override.md" in content
 
-    def test_init_vscode_settings_keep_work_visible(
+    def test_init_vscode_settings_keep_run_artifacts_visible(
         self,
         tmp_path: Path,
     ) -> None:
-        """VS Code keeps run work visible while hiding internal files."""
+        """VS Code keeps useful run artifacts visible while hiding internals."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         settings = json.loads(
             (tmp_path / ".vscode" / "settings.json").read_text(encoding="utf-8")
@@ -331,7 +331,7 @@ class TestInit:
         assert files_exclude[".runops/environment.toml"] is True
         assert "runs/**/work" not in files_exclude
         assert files_exclude["runs/**/status"] is True
-        assert files_exclude["runs/**/submit"] is True
+        assert "runs/**/submit" not in files_exclude
         assert files_exclude["runs/**/manifest.toml"] is True
         assert "cases" not in files_exclude
         assert "notes" not in files_exclude
@@ -342,6 +342,7 @@ class TestInit:
         assert search_exclude[".ruff_cache"] is True
         assert search_exclude[".pytest_cache"] is True
         assert search_exclude["runs/**/work"] is True
+        assert "runs/**/submit" not in search_exclude
         assert search_exclude["materials/**/*.pdf"] is True
         assert "materials" not in search_exclude
 
@@ -351,6 +352,7 @@ class TestInit:
         assert watcher_exclude[".pytest_cache/**"] is True
         assert watcher_exclude["runs/**/work/**"] is True
         assert watcher_exclude["runs/**/status/**"] is True
+        assert "runs/**/submit/**" not in watcher_exclude
 
         analysis_exclude = settings["python.analysis.exclude"]
         assert "**/node_modules" in analysis_exclude
@@ -361,6 +363,7 @@ class TestInit:
         assert ".pytest_cache" in analysis_exclude
         assert "refs" in analysis_exclude
         assert "runs/**/work" in analysis_exclude
+        assert "runs/**/submit" not in analysis_exclude
 
     def test_init_skips_existing_files(self, tmp_path: Path) -> None:
         """Init does not overwrite existing files."""
