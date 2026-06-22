@@ -132,8 +132,10 @@ Launcher / job.sh は `$implement-launcher`、Simulator Adapter は `$implement-
 現在は private / v0 系のため、後方互換性は強く維持しなくてよい。
 project-state に影響する breaking change は `docs/migrations/v0.md` に移行方法を残す。
 
-GitHub Flow を採用する。作業は branch で行い、`origin/main` への反映は PR merge 経由にする。
-`main` への direct push、`--force`、`--no-verify` は使わない。
+現在は個人開発のため main-first で進める。通常作業は `main` で行い、
+品質ゲートを通してから `origin/main` へ fast-forward / direct push する。
+大きな設計レビューや共同作業が必要な変更だけ branch / PR に分ける。
+`--force`、non-fast-forward push、`--no-verify` は使わない。
 release は `$release` を使い、`pyproject.toml` と `src/runops/__init__.py` の version を
 同時に更新する。annotated tag message と GitHub Release 本文は日本語で書く。
 

@@ -1,6 +1,6 @@
 ---
 name: release
-description: "Prepare and publish a new runops release through GitHub Flow. Bump version, sync __init__.py, draft Japanese release notes, open/merge a PR, tag main, create GitHub Release, and verify PyPI publish."
+description: "Prepare and publish a new runops release from main. Bump version, sync __init__.py, draft Japanese release notes, push main, tag the release commit, create GitHub Release, and verify PyPI publish."
 ---
 
 # runops リリース
@@ -24,10 +24,11 @@ $release 0.3.0      # 明示的にバージョン指定
 ```
 
 引数なしで呼んだ場合は、変更内容から bump レベルを自動判定し、
-確認 → release PR → tag → GitHub Release → publish 確認まで一気通貫で実行する。
+main release commit → main push → CI 確認 → tag → GitHub Release → publish 確認まで一気通貫で実行する。
 
-`main` への direct push は禁止。release commit も必ず release branch から PR に載せ、
-CI green 後に `main` へ merge してから tag を切る。
+現在は個人開発のため main-first。release commit は `main` 上で作り、
+品質ゲートと CI green を確認してから、その release commit に tag を切る。
+`--force`、non-fast-forward push、`--no-verify` は使わない。
 
 ## 手順
 
@@ -89,49 +90,40 @@ commit message から以下を分類する:
 1. `pyproject.toml` の `version = "X.Y.Z"` — pip / PyPI が参照する正本
 2. `src/runops/__init__.py` の `__version__ = "X.Y.Z"` — ランタイム参照
 
-### 5. release branch でコミットする
+### 5. main で release commit を作る
 
-`main` を最新化してから release branch を作る。既に release branch 上なら、base が
-最新 `origin/main` から分岐していることを確認する。
+`main` を最新化し、未コミットの実装・docs 変更は先に論理単位で commit しておく。
+最後に version bump commit を作る。
 
 ```bash
 git fetch origin
 git switch main
 git pull --ff-only origin main
-git switch -c release/vX.Y.Z
 git add pyproject.toml src/runops/__init__.py
 git commit -m "chore: bump version to X.Y.Z"
 ```
 
-### 6. release PR を作成し、merge する
+### 6. main を push し、CI を確認する
 
-release branch を push して PR を作成する。`main` へ直接 push しない。
-
-```bash
-git push -u origin release/vX.Y.Z
-gh pr create \
-  --base main \
-  --head release/vX.Y.Z \
-  --title "chore: release X.Y.Z" \
-  --body-file <release-notes.md>
-```
-
-PR の CI が green であることを確認してから merge する。merge 後、ローカル `main` を
-必ず fast-forward で最新化する。
+main は direct push する。GitHub ruleset は default branch の削除と
+non-fast-forward を防ぐ。push 後に CI green を確認する。
 
 ```bash
-gh pr checks --watch
-gh pr merge --squash --delete-branch
-git switch main
-git pull --ff-only origin main
+git push origin main
+gh run list --branch main --limit 5
+gh run watch <run-id> --exit-status
 ```
+
+CI が失敗した場合は、同じ `main` 上で修正 commit を積み、再度 `git push origin main`
+してから release tag へ進む。
 
 ### 7. main の release commit に tag を付けて公開する
 
-tag は merge 後の `main` の release commit に付ける。release branch 上では tag を切らない。
+tag は `main` の release commit に付ける。
 tag push により `.github/workflows/publish.yml` が起動し、CI が自動で PyPI にパブリッシュする。
 
 ```bash
+git pull --ff-only origin main
 git tag -a vX.Y.Z -m "<日本語のリリースノート要約>"
 git push origin vX.Y.Z
 ```
@@ -180,4 +172,4 @@ gh release view vX.Y.Z --json tagName,name,body,url
 2. bump レベルを自動判定
 3. 日本語のリリースノート草案を作る
 4. 変更サマリとバージョンをユーザーに提示して確認
-5. 確認が取れたら手順 4〜9 を順に実行 (バージョン更新 → release PR → merge → tag push → GitHub Release 作成)
+5. 明示依頼または確認が取れていれば手順 4〜9 を順に実行 (バージョン更新 → main push → CI 確認 → tag push → GitHub Release 作成)

@@ -42,9 +42,9 @@ CI でも同じチェックと分岐込み coverage floor が走る。ruff forma
 
 - 1 コミット = 1 論理変更
 - commit message は英語推奨 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)
-- GitHub Flow を採用する。作業は `codex/...`, `feature/...`, `fix/...`, `release/...` の branch で行う
-- `main` への direct push は禁止。変更は必ず PR で `main` へ入れる
-- PR merge 前に CI green を確認する
+- 現在は個人開発のため main-first。通常作業は `main` で行い、品質ゲート後に `origin/main` へ fast-forward / direct push する
+- 大きな設計レビュー、共同作業、実験的な変更だけ `codex/...`, `feature/...`, `fix/...` などの branch / PR に分ける
+- GitHub ruleset は default branch の削除と non-fast-forward だけを防ぐ。CI は push 後にも走るため、失敗したら同じ `main` 上で修正 commit を積む
 - `--no-verify` / `--force` は使わない
 
 ## リリース
@@ -54,12 +54,12 @@ CI でも同じチェックと分岐込み coverage floor が走る。ruff forma
 1. 品質ゲート通過を確認
 2. `pyproject.toml` と `src/runops/__init__.py` のバージョンを **同時に** 更新
 3. 日本語のリリースノート草案を作る
-4. `release/vX.Y.Z` branch で `git commit -m "chore: bump version to X.Y.Z"` を作成
-5. release PR を作成し、CI green 後に `main` へ merge する
-6. `main` を `git pull --ff-only origin main` で最新化し、その commit に `git tag -a vX.Y.Z` を切る
+4. `main` 上で `git commit -m "chore: bump version to X.Y.Z"` を作成
+5. `git push origin main` 後、CI green を確認する
+6. その release commit に `git tag -a vX.Y.Z` を切る
 7. `git push origin vX.Y.Z` を実行し、`Publish to PyPI` を確認する
 8. GitHub Release 本文も日本語で作成する
 
-release branch 上で tag を切らない。PR merge 後の `main` の release commit に tag を付ける。
-`git pull --ff-only origin main`、`git tag -a`、`git push origin vX.Y.Z` は並列化しない。
-tag が release commit 以外を指すと publish が壊れる。
+tag は必ず `main` の release commit に付ける。`git pull --ff-only origin main`、
+`git tag -a`、`git push origin vX.Y.Z` は並列化しない。tag が release commit
+以外を指すと publish が壊れる。

@@ -51,9 +51,8 @@ PyPI パッケージのバージョンがずれる。`$release` スキルを使�
 
 ## release の commit / tag 順序
 
-release commit は `release/vX.Y.Z` branch から PR に載せ、CI green 後に `main` へ merge する。
-release branch 上では tag を切らない。merge 後に `main` を `git pull --ff-only origin main`
-で最新化し、その release commit に `git tag -a` を切る。
+release commit は `main` 上で作り、`git push origin main` 後に CI green を確認する。
+tag はその `main` の release commit に `git tag -a` で付ける。
 
 tag 作成と `git push origin vX.Y.Z` を並列に走らせると、tag が古い commit を指したまま
 publish されることがある。

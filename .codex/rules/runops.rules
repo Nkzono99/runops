@@ -141,8 +141,8 @@ prefix_rule(
 
 prefix_rule(
     pattern = ["git", "push", "origin", "main"],
-    decision = "forbidden",
-    justification = "main is protected by GitHub Flow; open a pull request instead of direct-pushing.",
+    decision = "allow",
+    justification = "runops is currently main-first; push only after local quality gates and fast-forward checks.",
     match = [
         "git push origin main",
     ],
