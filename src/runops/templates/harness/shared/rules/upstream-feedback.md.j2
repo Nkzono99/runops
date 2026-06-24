@@ -5,7 +5,9 @@
 (バグ・使いにくさ・不足している機能・分かりにくい docs / エラーメッセージ・
 抜けている adapter / launcher サポート 等) に気づいたら、upstream に
 フィードバックして runops を育てることもタスクに含める。
-フィードバックの記録、routing、sanitize、export は HarnessOps (`hops`) に委譲し、
+フィードバックの記録、routing、sanitize、export は HarnessOps CLI に委譲し、
+PATH 上の `hops` に依存せず `uvx --from harnessops hops <command>` を既定の
+portable invocation として使う。
 GitHub issue はサニタイズ済み bundle から作る外部共有チャンネルとして扱う。
 
 {{ rule_heading | default("#") }}# いつフィードバックするか
@@ -22,29 +24,31 @@ GitHub issue はサニタイズ済み bundle から作る外部共有チャン�
 
 {{ rule_heading | default("#") }}# フィードバック手順
 
-1. **HarnessOps overlay を確認する** — `hops doctor --check-overlay` を実行する。
-   未初期化なら `hops detect` の結果を確認し、runops project では通常
-   `hops init --profile runops-project --with-agent-bridge` で初期化してから進める。
+1. **HarnessOps overlay を確認する** — `uvx --from harnessops hops doctor --check-overlay`
+   を実行する。未初期化なら `uvx --from harnessops hops detect` の結果を確認し、
+   runops project では通常
+   `uvx --from harnessops hops init --profile runops-project --with-agent-bridge`
+   で初期化してから進める。
    `.harnessops/` や `harness-feedback/` を手で組み替えない。
 2. **失敗/摩擦を記録する** — issue 本文をいきなり書かず、まず private な
    HarnessOps record にする:
 
    ```bash
-   hops add-failure --title "<短い題名>" --target runops \
+   uvx --from harnessops hops add-failure --title "<短い題名>" --target runops \
      --context "<文脈>" \
      --what-happened "<起きたこと>" \
      --why-matters "<重要性>" \
      --desired-behavior "<望ましい挙動>" \
      --local-workaround "<回避策>"
-   hops route --record F0001
+   uvx --from harnessops hops route --record F0001
    ```
 
 3. **upstream bundle を作る** — route が `target-upstream-candidate` の場合だけ、
    runops への下書きとして export する:
 
    ```bash
-   hops add-feedback --from F0001 --target runops --summary "<要約>"
-   hops feedback export --target runops --sanitize --format github-issue
+   uvx --from harnessops hops add-feedback --from F0001 --target runops --summary "<要約>"
+   uvx --from harnessops hops feedback export --target runops --sanitize --format github-issue
    ```
 
    export された `harness-feedback/views/exported-feedback/UF*.md` を読み、ローカルパス、

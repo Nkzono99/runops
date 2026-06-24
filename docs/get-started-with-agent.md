@@ -201,18 +201,19 @@ Claude Code では:
 ```
 
 引数なしなら、そのセッション中に見つかった候補を一覧します。具体的な内容を
-渡すと、`hops add-failure` / `hops route` / `hops add-feedback` /
-`hops feedback export --sanitize --format github-issue` で record と下書きを作り、
-重複 issue を確認し、環境情報を集め、issue のタイトルと本文案を作ります。
+渡すと、`uvx --from harnessops hops add-failure` / `route` / `add-feedback` /
+`feedback export --sanitize --format github-issue` で record と下書きを作り、重複
+issue を確認し、環境情報を集め、issue のタイトルと本文案を作ります。
 
 この SKILL は安全のため、ユーザー確認なしに GitHub issue を作りません。
 起票前に必ず内容を表示させ、private なデータパス・クラスタ固有の秘密・未公開の
 研究情報が本文に入っていないことを確認してください。作成後は issue URL を
 `notes/YYYY-MM-DD.md` に記録しておくと、後で「あのときの改善要望」を辿りやすくなります。
 
-`hops` CLI が利用できる環境では、`runo init` / `runo setup` が
-`hops init --profile runops-project` を連鎖して呼び、`runo update-harness` が
-`hops update-harness` を連鎖して呼びます。HarnessOps を使わない環境では
+HarnessOps が利用できる環境では、`runo init` / `runo setup` が project 側
+overlay 初期化を連鎖し、`runo update-harness` が overlay 更新を連鎖して呼びます。
+生成 guidance で HarnessOps CLI を直接呼ぶ場合は、PATH 上の `hops` に依存せず
+`uvx --from harnessops hops ...` を使います。HarnessOps を使わない環境では
 `--no-harnessops` でこの連携を無効化できます。
 
 ## 次に読む
