@@ -33,9 +33,10 @@ runops 本体の修正が必要な場合は、project とは別の source checko
   実行中の package を正として project harness を再生成し、`.runops/harness.lock`
   に適用済み runops version を記録する。
 - HarnessOps が利用できる環境では、`runo init` / `runo setup` は project 側
-  `hops init --profile runops-project` を連鎖し、`runo update-harness` は
-  `hops update-harness` を連鎖する。HarnessOps 管理ファイルは runops が直接書かず、
-  すべて `hops` に委譲する。
+  overlay 初期化を連鎖し、`runo update-harness` は overlay 更新を連鎖する。
+  HarnessOps 管理ファイルは runops が直接書かず、すべて HarnessOps CLI に委譲する。
+  生成 guidance で直接呼ぶ場合は PATH 上の `hops` に依存せず
+  `uvx --from harnessops hops ...` を使う。
 
 ## 標準フロー
 

@@ -7,7 +7,9 @@ description: Record runops feedback through HarnessOps, export a sanitized upstr
 
 `{{ skill_prefix }}feedback-runops` は runops 本体への **バグ報告・機能要望・改善提案** を
 HarnessOps に記録し、サニタイズ済み bundle を作ってから issue 下書きまたは起票へ進める
-thin wrapper。records / routing / sanitize / export は必ず `hops` CLI に委譲する。
+thin wrapper。records / routing / sanitize / export は必ず HarnessOps CLI に委譲する。
+project 環境では PATH 上の `hops` に依存せず、
+`uvx --from harnessops hops <command>` を既定の portable invocation として使う。
 
 別 checkout の runops local patch がある場合も、この skill を使ってよい。
 特に、汎用価値はありそうだが設計がまだ粗い、一部だけ汎用、draft PR には早い、
@@ -18,19 +20,19 @@ thin wrapper。records / routing / sanitize / export は必ず `hops` CLI に委
 まず HarnessOps overlay があるか確認する:
 
 ```bash
-hops doctor --check-overlay
+uvx --from harnessops hops doctor --check-overlay
 ```
 
-`hops` が見つからない、または overlay が未初期化なら、次を実行する前にユーザーへ
+overlay が未初期化なら、次を実行する前にユーザーへ
 「HarnessOps project overlay を作る」ことを説明する。runops project では通常:
 
 ```bash
-hops detect
-hops init --profile runops-project --with-agent-bridge
-hops doctor --check-overlay --check-records
+uvx --from harnessops hops detect
+uvx --from harnessops hops init --profile runops-project --with-agent-bridge
+uvx --from harnessops hops doctor --check-overlay --check-records
 ```
 
-`hops init` が既存ファイルの上書きを拒否したら停止し、競合ファイルを報告する。
+`hops init` 相当の処理が既存ファイルの上書きを拒否したら停止し、競合ファイルを報告する。
 `.harnessops/`、`harness-feedback/` の構造を手で組み替えない。
 
 ## 引数なしの場合: フィードバック候補をリストアップ
@@ -81,16 +83,16 @@ upstream feedback へ混ぜない。必要なら `.harnessops/sanitize.yml` を�
 
 ### 2. 失敗レコードを作る
 
-状態変更は `hops` に委譲する:
+状態変更は HarnessOps CLI に委譲する:
 
 ```bash
-hops add-failure --title "<短い題名>" --target runops \
+uvx --from harnessops hops add-failure --title "<短い題名>" --target runops \
   --context "<文脈>" \
   --what-happened "<起きたこと>" \
   --why-matters "<重要性>" \
   --desired-behavior "<望ましい挙動>" \
   --local-workaround "<回避策>"
-hops route --record F0001
+uvx --from harnessops hops route --record F0001
 ```
 
 `hops add-failure` が出力した実際の ID を使う。route 結果が
@@ -99,11 +101,11 @@ hops route --record F0001
 ### 3. upstream feedback 下書きを作って sanitize export する
 
 ```bash
-hops add-feedback --from F0001 --target runops \
+uvx --from harnessops hops add-feedback --from F0001 --target runops \
   --type "<bug|feature|improvement|docs>" \
   --title "<issue候補タイトル>" \
   --summary "<サニタイズ可能な要約>"
-hops feedback export --target runops --sanitize --format github-issue
+uvx --from harnessops hops feedback export --target runops --sanitize --format github-issue
 ```
 
 export された `harness-feedback/views/exported-feedback/UF*.md` を読み、

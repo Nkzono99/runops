@@ -52,7 +52,7 @@ uvx --from runops runo update-harness --apply-chain
 - `.runops/harness.lock` に最後に適用した runops version が記録される
 - `.runops/harness.lock` の `upgrade_chain` に exact-version step の履歴が記録される
 - `--dry-run` で事前確認、`--force` で全上書き
-- HarnessOps overlay がある場合は `hops update-harness` も連鎖し、repo-local HarnessOps skills と overlay metadata を更新する
+- HarnessOps overlay がある場合は HarnessOps CLI 経由の `update-harness` も連鎖し、repo-local HarnessOps skills と overlay metadata を更新する。直接呼ぶ場合は `uvx --from harnessops hops update-harness` を使う
 
 ## 3. migration guide を確認
 

@@ -10,6 +10,10 @@ from runops.harness import (
 )
 
 
+def _bare_hops_command_lines(content: str) -> list[str]:
+    return [line for line in content.splitlines() if line.lstrip().startswith("hops ")]
+
+
 def test_build_codex_config_keeps_repo_stable_defaults() -> None:
     """Config echoes the project name and avoids runtime-sensitive policy."""
     content = build_codex_config("demo")
@@ -188,6 +192,39 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert 'git commit -m "chore: scaffold runops project"' in claude_setup
     assert "{{ skill_prefix }}" not in codex_setup
     assert "{{ skill_prefix }}" not in codex_setup_plugins
+
+
+def test_generated_feedback_guidance_uses_portable_hops_invocation() -> None:
+    """Generated feedback guidance must not assume hops is on PATH."""
+    bundle = build_harness_bundle(
+        "demo",
+        ["emses"],
+        knowledge_imports_path=".runops/knowledge/enabled/imports.md",
+    )
+
+    codex_feedback = bundle.files[".agents/skills/feedback-runops/SKILL.md"]
+    assert "uvx --from harnessops hops doctor --check-overlay" in codex_feedback
+    assert (
+        "uvx --from harnessops hops feedback export --target runops --sanitize"
+        in codex_feedback
+    )
+    assert _bare_hops_command_lines(codex_feedback) == []
+
+    agents = bundle.files["AGENTS.md"]
+    assert "uvx --from harnessops hops doctor --check-overlay" in agents
+    assert (
+        "uvx --from harnessops hops feedback export --target runops --sanitize"
+        in agents
+    )
+    assert _bare_hops_command_lines(agents) == []
+
+    claude_rule = bundle.files[".claude/rules/upstream-feedback.md"]
+    assert "uvx --from harnessops hops doctor --check-overlay" in claude_rule
+    assert (
+        "uvx --from harnessops hops feedback export --target runops --sanitize"
+        in claude_rule
+    )
+    assert _bare_hops_command_lines(claude_rule) == []
 
 
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:
