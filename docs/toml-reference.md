@@ -158,7 +158,7 @@ simulator 設定に紐づく外部 Codex plugin 推薦。Adapter の `codex_plug
 
 ### resolver_mode
 
-- **`package`** (recommended): Executable is pip-installed into `.venv` from the adapter's package spec. For simulator packages backed by Git repositories, this means a git-pinned/package install rather than an editable checkout. This is the default for reproducible runs because provenance can record the resolved source and `runo update` can follow upstream package specs.
+- **`package`** (recommended): Executable is pip-installed into `.venv` from the adapter's package spec. For simulator packages backed by Git repositories, this means a git-pinned/package install rather than an editable checkout. This is the default for reproducible runs because provenance can record the resolved source and `runo update` can follow upstream package specs. When generated `job.sh` activates the project `.venv`, runops prefers `.venv/bin/<executable>` over a command path resolved from the run-creation shell and warns if that shell path would bypass the job environment.
 - **`local_executable`**: Executable is on PATH or specified as an absolute path.
 - **`local_source`**: Build from source. `source_repo` and `build_command` must be set.
 

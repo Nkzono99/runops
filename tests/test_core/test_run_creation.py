@@ -412,6 +412,45 @@ class TestTransactionalRunCreation:
         assert str(run_dir / "input" / "params.json") in job_sh
         assert ".tmp-" not in job_sh
 
+    def test_package_mode_uses_project_venv_executable_for_generated_job(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        project = _transactional_project(tmp_path)
+        project.simulators["generic"]["resolver_mode"] = "package"
+        project.simulators["generic"]["executable"] = "solver"
+        venv_bin = tmp_path / ".venv" / "bin"
+        venv_bin.mkdir(parents=True)
+        venv_executable = venv_bin / "solver"
+        venv_executable.write_text("#!/bin/sh\n")
+        (venv_bin / "activate").write_text("# activate\n")
+        monkeypatch.setattr(
+            "runops.adapters.generic.shutil.which",
+            lambda _name: "/opt/system/bin/solver",
+        )
+        case_data = _transactional_case(tmp_path / "cases" / "base_case")
+        parent_dir = tmp_path / "runs" / "base_case"
+
+        result = create_prepared_run(
+            parent_dir=parent_dir,
+            case_data=case_data,
+            project=project,
+            adapter=GenericAdapter(),
+            launcher=_transactional_launcher(),
+            site=_standard_site(),
+            existing_ids=set(),
+        )
+
+        job_sh = (result.run_info.run_dir / "submit" / "job.sh").read_text()
+        assert str(venv_executable) in job_sh
+        assert "/opt/system/bin/solver" not in job_sh
+        assert result.warnings == (
+            "package executable 'solver' resolved to /opt/system/bin/solver "
+            f"before job setup; using project virtualenv executable {venv_executable} "
+            "because job.sh activates .venv.",
+        )
+
     def test_stale_existing_ids_skip_existing_final_dir(
         self,
         tmp_path: Path,

@@ -69,6 +69,71 @@ class _RunIdCollisionError(Exception):
         self.run_id = run_id
 
 
+def _is_plain_executable_name(executable: str) -> bool:
+    """Return True for command names that can live under ``.venv/bin``."""
+    path = Path(executable)
+    return executable == path.name and not path.is_absolute()
+
+
+def _path_is_within(path: Path, root: Path) -> bool:
+    try:
+        path.relative_to(root)
+    except ValueError:
+        return False
+    return True
+
+
+def _align_package_runtime_with_job_environment(
+    sim_config: dict[str, Any],
+    runtime_info: dict[str, Any],
+    project_root: Path,
+    venv_activate: Path,
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Prefer the project virtualenv executable when job.sh activates it."""
+    if runtime_info.get("resolver_mode") != "package" or not venv_activate.is_file():
+        return runtime_info, ()
+
+    configured_executable = str(sim_config.get("executable", "")).strip()
+    if not configured_executable or not _is_plain_executable_name(
+        configured_executable
+    ):
+        return runtime_info, ()
+
+    venv_dir = project_root / ".venv"
+    venv_executable = venv_activate.parent / configured_executable
+    resolved_executable = str(runtime_info.get("executable", "")).strip()
+    warnings: list[str] = []
+
+    if not venv_executable.is_file():
+        resolved_path = Path(resolved_executable)
+        if resolved_path.is_absolute() and not _path_is_within(resolved_path, venv_dir):
+            warnings.append(
+                f"package executable {configured_executable!r} resolved to "
+                f"{resolved_executable} before job setup; job.sh activates .venv "
+                f"but {venv_executable} was not found, so the generated job may "
+                "bypass the project virtualenv."
+            )
+        return runtime_info, tuple(warnings)
+
+    if resolved_executable == str(venv_executable):
+        return runtime_info, ()
+
+    aligned_runtime = dict(runtime_info)
+    aligned_runtime["executable"] = str(venv_executable)
+    if resolved_executable:
+        aligned_runtime["pre_job_setup_executable"] = resolved_executable
+
+    resolved_path = Path(resolved_executable)
+    if resolved_path.is_absolute() and not _path_is_within(resolved_path, venv_dir):
+        warnings.append(
+            f"package executable {configured_executable!r} resolved to "
+            f"{resolved_executable} before job setup; using project virtualenv "
+            f"executable {venv_executable} because job.sh activates .venv."
+        )
+
+    return aligned_runtime, tuple(warnings)
+
+
 def create_prepared_run(
     parent_dir: Path,
     case_data: CaseData,
@@ -95,7 +160,7 @@ def create_prepared_run(
     validation_data = {"case": case_section, "params": effective_params}
     issues = adapter.validate_params(validation_data)
 
-    warnings = tuple(i.message for i in issues if i.severity == "warning")
+    base_warnings = tuple(i.message for i in issues if i.severity == "warning")
     errors = [i for i in issues if i.severity == "error"]
     if errors:
         raise ParameterValidationError(issues)
@@ -118,6 +183,7 @@ def create_prepared_run(
         )
         committed = False
         pending_artifacts: list[tuple[Path, str, str, str]] = []
+        warnings = list(base_warnings)
         try:
             copied_inputs = _copy_case_files(
                 case_data.case_dir,
@@ -137,6 +203,16 @@ def create_prepared_run(
             sim_config = _get_simulator_config(project, case_data.simulator)
             resolver_mode = sim_config.get("resolver_mode", "package")
             runtime_info = adapter.resolve_runtime(sim_config, resolver_mode)
+            venv_activate = project.root_dir / ".venv" / "bin" / "activate"
+            runtime_info, runtime_warnings = (
+                _align_package_runtime_with_job_environment(
+                    sim_config,
+                    runtime_info,
+                    project.root_dir,
+                    venv_activate,
+                )
+            )
+            warnings.extend(runtime_warnings)
             program_cmd = adapter.build_program_command(runtime_info, staging_run_dir)
             program_cmd = _rewrite_staging_paths(
                 program_cmd,
@@ -159,7 +235,6 @@ def create_prepared_run(
             job_config = _build_job_config(case_data.job, effective_site)
 
             extra_setup: list[str] = []
-            venv_activate = project.root_dir / ".venv" / "bin" / "activate"
             if venv_activate.exists():
                 extra_setup.append(f"source {shlex.quote(str(venv_activate))}")
 
@@ -229,7 +304,7 @@ def create_prepared_run(
                 shutil.rmtree(staging_run_dir, ignore_errors=True)
 
         known_ids.add(final_run_info.run_id)
-        return CreatedRunResult(run_info=final_run_info, warnings=warnings)
+        return CreatedRunResult(run_info=final_run_info, warnings=tuple(warnings))
 
     raise SimctlError(
         f"Could not allocate a free run_id after {_RUN_ID_ALLOCATION_ATTEMPTS} attempts"
