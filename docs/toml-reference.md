@@ -980,6 +980,53 @@ project-level analysis layer として使う。
 
 ---
 
+## story acceptance audit workspace
+
+研究 campaign の narrative / claim が、既存の解析 artifact でどこまで支えられているかを確認するには、
+`analysis/stories/<story_id>/` を使う。
+
+```bash
+runo analyze new-story "surface adhesion scaling" --source runs/sheath_scan
+runo analyze audit-story analysis/stories/surface-adhesion-scaling
+```
+
+### 生成されるファイル
+
+| File | Description |
+|------|-------------|
+| `analysis/stories/<story_id>/story.toml` | user-editable な story spec。source と narrative step、必要 artifact selector、claim ceiling を記録 |
+| `analysis/stories/<story_id>/audit.json` | 機械可読な audit 結果。step ごとの covered / partial / missing と matched artifacts を含む |
+| `analysis/stories/<story_id>/audit.md` | 人間/Agent 向けの concise report。research agenda には長い evidence inventory ではなく、この report へのリンクを置く |
+
+### story.toml の概要
+
+```toml
+schema_version = 1
+id = "surface-adhesion-scaling"
+title = "Surface adhesion scaling"
+status = "draft"
+
+[[sources]]
+kind = "survey"
+path = "runs/sheath_scan"
+
+[[steps]]
+id = "surface-potential"
+title = "Surface-potential visualization"
+required_artifacts = ["figure:surface_potential"]
+acceptable_status = ["main", "accepted", "draft"]
+claim_ceiling = "static field evidence; not dynamic adhesion proof"
+notes = ""
+```
+
+`required_artifacts` は v0 では `kind:name` 形式の文字列 selector とする。
+`name` は artifact の `name`, `id`, `title`, `quantity`, `path` stem, `tags`
+と照合される。`acceptable_status` に含まれない status の artifact は weak evidence
+として report され、missing と同様に overall status を `partial` に落とす。
+この audit は物理的妥当性を自動判定せず、artifact provenance と story step の対応を明示する。
+
+---
+
 ## publication export outputs
 
 `runo analyze export <run-or-survey> --paper <paper-id>` は、paper repo に渡しやすい

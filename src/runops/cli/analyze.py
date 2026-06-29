@@ -10,7 +10,9 @@ import typer
 from runops.cli.run_lookup import find_project_runs_dir, resolve_run_or_cwd
 from runops.core.actions import ActionStatus, execute_action
 from runops.core.analysis import (
+    audit_story_workspace,
     create_comparison_workspace,
+    create_story_workspace,
     list_survey_plot_recipes,
     load_survey_plot_table,
     render_survey_plot,
@@ -305,6 +307,75 @@ def new_comparison(
     typer.echo(f"  Manifest: {result.manifest_path}")
     typer.echo(f"  README: {result.readme_path}")
     typer.echo(f"  Sources: {result.source_count}")
+
+
+def new_story(
+    name: str = typer.Argument(help="Human-readable story name or stable id."),
+    story_id: str = typer.Option(
+        "",
+        "--id",
+        help="Stable story id under analysis/stories/. Defaults to a slugified name.",
+    ),
+    title: str = typer.Option(
+        "",
+        "--title",
+        help="Optional display title. Defaults to the story name.",
+    ),
+    sources: list[Path] | None = typer.Option(
+        None,
+        "--source",
+        "-s",
+        help="Run, survey, comparison, or path source to record in story.toml.",
+    ),
+) -> None:
+    """Create a story acceptance audit workspace."""
+    try:
+        cwd = Path.cwd()
+        project_root = find_project_root(cwd)
+        resolved_sources = tuple(
+            source if source.is_absolute() else (cwd / source)
+            for source in (sources or [])
+        )
+        result = create_story_workspace(
+            project_root,
+            story_id or name,
+            title=title or name,
+            sources=resolved_sources,
+        )
+    except (OSError, SimctlError) as e:
+        typer.echo(f"Error creating story workspace: {e}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Story workspace created: {result.story_dir}")
+    typer.echo(f"  ID: {result.story_id}")
+    typer.echo(f"  Story: {result.story_path}")
+    typer.echo(f"  Sources: {result.source_count}")
+
+
+def audit_story(
+    story_dir: Path = typer.Argument(
+        None,
+        help="Story workspace directory (defaults to cwd).",
+    ),
+) -> None:
+    """Audit a story workspace against indexed analysis artifacts."""
+    if story_dir is None:
+        story_dir = Path.cwd()
+    elif not story_dir.is_absolute():
+        story_dir = Path.cwd() / story_dir
+
+    try:
+        result = audit_story_workspace(story_dir)
+    except (OSError, SimctlError) as e:
+        typer.echo(f"Error auditing story: {e}", err=True)
+        raise typer.Exit(code=1) from None
+
+    typer.echo(f"Audit: {result.audit_md_path}")
+    typer.echo(f"  JSON: {result.audit_json_path}")
+    typer.echo(f"  Story: {result.story_id}")
+    typer.echo(f"  Status: {result.overall_status}")
+    if result.warnings:
+        typer.echo(f"  Warnings: {len(result.warnings)}")
 
 
 def export(

@@ -42,7 +42,7 @@ missing before a result is treated as complete.
 Create a story workspace:
 
 ```bash
-runo analyze story init surface-adhesion-scaling --source runs/sheath_scan
+runo analyze new-story surface-adhesion-scaling --source runs/sheath_scan
 ```
 
 Audit it after editing the generated `story.toml`:
@@ -60,10 +60,8 @@ analysis/stories/<story_id>/
   audit.md
 ```
 
-The initial CLI may expose `runo analyze story init` and
-`runo analyze audit-story`. If Typer nesting makes this awkward, the first slice
-can use `runo analyze new-story` plus `runo analyze audit-story` while keeping
-the same workspace layout.
+The initial CLI exposes `runo analyze new-story` plus
+`runo analyze audit-story` while keeping the same workspace layout.
 
 ## Story Schema
 

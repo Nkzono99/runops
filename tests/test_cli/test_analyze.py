@@ -106,6 +106,80 @@ class TestNewComparison:
         assert "already exists" in result.output
 
 
+class TestStoryAudit:
+    def test_new_story_creates_workspace(self, tmp_path: Path) -> None:
+        _write_project_file(tmp_path)
+
+        with patch("runops.cli.analyze.Path.cwd", return_value=tmp_path):
+            result = runner.invoke(
+                app,
+                [
+                    "analyze",
+                    "new-story",
+                    "Surface adhesion",
+                    "--source",
+                    "runs/scan",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        story_dir = tmp_path / "analysis" / "stories" / "surface-adhesion"
+        assert (story_dir / "story.toml").is_file()
+        assert "Story workspace created" in result.output
+        assert "surface-adhesion" in result.output
+
+    def test_audit_story_writes_outputs(self, tmp_path: Path) -> None:
+        _write_project_file(tmp_path)
+        run_dir = _create_run(tmp_path / "runs" / "scan", "R20260629-0001")
+        with open(run_dir / "analysis" / "artifacts.toml", "wb") as f:
+            tomli_w.dump(
+                {
+                    "schema_version": 1,
+                    "scope": "run",
+                    "generated_by": "test",
+                    "artifacts": [
+                        {
+                            "kind": "figure",
+                            "path": "figures/surface_potential.png",
+                            "title": "Surface Potential",
+                            "status": "main",
+                            "quantity": "surface_potential",
+                        }
+                    ],
+                },
+                f,
+            )
+        story_dir = tmp_path / "analysis" / "stories" / "surface-adhesion"
+        story_dir.mkdir(parents=True)
+        with open(story_dir / "story.toml", "wb") as f:
+            tomli_w.dump(
+                {
+                    "schema_version": 1,
+                    "id": "surface-adhesion",
+                    "title": "Surface adhesion story",
+                    "sources": [{"kind": "survey", "path": "runs/scan"}],
+                    "steps": [
+                        {
+                            "id": "surface-potential",
+                            "title": "Surface-potential visualization",
+                            "required_artifacts": ["figure:surface_potential"],
+                            "acceptable_status": ["main", "accepted"],
+                        }
+                    ],
+                },
+                f,
+            )
+
+        with patch("runops.cli.analyze.Path.cwd", return_value=tmp_path):
+            result = runner.invoke(app, ["analyze", "audit-story", str(story_dir)])
+
+        assert result.exit_code == 0, result.output
+        assert "Audit:" in result.output
+        assert "Status: covered" in result.output
+        assert (story_dir / "audit.json").is_file()
+        assert (story_dir / "audit.md").is_file()
+
+
 class TestSummarize:
     def test_summarize_success(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001")

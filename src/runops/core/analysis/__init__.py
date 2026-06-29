@@ -7,6 +7,13 @@ from .comparison import (
     create_comparison_workspace,
     slugify_comparison_id,
 )
+from .story import (
+    StoryAuditResult,
+    StoryWorkspaceResult,
+    audit_story_workspace,
+    create_story_workspace,
+    slugify_story_id,
+)
 from .workflow import (
     PLOT_KINDS,
     ResolvedSurveyPlotRecipe,
@@ -34,14 +41,18 @@ __all__ = [
     "ComparisonWorkspaceResult",
     "ResolvedSurveyPlotRecipe",
     "RunSummaryResult",
+    "StoryAuditResult",
+    "StoryWorkspaceResult",
     "SurveyCollectionResult",
     "SurveyPlotDataResult",
     "SurveyPlotRecipe",
     "SurveyPlotResult",
     "SurveyPlotSeries",
     "SurveyTableResult",
+    "audit_story_workspace",
     "collect_survey_summaries",
     "create_comparison_workspace",
+    "create_story_workspace",
     "extract_run_figures",
     "find_summarize_script",
     "generate_run_summary",
@@ -52,4 +63,5 @@ __all__ = [
     "resolve_survey_plot_recipe",
     "run_summarize_script",
     "slugify_comparison_id",
+    "slugify_story_id",
 ]
