@@ -9,6 +9,8 @@ description: Update the project-level research agenda. Read campaign.toml, recen
 同じ研究判断の地点から再開できるようにすること。
 
 `research/agenda.md` は TODO リストではなく、**判断の台帳** である。
+**agenda.md is not an artifact ledger.**
+Do not put chronological notes or artifact inventories back into agenda.md.
 本文は日本語で書き、コード、コマンド、変数名、run_id、ファイルパス、
 エラーメッセージは実際の表記のまま残す。
 
@@ -16,7 +18,10 @@ description: Update the project-level research agenda. Read campaign.toml, recen
 
 - `research/agenda.md` は mutable な現在状態。
 - `notes/YYYY-MM-DD.md` は append-only な時系列ログ。
+- `notes/reports/README.md` は report 群の reading order / entry point。
 - `notes/reports/` は改稿可能な整理済み report。
+- `analysis/cross_run/<comparison_id>/` は複数 run 比較の data / figures /
+  scripts / logs などの機械的 artifact。
 - `.agents/skills/` / `.claude/skills/` は手順であり、研究状態ではない。
 - `research/proposals/` と `research/reviews/` は必要時のみ使う。
 
@@ -107,6 +112,9 @@ description: Update the project-level research agenda. Read campaign.toml, recen
 - 新しい production run / new model family / large sweep は proposal なしに進めない。
 - `paused` / `killed` を消さない。理由と revisit condition を残す。
 - 詳細な時系列は note へ、現在判断は agenda へ置く。
+- report の読む順番や artifact index は `notes/reports/README.md` に置く。
+- cross-run の CSV、figure、script、log は `analysis/cross_run/<comparison_id>/`
+  に置く。
 - 毎回、次 action は 0〜3 個に絞る。
 - 「何もしない」「待つ」「kill」「report 化する」も有効な decision とする。
 - `Feedback To runops` に研究 TODO を混ぜない。

@@ -79,8 +79,13 @@ def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
     notes_dir = project_dir / "notes"
     if _mkdir_if_missing(notes_dir):
         created.append("notes/")
-    if _mkdir_if_missing(notes_dir / "reports"):
+    reports_dir = notes_dir / "reports"
+    if _mkdir_if_missing(reports_dir):
         created.append("notes/reports/")
+    if _mkdir_if_missing(reports_dir / "archive"):
+        created.append("notes/reports/archive/")
+    if _mkdir_if_missing(reports_dir / "figures"):
+        created.append("notes/reports/figures/")
     if _mkdir_if_missing(notes_dir / "history"):
         created.append("notes/history/")
 
@@ -89,6 +94,12 @@ def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
     readme_path = notes_dir / "README.md"
     if _write_if_missing(readme_path, load_static("scaffold/notes/README.md")):
         created.append("notes/README.md")
+    reports_readme_path = reports_dir / "README.md"
+    if _write_if_missing(
+        reports_readme_path,
+        load_static("scaffold/notes/reports/README.md"),
+    ):
+        created.append("notes/reports/README.md")
 
 
 def _create_materials_skeleton(project_dir: Path, created: list[str]) -> None:

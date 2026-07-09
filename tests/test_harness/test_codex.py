@@ -149,7 +149,17 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "{{ skill_prefix }}" not in codex_note
     assert "Model name must not stand alone" in codex_note
     assert "Figures are first-class note content" in codex_note
+    assert "Do not replace image embeds with plain Markdown links" in codex_note
+    assert "notes/reports/README.md" in codex_note
     assert "Quality gate before append" in codex_note
+    codex_research = bundle.files[".agents/skills/research-agenda/SKILL.md"]
+    assert "agenda.md is not an artifact ledger" in codex_research
+    assert (
+        "Do not put chronological notes or artifact inventories back into agenda.md"
+        in codex_research
+    )
+    assert "notes/reports/README.md" in codex_research
+    assert "analysis/cross_run/<comparison_id>/" in codex_research
     codex_run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
     assert "runo runs submit --dry-run --all" in codex_run_all
     assert "runo runs submit --all --dry-run" not in codex_run_all
@@ -161,6 +171,9 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     codex_summarize = bundle.files[".agents/skills/summarize-script/SKILL.md"]
     assert "`$note`" in codex_summarize
     assert "cases/<simulator>/<case>/summarize.py" in codex_summarize
+    assert "analysis/cross_run/<comparison_id>/" in codex_summarize
+    assert "notes/reports/<topic>.md" in codex_summarize
+    assert "research/agenda.md" in codex_summarize
     assert "{{ skill_prefix }}" not in codex_summarize
     codex_migrate = bundle.files[".agents/skills/migrate-runops/SKILL.md"]
     assert "`$update-runops`" in codex_migrate

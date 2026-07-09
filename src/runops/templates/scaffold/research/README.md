@@ -29,6 +29,12 @@
 `agenda.md` は TODO リストではなく、判断の台帳です。次の Agent / 人間が
 同じ研究判断の地点から再開できるように、次を短く保ちます。
 
+**agenda.md is not an artifact ledger.**
+Do not put chronological notes or artifact inventories back into agenda.md.
+時系列の作業ログは `notes/YYYY-MM-DD.md`、整理済み report の入口は
+`notes/reports/README.md`、複数 run 比較の機械的 artifact は
+`analysis/cross_run/<comparison_id>/` に分けます。
+
 - 今、何を信じているか
 - その根拠はどこにあるか
 - 何が未解決か

@@ -40,6 +40,20 @@ EOF
 - `runo notes show [DATE|today|latest]` — active と history から指定日の内容を表示
 - `runo notes archive --older-than 7d` — 古い日次 notebook を history に移す
 
+## 書き先の分岐
+
+- daily chronology -> `notes/YYYY-MM-DD.md`
+- reading order / report index -> `notes/reports/README.md`
+- refined prose / analysis story -> `notes/reports/<topic>.md`
+- old or full report -> `notes/reports/archive/`
+- report-owned figures -> `notes/reports/figures/`
+- cross-run machine artifacts -> `analysis/cross_run/<comparison_id>/`
+- current decision -> `research/agenda.md`
+- proposals / reviews -> `research/proposals/`, `research/reviews/`
+
+`{{ skill_prefix }}note` が直接 append するのは `notes/YYYY-MM-DD.md` だけ。
+長くなった story は note に要点と path を残し、report/index/agenda へ分ける。
+
 ## ノートの基本原則
 
 1. **Context first**
@@ -59,6 +73,9 @@ EOF
 
 4. **Figures are first-class note content**
    - 図を生成した場合、原則として Markdown image として note に埋め込む。
+   - Do not replace image embeds with plain Markdown links. 人間が
+     Markdown だけを開いて図を確認できるように、代表図は
+     `![caption](relative/path.png)` で表示する。
    - 図には、何を描いたか、scale/normalization、主要観察、解釈、caveat を添える。
    - 大量の図を生成した場合は、代表図または contact sheet を埋め込み、全 figure path
      を列挙する。
@@ -348,6 +365,8 @@ entry が 3 件以上にまたがって同じ story を形成したら、`notes/
 - model 名だけで終わっていないか
 - command / script / output path / manifest / summary などの evidence があるか
 - 図を生成した場合、Markdown image と caption/observation/interpretation があるか
+- 代表図が `![caption](relative/path.png)` として埋め込まれ、plain link だけに
+  なっていないか
 - 数値には単位・対象 run・frame/slice があるか
 - observation と interpretation が混ざっていないか
 - next action または stop condition があるか

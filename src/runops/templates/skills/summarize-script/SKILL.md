@@ -36,6 +36,11 @@ survey 全体の contact sheet、複数 run を並べる比較図、論文図は
 `summarize.py` に入れず、`runo analyze collect` 後に `<survey>/summary/plots/`
 または `analysis/cross_run/<comparison_id>/` で作る。
 
+cross-run comparison や paper material bundle は
+`analysis/cross_run/<comparison_id>/` に置く。人間が読む interpretation や
+analysis story は `notes/reports/<topic>.md`、現在の研究判断だけは
+`research/agenda.md` に分ける。
+
 ## 必須インタフェース
 
 ```python

@@ -113,6 +113,9 @@ class TestInit:
         # Lab notebook scaffolding
         assert (tmp_path / "notes").is_dir()
         assert (tmp_path / "notes" / "reports").is_dir()
+        assert (tmp_path / "notes" / "reports" / "README.md").is_file()
+        assert (tmp_path / "notes" / "reports" / "archive").is_dir()
+        assert (tmp_path / "notes" / "reports" / "figures").is_dir()
         assert (tmp_path / "notes" / "history").is_dir()
         assert (tmp_path / "notes" / "README.md").is_file()
         # Source material scaffolding
@@ -139,11 +142,26 @@ class TestInit:
         assert "runo notes archive" in readme
         assert "notes/YYYY-MM-DD.md" in readme
         assert "notes/history/YYYY/YYYY-MM-DD.md" in readme
+        assert "notes/reports/README.md" in readme
+        assert "Markdown だけで図を確認できる" in readme
         assert "再開できるログ" in readme
         assert "Context:" in readme
         assert "Evidence:" in readme
         assert "Observation:" in readme
         assert "Interpretation:" in readme
+
+    def test_init_reports_readme_content(self, tmp_path: Path) -> None:
+        """notes/reports/README.md describes report-index conventions."""
+        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+        readme = (tmp_path / "notes" / "reports" / "README.md").read_text(
+            encoding="utf-8"
+        )
+
+        assert "Recommended Reading Order" in readme
+        assert "Machine-Readable Entry Points" in readme
+        assert "Heavy / Recovery-Only Material" in readme
+        assert "Markdown image" in readme
+        assert "analysis/cross_run/<comparison_id>/" in readme
 
     def test_init_materials_readme_content(self, tmp_path: Path) -> None:
         """materials/README.md describes visible source material storage."""
@@ -165,8 +183,11 @@ class TestInit:
 
         assert "研究判断の台帳" in readme
         assert "TODO リストではなく" in readme
+        assert "agenda.md is not an artifact ledger" in readme
+        assert "Do not put chronological notes or artifact inventories" in readme
         assert "本文は日本語" in readme
         assert "mutable な現在の研究判断の台帳" in agenda
+        assert "agenda.md is not an artifact ledger" in agenda
         assert "What Would Change Our Mind" in agenda
         assert "Human gate: yes/no" in agenda
 
@@ -188,6 +209,8 @@ class TestInit:
         assert "`/note`" not in codex_content
         assert "Model name must not stand alone" in codex_content
         assert "Figures are first-class note content" in codex_content
+        assert "Do not replace image embeds with plain Markdown links" in codex_content
+        assert "notes/reports/README.md" in codex_content
         assert "Quality gate before append" in codex_content
 
     def test_init_creates_research_agenda_skill(self, tmp_path: Path) -> None:
@@ -206,6 +229,13 @@ class TestInit:
         assert "research/agenda.md" in content
         assert "本文は日本語" in content
         assert "判断の台帳" in codex_content
+        assert "agenda.md is not an artifact ledger" in codex_content
+        assert (
+            "Do not put chronological notes or artifact inventories back into agenda.md"
+            in codex_content
+        )
+        assert "notes/reports/README.md" in codex_content
+        assert "analysis/cross_run/<comparison_id>/" in codex_content
         assert (tmp_path / "research" / "paper_requests.toml").is_file()
 
     def test_init_creates_migrate_runops_skill(self, tmp_path: Path) -> None:

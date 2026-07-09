@@ -3,6 +3,8 @@
 <!--
 このファイルは mutable な現在の研究判断の台帳です。
 時系列ログではありません。詳細な作業履歴は notes/ に残します。
+agenda.md is not an artifact ledger.
+Do not put chronological notes or artifact inventories back into agenda.md.
 判断には notes/reports/runs などの evidence path を添えてください。
 本文は日本語で書き、コード・コマンド・ファイルパス・変数名・run_id は実際の表記のまま記述します。
 -->
