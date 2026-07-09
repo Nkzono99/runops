@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 from unittest.mock import patch
@@ -277,6 +278,47 @@ class TestSummarize:
         summary = adapter.summarize(run_dir)
         assert summary.get("sim_batch_count") == 200
         assert summary.get("sim_field_solver") == "fmm"
+
+    def test_summary_reads_latest_stdout_batch_progress(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        older = run_dir / "work" / "stdout.111.log"
+        newer = run_dir / "work" / "stdout.222.log"
+        older.write_text(
+            "---------- batch 10/280000 rel_change=1.0e-2 ----------\n",
+            encoding="utf-8",
+        )
+        newer.write_text(
+            "warmup\n"
+            "---------- batch 170489/280000 rel_change=2.0e-6 ----------\n"
+            "---------- batch 170490/280000 rel_change=1.9e-6 ----------\n",
+            encoding="utf-8",
+        )
+        os.utime(older, (1, 1))
+        os.utime(newer, (2, 2))
+
+        summary = adapter.summarize(run_dir)
+
+        assert summary["last_step"] == 170490
+        assert summary["nstep"] == 280000
+        assert summary["status"] == "running"
+
+    def test_status_prefers_newer_incomplete_stdout_over_stale_summary(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        out_dir = run_dir / "work" / "latest"
+        out_dir.mkdir(parents=True)
+        summary_file = out_dir / "summary.txt"
+        summary_file.write_text("batches=100\n", encoding="utf-8")
+        stdout = run_dir / "work" / "stdout.123.log"
+        stdout.write_text(
+            "---------- batch 25/100 rel_change=5.0e-4 ----------\n",
+            encoding="utf-8",
+        )
+        os.utime(summary_file, (1, 1))
+        os.utime(stdout, (2, 2))
+
+        assert adapter.detect_status(run_dir) == "running"
 
 
 # ===================================================================

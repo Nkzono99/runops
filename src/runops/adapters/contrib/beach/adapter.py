@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import shutil
 import subprocess
 import sys
@@ -44,6 +45,9 @@ from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
+
+_BATCH_PROGRESS_RE = re.compile(r"\bbatch\s+(\d+)\s*/\s*(\d+)\b", re.IGNORECASE)
+_STDOUT_TAIL_BYTES = 256 * 1024
 
 
 class BeachAdapter(SimulatorAdapter):
@@ -545,10 +549,12 @@ class BeachAdapter(SimulatorAdapter):
 
         Detection logic:
 
-        1. If ``summary.txt`` exists -> ``"completed"``.
-        2. If error logs contain error keywords -> ``"failed"``.
-        3. If ``charges.csv`` exists (partial output) -> ``"running"``.
-        4. Otherwise -> ``"unknown"``.
+        1. If newer stdout reports incomplete ``batch N/M`` progress ->
+           ``"running"``.
+        2. If ``summary.txt`` exists -> ``"completed"``.
+        3. If error logs contain error keywords -> ``"failed"``.
+        4. If partial outputs or logs exist -> ``"running"``.
+        5. Otherwise -> ``"unknown"``.
 
         Args:
             run_dir: The run directory.
@@ -558,15 +564,24 @@ class BeachAdapter(SimulatorAdapter):
         """
         work_dir = run_dir / WORK_DIR
 
+        summary_mtime = self._newest_summary_mtime(work_dir)
+        progress = self._latest_stdout_batch_progress(work_dir)
+        if progress is not None:
+            last_batch, batch_count, log_file = progress
+            log_mtime = self._mtime(log_file)
+            if last_batch < batch_count and (
+                summary_mtime is None
+                or (log_mtime is not None and log_mtime >= summary_mtime)
+            ):
+                return "running"
+
         # Check for summary.txt (written on normal completion)
-        for output_dir in (
-            work_dir / "latest",
-            work_dir / "outputs" / "latest",
-            work_dir / "outputs",
-            work_dir,
-        ):
-            if (output_dir / "summary.txt").is_file():
-                return "completed"
+        if summary_mtime is not None:
+            return "completed"
+
+        if progress is not None:
+            last_batch, batch_count, _log_file = progress
+            return "completed" if last_batch >= batch_count else "running"
 
         # Check for errors in logs
         for pattern in ("stderr.*.log", "*.err"):
@@ -582,12 +597,7 @@ class BeachAdapter(SimulatorAdapter):
                     pass
 
         # Partial outputs indicate running
-        for output_dir in (
-            work_dir / "latest",
-            work_dir / "outputs" / "latest",
-            work_dir / "outputs",
-            work_dir,
-        ):
+        for output_dir in self._output_dirs(work_dir):
             if (output_dir / "charges.csv").is_file():
                 return "running"
 
@@ -659,7 +669,90 @@ class BeachAdapter(SimulatorAdapter):
             except (tomllib.TOMLDecodeError, OSError):
                 pass
 
+        progress = self._latest_stdout_batch_progress(work_dir)
+        if progress is not None:
+            last_batch, batch_count, _log_file = progress
+            summary["last_step"] = last_batch
+            summary["nstep"] = batch_count
+
         return summary
+
+    @staticmethod
+    def _output_dirs(work_dir: Path) -> tuple[Path, ...]:
+        """Return BEACH output directory candidates in lookup order."""
+        return (
+            work_dir / "latest",
+            work_dir / "outputs" / "latest",
+            work_dir / "outputs",
+            work_dir,
+        )
+
+    @staticmethod
+    def _mtime(path: Path) -> float | None:
+        """Return file mtime, or ``None`` when it cannot be read."""
+        try:
+            return path.stat().st_mtime
+        except OSError:
+            return None
+
+    def _newest_summary_mtime(self, work_dir: Path) -> float | None:
+        """Return the newest ``summary.txt`` mtime across output candidates."""
+        newest: float | None = None
+        for output_dir in self._output_dirs(work_dir):
+            summary_file = output_dir / "summary.txt"
+            if not summary_file.is_file():
+                continue
+            mtime = self._mtime(summary_file)
+            if mtime is not None and (newest is None or mtime > newest):
+                newest = mtime
+        return newest
+
+    def _latest_stdout_batch_progress(
+        self, work_dir: Path
+    ) -> tuple[int, int, Path] | None:
+        """Return latest parsed stdout ``batch current/total`` progress."""
+        for log_file in self._stdout_logs(work_dir):
+            progress = self._parse_batch_progress(self._read_text_tail(log_file))
+            if progress is not None:
+                last_batch, batch_count = progress
+                return last_batch, batch_count, log_file
+        return None
+
+    def _stdout_logs(self, work_dir: Path) -> list[Path]:
+        """Return stdout log candidates newest first."""
+        candidates: list[tuple[float, str, Path]] = []
+        seen: set[Path] = set()
+        for pattern in ("stdout.*.log", "*.out"):
+            for log_file in work_dir.glob(pattern):
+                if log_file in seen or not log_file.is_file():
+                    continue
+                mtime = self._mtime(log_file)
+                if mtime is None:
+                    continue
+                candidates.append((mtime, log_file.name, log_file))
+                seen.add(log_file)
+        candidates.sort(reverse=True)
+        return [path for _mtime, _name, path in candidates]
+
+    @staticmethod
+    def _read_text_tail(path: Path) -> str:
+        """Read the tail of a potentially large text log."""
+        try:
+            with path.open("rb") as f:
+                f.seek(0, 2)
+                size = f.tell()
+                f.seek(max(0, size - _STDOUT_TAIL_BYTES))
+                return f.read().decode("utf-8", errors="replace")
+        except OSError:
+            return ""
+
+    @staticmethod
+    def _parse_batch_progress(text: str) -> tuple[int, int] | None:
+        """Parse the last ``batch N/M`` progress marker from text."""
+        latest: tuple[int, int] | None = None
+        for match in _BATCH_PROGRESS_RE.finditer(text):
+            latest = (int(match.group(1)), int(match.group(2)))
+        return latest
 
     def collect_provenance(
         self,

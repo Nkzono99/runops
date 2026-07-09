@@ -23,6 +23,8 @@ def _create_dashboard_run(
     status: str,
     job_id: str = "",
     display_name: str = "",
+    simulator_name: str = "fake_sim",
+    adapter: str = "fake_sim",
     last_slurm_state: str = "",
 ) -> Path:
     """Create a minimal dashboard run under ``runs_dir``."""
@@ -32,6 +34,8 @@ def _create_dashboard_run(
         status=status,
         job_id=job_id,
         display_name=display_name or None,
+        simulator_name=simulator_name,
+        adapter=adapter,
         last_slurm_state=last_slurm_state,
     )
 
@@ -124,6 +128,34 @@ class TestDashboard:
         assert result.exit_code == 0
         assert "R20260327-0001" in result.output
         assert "COMPLETED" not in result.output
+
+    def test_dashboard_shows_beach_stdout_batch_progress(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project_dir = create_minimal_project(tmp_path)
+        survey = project_dir / "runs" / "series_x"
+        run_dir = _create_dashboard_run(
+            survey,
+            "R20260327-0001",
+            status="running",
+            job_id="11111",
+            last_slurm_state="RUNNING",
+            simulator_name="beach",
+            adapter="beach",
+        )
+        work_dir = run_dir / "work"
+        work_dir.mkdir()
+        (work_dir / "stdout.11111.log").write_text(
+            "---------- batch 170490/280000 rel_change=1.9e-6 ----------\n",
+            encoding="utf-8",
+        )
+
+        result = runner.invoke(app, ["runs", "dashboard", str(survey)])
+
+        assert result.exit_code == 0, result.output
+        assert "170490/280000" in result.output
+        assert " 60.9%" in result.output
 
 
 class TestDashboardWatch:
