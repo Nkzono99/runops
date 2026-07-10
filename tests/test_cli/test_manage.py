@@ -354,7 +354,7 @@ class TestCancel:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """`runs cancel` invokes scancel and then sync."""
-        from runops.core import actions
+        from runops.application import actions
         from runops.slurm import submit as slurm_submit
         from runops.slurm.submit import CommandResult
 
@@ -371,7 +371,7 @@ class TestCancel:
         monkeypatch.setattr(slurm_submit, "_default_runner", fake_runner)
 
         # Stub sync_run so we don't actually talk to Slurm.
-        from runops.core.actions import ActionResult, ActionStatus
+        from runops.application.actions import ActionResult, ActionStatus
 
         def fake_sync(rd: Path) -> ActionResult:
             return ActionResult(
@@ -402,8 +402,8 @@ class TestCancel:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """`runs cancel` accepts multiple run arguments and cancels each."""
-        from runops.core import actions
-        from runops.core.actions import ActionResult, ActionStatus
+        from runops.application import actions
+        from runops.application.actions import ActionResult, ActionStatus
 
         (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
         r1 = _create_run(tmp_path, "R20260327-0001", status="running", job_id="100")
@@ -438,8 +438,8 @@ class TestCancel:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Passing a survey dir cancels only submitted/running runs."""
-        from runops.core import actions
-        from runops.core.actions import ActionResult, ActionStatus
+        from runops.application import actions
+        from runops.application.actions import ActionResult, ActionStatus
 
         (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
         survey = tmp_path / "runs" / "series_A"

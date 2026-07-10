@@ -7,9 +7,9 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops.application.actions import ActionStatus
+from runops.application.actions import sync_run as sync_run_action
 from runops.cli.run_lookup import resolve_run_targets
-from runops.core.actions import ActionStatus
-from runops.core.actions import sync_run as sync_run_action
 from runops.core.exceptions import (
     ManifestNotFoundError,
 )

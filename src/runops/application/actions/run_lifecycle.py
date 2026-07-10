@@ -6,8 +6,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from runops.core.actions.helpers import _error, _precondition_fail, _require_state
-from runops.core.actions.result import ActionResult, ActionStatus
+from runops.application.actions.helpers import (
+    _error,
+    _precondition_fail,
+    _require_state,
+)
+from runops.application.actions.result import ActionResult, ActionStatus
 from runops.core.event_log import logged_action
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState
@@ -23,8 +27,8 @@ def create_run(
     params: dict[str, Any] | None = None,
 ) -> ActionResult:
     """Create a new run directory from a case definition."""
+    from runops.application.run_creation import create_case_run
     from runops.core.project import load_project
-    from runops.core.run_creation import create_case_run
 
     try:
         project = load_project(project_root)
@@ -55,8 +59,8 @@ def create_run(
 @logged_action("create_survey")
 def create_survey(project_root: Path, survey_dir: Path) -> ActionResult:
     """Expand a survey.toml into created run directories."""
+    from runops.application.run_creation import create_survey_runs
     from runops.core.project import load_project
-    from runops.core.run_creation import create_survey_runs
 
     try:
         project = load_project(project_root)

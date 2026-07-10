@@ -8,6 +8,7 @@ from typing import Optional
 
 import typer
 
+from runops.application.run_creation import create_case_run
 from runops.cli.run_lookup import resolve_run_or_cwd
 from runops.core.discovery import collect_existing_run_ids
 from runops.core.exceptions import SimctlError
@@ -18,7 +19,6 @@ from runops.core.run import (
     rewrite_job_script_references,
     sanitize_derived_manifest,
 )
-from runops.core.run_creation import create_case_run
 
 
 def clone(

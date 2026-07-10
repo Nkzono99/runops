@@ -14,8 +14,8 @@ from typing import Any
 import tomli_w
 
 from runops import __version__
+from runops.application.context import build_project_context
 from runops.core.analysis.artifacts import read_artifacts_index
-from runops.core.context import build_project_context
 from runops.core.discovery import discover_runs, resolve_run, validate_uniqueness
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest

@@ -101,7 +101,7 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
 
     # -- Available actions --
     try:
-        from runops.core.actions import list_actions
+        from runops.application.actions import list_actions
 
         ctx["available_actions"] = [a.to_dict() for a in list_actions()]
     except Exception as exc:

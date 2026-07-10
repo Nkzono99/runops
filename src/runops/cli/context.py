@@ -23,7 +23,7 @@ def context(
     ),
 ) -> None:
     """Show project context bundle (designed for AI agents)."""
-    from runops.core.context import build_project_context
+    from runops.application.context import build_project_context
 
     root = find_project_root(directory)
     ctx = build_project_context(root)

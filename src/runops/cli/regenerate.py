@@ -7,10 +7,10 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops.application.run_creation import RegenerateResult, regenerate_run
 from runops.cli.run_lookup import resolve_run_or_cwd
 from runops.core.exceptions import ProjectConfigError, SimctlError
 from runops.core.project import find_project_root, load_project
-from runops.core.run_creation import RegenerateResult, regenerate_run
 
 
 def regenerate(

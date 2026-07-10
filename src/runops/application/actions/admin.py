@@ -6,13 +6,13 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from runops.core.actions.helpers import (
+from runops.application.actions.helpers import (
     _dir_size,
     _error,
     _precondition_fail,
     _require_state,
 )
-from runops.core.actions.result import ActionResult, ActionStatus
+from runops.application.actions.result import ActionResult, ActionStatus
 from runops.core.event_log import emit_event, logged_action
 from runops.core.exceptions import ProjectNotFoundError, SimctlError
 from runops.core.project import find_project_root
@@ -227,7 +227,7 @@ def cancel_run(run_dir: Path) -> ActionResult:
     updated atomically once Slurm reports the cancellation.  Use this instead
     of bare ``scancel`` so the run state ends up consistent.
     """
-    from runops.core import actions as action_registry
+    from runops.application import actions as action_registry
     from runops.core.manifest import read_manifest
     from runops.slurm.submit import (
         SlurmCancelError,

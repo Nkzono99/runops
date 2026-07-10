@@ -6,8 +6,12 @@ import json
 from pathlib import Path
 from typing import Any
 
-from runops.core.actions.helpers import _error, _precondition_fail, _require_state
-from runops.core.actions.result import ActionResult, ActionStatus
+from runops.application.actions.helpers import (
+    _error,
+    _precondition_fail,
+    _require_state,
+)
+from runops.application.actions.result import ActionResult, ActionStatus
 from runops.core.event_log import logged_action
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState

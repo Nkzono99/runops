@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.actions.result import ActionResult, ActionStatus
+from runops.application.actions.result import ActionResult, ActionStatus
 from runops.core.state import RunState
 
 

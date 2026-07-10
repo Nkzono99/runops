@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
+from runops.application import actions
+from runops.application.actions import ActionStatus
 from runops.cli.main import app as cli_app
-from runops.core import actions
-from runops.core.actions import ActionStatus
 from runops.mcp.registry import all_tool_specs
 
 

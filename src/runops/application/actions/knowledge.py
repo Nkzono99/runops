@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.actions.helpers import _error, _precondition_fail
-from runops.core.actions.result import ActionResult, ActionStatus
+from runops.application.actions.helpers import _error, _precondition_fail
+from runops.application.actions.result import ActionResult, ActionStatus
 from runops.core.event_log import logged_action
 
 

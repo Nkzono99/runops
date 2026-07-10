@@ -7,10 +7,10 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops.application.actions import ActionStatus
+from runops.application.actions import plan_retry as plan_retry_action
+from runops.application.actions import retry_run as retry_run_action
 from runops.cli.run_lookup import resolve_run_or_cwd
-from runops.core.actions import ActionStatus
-from runops.core.actions import plan_retry as plan_retry_action
-from runops.core.actions import retry_run as retry_run_action
 
 
 def _parse_adjustments(values: list[str]) -> dict[str, str]:

@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 
 import tomli_w
 
-from runops.core.actions import (
+from runops.application.actions import (
     ActionStatus,
     add_fact,
     archive_run,
@@ -25,7 +25,7 @@ from runops.core.actions import (
     submit_run,
     summarize_run,
 )
-from runops.core.actions import (
+from runops.application.actions import (
     create_run as create_run_action,
 )
 from runops.core.knowledge import list_insights, load_facts
@@ -33,6 +33,13 @@ from runops.core.state import RunState
 from runops.slurm.query import JobStatus
 
 ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
+
+
+def test_application_actions_expose_registered_actions() -> None:
+    from runops.application import actions
+
+    assert set(actions.ACTION_SPECS) == set(actions._DISPATCH)
+    assert callable(actions.submit_run)
 
 
 def _write_manifest(run_dir: Path, data: dict[str, Any]) -> None:

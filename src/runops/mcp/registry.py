@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from runops.core.actions.specs import ACTION_SPECS
+from runops.application.actions.specs import ACTION_SPECS
 from runops.core.codex_plugin import (
     CODEX_PLUGIN_ACTIVATION_SCOPE,
     CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,

@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import tomli_w
 
-from runops.core.context import (
+from runops.application.context import (
     _collect_codex_plugins,
     _collect_facts_summary,
     _collect_knowledge_paths,
@@ -580,7 +580,10 @@ def test_build_project_context_marks_available_actions_as_degraded_on_error(
 ) -> None:
     _write_toml(tmp_path / "runops.toml", {"project": {"name": "demo"}})
 
-    with patch("runops.core.actions.list_actions", side_effect=RuntimeError("boom")):
+    with patch(
+        "runops.application.actions.list_actions",
+        side_effect=RuntimeError("boom"),
+    ):
         ctx = build_project_context(tmp_path)
 
     assert ctx["available_actions"] == []

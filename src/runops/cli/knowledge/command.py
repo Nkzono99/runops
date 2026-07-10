@@ -8,12 +8,12 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops.application.actions import ActionStatus
+from runops.application.actions import add_fact as add_fact_action
+from runops.application.actions import promote_fact as promote_fact_action
+from runops.application.actions import save_insight as save_insight_action
 from runops.cli.knowledge.common import _find_root
 from runops.cli.knowledge.sources import profile_app, source_app
-from runops.core.actions import ActionStatus
-from runops.core.actions import add_fact as add_fact_action
-from runops.core.actions import promote_fact as promote_fact_action
-from runops.core.actions import save_insight as save_insight_action
 from runops.core.knowledge import (
     FACT_TYPES,
     INSIGHT_TYPES,

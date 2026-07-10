@@ -21,7 +21,7 @@ def test_context_outputs_json_bundle(tmp_path: Path) -> None:
 
     with (
         patch("runops.cli.context.find_project_root", return_value=tmp_path),
-        patch("runops.core.context.build_project_context", return_value=context_data),
+        patch("runops.application.context.build_project_context", return_value=context_data),
     ):
         result = runner.invoke(app, ["context", str(tmp_path)])
 
@@ -51,7 +51,7 @@ def test_context_no_json_outputs_human_summary(tmp_path: Path) -> None:
 
     with (
         patch("runops.cli.context.find_project_root", return_value=tmp_path),
-        patch("runops.core.context.build_project_context", return_value=context_data),
+        patch("runops.application.context.build_project_context", return_value=context_data),
     ):
         result = runner.invoke(app, ["context", "--no-json", str(tmp_path)])
 
