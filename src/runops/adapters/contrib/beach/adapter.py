@@ -6,11 +6,9 @@ detection, and OpenMP/MPI hybrid execution.
 
 from __future__ import annotations
 
-import hashlib
 import logging
 import re
 import shutil
-import subprocess
 import sys
 from pathlib import Path
 from typing import Any
@@ -25,7 +23,15 @@ try:
 except ImportError:
     tomli_w = None  # type: ignore[assignment]
 
-from runops.adapters._utils import find_venv
+from runops.adapters._provenance import (
+    collect_executable_provenance as _collect_executable_provenance,
+)
+from runops.adapters._runtime import (
+    ExecutableRuntimeDefaults as _ExecutableRuntimeDefaults,
+)
+from runops.adapters._runtime import (
+    resolve_executable_runtime as _resolve_executable_runtime,
+)
 from runops.adapters._utils.toml_utils import apply_dotted_overrides
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.contrib._paths import relative_to_run
@@ -48,6 +54,12 @@ logger = logging.getLogger(__name__)
 
 _BATCH_PROGRESS_RE = re.compile(r"\bbatch\s+(\d+)\s*/\s*(\d+)\b", re.IGNORECASE)
 _STDOUT_TAIL_BYTES = 256 * 1024
+_RUNTIME_DEFAULTS = _ExecutableRuntimeDefaults(
+    executable="beach",
+    build_command="make build",
+    discover_venv=True,
+    require_executable=False,
+)
 
 
 class BeachAdapter(SimulatorAdapter):
@@ -446,45 +458,13 @@ class BeachAdapter(SimulatorAdapter):
         Raises:
             ValueError: If required keys are missing or mode is invalid.
         """
-        runtime: dict[str, Any] = {"resolver_mode": resolver_mode}
-        executable = simulator_config.get("executable", "beach")
-
-        venv_path = simulator_config.get("venv_path", "")
-        if not venv_path:
-            found = find_venv(Path.cwd())
-            if found:
-                venv_path = str(found)
-        if venv_path:
-            runtime["venv_path"] = venv_path
-
-        if resolver_mode == "package":
-            resolved = shutil.which(executable)
-            runtime["executable"] = resolved if resolved else executable
-            runtime["source"] = "package"
-
-        elif resolver_mode == "local_source":
-            source_repo = simulator_config.get("source_repo", "")
-            if not source_repo:
-                msg = "source_repo required for local_source mode"
-                raise ValueError(msg)
-            runtime["source_repo"] = source_repo
-            runtime["executable"] = executable
-            runtime["build_command"] = simulator_config.get(
-                "build_command", "make build"
-            )
-
-        elif resolver_mode == "local_executable":
-            exe_path = simulator_config.get("executable", "")
-            if not exe_path:
-                msg = "executable path required for local_executable mode"
-                raise ValueError(msg)
-            runtime["executable"] = exe_path
-
-        else:
-            msg = f"Unsupported resolver_mode: {resolver_mode}"
-            raise ValueError(msg)
-
-        return runtime
+        return _resolve_executable_runtime(
+            simulator_config,
+            resolver_mode,
+            defaults=_RUNTIME_DEFAULTS,
+            which=shutil.which,
+            start_dir=Path.cwd(),
+        )
 
     def build_program_command(
         self,
@@ -766,53 +746,9 @@ class BeachAdapter(SimulatorAdapter):
         Returns:
             Provenance dict with executable hash and git info.
         """
-        provenance: dict[str, Any] = {
-            "resolver_mode": runtime_info.get("resolver_mode", ""),
-            "executable": runtime_info.get("executable", ""),
-            "exe_hash": "",
-            "git_commit": "",
-            "git_dirty": False,
-            "source_repo": runtime_info.get("source_repo", ""),
-            "build_command": runtime_info.get("build_command", ""),
-            "package_version": "",
-        }
-
-        # Executable hash
-        exe_path = Path(runtime_info.get("executable", ""))
-        if exe_path.is_file():
-            h = hashlib.sha256()
-            with exe_path.open("rb") as f:
-                for chunk in iter(lambda: f.read(8192), b""):
-                    h.update(chunk)
-            provenance["exe_hash"] = f"sha256:{h.hexdigest()}"
-
-        # Git provenance for local_source
-        if runtime_info.get("resolver_mode") == "local_source":
-            repo = runtime_info.get("source_repo", "")
-            if repo and Path(repo).is_dir():
-                try:
-                    result = subprocess.run(
-                        ["git", "rev-parse", "HEAD"],
-                        capture_output=True,
-                        text=True,
-                        cwd=repo,
-                        check=False,
-                    )
-                    if result.returncode == 0:
-                        provenance["git_commit"] = result.stdout.strip()
-                    result = subprocess.run(
-                        ["git", "status", "--porcelain"],
-                        capture_output=True,
-                        text=True,
-                        cwd=repo,
-                        check=False,
-                    )
-                    if result.returncode == 0:
-                        provenance["git_dirty"] = bool(result.stdout.strip())
-                except FileNotFoundError:
-                    logger.debug("git not found; skipping git provenance")
-
-        return provenance
+        provenance_info = dict(runtime_info)
+        provenance_info["package_version"] = ""
+        return _collect_executable_provenance(provenance_info)
 
     # ------------------------------------------------------------------
     # BEACH-specific helpers (used by CLI / jobgen integration)

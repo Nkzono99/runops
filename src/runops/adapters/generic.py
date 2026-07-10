@@ -7,14 +7,21 @@ locations within the ``work/`` directory.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import logging
 import shutil
-import subprocess
 from pathlib import Path
 from typing import Any
 
+from runops.adapters._provenance import (
+    collect_executable_provenance as _collect_executable_provenance,
+)
+from runops.adapters._runtime import (
+    ExecutableRuntimeDefaults as _ExecutableRuntimeDefaults,
+)
+from runops.adapters._runtime import (
+    resolve_executable_runtime as _resolve_executable_runtime,
+)
 from runops.adapters.base import SimulatorAdapter
 
 logger = logging.getLogger(__name__)
@@ -35,7 +42,7 @@ STDERR_FILE = "stderr.log"
 
 SUMMARY_FILE = "summary.json"
 
-_RESOLVER_MODES = frozenset({"package", "local_source", "local_executable"})
+_RUNTIME_DEFAULTS = _ExecutableRuntimeDefaults()
 
 
 class GenericAdapter(SimulatorAdapter):
@@ -143,48 +150,13 @@ class GenericAdapter(SimulatorAdapter):
             ValueError: If *resolver_mode* is unsupported or required keys
                 are missing.
         """
-        if resolver_mode not in _RESOLVER_MODES:
-            msg = (
-                f"Unsupported resolver_mode '{resolver_mode}'. "
-                f"Expected one of {sorted(_RESOLVER_MODES)}"
-            )
-            raise ValueError(msg)
-
-        runtime: dict[str, Any] = {"resolver_mode": resolver_mode}
-
-        if resolver_mode == "package":
-            exe_name = simulator_config.get("executable", "")
-            if not exe_name:
-                msg = "simulator_config must specify 'executable' for package mode"
-                raise ValueError(msg)
-            resolved = shutil.which(exe_name)
-            runtime["executable"] = resolved if resolved else exe_name
-            runtime["source"] = "package"
-
-        elif resolver_mode == "local_source":
-            source_repo = simulator_config.get("source_repo", "")
-            executable = simulator_config.get("executable", "")
-            if not source_repo or not executable:
-                msg = (
-                    "simulator_config must specify 'source_repo' and "
-                    "'executable' for local_source mode"
-                )
-                raise ValueError(msg)
-            runtime["source_repo"] = source_repo
-            runtime["executable"] = executable
-            runtime["build_command"] = simulator_config.get("build_command", "")
-
-        elif resolver_mode == "local_executable":
-            executable = simulator_config.get("executable", "")
-            if not executable:
-                msg = (
-                    "simulator_config must specify 'executable' "
-                    "for local_executable mode"
-                )
-                raise ValueError(msg)
-            runtime["executable"] = executable
-
-        return runtime
+        return _resolve_executable_runtime(
+            simulator_config,
+            resolver_mode,
+            defaults=_RUNTIME_DEFAULTS,
+            which=shutil.which,
+            start_dir=Path.cwd(),
+        )
 
     def build_program_command(
         self,
@@ -344,98 +316,4 @@ class GenericAdapter(SimulatorAdapter):
         Returns:
             Provenance dictionary.
         """
-        provenance: dict[str, Any] = {
-            "resolver_mode": runtime_info.get("resolver_mode", ""),
-            "executable": runtime_info.get("executable", ""),
-            "exe_hash": "",
-            "git_commit": "",
-            "git_dirty": False,
-            "source_repo": runtime_info.get("source_repo", ""),
-            "build_command": runtime_info.get("build_command", ""),
-            "package_version": runtime_info.get("package_version", ""),
-        }
-
-        # Executable hash
-        exe_path = Path(runtime_info.get("executable", ""))
-        if exe_path.is_file():
-            provenance["exe_hash"] = _compute_file_hash(exe_path)
-
-        # Git provenance for local_source
-        if runtime_info.get("resolver_mode") == "local_source":
-            repo = runtime_info.get("source_repo", "")
-            if repo:
-                git_info = _collect_git_info(Path(repo))
-                provenance["git_commit"] = git_info.get("commit", "")
-                provenance["git_dirty"] = git_info.get("dirty", False)
-
-        return provenance
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _compute_file_hash(path: Path) -> str:
-    """Return ``sha256:<hex>`` hash of a file.
-
-    Args:
-        path: Path to the file.
-
-    Returns:
-        Hash string prefixed with ``sha256:``.
-    """
-    h = hashlib.sha256()
-    with path.open("rb") as f:
-        for chunk in iter(lambda: f.read(8192), b""):
-            h.update(chunk)
-    return f"sha256:{h.hexdigest()}"
-
-
-def _collect_git_info(repo_path: Path) -> dict[str, Any]:
-    """Collect basic git info from a repository path.
-
-    Args:
-        repo_path: Path to the git repository root.
-
-    Returns:
-        Dictionary with ``commit``, ``dirty``, and ``branch`` keys.
-        Returns empty values on failure rather than raising.
-    """
-    info: dict[str, Any] = {"commit": "", "dirty": False, "branch": ""}
-    if not repo_path.is_dir():
-        return info
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=repo_path,
-            check=False,
-        )
-        if result.returncode == 0:
-            info["commit"] = result.stdout.strip()
-
-        result = subprocess.run(
-            ["git", "status", "--porcelain"],
-            capture_output=True,
-            text=True,
-            cwd=repo_path,
-            check=False,
-        )
-        if result.returncode == 0:
-            info["dirty"] = bool(result.stdout.strip())
-
-        result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=repo_path,
-            check=False,
-        )
-        if result.returncode == 0:
-            info["branch"] = result.stdout.strip()
-    except FileNotFoundError:
-        logger.debug("git not found on PATH; skipping git provenance")
-
-    return info
+        return _collect_executable_provenance(runtime_info)

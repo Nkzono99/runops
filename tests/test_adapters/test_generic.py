@@ -205,6 +205,20 @@ class TestResolveRuntime:
             rt = adapter.resolve_runtime(simulator_config_package, "package")
         assert rt["executable"] == "solver"
 
+    def test_package_mode_preserves_runtime_shape(
+        self,
+        adapter: GenericAdapter,
+        simulator_config_package: dict[str, Any],
+    ) -> None:
+        """Package mode keeps the established three-key payload."""
+        with patch("shutil.which", return_value=None):
+            rt = adapter.resolve_runtime(simulator_config_package, "package")
+        assert rt == {
+            "resolver_mode": "package",
+            "executable": "solver",
+            "source": "package",
+        }
+
     def test_local_source_mode(
         self,
         adapter: GenericAdapter,
@@ -543,3 +557,18 @@ class TestCollectProvenance:
         assert prov["git_dirty"] is False
         assert prov["build_command"] == ""
         assert prov["package_version"] == ""
+
+    def test_provenance_preserves_package_version(
+        self,
+        adapter: GenericAdapter,
+    ) -> None:
+        """Generic runtime metadata carries package version into provenance."""
+        prov = adapter.collect_provenance(
+            {
+                "resolver_mode": "package",
+                "executable": "solver",
+                "package_version": "2.3.4",
+            }
+        )
+
+        assert prov["package_version"] == "2.3.4"

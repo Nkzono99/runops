@@ -163,6 +163,16 @@ class TestRenderInputs:
 
 
 class TestResolveRuntime:
+    def test_package_mode_uses_simulator_default(self, adapter: BeachAdapter) -> None:
+        with patch("shutil.which", return_value=None):
+            rt = adapter.resolve_runtime({"venv_path": "/opt/beach-venv"}, "package")
+        assert rt == {
+            "resolver_mode": "package",
+            "venv_path": "/opt/beach-venv",
+            "executable": "beach",
+            "source": "package",
+        }
+
     def test_package_mode(self, adapter: BeachAdapter) -> None:
         with patch("shutil.which", return_value="/usr/local/bin/beach"):
             rt = adapter.resolve_runtime({"executable": "beach"}, "package")
@@ -174,7 +184,27 @@ class TestResolveRuntime:
             "local_source",
         )
         assert rt["source_repo"] == "/src/BEACH"
+        assert rt["executable"] == "beach"
         assert rt["build_command"] == "make build"
+
+    def test_local_source_mode_uses_simulator_defaults(
+        self,
+        adapter: BeachAdapter,
+    ) -> None:
+        rt = adapter.resolve_runtime(
+            {
+                "source_repo": "/src/BEACH",
+                "venv_path": "/opt/beach-venv",
+            },
+            "local_source",
+        )
+        assert rt == {
+            "resolver_mode": "local_source",
+            "venv_path": "/opt/beach-venv",
+            "source_repo": "/src/BEACH",
+            "executable": "beach",
+            "build_command": "make build",
+        }
 
     def test_local_executable_mode(self, adapter: BeachAdapter) -> None:
         rt = adapter.resolve_runtime(
@@ -341,6 +371,17 @@ class TestCollectProvenance:
             {"resolver_mode": "local_executable", "executable": str(exe)}
         )
         assert prov["exe_hash"].startswith("sha256:")
+
+    def test_package_version_remains_empty(self, adapter: BeachAdapter) -> None:
+        prov = adapter.collect_provenance(
+            {
+                "resolver_mode": "package",
+                "executable": "beach",
+                "package_version": "9.9.9",
+            }
+        )
+
+        assert prov["package_version"] == ""
 
 
 # ===================================================================

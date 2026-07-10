@@ -231,6 +231,16 @@ class TestRenderInputs:
 
 
 class TestResolveRuntime:
+    def test_package_mode_uses_simulator_default(self, adapter: EmseAdapter) -> None:
+        with patch("shutil.which", return_value=None):
+            rt = adapter.resolve_runtime({"venv_path": "/opt/emses-venv"}, "package")
+        assert rt == {
+            "resolver_mode": "package",
+            "venv_path": "/opt/emses-venv",
+            "executable": "mpiemses3D",
+            "source": "package",
+        }
+
     def test_package_mode(self, adapter: EmseAdapter) -> None:
         with patch("shutil.which", return_value="/usr/bin/mpiemses3D"):
             rt = adapter.resolve_runtime({"executable": "mpiemses3D"}, "package")
@@ -248,6 +258,27 @@ class TestResolveRuntime:
             "local_source",
         )
         assert rt["source_repo"] == "/src/EMSES"
+        assert rt["executable"] == "mpiemses3D"
+        assert rt["build_command"] == ""
+
+    def test_local_source_mode_uses_simulator_defaults(
+        self,
+        adapter: EmseAdapter,
+    ) -> None:
+        rt = adapter.resolve_runtime(
+            {
+                "source_repo": "/src/EMSES",
+                "venv_path": "/opt/emses-venv",
+            },
+            "local_source",
+        )
+        assert rt == {
+            "resolver_mode": "local_source",
+            "venv_path": "/opt/emses-venv",
+            "source_repo": "/src/EMSES",
+            "executable": "mpiemses3D",
+            "build_command": "",
+        }
 
     def test_unsupported_mode(self, adapter: EmseAdapter) -> None:
         with pytest.raises(ValueError, match="Unsupported"):
@@ -436,6 +467,17 @@ class TestCollectProvenance:
             {"resolver_mode": "local_executable", "executable": str(exe)}
         )
         assert prov["exe_hash"].startswith("sha256:")
+
+    def test_package_version_remains_empty(self, adapter: EmseAdapter) -> None:
+        prov = adapter.collect_provenance(
+            {
+                "resolver_mode": "package",
+                "executable": "mpiemses3D",
+                "package_version": "9.9.9",
+            }
+        )
+
+        assert prov["package_version"] == ""
 
 
 # ===================================================================
