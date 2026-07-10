@@ -23,6 +23,19 @@ from runops.core.event_log import emit_artifact_event
 from runops.core.exceptions import ManifestError, ManifestNotFoundError
 
 _MANIFEST_FILE = "manifest.toml"
+_KNOWN_MANIFEST_SECTIONS = (
+    "run",
+    "path",
+    "origin",
+    "classification",
+    "simulator",
+    "launcher",
+    "simulator_source",
+    "job",
+    "variation",
+    "params_snapshot",
+    "files",
+)
 
 
 @dataclass
@@ -43,6 +56,7 @@ class ManifestData:
         variation: Changed keys from survey expansion.
         params_snapshot: Full parameter snapshot.
         files: Standard directory names.
+        extra_sections: Unrecognized top-level sections preserved losslessly.
     """
 
     run: dict[str, Any] = field(default_factory=dict)
@@ -56,6 +70,7 @@ class ManifestData:
     variation: dict[str, Any] = field(default_factory=dict)
     params_snapshot: dict[str, Any] = field(default_factory=dict)
     files: dict[str, Any] = field(default_factory=dict)
+    extra_sections: dict[str, Any] = field(default_factory=dict, repr=False)
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the manifest to a TOML-serializable dictionary.
@@ -63,28 +78,30 @@ class ManifestData:
         Returns:
             Dictionary suitable for writing with tomli_w.
         """
-        result: dict[str, Any] = {}
+        result = copy.deepcopy(self.extra_sections)
+        for section in _KNOWN_MANIFEST_SECTIONS:
+            result.pop(section, None)
         if self.run:
-            result["run"] = dict(self.run)
+            result["run"] = copy.deepcopy(self.run)
         if self.path:
-            result["path"] = dict(self.path)
+            result["path"] = copy.deepcopy(self.path)
         if self.origin:
-            result["origin"] = dict(self.origin)
+            result["origin"] = copy.deepcopy(self.origin)
         if self.classification:
-            result["classification"] = dict(self.classification)
+            result["classification"] = copy.deepcopy(self.classification)
         if self.simulator:
-            result["simulator"] = dict(self.simulator)
+            result["simulator"] = copy.deepcopy(self.simulator)
         if self.launcher:
-            result["launcher"] = dict(self.launcher)
+            result["launcher"] = copy.deepcopy(self.launcher)
         if self.simulator_source:
-            result["simulator_source"] = dict(self.simulator_source)
+            result["simulator_source"] = copy.deepcopy(self.simulator_source)
         if self.job:
-            result["job"] = dict(self.job)
+            result["job"] = copy.deepcopy(self.job)
         if self.variation:
-            result["variation"] = dict(self.variation)
-        result["params_snapshot"] = dict(self.params_snapshot)
+            result["variation"] = copy.deepcopy(self.variation)
+        result["params_snapshot"] = copy.deepcopy(self.params_snapshot)
         if self.files:
-            result["files"] = dict(self.files)
+            result["files"] = copy.deepcopy(self.files)
         return result
 
     @classmethod
@@ -98,18 +115,33 @@ class ManifestData:
             ManifestData instance.
         """
         return cls(
-            run=dict(data.get("run", {})),
-            path=dict(data.get("path", {})),
-            origin=dict(data.get("origin", {})),
-            classification=dict(data.get("classification", {})),
-            simulator=dict(data.get("simulator", {})),
-            launcher=dict(data.get("launcher", {})),
-            simulator_source=dict(data.get("simulator_source", {})),
-            job=dict(data.get("job", {})),
-            variation=dict(data.get("variation", {})),
-            params_snapshot=dict(data.get("params_snapshot", {})),
-            files=dict(data.get("files", {})),
+            run=_copy_manifest_section(data, "run"),
+            path=_copy_manifest_section(data, "path"),
+            origin=_copy_manifest_section(data, "origin"),
+            classification=_copy_manifest_section(data, "classification"),
+            simulator=_copy_manifest_section(data, "simulator"),
+            launcher=_copy_manifest_section(data, "launcher"),
+            simulator_source=_copy_manifest_section(data, "simulator_source"),
+            job=_copy_manifest_section(data, "job"),
+            variation=_copy_manifest_section(data, "variation"),
+            params_snapshot=_copy_manifest_section(data, "params_snapshot"),
+            files=_copy_manifest_section(data, "files"),
+            extra_sections={
+                key: copy.deepcopy(value)
+                for key, value in data.items()
+                if key not in _KNOWN_MANIFEST_SECTIONS
+            },
         )
+
+
+def _copy_manifest_section(data: dict[str, Any], section: str) -> dict[str, Any]:
+    """Return one canonical manifest section as an isolated dictionary."""
+    if section not in data:
+        return {}
+    value = data[section]
+    if not isinstance(value, dict):
+        raise ManifestError(f"Manifest section {section!r} must be a TOML table")
+    return copy.deepcopy(value)
 
 
 def read_manifest(run_dir: Path) -> ManifestData:

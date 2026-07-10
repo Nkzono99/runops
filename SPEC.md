@@ -677,6 +677,7 @@ resolver_mode = "local_source"
 name = "slurm_srun"
 
 [simulator_source]
+resolver_mode = "local_source"
 source_repo = "/home/user/work/lunar-pic"
 git_commit = "abc1234"
 git_dirty = false
@@ -714,16 +715,34 @@ status_dir = "status"
 
 ## 12.3 必須記録項目
 
-最低限、以下を保持する。
+`manifest.toml` は最低限、次の table と field を保持する。
 
-* `run.id`
-* `run.status`
-* `origin.case`
-* simulator 名
-* launcher 名
-* code provenance
-* job 情報
-* params snapshot
+* `[run]`: `id`, `status`
+* `[origin]`: `case`
+* `[simulator]`: `name`
+* `[launcher]`: `name`
+* `[simulator_source]`: code provenance table
+* `[job]`: `scheduler`, `job_id`, `submitted_at`
+* `[params_snapshot]`: run 生成時の完全な parameter snapshot（空 table も可）
+
+runops が新しく生成する manifest は、上記に加えて `[path]`,
+`[classification]`, `[variation]`, `[files]` を含む canonical shape を使う。
+既存 v0 manifest は optional table が欠けていても読み取り可能とする。
+
+## 12.4 拡張データと read/write 保全
+
+canonical な top-level table は `run`, `path`, `origin`, `classification`,
+`simulator`, `launcher`, `simulator_source`, `job`, `variation`,
+`params_snapshot`, `files` である。
+
+将来の runops や外部 tool が追加した未知の top-level table と、canonical table
+内の未知 field は、runops が解釈しなくても read/write または update の前後で
+値を保持する。内部表現で拡張データと canonical table 名が衝突した場合は、
+canonical table を正本として優先する。
+
+第三者固有の metadata は、名前衝突を避けるため
+`[extensions.<namespace>]` 以下へ置くことを推奨する。TOML の comment や table
+順序は保全対象ではなく、parse された値の semantic preservation を保証する。
 
 ---
 

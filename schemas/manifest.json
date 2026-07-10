@@ -3,7 +3,15 @@
   "title": "manifest.toml",
   "description": "Run manifest, the source of truth for a runops run",
   "type": "object",
-  "required": ["run"],
+  "required": [
+    "run",
+    "origin",
+    "simulator",
+    "launcher",
+    "simulator_source",
+    "job",
+    "params_snapshot"
+  ],
   "properties": {
     "run": {
       "type": "object",
@@ -45,6 +53,7 @@
     },
     "origin": {
       "type": "object",
+      "required": ["case"],
       "properties": {
         "case": { "type": "string" },
         "survey": { "type": "string" },
@@ -66,6 +75,7 @@
     },
     "simulator": {
       "type": "object",
+      "required": ["name"],
       "properties": {
         "name": { "type": "string" },
         "adapter": { "type": "string" },
@@ -78,6 +88,7 @@
     },
     "launcher": {
       "type": "object",
+      "required": ["name"],
       "properties": {
         "name": { "type": "string" }
       },
@@ -101,6 +112,7 @@
     "job": {
       "type": "object",
       "description": "Scheduler job configuration and latest submission state",
+      "required": ["scheduler", "job_id", "submitted_at"],
       "properties": {
         "scheduler": { "type": "string" },
         "job_id": { "type": "string" },

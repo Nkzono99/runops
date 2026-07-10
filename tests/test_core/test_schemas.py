@@ -130,6 +130,17 @@ def test_manifest_schema_matches_manifest_data_sections() -> None:
     schema = _load_schema("manifest.json")
     props = schema["properties"]
 
+    assert schema["required"] == [
+        "run",
+        "origin",
+        "simulator",
+        "launcher",
+        "simulator_source",
+        "job",
+        "params_snapshot",
+    ]
+    assert schema["additionalProperties"] is True
+
     for section in (
         "run",
         "path",
@@ -147,6 +158,10 @@ def test_manifest_schema_matches_manifest_data_sections() -> None:
     assert "slurm" not in props
     assert "provenance" not in props
     assert "params" not in props
+    assert props["origin"]["required"] == ["case"]
+    assert props["simulator"]["required"] == ["name"]
+    assert props["launcher"]["required"] == ["name"]
+    assert props["job"]["required"] == ["scheduler", "job_id", "submitted_at"]
 
 
 def test_launcher_schema_accepts_current_and_legacy_type_keys() -> None:

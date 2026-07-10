@@ -18,8 +18,10 @@ import pytest
 from runops.adapters.generic import GenericAdapter
 from runops.core.case import CaseData, ClassificationData, JobData
 from runops.core.project import ProjectConfig
+from runops.core.run import RunInfo
 from runops.core.run_creation import (
     _build_job_config,
+    _build_manifest,
     _build_manifest_job,
     _merge_classification,
     _merge_job,
@@ -180,6 +182,49 @@ class TestBuildManifestJob:
         assert result["nodes"] == 2
         assert result["ntasks"] == 8
         assert "processes" not in result
+
+
+def test_build_manifest_emits_canonical_required_contract(tmp_path: Path) -> None:
+    run_info = RunInfo(
+        run_id="R20260710-0001",
+        run_dir=tmp_path / "runs" / "R20260710-0001",
+        display_name="baseline",
+        created_at="2026-07-10T12:00:00+09:00",
+        params={"nx": 64},
+    )
+    manifest = _build_manifest(
+        run_info,
+        _transactional_case(tmp_path / "cases" / "base_case"),
+        _transactional_project(tmp_path),
+        {
+            "resolver_mode": "local_executable",
+            "executable": "/nonexistent/solver",
+        },
+        GenericAdapter(),
+        _standard_site(),
+    )
+
+    raw = manifest.to_dict()
+
+    assert set(raw) == {
+        "run",
+        "path",
+        "origin",
+        "classification",
+        "simulator",
+        "launcher",
+        "simulator_source",
+        "job",
+        "variation",
+        "params_snapshot",
+        "files",
+    }
+    assert raw["origin"]["case"] == "base_case"
+    assert raw["simulator"]["name"] == "generic"
+    assert raw["launcher"]["name"] == "srun"
+    assert raw["job"]["scheduler"] == "slurm"
+    assert raw["job"]["job_id"] == ""
+    assert raw["job"]["submitted_at"] == ""
 
 
 class TestSurveyOverrides:

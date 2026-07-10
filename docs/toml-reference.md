@@ -572,31 +572,65 @@ Run manifest. The source of truth for a run's state, provenance, and history. Lo
 ```toml
 [run]
 id = "R20260329-0001"
+display_name = "wc0147_phi45"
 status = "completed"
 created_at = "2026-03-29T10:30:00+09:00"
-simulator = "emses"
+
+[path]
+run_dir = "runs/sheath/wc_scan/R20260329-0001"
+
+[origin]
 case = "flat_surface"
-
-[params]
-"tmgrid.nx" = 4000
-"tmgrid.nz" = 800
-"plasma.wc" = 0.147
-"plasma.phiz" = 45.0
-
-[job]
-job_id = "12345"
-submitted_at = "2026-03-29T10:31:00+09:00"
+survey = "S20260329-sheath-wc"
+parent_run = ""
 
 [classification]
 model = "sheath"
 submodel = "with_mag"
 tags = ["magnetic"]
 
-[provenance]
+[simulator]
+name = "emses"
+adapter = "emses"
+resolver_mode = "package"
+
+[launcher]
+name = "slurm_srun"
+
+[simulator_source]
 resolver_mode = "package"
 executable = "mpiemses3D"
+exe_hash = "sha256:..."
 git_commit = "abc1234"
 git_dirty = false
+source_repo = ""
+build_command = ""
+package_version = "1.2.3"
+
+[job]
+scheduler = "slurm"
+job_id = "12345"
+partition = "gr20001b"
+nodes = 1
+ntasks = 32
+walltime = "12:00:00"
+submitted_at = "2026-03-29T10:31:00+09:00"
+
+[variation]
+changed_keys = ["plasma.wc", "plasma.phiz"]
+
+[params_snapshot]
+"tmgrid.nx" = 4000
+"tmgrid.nz" = 800
+"plasma.wc" = 0.147
+"plasma.phiz" = 45.0
+
+[files]
+input_dir = "input"
+submit_dir = "submit"
+work_dir = "work"
+analysis_dir = "analysis"
+status_dir = "status"
 ```
 
 ### `[run]`
@@ -606,9 +640,23 @@ git_dirty = false
 | `id` | string | Unique run ID (`R<YYYYMMDD>-<NNNN>`) |
 | `status` | string | Current state (see state machine below) |
 | `created_at` | datetime | ISO 8601 creation timestamp |
-| `simulator` | string | Simulator name |
+
+### `[origin]`
+
+| Field | Type | Description |
+|-------|------|-------------|
 | `case` | string | Source case name |
-| `parent_run_id` | string | Parent run ID (for cloned/extended runs) |
+| `survey` | string | Source survey ID; empty for a non-survey run |
+| `parent_run` | string | Parent run ID for cloned/extended runs |
+
+### `[simulator]` / `[launcher]`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `simulator.name` | string | Simulator name |
+| `simulator.adapter` | string | Adapter registry name |
+| `simulator.resolver_mode` | string | Configured runtime resolver mode |
+| `launcher.name` | string | Launcher profile name |
 
 ### `[path]`
 
@@ -657,7 +705,7 @@ retry intent と partial output の検出結果だけを manifest に記録す�
 `run.retry_status = "retry_ready"` を記録する。partial output は消さずに
 `run.partial_outputs` に件数を残す。
 
-### `[params]`
+### `[params_snapshot]`
 
 Frozen parameter snapshot at run creation time.
 
@@ -665,10 +713,11 @@ Frozen parameter snapshot at run creation time.
 
 | Field | Type | Description |
 |-------|------|-------------|
+| `scheduler` | string | Scheduler name (`slurm`) |
 | `job_id` | string | Slurm job ID |
 | `submitted_at` | datetime | Submission timestamp |
 
-### `[provenance]`
+### `[simulator_source]`
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -678,6 +727,22 @@ Frozen parameter snapshot at run creation time.
 | `git_commit` | string | Git commit hash |
 | `git_dirty` | boolean | Whether working tree had uncommitted changes |
 | `source_repo` | string | Source repository path |
+| `build_command` | string | Command used to build the simulator |
+| `package_version` | string | Installed simulator package version |
+
+### Required contract and extensions
+
+The required top-level tables are `[run]`, `[origin]`, `[simulator]`,
+`[launcher]`, `[simulator_source]`, `[job]`, and `[params_snapshot]`.
+Within them, `run.id`, `run.status`, `origin.case`, `simulator.name`,
+`launcher.name`, `job.scheduler`, `job.job_id`, and `job.submitted_at` are
+required. A parameter-less run still records an empty `[params_snapshot]`.
+
+runops preserves parsed values in unknown top-level tables and unknown fields in
+canonical tables across read/write and update cycles. Third-party metadata should
+use `[extensions.<namespace>]`, for example `[extensions.example_plugin]`, to avoid
+name collisions. Canonical tables take precedence if extension data attempts to
+shadow one of their names. TOML comments and table ordering are not preserved.
 
 ---
 

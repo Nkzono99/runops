@@ -3,9 +3,15 @@
 from __future__ import annotations
 
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from runops.core.exceptions import ManifestError, ManifestNotFoundError
 from runops.core.manifest import (
@@ -45,6 +51,40 @@ class TestManifestData:
         data = ManifestData.from_dict({})
         assert data.run == {}
         assert data.params_snapshot == {}
+
+    def test_from_dict_deep_copies_extra_sections(self) -> None:
+        raw = {
+            "run": {"id": "R20260710-0001", "status": "created"},
+            "extensions": {"plugin": {"items": ["a", "b"]}},
+        }
+
+        data = ManifestData.from_dict(raw)
+        raw["extensions"]["plugin"]["items"].append("source-only")
+        serialized = data.to_dict()
+        serialized["extensions"]["plugin"]["items"].append("output-only")
+
+        assert data.extra_sections == {"extensions": {"plugin": {"items": ["a", "b"]}}}
+
+    def test_to_dict_canonical_sections_override_extra_sections(self) -> None:
+        data = ManifestData(
+            run={"id": "R20260710-0001", "status": "created"},
+            extra_sections={
+                "run": {"id": "shadowed", "status": "failed"},
+                "extensions": {"plugin": {"enabled": True}},
+            },
+        )
+
+        serialized = data.to_dict()
+
+        assert serialized["run"] == {
+            "id": "R20260710-0001",
+            "status": "created",
+        }
+        assert serialized["extensions"] == {"plugin": {"enabled": True}}
+
+    def test_from_dict_rejects_non_table_canonical_section(self) -> None:
+        with pytest.raises(ManifestError, match=r"run.*table"):
+            ManifestData.from_dict({"run": "not-a-table"})
 
 
 class TestReadManifest:
@@ -91,6 +131,47 @@ class TestWriteManifest:
         write_manifest(deep_dir, data)
         assert (deep_dir / "manifest.toml").exists()
 
+    def test_manifest_roundtrip_preserves_unknown_sections(
+        self, tmp_path: Path
+    ) -> None:
+        run_dir = tmp_path / "R20260710-0001"
+        run_dir.mkdir()
+        (run_dir / "manifest.toml").write_text(
+            '[run]\nid = "R20260710-0001"\nstatus = "created"\n'
+            '[extensions.plugin]\nenabled = true\nitems = ["a", "b"]\n',
+            encoding="utf-8",
+        )
+
+        manifest = read_manifest(run_dir)
+        manifest.run["display_name"] = "kept"
+        write_manifest(run_dir, manifest)
+
+        raw = tomllib.loads((run_dir / "manifest.toml").read_text(encoding="utf-8"))
+        assert raw["run"]["display_name"] == "kept"
+        assert raw["extensions"]["plugin"] == {
+            "enabled": True,
+            "items": ["a", "b"],
+        }
+
+    def test_manifest_roundtrip_preserves_unknown_fields_in_known_sections(
+        self, tmp_path: Path
+    ) -> None:
+        run_dir = tmp_path / "R20260710-0001"
+        run_dir.mkdir()
+        (run_dir / "manifest.toml").write_text(
+            '[run]\nid = "R20260710-0001"\nstatus = "created"\n'
+            'future_flag = "preserved"\n'
+            '[run.future_metadata]\nitems = ["a", "b"]\n',
+            encoding="utf-8",
+        )
+
+        manifest = read_manifest(run_dir)
+        write_manifest(run_dir, manifest)
+
+        raw = tomllib.loads((run_dir / "manifest.toml").read_text(encoding="utf-8"))
+        assert raw["run"]["future_flag"] == "preserved"
+        assert raw["run"]["future_metadata"] == {"items": ["a", "b"]}
+
 
 class TestUpdateManifest:
     """Tests for update_manifest()."""
@@ -118,3 +199,17 @@ class TestUpdateManifest:
     def test_update_nonexistent_raises(self, tmp_path: Path) -> None:
         with pytest.raises(ManifestNotFoundError):
             update_manifest(tmp_path, {"run": {"status": "submitted"}})
+
+    def test_update_preserves_unknown_sections(self, tmp_path: Path) -> None:
+        (tmp_path / "manifest.toml").write_text(
+            '[run]\nid = "R20260710-0001"\nstatus = "created"\n'
+            "[extensions.plugin]\nenabled = true\n",
+            encoding="utf-8",
+        )
+
+        updated = update_manifest(tmp_path, {"run": {"status": "submitted"}})
+
+        raw = tomllib.loads((tmp_path / "manifest.toml").read_text(encoding="utf-8"))
+        assert updated.run["status"] == "submitted"
+        assert updated.extra_sections == {"extensions": {"plugin": {"enabled": True}}}
+        assert raw["extensions"] == {"plugin": {"enabled": True}}
