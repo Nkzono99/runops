@@ -277,6 +277,90 @@ class TestDetectStatus:
         (out_dir / "charges.csv").write_text("elem_idx,charge_C\n")
         assert adapter.detect_status(run_dir) == "running"
 
+    def test_current_empty_stdout_does_not_reuse_completed_old_attempt(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(run_dir, job_id="222")
+        (run_dir / "work" / "stdout.111.log").write_text(
+            "---------- batch 100/100 ----------\n",
+            encoding="utf-8",
+        )
+        (run_dir / "work" / "stdout.222.log").write_text("", encoding="utf-8")
+
+        assert adapter.detect_status(run_dir) == "running"
+        assert "last_step" not in adapter.summarize(run_dir)
+
+    def test_current_final_batch_is_progress_not_completion(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(run_dir, job_id="222")
+        (run_dir / "work" / "stdout.222.log").write_text(
+            "---------- batch 100/100 ----------\n",
+            encoding="utf-8",
+        )
+
+        assert adapter.detect_status(run_dir) == "running"
+
+    def test_current_error_takes_precedence_over_final_batch(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(run_dir, job_id="222")
+        (run_dir / "work" / "stdout.222.log").write_text(
+            "---------- batch 100/100 ----------\n",
+            encoding="utf-8",
+        )
+        (run_dir / "work" / "stderr.222.log").write_text(
+            "FATAL: solver aborted\n",
+            encoding="utf-8",
+        )
+
+        assert adapter.detect_status(run_dir) == "failed"
+
+    def test_retry_ignores_summary_older_than_current_submission(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(
+            run_dir,
+            job_id="222",
+            submitted_at="2026-07-10T00:00:00+00:00",
+        )
+        out_dir = run_dir / "work" / "latest"
+        out_dir.mkdir(parents=True)
+        summary_file = out_dir / "summary.txt"
+        summary_file.write_text("batches=100\n", encoding="utf-8")
+        os.utime(summary_file, (1, 1))
+        (run_dir / "work" / "stdout.222.log").write_text("", encoding="utf-8")
+
+        assert adapter.detect_status(run_dir) == "running"
+
+    def test_retry_ignores_error_from_old_attempt(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(run_dir, job_id="222")
+        (run_dir / "work" / "stderr.111.log").write_text(
+            "FATAL: old attempt failed\n",
+            encoding="utf-8",
+        )
+        (run_dir / "work" / "stdout.222.log").write_text(
+            "---------- batch 3/100 ----------\n",
+            encoding="utf-8",
+        )
+
+        assert adapter.detect_status(run_dir) == "running"
+
+    def test_checks_all_stderr_names_for_current_attempt(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(run_dir, job_id="222")
+        error_log = run_dir / "work" / "stderr.222.log"
+        empty_log = run_dir / "work" / "222.err"
+        error_log.write_text("FATAL: solver aborted\n", encoding="utf-8")
+        empty_log.write_text("", encoding="utf-8")
+        os.utime(error_log, (1, 1))
+        os.utime(empty_log, (2, 2))
+
+        assert adapter.detect_status(run_dir) == "failed"
+
 
 # ===================================================================
 # 7. summarize
@@ -300,6 +384,25 @@ class TestSummarize:
         assert summary["mesh_nelem"] == 400
         assert summary["batches"] == 100
         assert summary["processed_particles"] == 12345
+
+    def test_summary_parses_the_same_newest_file_used_for_status(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        old_dir = run_dir / "work" / "latest"
+        current_dir = run_dir / "work" / "outputs" / "latest"
+        old_dir.mkdir(parents=True)
+        current_dir.mkdir(parents=True)
+        old_summary = old_dir / "summary.txt"
+        current_summary = current_dir / "summary.txt"
+        old_summary.write_text("batches=10\n", encoding="utf-8")
+        current_summary.write_text("batches=20\n", encoding="utf-8")
+        os.utime(old_summary, (1, 1))
+        os.utime(current_summary, (2, 2))
+
+        summary = adapter.summarize(run_dir)
+
+        assert summary["status"] == "completed"
+        assert summary["batches"] == 20
 
     def test_summary_reads_config(
         self, adapter: BeachAdapter, run_dir: Path, case_data: dict[str, Any]
@@ -349,6 +452,47 @@ class TestSummarize:
         os.utime(stdout, (2, 2))
 
         assert adapter.detect_status(run_dir) == "running"
+
+    def test_legacy_progress_uses_only_newest_stdout_candidate(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        older = run_dir / "work" / "stdout.111.log"
+        newer = run_dir / "work" / "222.out"
+        older.write_text("batch 90/100\n", encoding="utf-8")
+        newer.write_text("starting\n", encoding="utf-8")
+        os.utime(older, (1, 1))
+        os.utime(newer, (2, 2))
+
+        summary = adapter.summarize(run_dir)
+
+        assert summary["status"] == "running"
+        assert "last_step" not in summary
+
+    def test_current_job_supports_plain_slurm_log_names(
+        self, adapter: BeachAdapter, run_dir: Path
+    ) -> None:
+        _write_job_manifest(run_dir, job_id="222")
+        (run_dir / "work" / "222.out").write_text(
+            "batch 7/100\n",
+            encoding="utf-8",
+        )
+
+        summary = adapter.summarize(run_dir)
+
+        assert summary["last_step"] == 7
+        assert summary["nstep"] == 100
+
+
+def _write_job_manifest(
+    run_dir: Path,
+    *,
+    job_id: str,
+    submitted_at: str = "2026-07-10T00:00:00+00:00",
+) -> None:
+    (run_dir / "manifest.toml").write_text(
+        f'[job]\njob_id = "{job_id}"\nsubmitted_at = "{submitted_at}"\n',
+        encoding="utf-8",
+    )
 
 
 # ===================================================================

@@ -10,6 +10,9 @@ import logging
 import re
 import shutil
 import sys
+from collections.abc import Iterable
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -48,6 +51,8 @@ from runops.adapters.contrib.beach.validation import (
     validate_params as validate_beach_params,
 )
 from runops.core.codex_plugin import CodexPluginRecommendation
+from runops.core.exceptions import SimctlError
+from runops.core.manifest import read_manifest
 from runops.core.validation import ValidationIssue
 
 logger = logging.getLogger(__name__)
@@ -60,6 +65,23 @@ _RUNTIME_DEFAULTS = _ExecutableRuntimeDefaults(
     discover_venv=True,
     require_executable=False,
 )
+
+
+@dataclass(frozen=True)
+class _AttemptContext:
+    """Current BEACH job attempt recorded by the run manifest."""
+
+    job_id: str = ""
+    submitted_at: float | None = None
+
+
+@dataclass(frozen=True)
+class _BeachStatusSnapshot:
+    """Attempt-scoped status inputs shared by status and summary rendering."""
+
+    status: str
+    summary_file: Path | None
+    progress: tuple[int, int, Path] | None
 
 
 class BeachAdapter(SimulatorAdapter):
@@ -529,11 +551,11 @@ class BeachAdapter(SimulatorAdapter):
 
         Detection logic:
 
-        1. If newer stdout reports incomplete ``batch N/M`` progress ->
-           ``"running"``.
-        2. If ``summary.txt`` exists -> ``"completed"``.
-        3. If error logs contain error keywords -> ``"failed"``.
-        4. If partial outputs or logs exist -> ``"running"``.
+        1. Scope logs and summaries to the current manifest attempt when possible.
+        2. If the current stderr contains an error marker -> ``"failed"``.
+        3. If a current ``summary.txt`` is newer than current progress ->
+           ``"completed"``.
+        4. If current progress or partial outputs exist -> ``"running"``.
         5. Otherwise -> ``"unknown"``.
 
         Args:
@@ -542,49 +564,54 @@ class BeachAdapter(SimulatorAdapter):
         Returns:
             A status string.
         """
-        work_dir = run_dir / WORK_DIR
+        return self._status_snapshot(run_dir).status
 
-        summary_mtime = self._newest_summary_mtime(work_dir)
-        progress = self._latest_stdout_batch_progress(work_dir)
+    def _status_snapshot(self, run_dir: Path) -> _BeachStatusSnapshot:
+        """Collect one internally consistent current-attempt status snapshot."""
+        work_dir = run_dir / WORK_DIR
+        attempt = self._attempt_context(run_dir)
+
+        summary_file = self._newest_summary_file(work_dir)
+        summary_mtime = self._mtime(summary_file) if summary_file is not None else None
+        if (
+            summary_mtime is not None
+            and attempt.submitted_at is not None
+            and summary_mtime < attempt.submitted_at
+        ):
+            summary_file = None
+            summary_mtime = None
+
+        progress = self._latest_stdout_batch_progress(
+            work_dir,
+            job_id=attempt.job_id,
+        )
+        if self._has_error_log(work_dir, job_id=attempt.job_id):
+            return _BeachStatusSnapshot("failed", None, progress)
+
         if progress is not None:
-            last_batch, batch_count, log_file = progress
+            _last_batch, _batch_count, log_file = progress
             log_mtime = self._mtime(log_file)
-            if last_batch < batch_count and (
-                summary_mtime is None
-                or (log_mtime is not None and log_mtime >= summary_mtime)
+            if summary_mtime is None or (
+                log_mtime is not None and log_mtime >= summary_mtime
             ):
-                return "running"
+                return _BeachStatusSnapshot("running", None, progress)
 
         # Check for summary.txt (written on normal completion)
-        if summary_mtime is not None:
-            return "completed"
+        if summary_file is not None:
+            return _BeachStatusSnapshot("completed", summary_file, progress)
 
         if progress is not None:
-            last_batch, batch_count, _log_file = progress
-            return "completed" if last_batch >= batch_count else "running"
-
-        # Check for errors in logs
-        for pattern in ("stderr.*.log", "*.err"):
-            for log in work_dir.glob(pattern):
-                try:
-                    content = log.read_text(errors="replace")
-                    if content.strip() and any(
-                        kw in content.lower()
-                        for kw in ("error", "fatal", "killed", "oom")
-                    ):
-                        return "failed"
-                except OSError:
-                    pass
+            return _BeachStatusSnapshot("running", None, progress)
 
         # Partial outputs indicate running
         for output_dir in self._output_dirs(work_dir):
             if (output_dir / "charges.csv").is_file():
-                return "running"
+                return _BeachStatusSnapshot("running", None, None)
 
         if work_dir.is_dir() and any(work_dir.iterdir()):
-            return "running"
+            return _BeachStatusSnapshot("running", None, None)
 
-        return "unknown"
+        return _BeachStatusSnapshot("unknown", None, None)
 
     def summarize(self, run_dir: Path) -> dict[str, Any]:
         """Extract key metrics from BEACH outputs.
@@ -599,36 +626,30 @@ class BeachAdapter(SimulatorAdapter):
             Summary dictionary.
         """
         summary: dict[str, Any] = {}
-        work_dir = run_dir / WORK_DIR
+        snapshot = self._status_snapshot(run_dir)
 
-        summary["status"] = self.detect_status(run_dir)
+        summary["status"] = snapshot.status
 
         # Parse summary.txt
-        for output_dir in (
-            work_dir / "latest",
-            work_dir / "outputs" / "latest",
-            work_dir / "outputs",
-            work_dir,
-        ):
-            summary_file = output_dir / "summary.txt"
-            if summary_file.is_file():
-                try:
-                    for line in summary_file.read_text(encoding="utf-8").split("\n"):
-                        line = line.strip()
-                        if "=" not in line:
-                            continue
-                        key, value = line.split("=", 1)
-                        key, value = key.strip(), value.strip()
+        if snapshot.summary_file is not None:
+            try:
+                for line in snapshot.summary_file.read_text(encoding="utf-8").split(
+                    "\n"
+                ):
+                    line = line.strip()
+                    if "=" not in line:
+                        continue
+                    key, value = line.split("=", 1)
+                    key, value = key.strip(), value.strip()
+                    try:
+                        summary[key] = int(value)
+                    except ValueError:
                         try:
-                            summary[key] = int(value)
+                            summary[key] = float(value)
                         except ValueError:
-                            try:
-                                summary[key] = float(value)
-                            except ValueError:
-                                summary[key] = value
-                except OSError:
-                    pass
-                break
+                            summary[key] = value
+            except OSError:
+                pass
 
         # Output counts
         outputs = self.detect_outputs(run_dir)
@@ -649,7 +670,7 @@ class BeachAdapter(SimulatorAdapter):
             except (tomllib.TOMLDecodeError, OSError):
                 pass
 
-        progress = self._latest_stdout_batch_progress(work_dir)
+        progress = snapshot.progress
         if progress is not None:
             last_batch, batch_count, _log_file = progress
             summary["last_step"] = last_batch
@@ -675,44 +696,107 @@ class BeachAdapter(SimulatorAdapter):
         except OSError:
             return None
 
-    def _newest_summary_mtime(self, work_dir: Path) -> float | None:
-        """Return the newest ``summary.txt`` mtime across output candidates."""
-        newest: float | None = None
-        for output_dir in self._output_dirs(work_dir):
-            summary_file = output_dir / "summary.txt"
-            if not summary_file.is_file():
-                continue
-            mtime = self._mtime(summary_file)
-            if mtime is not None and (newest is None or mtime > newest):
-                newest = mtime
-        return newest
+    def _newest_summary_file(self, work_dir: Path) -> Path | None:
+        """Return the newest readable ``summary.txt`` across output candidates."""
+        candidates = self._sort_logs(
+            output_dir / "summary.txt" for output_dir in self._output_dirs(work_dir)
+        )
+        return candidates[0] if candidates else None
 
     def _latest_stdout_batch_progress(
-        self, work_dir: Path
+        self,
+        work_dir: Path,
+        *,
+        job_id: str = "",
     ) -> tuple[int, int, Path] | None:
-        """Return latest parsed stdout ``batch current/total`` progress."""
-        for log_file in self._stdout_logs(work_dir):
-            progress = self._parse_batch_progress(self._read_text_tail(log_file))
-            if progress is not None:
-                last_batch, batch_count = progress
-                return last_batch, batch_count, log_file
-        return None
+        """Return progress from the selected attempt stdout log, if present."""
+        logs = self._stdout_logs(work_dir, job_id=job_id)
+        if not logs:
+            return None
+        log_file = logs[0]
+        progress = self._parse_batch_progress(self._read_text_tail(log_file))
+        if progress is None:
+            return None
+        last_batch, batch_count = progress
+        return last_batch, batch_count, log_file
 
-    def _stdout_logs(self, work_dir: Path) -> list[Path]:
-        """Return stdout log candidates newest first."""
+    def _stdout_logs(self, work_dir: Path, *, job_id: str = "") -> list[Path]:
+        """Return stdout candidates, scoped to ``job_id`` when available."""
+        if job_id:
+            return self._existing_logs(
+                work_dir,
+                (f"stdout.{job_id}.log", f"{job_id}.out"),
+            )
+        return self._newest_logs(work_dir, ("stdout.*.log", "*.out"))
+
+    def _has_error_log(self, work_dir: Path, *, job_id: str) -> bool:
+        """Return whether the selected attempt stderr contains an error marker."""
+        if job_id:
+            logs = self._existing_logs(
+                work_dir,
+                (f"stderr.{job_id}.log", f"{job_id}.err"),
+            )
+        else:
+            logs = self._newest_logs(work_dir, ("stderr.*.log", "*.err"))
+        return any(
+            content.strip()
+            and any(
+                keyword in content for keyword in ("error", "fatal", "killed", "oom")
+            )
+            for content in (self._read_text_tail(log_file).lower() for log_file in logs)
+        )
+
+    def _existing_logs(self, work_dir: Path, names: tuple[str, ...]) -> list[Path]:
+        """Return exact-name log candidates newest first."""
+        paths = [work_dir / name for name in names]
+        return self._sort_logs(path for path in paths if path.is_file())
+
+    def _newest_logs(self, work_dir: Path, patterns: tuple[str, ...]) -> list[Path]:
+        """Return at most the newest matching legacy log candidate."""
+        paths: list[Path] = []
+        for pattern in patterns:
+            paths.extend(work_dir.glob(pattern))
+        sorted_paths = self._sort_logs(paths)
+        return sorted_paths[:1]
+
+    def _sort_logs(self, paths: Iterable[Path]) -> list[Path]:
+        """Deduplicate and sort readable log paths by mtime then name."""
         candidates: list[tuple[float, str, Path]] = []
         seen: set[Path] = set()
-        for pattern in ("stdout.*.log", "*.out"):
-            for log_file in work_dir.glob(pattern):
-                if log_file in seen or not log_file.is_file():
-                    continue
-                mtime = self._mtime(log_file)
-                if mtime is None:
-                    continue
-                candidates.append((mtime, log_file.name, log_file))
-                seen.add(log_file)
+        for log_file in paths:
+            if log_file in seen or not log_file.is_file():
+                continue
+            mtime = self._mtime(log_file)
+            if mtime is None:
+                continue
+            candidates.append((mtime, log_file.name, log_file))
+            seen.add(log_file)
         candidates.sort(reverse=True)
         return [path for _mtime, _name, path in candidates]
+
+    @staticmethod
+    def _attempt_context(run_dir: Path) -> _AttemptContext:
+        """Read current job attempt metadata without requiring a manifest."""
+        try:
+            job = read_manifest(run_dir).job
+        except SimctlError:
+            return _AttemptContext()
+        job_id = str(job.get("job_id", "")).strip()
+        submitted_at = BeachAdapter._parse_submitted_at(job.get("submitted_at"))
+        return _AttemptContext(job_id=job_id, submitted_at=submitted_at)
+
+    @staticmethod
+    def _parse_submitted_at(value: Any) -> float | None:
+        """Convert an ISO submission timestamp into epoch seconds."""
+        if not isinstance(value, str) or not value.strip():
+            return None
+        try:
+            submitted_at = datetime.fromisoformat(value.strip())
+        except ValueError:
+            return None
+        if submitted_at.tzinfo is None or submitted_at.utcoffset() is None:
+            return None
+        return submitted_at.timestamp()
 
     @staticmethod
     def _read_text_tail(path: Path) -> str:

@@ -105,3 +105,35 @@ def test_runs_create_writes_event_log_from_global_options(
         for event in events
         if event["type"] == "artifact_write"
     )
+
+
+def test_cli_invocation_never_persists_raw_argv_values(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "test-project"\n',
+        encoding="utf-8",
+    )
+    log_path = tmp_path / "events.jsonl"
+    monkeypatch.chdir(tmp_path)
+
+    result = runner.invoke(
+        app,
+        [
+            "--event-log",
+            str(log_path),
+            "notes",
+            "append",
+            "Secret note",
+            "top-secret-value",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "top-secret-value" not in log_text
+    invocation = _read_events(log_path)[0]
+    assert invocation["type"] == "cli_invocation"
+    assert invocation["data"] == {"program": "runo"}
+    assert "argv" not in invocation["data"]

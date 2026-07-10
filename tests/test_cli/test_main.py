@@ -2,12 +2,113 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from typer.testing import CliRunner
 
 from runops import __version__
 from runops.cli.main import app, runops_app
 
 runner = CliRunner()
+
+
+def _command_name(command: Any) -> str:
+    name = command.name
+    if name:
+        return str(name)
+    callback = command.callback
+    assert callback is not None
+    return str(callback.__name__).replace("_", "-")
+
+
+def _command_paths(typer_app: Any, prefix: tuple[str, ...] = ()) -> set[str]:
+    paths = {
+        " ".join((*prefix, _command_name(command)))
+        for command in typer_app.registered_commands
+    }
+    for group in typer_app.registered_groups:
+        paths.update(
+            _command_paths(
+                group.typer_instance,
+                (*prefix, str(group.name)),
+            )
+        )
+    return paths
+
+
+def test_command_tree_is_stable_for_primary_and_alias_apps() -> None:
+    expected = {
+        "analyze audit-story",
+        "analyze collect",
+        "analyze export",
+        "analyze new-comparison",
+        "analyze new-story",
+        "analyze plot",
+        "analyze summarize",
+        "case new",
+        "config add-launcher",
+        "config add-simulator",
+        "config show",
+        "context",
+        "demo build-codex-replay",
+        "demo import-codex-session",
+        "demo render-replay",
+        "doctor",
+        "init",
+        "knowledge add-fact",
+        "knowledge facts",
+        "knowledge list",
+        "knowledge profile disable",
+        "knowledge profile enable",
+        "knowledge promote-fact",
+        "knowledge save",
+        "knowledge show",
+        "knowledge source attach",
+        "knowledge source detach",
+        "knowledge source list",
+        "knowledge source render",
+        "knowledge source status",
+        "knowledge source sync",
+        "lint",
+        "mcp check",
+        "mcp prompts",
+        "mcp resources",
+        "mcp serve",
+        "mcp tools",
+        "migrate apply",
+        "migrate list",
+        "migrate show",
+        "notes append",
+        "notes archive",
+        "notes list",
+        "notes show",
+        "plugins",
+        "runs archive",
+        "runs cancel",
+        "runs clone",
+        "runs create",
+        "runs dashboard",
+        "runs delete",
+        "runs extend",
+        "runs history",
+        "runs jobs",
+        "runs list",
+        "runs log",
+        "runs purge-work",
+        "runs regenerate",
+        "runs retry",
+        "runs status",
+        "runs submit",
+        "runs sweep",
+        "runs sync",
+        "setup",
+        "update",
+        "update-harness",
+        "update-refs",
+    }
+
+    assert _command_paths(app) == expected
+    assert _command_paths(runops_app) == expected
 
 
 def test_help_shows_primary_commands() -> None:

@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from runops.application.actions import ActionStatus
 from runops.application.actions import (
     create_run as create_run_action,
@@ -150,3 +152,57 @@ def test_save_insight_action_redacts_content_in_action_start(
     redacted = start_event["data"]["params"]["content"]
     assert redacted.startswith("<redacted:")
     assert redacted.endswith(" chars>")
+
+
+@pytest.mark.parametrize(
+    "secret_text",
+    [
+        "runo demo --token top-secret-value",
+        "runo demo --api-key=top-secret-value",
+        "https://alice:top-secret-value@example.com/private",
+        "Authorization: Bearer top-secret-value",
+    ],
+)
+def test_emit_event_redacts_secrets_from_free_form_strings(
+    tmp_path: Path,
+    secret_text: str,
+) -> None:
+    log_path = tmp_path / "events.jsonl"
+    configure_event_logging(log_path, session_id="sess-secret")
+    try:
+        emit_event(
+            "diagnostic",
+            summary=secret_text,
+            data={"detail": secret_text},
+        )
+    finally:
+        clear_event_logging()
+
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "top-secret-value" not in log_text
+    assert "<redacted>" in log_text
+
+
+def test_emit_event_redacts_nested_secret_key_variants(tmp_path: Path) -> None:
+    log_path = tmp_path / "events.jsonl"
+    configure_event_logging(log_path, session_id="sess-secret")
+    try:
+        emit_event(
+            "diagnostic",
+            data={
+                "outer": {
+                    "API_KEY": "first-secret",
+                    "client-secret": "second-secret",
+                    "authorization": "Bearer third-secret",
+                    "safe": "visible",
+                }
+            },
+        )
+    finally:
+        clear_event_logging()
+
+    log_text = log_path.read_text(encoding="utf-8")
+    assert "first-secret" not in log_text
+    assert "second-secret" not in log_text
+    assert "third-secret" not in log_text
+    assert "visible" in log_text

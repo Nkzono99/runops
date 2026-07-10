@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -25,6 +26,7 @@ else:
 _STORIES_ROOT = Path("analysis") / "stories"
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 _DEFAULT_MATURITY = ("main", "accepted", "draft")
+_SOURCE_KINDS = frozenset({"run", "survey", "comparison", "path"})
 
 
 @dataclass(frozen=True)
@@ -73,8 +75,9 @@ def slugify_story_id(value: str) -> str:
 
 def create_story_workspace(
     project_root: Path,
-    story_id: str,
+    name: str,
     *,
+    story_id: str = "",
     title: str = "",
     sources: tuple[Path, ...] = (),
 ) -> StoryWorkspaceResult:
@@ -82,7 +85,8 @@ def create_story_workspace(
 
     Args:
         project_root: runops project root.
-        story_id: Desired stable story id or human-readable name to slugify.
+        name: Human-readable story name.
+        story_id: Optional stable story id. Defaults to a slug or stable hash.
         title: Optional human-readable story title.
         sources: Optional run, survey, or path sources to record.
 
@@ -93,8 +97,15 @@ def create_story_workspace(
         SimctlError: If the story id is invalid or the destination exists.
     """
     root = project_root.resolve()
-    resolved_id = _validate_story_id(slugify_story_id(story_id) or story_id.strip())
-    story_title = title.strip() or resolved_id.replace("-", " ").title()
+    normalized_name = name.strip()
+    if not normalized_name:
+        raise SimctlError("story name must be non-empty")
+    generated_id = slugify_story_id(normalized_name)
+    if not generated_id:
+        digest = hashlib.sha256(normalized_name.encode("utf-8")).hexdigest()[:10]
+        generated_id = f"story-{digest}"
+    resolved_id = _validate_story_id(story_id or generated_id)
+    story_title = title.strip() or normalized_name
     story_dir = root / _STORIES_ROOT / resolved_id
     if story_dir.exists():
         raise SimctlError(f"story workspace already exists: {story_dir}")
@@ -149,7 +160,12 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
 
     project_root = _find_project_root_for_story(story_root)
     story = _read_story(story_path)
-    story_id = _required_string(story, "id", default=story_root.name)
+    schema_version = story.get("schema_version")
+    if type(schema_version) is not int or schema_version != 1:
+        raise SimctlError("story schema_version must be 1")
+    story_id = _validate_story_id(
+        _required_string(story, "id", default=story_root.name)
+    )
     title = _required_string(story, "title", default=story_id)
     steps = _read_steps(story)
     source_records = _read_sources(story)
@@ -164,9 +180,8 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
         artifacts.extend(source_artifacts)
         warnings.extend(source_warnings)
 
-    source_blocked = (
-        any(warning.startswith("Story source not found:") for warning in warnings)
-        and not artifacts
+    source_blocked = any(
+        warning.startswith("Story source not found:") for warning in warnings
     )
     step_results = [
         _audit_step(step, artifacts, source_blocked=source_blocked) for step in steps
@@ -218,9 +233,11 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
 
 
 def _validate_story_id(value: str) -> str:
-    story_id = value.strip()
+    story_id = value
     if not story_id:
         raise SimctlError("story id must be non-empty")
+    if story_id != story_id.strip():
+        raise SimctlError("story id must not contain leading or trailing whitespace")
     if not _ID_PATTERN.match(story_id):
         raise SimctlError(
             "story id must start with a lowercase letter or digit and contain "
@@ -230,13 +247,13 @@ def _validate_story_id(value: str) -> str:
 
 
 def _source_record(project_root: Path, source_path: Path) -> dict[str, str]:
-    path = _display_path(source_path, base=project_root)
-    kind = "path"
-    resolved = _resolve_source_path(project_root, path)
-    if (resolved / "manifest.toml").is_file():
-        kind = "run"
-    elif (resolved / "survey.toml").is_file() or discover_runs(resolved):
-        kind = "survey"
+    resolved = (
+        source_path.resolve()
+        if source_path.is_absolute()
+        else (project_root / source_path).resolve()
+    )
+    path = _display_path(resolved, base=project_root)
+    kind = _detect_source_kind(resolved) if resolved.exists() else "path"
     return {"kind": kind, "path": path}
 
 
@@ -264,10 +281,17 @@ def _read_sources(story: dict[str, Any]) -> list[dict[str, str]]:
     for index, item in enumerate(raw_sources, start=1):
         if not isinstance(item, dict):
             raise SimctlError(f"story source #{index} must be a table")
-        path = str(item.get("path", "")).strip()
+        raw_path = item.get("path", "")
+        if not isinstance(raw_path, str):
+            raise SimctlError(f"story source #{index} path must be a string")
+        path = raw_path.strip()
         if not path:
             raise SimctlError(f"story source #{index} is missing path")
-        sources.append({"kind": str(item.get("kind", "path") or "path"), "path": path})
+        raw_kind = item.get("kind", "path")
+        if not isinstance(raw_kind, str) or raw_kind not in _SOURCE_KINDS:
+            valid = ", ".join(sorted(_SOURCE_KINDS))
+            raise SimctlError(f"story source #{index} kind must be one of: {valid}")
+        sources.append({"kind": raw_kind, "path": path})
     return sources
 
 
@@ -287,8 +311,14 @@ def _read_steps(story: dict[str, Any]) -> list[dict[str, Any]]:
         if step_id in seen:
             raise SimctlError(f"Duplicate story step id: {step_id}")
         seen.add(step_id)
-        required = _string_list(item.get("required_artifacts", []))
-        acceptable = _string_list(item.get("acceptable_status", _DEFAULT_MATURITY))
+        required = _required_string_array(
+            item.get("required_artifacts"),
+            field=f"story step #{index} required_artifacts",
+        )
+        acceptable = _required_string_array(
+            item.get("acceptable_status"),
+            field=f"story step #{index} acceptable_status",
+        )
         steps.append(
             {
                 "id": step_id,
@@ -310,10 +340,28 @@ def _collect_source_artifacts(
     if not source_path.exists():
         return [], [f"Story source not found: {source['path']}"]
 
+    detected_kind = _detect_source_kind(source_path)
+    if source["kind"] != detected_kind:
+        raise SimctlError(
+            "story source kind mismatch for "
+            f"{source['path']}: declared {source['kind']!r}, "
+            f"detected {detected_kind!r}"
+        )
+
     artifacts: list[dict[str, Any]] = []
     warnings: list[str] = []
-    if (source_path / "manifest.toml").is_file():
+    if detected_kind == "run":
         artifacts.extend(_read_run_artifacts(source_path, project_root=project_root))
+        if not artifacts:
+            warnings.append(f"No artifact index found for source: {source['path']}")
+        return artifacts, warnings
+
+    if detected_kind == "comparison":
+        artifacts.extend(
+            _read_comparison_artifacts(source_path, project_root=project_root)
+        )
+        if not artifacts:
+            warnings.append(f"No artifact index found for source: {source['path']}")
         return artifacts, warnings
 
     summary_index = source_path / "summary" / "artifacts.toml"
@@ -327,15 +375,112 @@ def _collect_source_artifacts(
             )
         )
 
-    run_dirs = discover_runs(source_path)
+    root_index = source_path / "artifacts.toml"
+    if detected_kind == "path" and root_index.is_file():
+        artifacts.extend(
+            _read_index_artifacts(
+                root_index,
+                project_root=project_root,
+                source_scope=_display_path(source_path, base=project_root),
+                base_dir=root_index.parent,
+            )
+        )
+
+    run_dirs = discover_runs(source_path) if detected_kind == "survey" else []
     if run_dirs:
         for run_dir in run_dirs:
             artifacts.extend(_read_run_artifacts(run_dir, project_root=project_root))
         return artifacts, warnings
 
-    if not summary_index.is_file():
+    if not summary_index.is_file() and not root_index.is_file():
         warnings.append(f"No artifact index found for source: {source['path']}")
     return artifacts, warnings
+
+
+def _detect_source_kind(source_path: Path) -> str:
+    """Return the structured source kind represented by ``source_path``."""
+    manifest_path = source_path / "manifest.toml"
+    if manifest_path.is_file():
+        manifest = _read_toml_mapping(manifest_path)
+        if isinstance(manifest.get("comparison"), dict):
+            return "comparison"
+        if isinstance(manifest.get("run"), dict):
+            return "run"
+    if (source_path / "survey.toml").is_file() or discover_runs(source_path):
+        return "survey"
+    return "path"
+
+
+def _read_comparison_artifacts(
+    comparison_dir: Path,
+    *,
+    project_root: Path,
+) -> list[dict[str, Any]]:
+    """Read lightweight artifact entries from a comparison manifest."""
+    manifest_path = comparison_dir / "manifest.toml"
+    manifest = _read_toml_mapping(manifest_path)
+    raw_artifacts = manifest.get("artifacts", {})
+    if not isinstance(raw_artifacts, dict):
+        raise SimctlError(f"comparison artifacts must be a table: {manifest_path}")
+
+    kind_by_group = {"figures": "figure", "data": "data", "scripts": "script"}
+    source_scope = _display_path(comparison_dir, base=project_root)
+    rows: list[dict[str, Any]] = []
+    for group, kind in kind_by_group.items():
+        values = raw_artifacts.get(group, [])
+        if not isinstance(values, list):
+            raise SimctlError(
+                f"comparison artifacts.{group} must be an array: {manifest_path}"
+            )
+        for index, value in enumerate(values, start=1):
+            if isinstance(value, str) and value.strip():
+                artifact_path = value.strip()
+                row: dict[str, Any] = {
+                    "kind": kind,
+                    "path": _display_path(
+                        comparison_dir / artifact_path,
+                        base=project_root,
+                    ),
+                    "title": Path(artifact_path).stem,
+                    "status": "draft",
+                }
+            elif isinstance(value, dict):
+                row = dict(value)
+                artifact_path = row.get("path", "")
+                if not isinstance(artifact_path, str) or not artifact_path.strip():
+                    raise SimctlError(
+                        f"comparison artifacts.{group}[{index}] is missing path"
+                    )
+                row.setdefault("kind", kind)
+                row.setdefault("title", Path(artifact_path).stem)
+                row.setdefault("status", "draft")
+                row["path"] = _display_path(
+                    comparison_dir / artifact_path,
+                    base=project_root,
+                )
+            else:
+                raise SimctlError(
+                    f"comparison artifacts.{group}[{index}] must be a path or table"
+                )
+            row["source_scope"] = source_scope
+            row["source_index"] = _display_path(
+                manifest_path,
+                base=project_root,
+            )
+            rows.append(row)
+    return rows
+
+
+def _read_toml_mapping(path: Path) -> dict[str, Any]:
+    """Read one TOML mapping and translate parser errors to ``SimctlError``."""
+    try:
+        with open(path, "rb") as f:
+            payload = tomllib.load(f)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise SimctlError(f"Failed to read TOML {path}: {exc}") from exc
+    if not isinstance(payload, dict):
+        raise SimctlError(f"TOML root must be a table: {path}")
+    return payload
 
 
 def _read_run_artifacts(run_dir: Path, *, project_root: Path) -> list[dict[str, Any]]:
@@ -488,7 +633,7 @@ def _overall_status(step_results: list[dict[str, Any]], warnings: list[str]) -> 
         return "blocked"
     statuses = {str(step["status"]) for step in step_results}
     if statuses == {"covered"}:
-        return "covered"
+        return "partial" if warnings else "covered"
     if statuses == {"missing"}:
         return "missing"
     if "blocked" in statuses:
@@ -591,6 +736,18 @@ def _string_list(value: Any) -> list[str]:
     if isinstance(value, list):
         return [str(item) for item in value if str(item)]
     return []
+
+
+def _required_string_array(value: Any, *, field: str) -> list[str]:
+    """Validate a non-empty TOML array containing only non-empty strings."""
+    if not isinstance(value, list) or not value:
+        raise SimctlError(f"{field} must be a non-empty string array")
+    result: list[str] = []
+    for item in value:
+        if not isinstance(item, str) or not item.strip():
+            raise SimctlError(f"{field} must contain only non-empty strings")
+        result.append(item.strip())
+    return result
 
 
 def _normalize_token(value: str) -> str:

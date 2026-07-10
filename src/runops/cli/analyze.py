@@ -330,17 +330,13 @@ def new_story(
 ) -> None:
     """Create a story acceptance audit workspace."""
     try:
-        cwd = Path.cwd()
-        project_root = find_project_root(cwd)
-        resolved_sources = tuple(
-            source if source.is_absolute() else (cwd / source)
-            for source in (sources or [])
-        )
+        project_root = find_project_root(Path.cwd())
         result = create_story_workspace(
             project_root,
-            story_id or name,
-            title=title or name,
-            sources=resolved_sources,
+            name=name,
+            story_id=story_id,
+            title=title,
+            sources=tuple(sources or []),
         )
     except (OSError, SimctlError) as e:
         typer.echo(f"Error creating story workspace: {e}", err=True)

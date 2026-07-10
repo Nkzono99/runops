@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from collections.abc import Callable
 from contextvars import ContextVar
 from dataclasses import dataclass
@@ -25,7 +26,36 @@ EVENT_LOG_MODE_ENV_VAR: Final = "RUNOPS_EVENT_LOG_MODE"
 EVENT_LOG_SESSION_ENV_VAR: Final = "RUNOPS_EVENT_LOG_SESSION"
 
 _UNSET: Final = object()
-_REDACTED_PARAM_NAMES: Final = frozenset({"content"})
+_REDACTED_PARAM_NAMES: Final = frozenset(
+    {
+        "apikey",
+        "accesskey",
+        "authorization",
+        "clientsecret",
+        "content",
+        "credential",
+        "credentials",
+        "password",
+        "privatekey",
+        "secret",
+        "token",
+    }
+)
+_SECRET_ASSIGNMENT_RE: Final = re.compile(
+    r"(?ix)"
+    r"(?P<name>--?(?:api[-_]?key|access[-_]?key|client[-_]?secret|"
+    r"private[-_]?key|authorization|credentials?|password|secret|token)|"
+    r"(?:api[-_]?key|access[-_]?key|client[-_]?secret|private[-_]?key|"
+    r"authorization|credentials?|password|secret|token))"
+    r"(?P<separator>\s*[:=]\s*|\s+)"
+    r"(?P<value>\"[^\"]*\"|'[^']*'|[^\s,;]+)"
+)
+_AUTH_VALUE_RE: Final = re.compile(
+    r"(?i)\b(?P<scheme>bearer|basic)\s+(?P<value>[^\s,;]+)"
+)
+_URL_USERINFO_RE: Final = re.compile(
+    r"(?i)(?P<scheme>[a-z][a-z0-9+.-]*://)(?P<userinfo>[^/@\s]+)@"
+)
 _MAX_ITEMS: Final = 20
 _MAX_DEPTH: Final = 3
 _MAX_STRING_LENGTH: Final = 240
@@ -138,13 +168,13 @@ def emit_event(
         "type": event_type,
     }
     if summary:
-        payload["summary"] = summary
+        payload["summary"] = _sanitize_text(summary)
     if action:
         payload["action"] = action
     if status:
         payload["status"] = status
     if path is not None:
-        payload["path"] = str(Path(path))
+        payload["path"] = _sanitize_text(str(Path(path)))
     if data:
         payload["data"] = _sanitize_value(data)
 
@@ -324,7 +354,7 @@ def _sanitize_mapping(values: dict[str, Any]) -> dict[str, Any]:
 
 
 def _sanitize_named_value(name: str, value: Any, *, depth: int) -> Any:
-    if name in _REDACTED_PARAM_NAMES:
+    if _is_secret_name(name):
         return _redacted_marker(value)
     return _sanitize_value(value, depth=depth + 1)
 
@@ -340,9 +370,7 @@ def _sanitize_value(value: Any, *, depth: int = 0) -> Any:
     if isinstance(value, Path):
         return str(value)
     if isinstance(value, str):
-        if len(value) <= _MAX_STRING_LENGTH:
-            return value
-        return f"{value[: _MAX_STRING_LENGTH - 3]}..."
+        return _sanitize_text(value)
     if isinstance(value, bytes):
         return f"<bytes:{len(value)}>"
 
@@ -377,6 +405,28 @@ def _redacted_marker(value: Any) -> str:
     if isinstance(value, (bytes, bytearray)):
         return f"<redacted:{len(value)} bytes>"
     return "<redacted>"
+
+
+def _is_secret_name(name: str) -> bool:
+    """Return whether a mapping/parameter name denotes secret material."""
+    normalized = re.sub(r"[^a-z0-9]+", "", name.casefold())
+    return any(
+        normalized == marker or normalized.endswith(marker)
+        for marker in _REDACTED_PARAM_NAMES
+    )
+
+
+def _sanitize_text(value: str) -> str:
+    """Redact common inline secret forms before bounding event-log strings."""
+    sanitized = _URL_USERINFO_RE.sub(r"\g<scheme><redacted>@", value)
+    sanitized = _AUTH_VALUE_RE.sub(r"\g<scheme> <redacted>", sanitized)
+    sanitized = _SECRET_ASSIGNMENT_RE.sub(
+        r"\g<name>\g<separator><redacted>",
+        sanitized,
+    )
+    if len(sanitized) <= _MAX_STRING_LENGTH:
+        return sanitized
+    return f"{sanitized[: _MAX_STRING_LENGTH - 3]}..."
 
 
 __all__ = [

@@ -128,6 +128,36 @@ class TestStoryAudit:
         assert "Story workspace created" in result.output
         assert "surface-adhesion" in result.output
 
+    def test_new_story_resolves_source_from_project_root_and_preserves_id(
+        self, tmp_path: Path
+    ) -> None:
+        _write_project_file(tmp_path)
+        run_dir = _create_run(tmp_path / "runs", "R20260629-0001")
+        nested = tmp_path / "nested"
+        nested.mkdir()
+
+        with patch("runops.cli.analyze.Path.cwd", return_value=nested):
+            result = runner.invoke(
+                app,
+                [
+                    "analyze",
+                    "new-story",
+                    "表面電位の物語",
+                    "--id",
+                    "foo_bar",
+                    "--source",
+                    str(run_dir.relative_to(tmp_path)),
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        story_path = tmp_path / "analysis" / "stories" / "foo_bar" / "story.toml"
+        with open(story_path, "rb") as f:
+            story = tomllib.load(f)
+        assert story["id"] == "foo_bar"
+        assert story["title"] == "表面電位の物語"
+        assert story["sources"][0]["path"] == "runs/R20260629-0001"
+
     def test_audit_story_writes_outputs(self, tmp_path: Path) -> None:
         _write_project_file(tmp_path)
         run_dir = _create_run(tmp_path / "runs" / "scan", "R20260629-0001")
