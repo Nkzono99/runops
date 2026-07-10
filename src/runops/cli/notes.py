@@ -26,6 +26,7 @@ import typer
 from runops.application.research.notebook import (
     JST,
     NoteAppendRequest,
+    NoteArchiveApplyError,
     NoteDirectoryNotFoundError,
     NoteNotFoundError,
     NoteValidationError,
@@ -286,7 +287,24 @@ def archive(
         typer.echo("No active daily notebooks to archive.")
         return
 
-    application_result = None if dry_run else apply_note_archive(plan)
+    try:
+        application_result = None if dry_run else apply_note_archive(plan)
+    except NoteArchiveApplyError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        typer.echo(
+            "Completed before failure: "
+            f"{len(exc.completed.archived)} archived; "
+            f"{len(exc.completed.skipped)} skipped.",
+            err=True,
+        )
+        typer.echo(f"Failed entry: {exc.failed_entry.source.as_posix()}", err=True)
+        typer.echo(f"Cause: {type(exc.cause).__name__}: {exc.cause}", err=True)
+        if exc.recovery_path is not None:
+            typer.echo(f"Recovery file: {exc.recovery_path.as_posix()}", err=True)
+        raise typer.Exit(code=1) from None
+    except NoteValidationError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
     archived = set(application_result.archived) if application_result else set()
     skipped_entries = set(application_result.skipped) if application_result else set()
     moved = len(archived) if application_result else 0

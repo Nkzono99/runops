@@ -8,6 +8,11 @@ from unittest.mock import patch
 
 from typer.testing import CliRunner
 
+from runops.application.research.notebook import (
+    NoteArchiveApplyError,
+    NoteArchiveResult,
+    plan_note_archive,
+)
 from runops.cli import notes as notes_module
 from runops.cli.main import app
 
@@ -498,3 +503,43 @@ def test_archive_rejects_invalid_older_than_before_missing_notes_dir(
 
     assert result.exit_code == 2
     assert "invalid --older-than" in result.output
+
+
+def test_archive_renders_partial_result_and_recovery_path_without_traceback(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+    notes_dir = project / "notes"
+    notes_dir.mkdir()
+    (notes_dir / "2026-04-01.md").write_text("first\n", encoding="utf-8")
+    (notes_dir / "2026-04-02.md").write_text("second\n", encoding="utf-8")
+    plan = plan_note_archive(
+        notes_dir,
+        older_than="7d",
+        today=datetime(2026, 4, 10).date(),
+    )
+    first, second = plan.entries
+    recovery_path = notes_dir / f".{second.source.name}.archive-recovery.tmp"
+    apply_error = NoteArchiveApplyError(
+        "notebook archive failed after staging",
+        completed=NoteArchiveResult(archived=(first,), skipped=()),
+        failed_entry=second,
+        recovery_path=recovery_path,
+        cause=RuntimeError("injected archive invariant failure"),
+    )
+
+    with (
+        patch("runops.cli.notes.Path.cwd", return_value=project),
+        patch("runops.cli.notes.plan_note_archive", return_value=plan),
+        patch("runops.cli.notes.apply_note_archive", side_effect=apply_error),
+    ):
+        result = runner.invoke(app, ["notes", "archive", "--older-than", "7d"])
+
+    assert result.exit_code == 1
+    assert "Error: notebook archive failed after staging" in result.output
+    assert "Completed before failure: 1 archived; 0 skipped." in result.output
+    assert f"Failed entry: {second.source.as_posix()}" in result.output
+    assert f"Recovery file: {recovery_path.as_posix()}" in result.output
+    assert "Cause: RuntimeError: injected archive invariant failure" in result.output
+    assert "Traceback" not in result.output
+    assert not isinstance(result.exception, NoteArchiveApplyError)
