@@ -200,26 +200,28 @@ def test_archive_never_clobbers_destination_created_during_apply(
     _write_note(source, "old")
     plan = plan_note_archive(notes_dir, older_than="7d", today=date(2026, 4, 10))
     entry = plan.entries[0]
-    link = notebook_module.os.link
+    rename_noreplace = notebook_module._rename_noreplace
 
-    def create_destination_then_link(
-        src: str,
-        dst: str,
-        *,
-        src_dir_fd: int,
-        dst_dir_fd: int,
-        follow_symlinks: bool,
+    def create_destination_then_rename(
+        source_fd: int,
+        source_name: str,
+        destination_fd: int,
+        destination_name: str,
     ) -> None:
-        entry.destination.write_text("concurrent\n", encoding="utf-8")
-        link(
-            src,
-            dst,
-            src_dir_fd=src_dir_fd,
-            dst_dir_fd=dst_dir_fd,
-            follow_symlinks=follow_symlinks,
+        if destination_name == entry.destination.name:
+            entry.destination.write_text("concurrent\n", encoding="utf-8")
+        rename_noreplace(
+            source_fd,
+            source_name,
+            destination_fd,
+            destination_name,
         )
 
-    monkeypatch.setattr(notebook_module.os, "link", create_destination_then_link)
+    monkeypatch.setattr(
+        notebook_module,
+        "_rename_noreplace",
+        create_destination_then_rename,
+    )
 
     result = apply_note_archive(plan)
 
@@ -227,3 +229,43 @@ def test_archive_never_clobbers_destination_created_during_apply(
     assert result.skipped == (entry,)
     assert source.is_file()
     assert entry.destination.read_text(encoding="utf-8") == "concurrent\n"
+
+
+def test_archive_preserves_source_replacement_created_after_staging(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    source = notes_dir / "2026-04-01.md"
+    _write_note(source, "planned source")
+    planned_text = source.read_text(encoding="utf-8")
+    plan = plan_note_archive(notes_dir, older_than="7d", today=date(2026, 4, 10))
+    entry = plan.entries[0]
+    rename_noreplace = notebook_module._rename_noreplace
+
+    def replace_source_after_staging(
+        source_fd: int,
+        source_name: str,
+        destination_fd: int,
+        destination_name: str,
+    ) -> None:
+        rename_noreplace(
+            source_fd,
+            source_name,
+            destination_fd,
+            destination_name,
+        )
+        if source_name == entry.source.name and destination_name.startswith("."):
+            source.write_text("concurrent replacement\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        notebook_module,
+        "_rename_noreplace",
+        replace_source_after_staging,
+    )
+
+    result = apply_note_archive(plan)
+
+    assert result.archived == (entry,)
+    assert source.read_text(encoding="utf-8") == "concurrent replacement\n"
+    assert entry.destination.read_text(encoding="utf-8") == planned_text

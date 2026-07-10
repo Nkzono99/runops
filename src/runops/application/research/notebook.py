@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import ctypes
+import errno
 import os
+import secrets
 import stat
 from contextlib import ExitStack
 from dataclasses import dataclass
@@ -15,6 +18,19 @@ from runops.core.project import find_project_root
 JST = timezone(timedelta(hours=9))
 _HISTORY_DIR = "history"
 _NOTE_DATE_FORMAT = "%Y-%m-%d"
+_RENAME_NOREPLACE = 1
+
+_LIBC = ctypes.CDLL(None, use_errno=True)
+_RENAMEAT2 = getattr(_LIBC, "renameat2", None)
+if _RENAMEAT2 is not None:
+    _RENAMEAT2.argtypes = [
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_int,
+        ctypes.c_char_p,
+        ctypes.c_uint,
+    ]
+    _RENAMEAT2.restype = ctypes.c_int
 
 
 class NoteError(Exception):
@@ -260,55 +276,97 @@ def apply_note_archive(plan: NoteArchivePlan) -> NoteArchiveResult:
         for entry in plan.entries:
             _validate_archive_entry(plan.notes_dir, entry)
             source_stat = _stat_regular_source(root_fd, entry)
-            year = entry.source.stem[:4]
-            with ExitStack() as entry_stack:
-                history_fd = _open_or_create_directory(
+            staging_name = f".{entry.source.name}.archive-{secrets.token_hex(8)}.tmp"
+            try:
+                _rename_noreplace(
                     root_fd,
-                    _HISTORY_DIR,
-                    directory_flags=directory_flags,
+                    entry.source.name,
+                    root_fd,
+                    staging_name,
                 )
-                entry_stack.callback(os.close, history_fd)
-                year_fd = _open_or_create_directory(
-                    history_fd,
-                    year,
-                    directory_flags=directory_flags,
-                )
-                entry_stack.callback(os.close, year_fd)
-                try:
-                    os.link(
-                        entry.source.name,
-                        entry.destination.name,
-                        src_dir_fd=root_fd,
-                        dst_dir_fd=year_fd,
-                        follow_symlinks=False,
-                    )
-                except FileExistsError:
-                    skipped.append(entry)
-                    continue
-                except OSError as exc:
-                    raise NoteValidationError(
-                        f"could not archive notebook safely: {entry.source}"
-                    ) from exc
+            except OSError as exc:
+                raise NoteValidationError(
+                    f"could not stage notebook archive: {entry.source}"
+                ) from exc
 
-                try:
-                    linked_stat = os.stat(
+            staged_stat = os.stat(
+                staging_name,
+                dir_fd=root_fd,
+                follow_symlinks=False,
+            )
+            if (
+                staged_stat.st_dev != source_stat.st_dev
+                or staged_stat.st_ino != source_stat.st_ino
+            ):
+                _restore_staged_source(
+                    root_fd,
+                    staging_name=staging_name,
+                    source_name=entry.source.name,
+                    entry=entry,
+                )
+                raise NoteValidationError(
+                    f"archive source changed while staging: {entry.source}"
+                )
+
+            year = entry.source.stem[:4]
+            staged = True
+            try:
+                with ExitStack() as entry_stack:
+                    history_fd = _open_or_create_directory(
+                        root_fd,
+                        _HISTORY_DIR,
+                        directory_flags=directory_flags,
+                    )
+                    entry_stack.callback(os.close, history_fd)
+                    year_fd = _open_or_create_directory(
+                        history_fd,
+                        year,
+                        directory_flags=directory_flags,
+                    )
+                    entry_stack.callback(os.close, year_fd)
+                    try:
+                        _rename_noreplace(
+                            root_fd,
+                            staging_name,
+                            year_fd,
+                            entry.destination.name,
+                        )
+                    except FileExistsError:
+                        _restore_staged_source(
+                            root_fd,
+                            staging_name=staging_name,
+                            source_name=entry.source.name,
+                            entry=entry,
+                        )
+                        staged = False
+                        skipped.append(entry)
+                        continue
+                    staged = False
+                    archived_stat = os.stat(
                         entry.destination.name,
                         dir_fd=year_fd,
                         follow_symlinks=False,
                     )
                     if (
-                        linked_stat.st_dev != source_stat.st_dev
-                        or linked_stat.st_ino != source_stat.st_ino
+                        archived_stat.st_dev != source_stat.st_dev
+                        or archived_stat.st_ino != source_stat.st_ino
                     ):
                         raise NoteValidationError(
                             "archive destination changed unexpectedly: "
                             f"{entry.destination}"
                         )
-                    os.unlink(entry.source.name, dir_fd=root_fd)
-                except OSError as exc:
-                    raise NoteValidationError(
-                        f"could not finalize notebook archive: {entry.source}"
-                    ) from exc
+            except Exception as exc:
+                if staged:
+                    try:
+                        _restore_staged_source(
+                            root_fd,
+                            staging_name=staging_name,
+                            source_name=entry.source.name,
+                            entry=entry,
+                        )
+                    except NoteValidationError as restore_exc:
+                        raise restore_exc from exc
+                raise
             archived.append(entry)
     return NoteArchiveResult(archived=tuple(archived), skipped=tuple(skipped))
 
@@ -436,6 +494,58 @@ def _open_or_create_directory(
         return os.open(name, directory_flags, dir_fd=parent_fd)
     except OSError as exc:
         raise NoteValidationError(f"unsafe archive directory: {name}") from exc
+
+
+def _rename_noreplace(
+    source_fd: int,
+    source_name: str,
+    destination_fd: int,
+    destination_name: str,
+) -> None:
+    if _RENAMEAT2 is None:
+        raise OSError(errno.ENOSYS, "renameat2 is unavailable")
+    result = _RENAMEAT2(
+        source_fd,
+        os.fsencode(source_name),
+        destination_fd,
+        os.fsencode(destination_name),
+        _RENAME_NOREPLACE,
+    )
+    if result == 0:
+        return
+    error_number = ctypes.get_errno()
+    if error_number == errno.EEXIST:
+        raise FileExistsError(
+            error_number,
+            os.strerror(error_number),
+            destination_name,
+        )
+    raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _restore_staged_source(
+    root_fd: int,
+    *,
+    staging_name: str,
+    source_name: str,
+    entry: NoteArchiveEntry,
+) -> None:
+    try:
+        _rename_noreplace(
+            root_fd,
+            staging_name,
+            root_fd,
+            source_name,
+        )
+    except FileExistsError as exc:
+        raise NoteValidationError(
+            "archive source changed; original preserved as recovery file "
+            f"{entry.source.parent / staging_name}"
+        ) from exc
+    except OSError as exc:
+        raise NoteValidationError(
+            f"could not restore staged archive source: {entry.source}"
+        ) from exc
 
 
 __all__ = [
