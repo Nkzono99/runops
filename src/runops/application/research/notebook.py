@@ -502,6 +502,38 @@ def _rename_noreplace(
     destination_fd: int,
     destination_name: str,
 ) -> None:
+    try:
+        _renameat2_noreplace(
+            source_fd,
+            source_name,
+            destination_fd,
+            destination_name,
+        )
+        return
+    except OSError as exc:
+        unsupported = {
+            errno.EINVAL,
+            errno.ENOSYS,
+            getattr(errno, "ENOTSUP", errno.EOPNOTSUPP),
+            errno.EOPNOTSUPP,
+        }
+        if exc.errno not in unsupported:
+            raise
+
+    _fallback_move_noreplace(
+        source_fd,
+        source_name,
+        destination_fd,
+        destination_name,
+    )
+
+
+def _renameat2_noreplace(
+    source_fd: int,
+    source_name: str,
+    destination_fd: int,
+    destination_name: str,
+) -> None:
     if _RENAMEAT2 is None:
         raise OSError(errno.ENOSYS, "renameat2 is unavailable")
     result = _RENAMEAT2(
@@ -521,6 +553,57 @@ def _rename_noreplace(
             destination_name,
         )
     raise OSError(error_number, os.strerror(error_number), destination_name)
+
+
+def _fallback_move_noreplace(
+    source_fd: int,
+    source_name: str,
+    destination_fd: int,
+    destination_name: str,
+) -> None:
+    private_prefix = f".{source_name}.archive-"
+    private_staging = (
+        source_fd == destination_fd
+        and destination_name.startswith(private_prefix)
+        and destination_name.endswith(".tmp")
+    )
+    if private_staging:
+        try:
+            os.stat(
+                destination_name,
+                dir_fd=destination_fd,
+                follow_symlinks=False,
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            raise FileExistsError(
+                errno.EEXIST,
+                os.strerror(errno.EEXIST),
+                destination_name,
+            )
+        os.rename(
+            source_name,
+            destination_name,
+            src_dir_fd=source_fd,
+            dst_dir_fd=destination_fd,
+        )
+        return
+
+    os.link(
+        source_name,
+        destination_name,
+        src_dir_fd=source_fd,
+        dst_dir_fd=destination_fd,
+        follow_symlinks=False,
+    )
+    try:
+        os.unlink(source_name, dir_fd=source_fd)
+    except OSError as exc:
+        raise NoteValidationError(
+            "archive move linked its destination but could not remove private "
+            f"staging file: {source_name}"
+        ) from exc
 
 
 def _restore_staged_source(

@@ -269,3 +269,35 @@ def test_archive_preserves_source_replacement_created_after_staging(
     assert result.archived == (entry,)
     assert source.read_text(encoding="utf-8") == "concurrent replacement\n"
     assert entry.destination.read_text(encoding="utf-8") == planned_text
+
+
+def test_archive_falls_back_when_filesystem_rejects_rename_noreplace(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    source = notes_dir / "2026-04-01.md"
+    _write_note(source, "lustre fallback")
+    original = source.read_text(encoding="utf-8")
+    plan = plan_note_archive(notes_dir, older_than="7d", today=date(2026, 4, 10))
+
+    def reject_renameat2(
+        source_fd: int,
+        source_name: str,
+        destination_fd: int,
+        destination_name: str,
+    ) -> None:
+        del source_fd, source_name, destination_fd, destination_name
+        raise OSError(notebook_module.errno.EINVAL, "unsupported filesystem flag")
+
+    monkeypatch.setattr(
+        notebook_module,
+        "_renameat2_noreplace",
+        reject_renameat2,
+    )
+
+    result = apply_note_archive(plan)
+
+    assert result.archived == plan.entries
+    assert not source.exists()
+    assert plan.entries[0].destination.read_text(encoding="utf-8") == original
