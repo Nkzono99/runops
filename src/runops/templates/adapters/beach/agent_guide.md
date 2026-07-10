@@ -22,8 +22,8 @@ plugin; that remains user-local Codex state.
 - Treat the run directory and `manifest.toml` as the source of truth.
 - Let the BEACH adapter render `input/beach.toml` and detect required outputs.
 - Keep `work/`, `input/`, `submit/`, and `manifest.toml` under runops control.
-- Use `runo create`, `runo submit`, `runo status`, `runo summarize`, and
-  `runo collect` instead of ad hoc file movement.
+- Use `runo runs create`, `runo runs submit`, `runo runs status`,
+  `runo analyze summarize`, and `runo analyze collect` instead of ad hoc file movement.
 
 #### Minimal fallback facts
 

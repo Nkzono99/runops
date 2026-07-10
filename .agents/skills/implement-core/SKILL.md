@@ -1,11 +1,11 @@
 ---
 name: implement-core
-description: "Use when implementing or modifying pure domain logic under src/runops/core/: project/case/survey/run/manifest/state/provenance/discovery contracts and core boundary tests."
+description: "Use when implementing or modifying domain/state/parsing or runtime contracts under src/runops/core/: project/case/survey/run/manifest/state/provenance/discovery contracts and core boundary tests."
 ---
 
 # Core domain implementation
 
-`src/runops/core/` の pure domain contract を実装・修正する。仕様の正本は
+`src/runops/core/` の domain/state/parsing と runtime contract を実装・修正する。仕様の正本は
 [`SPEC.md`](../../../SPEC.md)、現行 CLI 名の正本は
 [`.codex/rules/commands.md`](../../../.codex/rules/commands.md) である。古い agent
 example や記憶から schema / command を推測しない。
@@ -36,7 +36,7 @@ completed -> archived -> purged
 
 1. `SPEC.md`、`.codex/rules/architecture.md`、対象 source/test を読む。
 2. 失敗 test を先に追加し、boundary と lossless behavior を含める。
-3. pure domain logic と domain-specific error を実装する。
+3. domain/runtime contract と domain-specific error を実装する。
 4. `$test-module` または対象 pytest、mypy strict、Ruff format/check を実行する。
 5. state/schema/CLI まで変わる場合は `SPEC.md` と canonical docs の更新を依頼する。
 

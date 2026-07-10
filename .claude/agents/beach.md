@@ -26,7 +26,8 @@ case/survey 展開、manifest、adapter contract、job.sh 生成、lint/test/doc
 
 - `src/runops/adapters/contrib/beach/adapter.py` の adapter contract、runtime
   resolution、required outputs、summary parsing を保つ。
-- `runo create`, `runo submit`, `runo status`, `runo summarize`, `runo collect`
+- `runo runs create`, `runo runs submit`, `runo runs status`,
+  `runo analyze summarize`, `runo analyze collect`
   から見た runops workflow を壊さない。
 - BEACH project では `runo plugins` が `BEACH Context` / `beach-context` と
   委譲 role を表示することを確認する。

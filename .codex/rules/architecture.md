@@ -8,7 +8,8 @@ runops は 1 つの installable package を、次の 4 bounded context に分け
   submission plan/apply、Adapter、Launcher、Slurm port。
 - **Research Workspace**: notes、analysis、publication、knowledge、paper request。
 - **Agent Gateway**: action facade、MCP、project harness、plugin metadata。
-- **Operator/Developer utilities**: init、migration、lint、update、diagnostics。
+- **Operator/Developer utilities**: init、migration、lint、update、update-harness、
+  diagnostics、demo replay。
 
 内側から外側へのレイヤの並びは次である。
 
@@ -16,10 +17,13 @@ runops は 1 つの installable package を、次の 4 bounded context に分け
 core -> application -> interfaces/infrastructure
 ```
 
-これは source dependency を外向きに許す意味ではない。import は外側から内側へ
-向け、`core/` は application、CLI、MCP、Slurm、Adapter 実装、harness を import
-しない。`application/` は use case と port を持ち、`cli/` / `mcp/` は入力・表示、
-`slurm/` / `harness/` 等は外部 I/O と concrete implementation を担う。
+これは責務の並びであり、全 package の import graph を表す矢印ではない。現在の
+強制境界は `core/` が application、CLI、MCP、Slurm、Adapter 実装、harness を
+import しないこと。`application/` は use case と port/injection seam を持つ一方、
+run creation / analysis は既存の Adapter・Launcher・jobgen registry を composition
+する。`core/demo/replay.py` から `templates.render` への import は既存 demo rendering
+contract の明示的な legacy exception とし、新しい依存を増やさない。
+`cli/` / `mcp/` は入力・表示、`slurm/` / `harness/` 等は外部 I/O を担う。
 
 ## 守るべき境界
 
@@ -39,9 +43,19 @@ run_id は `RYYYYMMDD-NNNN` 形式で不変、path は整理のため可変で�
 
 ## Research Workspace の成熟度
 
-raw な時系列記録は `notes/`、現在判断は `research/agenda.md`、再利用する整理済み
-知見は `.runops/insights/` / `.runops/facts.toml` に置く。生成済み context や会話ログを
-正本にしない。story は experimental surface として candidate-stable kernel から分ける。
+成熟経路は次とする。
+
+```text
+raw notes/materials
+  -> research/agenda.md OR notes/reports
+  -> analysis/publication artifact
+  -> insights/facts
+```
+
+`research/agenda.md` は現在判断、`notes/reports` は改稿可能な refined report/narrative、
+`.runops/insights/` / `.runops/facts.toml` は再利用する整理済み知見を担う。
+生成済み context や会話ログを正本にしない。story は experimental surface として
+candidate-stable kernel から分ける。
 
 ## ハーネス二重構造
 

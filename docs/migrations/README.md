@@ -95,10 +95,10 @@ project 側の手作業や Agent 作業が必要な変更は、次の情報を�
 
 ## Adding CLI-backed migrations
 
-定型化できる migration は `src/runops/core/migrations/` に実装します。
+定型化できる migration は `src/runops/application/operator/migrations/` に実装します。
 
 ```text
-src/runops/core/migrations/
+src/runops/application/operator/migrations/
   models.py      # Migration / MigrationContext / MigrationResult
   registry.py    # id 解決と実行
   v0.py          # v0 の migration handlers
@@ -108,9 +108,9 @@ src/runops/core/migrations/
 新しい item を CLI で実行可能にする手順:
 
 1. `docs/migrations/v<major>.md` に migration item を追加する。
-2. `src/runops/core/migrations/v<major>.py` に idempotent な handler を追加する。
+2. `src/runops/application/operator/migrations/v<major>.py` に idempotent な handler を追加する。
 3. `registered_migrations()` に `Migration(version="v0", number="0003", ...)` を登録する。
-4. `tests/test_core/test_migrations.py` と `tests/test_cli/test_migrate.py` に dry-run / apply のテストを追加する。
+4. `tests/test_application/test_migrations.py` と `tests/test_cli/test_migrate.py` に dry-run / apply のテストを追加する。
 
 CLI-backed migration は、同じ project に複数回実行しても壊れないことを前提にします。
 判断が必要な migration は CLI handler にせず、guide と `migrate-runops` skill で扱います。

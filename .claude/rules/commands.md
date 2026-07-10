@@ -7,13 +7,15 @@
 
 | コマンド | 説明 |
 |---------|------|
-| `runo init [SIMS...] -y [--with-refs]` | Project 初期化 (対話型がデフォルト、refs mirror は opt-in) |
+| `runo init [SIMS...] [--yes] [--with-refs]` | Project 初期化 (対話型がデフォルト、refs mirror は opt-in) |
 | `runo setup [URL] [--with-refs]` | 既存プロジェクトを clone + 環境セットアップ (refs mirror は opt-in) |
 | `runo doctor` | 環境検査 |
 | `runo context --json` | Agent 向け project context を JSON で取得 |
 | `runo plugins [--json] [--check] [--strict]` | project / simulator / site に基づく推奨 Codex plugins を表示・メタデータ検査 |
 | `runo lint [PATH] [--scope ...]` | project state と推奨 plugin metadata の health check |
-| `runo migrate list/show/apply` | project-state migration の確認・適用 |
+| `runo migrate list` | project-state migration 一覧 |
+| `runo migrate show MIGRATION [NUMBER]` | migration の詳細表示 |
+| `runo migrate apply MIGRATION [NUMBER]` | migration の適用 |
 | `runo mcp serve --transport stdio` | MCP provider を stdio で起動 |
 | `runo mcp serve --transport streamable-http` | MCP provider を Streamable HTTP で起動 |
 | `runo mcp check` | MCP registry / safety contract の軽量検査 |
@@ -68,10 +70,28 @@
 | `runo notes list` | active/history の lab notebook 日付一覧 |
 | `runo notes show [DATE]` | active/history から指定日の lab notebook を表示 |
 | `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
-| `runo knowledge save` | 知見を .runops/insights/ に保存 |
-| `runo knowledge add-fact` | 構造化 fact を追加 |
-| `runo knowledge list` / `show` / `facts` | 知見の表示 |
-| `runo knowledge source attach/detach/sync/render/status` | 外部知識ソース管理 |
+| `runo knowledge save NAME` | 知見を `.runops/insights/` に保存 |
+| `runo knowledge list` | 知見一覧 |
+| `runo knowledge show NAME` | 指定知見を表示 |
+| `runo knowledge add-fact CLAIM` | 構造化 fact を追加 |
+| `runo knowledge facts` | fact 一覧・検索 |
+| `runo knowledge promote-fact FACT_ID` | imported candidate fact を local curated fact へ昇格 |
+| `runo knowledge source list` | 外部知識ソース一覧 |
+| `runo knowledge source attach SOURCE_TYPE NAME URL_OR_PATH` | 外部知識ソース追加 |
+| `runo knowledge source detach NAME` | 外部知識ソース削除 |
+| `runo knowledge source sync [SOURCE_NAME]` | 外部知識ソース同期 |
+| `runo knowledge source render` | knowledge import 表示を再生成 |
+| `runo knowledge source status` | 外部知識ソース状態表示 |
+| `runo knowledge profile enable SOURCE_NAME PROFILE_NAMES...` | source profile を有効化 |
+| `runo knowledge profile disable SOURCE_NAME PROFILE_NAMES...` | source profile を無効化 |
+
+## Demo replay
+
+| コマンド | 説明 |
+|---------|------|
+| `runo demo import-codex-session SESSION_LOG --out PATH` | Codex session JSONL を正規化 event JSONL へ変換 |
+| `runo demo render-replay EVENTS --out PATH` | event JSONL から self-contained replay HTML を生成 |
+| `runo demo build-codex-replay [SESSION_LOG] --out PATH` | session import と replay HTML 生成を一括実行 |
 
 ## ライフサイクル管理
 

@@ -64,7 +64,7 @@ src/runops/
     init/        # runo init / doctor / scaffold / bootstrap
     knowledge/   # runo knowledge / knowledge source
     mcp.py       # runo mcp serve / check / tools
-  core/          # pure domain (application / CLI / infrastructure に依存しない)
+  core/          # domain/state/parsing + runtime contracts (禁止 import 境界を守る)
   application/   # use case / orchestration / port
   adapters/      # Simulator Adapter (抽象基底 + registry)
   launchers/     # Launcher Profile (srun / mpirun / mpiexec)

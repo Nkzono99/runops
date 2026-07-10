@@ -44,7 +44,8 @@ launcher/job.sh、lint/test/docs の整合性だけを扱う。
   resolution、input rendering、required outputs、summary parsing を保つ。
 - launcher / jobgen では Python を MPI rank wrapper にせず、job.sh から
   `srun` / `mpirun` / `mpiexec` を直接起動する境界を守る。
-- `runo create`, `runo submit`, `runo status`, `runo summarize`, `runo collect`
+- `runo runs create`, `runo runs submit`, `runo runs status`,
+  `runo analyze summarize`, `runo analyze collect`
   から見た runops workflow を壊さない。
 - EMSES project では `runo plugins` が `MPIEMSES3D Context` と `emout Context`
   の委譲 role を表示することを確認する。

@@ -16,9 +16,10 @@ core -> application -> interfaces/infrastructure
 source of truth の成熟は一方向です。
 
 ```text
-notes/ (raw chronological evidence)
+raw notes/materials
   -> research/agenda.md (mutable current decision)
-  -> notes/reports/ (refined narrative)
+     OR notes/reports/ (refined narrative)
+  -> analysis/publication artifact
   -> .runops/insights/ + .runops/facts.toml (curated reusable knowledge)
 ```
 

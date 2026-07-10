@@ -11,7 +11,7 @@ test boundary は `.codex/rules/architecture.md` を読む。実装の現在挙�
 
 ## Placement
 
-- `tests/test_core/`: pure domain contract と禁止 import。
+- `tests/test_core/`: domain/state/parsing・runtime contract と禁止 import。
 - `tests/test_application/`: use case、plan/apply、port injection、non-mutation。
 - `tests/test_cli/`: CliRunner の help / exit / rendering。domain rule は重複検査しない。
 - `tests/test_mcp/`: envelope、facade、registry、CLI/application parity。

@@ -8,7 +8,18 @@ from pathlib import Path
 
 import pytest
 
-FORBIDDEN = {"adapters", "application", "cli", "harness", "mcp", "slurm"}
+FORBIDDEN = {
+    "adapters",
+    "application",
+    "cli",
+    "harness",
+    "mcp",
+    "slurm",
+    "templates",
+}
+ALLOWED_OUTER_IMPORTS = {
+    ("demo/replay.py", "runops.templates.render"),
+}
 CORE_ROOT = Path(__file__).parents[2] / "src" / "runops" / "core"
 
 
@@ -72,6 +83,7 @@ def test_too_deep_relative_import_is_rejected() -> None:
 
 def test_core_does_not_import_outer_layers() -> None:
     violations: list[str] = []
+    allowed_seen: set[tuple[str, str]] = set()
 
     for path in sorted(CORE_ROOT.rglob("*.py")):
         tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
@@ -79,7 +91,15 @@ def test_core_does_not_import_outer_layers() -> None:
         package = ".".join(("runops", "core", *relative_parent.parts))
         for lineno, imported_module in _absolute_imports(tree, package=package):
             if _is_forbidden(imported_module):
+                import_key = (
+                    path.relative_to(CORE_ROOT).as_posix(),
+                    imported_module,
+                )
+                if import_key in ALLOWED_OUTER_IMPORTS:
+                    allowed_seen.add(import_key)
+                    continue
                 relative_path = path.relative_to(CORE_ROOT.parents[2])
                 violations.append(f"{relative_path}:{lineno}: {imported_module}")
 
     assert not violations, "core imports outer layers:\n" + "\n".join(violations)
+    assert allowed_seen == ALLOWED_OUTER_IMPORTS

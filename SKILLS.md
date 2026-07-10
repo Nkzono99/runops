@@ -150,7 +150,7 @@ EOF
 
 ### 手順
 
-1. `runops context --json` を実行
+1. `runo context --json` を実行
 2. 返却された JSON から以下を確認:
    - `runs.failed`: 失敗 run の数
    - `runs.running`: 実行中 run の数
@@ -161,10 +161,10 @@ EOF
 
 ### 優先順位
 
-1. submitted/running の run → sync で最新化
+1. submitted/running の run → `runo runs sync` で最新化
 2. failed run → 診断・復旧
-3. created run → submit
-4. completed survey → collect
+3. created run → `runo runs submit`
+4. completed survey → `runo analyze collect`
 5. 知見記録
 
 ---
@@ -176,17 +176,17 @@ EOF
 ### 手順
 
 1. 元 run が completed であることを確認
-2. `runops extend` で継続 run を生成
+2. `runo runs extend` で継続 run を生成
 3. 新 run の manifest に `origin.parent_run` が設定されていることを確認
 4. 必要に応じてパラメータを調整
-5. `submit_run` で投入
+5. `runo runs submit` で投入
 
 ---
 
 ## Action Quick Reference
 
 ```python
-from runops.core.actions import execute_action
+from runops.application.actions import execute_action
 
 # Run 生成
 result = execute_action("create_run", project_root=root, case_name="scan")
@@ -230,7 +230,7 @@ result = execute_action("add_fact", project_root=root,
 ## Retry Suggestion Quick Reference
 
 ```python
-from runops.core.retry import suggest_retry_for_run
+from runops.application.execution.retry import suggest_retry_for_run
 
 suggestions = suggest_retry_for_run(run_dir)
 for s in suggestions:
@@ -240,7 +240,7 @@ for s in suggestions:
 ## Context Bundle Quick Reference
 
 ```python
-from runops.core.context import build_project_context
+from runops.application.context import build_project_context
 
 ctx = build_project_context(project_root)
 print(ctx["runs"])              # state counts

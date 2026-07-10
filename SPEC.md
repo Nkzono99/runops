@@ -111,7 +111,8 @@ runops は 1 package の中を次の 4 context に分ける。
 * **Execution Kernel**: run identity、manifest/state、run 生成・実行 lifecycle
 * **Research Workspace**: notes、analysis、publication、knowledge、paper request
 * **Agent Gateway**: action facade、MCP、project harness、plugin metadata
-* **Operator/Developer utilities**: init、migration、lint、update、diagnostics
+* **Operator/Developer utilities**: init、migration、lint、update、update-harness、
+  diagnostics、demo replay
 
 内側から外側へのレイヤは次の順である。
 
@@ -119,9 +120,13 @@ runops は 1 package の中を次の 4 context に分ける。
 core -> application -> interfaces/infrastructure
 ```
 
-source import は外側から内側へ向ける。`core/` は application / interface /
-infrastructure を import せず、application use case が port を介して workflow を
-組み立てる。CLI と MCP は同じ use case/plan を翻訳し、domain rule を複製しない。
+この矢印は責務の並びであり、全 import graph ではない。`core/` は application、CLI、
+MCP、Slurm、Adapter 実装、harness を import しない。`core/demo/replay.py` から
+`templates.render` への import は既存 demo rendering contract の legacy exception
+とし、新しい依存を増やさない。application use case は外部 effect に port / injection
+seam を使う。既存 run creation / analysis が Adapter・Launcher・jobgen registry を
+compose する箇所は application に閉じ込める。CLI と MCP は同じ use case/plan を
+翻訳し、domain rule を複製しない。
 
 Execution Kernel は candidate-stable contract、Research Workspace と Agent Gateway は
 evolving surface とする。story / narrative generation は experimental であり、v0 中の
@@ -1043,8 +1048,10 @@ production tag を持つ run では、以下を推奨または要求する。
 ## 18. CLI 仕様
 
 preferred executable は `runo` で、`runops` は同じ command tree を指す alias とする。
-現行 v0 surface は grouped command である。全 command inventory と option の正本は
-`.codex/rules/commands.md` とし、この仕様では behavior contract のみを定める。
+現行 v0 surface は grouped command である。全 command path、required positional
+argument、主要 safety option の正本は `.codex/rules/commands.md` とし、parser の
+完全な option 一覧は `runo <group> <command> --help`、この仕様は behavior contract
+を定める。
 確認省略の正規 option は `--yes` とする。`runo update --force` は既存 script 用の
 hidden compatibility alias で、`--yes` と別 semantics を持たない。
 
@@ -1138,11 +1145,15 @@ curated knowledge (`.runops/insights/`, `.runops/facts.toml`) と並列に運用
 
 curated layer との関係:
 
-* `notes/YYYY-MM-DD.md` は **raw chronological log** (準備フェーズの意思決定、
-  観察、仮説、TODO)
-* `notes/reports/<topic>.md` は refined long-form (改稿可)
-* `.runops/insights/<name>.md` / `.runops/facts.toml` は curated, durable
-* 価値が出てきたら `notes/` → `reports/` → `insights/` / `facts.toml` の順で昇格
+```text
+raw notes/materials
+  -> research/agenda.md (current decision) OR notes/reports/<topic>.md
+  -> analysis/publication artifact
+  -> .runops/insights/<name>.md / .runops/facts.toml
+```
+
+raw evidence、現在判断/refined narrative、解析・出版 artifact、再利用可能知識を
+同じ正本として混ぜない。
 
 ### 18.9.1 Research layer
 
@@ -1181,11 +1192,16 @@ curated layer との関係:
 
 ## 19.3 `submit`
 
-* submit 対象 run を特定
-* 必要な provenance を取得
-* `sbatch submit/job.sh` を実行
-* job_id を manifest に記録
-* 状態を `submitted` にする
+* plan は run を特定し、`created` state、`submit/job.sh` の存在・readable・
+  `#SBATCH` directive、non-empty input を確認する
+* plan が返す exact scheduler command と precondition snapshot は CLI dry-run、
+  MCP、bulk submit、実 submit で共有する
+* apply は scheduler 呼び出し直前に run_id と state を再確認し、stale plan は
+  scheduler を呼ばず拒否する
+* scheduler failure では manifest と pre-submit state を変更しない
+* scheduler acceptance 後に job attempt、job_id、`submitted` state を manifest へ保存する
+* acceptance 後の persistence failure は accepted job_id と failure phase を持つ typed
+  error として返し、同じ plan を自動再 submit しない
 
 ---
 

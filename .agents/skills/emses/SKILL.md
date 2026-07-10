@@ -28,7 +28,8 @@ launcher/job.sh、lint/test/docs の整合性だけを扱う。
   resolution、input rendering、required outputs、summary parsing を保つ。
 - launcher / jobgen では Python を MPI rank wrapper にせず、job.sh から
   `srun` / `mpirun` / `mpiexec` を直接起動する境界を守る。
-- `runo create`, `runo submit`, `runo status`, `runo summarize`, `runo collect`
+- `runo runs create`, `runo runs submit`, `runo runs status`,
+  `runo analyze summarize`, `runo analyze collect`
   から見た runops workflow を壊さない。
 - EMSES project では `runo plugins` が `MPIEMSES3D Context` と `emout Context`
   の委譲 role を表示することを確認する。
@@ -48,8 +49,8 @@ launcher/job.sh、lint/test/docs の整合性だけを扱う。
 - Adapter 変更: `tests/test_adapters/test_emses.py`,
   `tests/test_adapters/test_contract.py`
 - launcher/job.sh 変更: `tests/test_launchers/`, `tests/test_slurm/test_jobgen.py`
-- plugin 推薦変更: `tests/test_core/test_plugins.py`,
-  `tests/test_cli/test_plugins.py`, `tests/test_core/test_context.py`,
+- plugin 推薦変更: `tests/test_application/test_plugins.py`,
+  `tests/test_cli/test_plugins.py`, `tests/test_application/test_context.py`,
   `tests/test_mcp/test_tools.py`
 - harness 表示変更: `tests/test_harness/test_codex.py`,
   `tests/test_cli/test_init.py`, `tests/test_cli/test_update_harness.py`

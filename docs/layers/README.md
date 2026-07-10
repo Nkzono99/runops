@@ -24,6 +24,18 @@ Experiment / Execution / Analysis / Research / Knowledge の各 Layer にある�
 読み書きします。Upstream Integration Layer は、運用中に見つかった runops 本体への
 改善や local patch を project の研究状態から切り離して扱うための境界です。
 
+この operational Layer taxonomy は product bounded context と競合する分類ではなく、
+project 側の正本を詳しく見るための view です。対応は次のとおりです。
+
+| Product bounded context | Operational Layer docs |
+|-------------------------|------------------------|
+| **Execution Kernel** | Experiment + Execution Kernel |
+| **Research Workspace** | Analysis + Research + Knowledge |
+| **Agent Gateway** | Interface + Harness |
+| **Operator/Developer utilities** | Upstream Integration + operator utilities |
+
+実装レイヤの並びは `core -> application -> interfaces/infrastructure` です。
+
 | Layer | Canonical Doc | 役割 |
 |-------|---------------|------|
 | Interface Layer | [interface.md](interface.md) | Agent / harness / operator が project state に触る command surface と gate |

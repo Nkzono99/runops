@@ -11,7 +11,7 @@ runops は 1 package のまま、責務を 4 context に分けます。
 | **Execution Kernel** | run identity、manifest/state、run 生成、submission、Adapter/Launcher/Slurm port | candidate-stable |
 | **Research Workspace** | notes、analysis、publication、knowledge、paper request | evolving |
 | **Agent Gateway** | action facade、MCP、project harness、plugin metadata | evolving |
-| **Operator/Developer utilities** | init、migration、lint、update、diagnostics | operator-facing |
+| **Operator/Developer utilities** | init、migration、lint、update、update-harness、diagnostics、demo replay | operator-facing |
 
 story / narrative generation は **experimental** です。Execution Kernel の contract と
 同じ安定性を前提にせず、v0 中に regroup / removal できます。
@@ -22,8 +22,11 @@ story / narrative generation は **experimental** です。Execution Kernel の 
 core -> application -> interfaces/infrastructure
 ```
 
-import は外側から内側へ向けます。`core/` は外側を import せず、`application/` が
-use case / port を持ち、CLI・MCP・Slurm・harness が composition と I/O を担います。
+この矢印は責務の並びで、全 import graph ではありません。強制している不変条件は
+`core/` が列挙済みの禁止 package を import しないことです（demo rendering の
+`templates.render` だけを legacy allowlist とする）。`application/` は use case と port/injection
+seam を持ちますが、run creation / analysis は既存の Adapter・Launcher・jobgen
+registry を application 内で composition します。CLI・MCP は入力と表示を担います。
 
 ## 設計原則
 
@@ -40,8 +43,9 @@ use case / port を持ち、CLI・MCP・Slurm・harness が composition と I/O 
 
 ```text
 runops/
-  core/          pure domain: project/case/survey/run/manifest/state
-  application/   use cases: actions, run_creation, execution, research, operator
+  core/          domain/state/parsing + deterministic/runtime contracts
+  application/   use cases: actions/context, run_creation, execution, analysis,
+                 publication, research, gateway, operator, ports
   cli/           Typer input, confirmation, rendering
   mcp/           Agent-facing transport facade and capability tools
   adapters/      Simulator-specific behavior
@@ -52,10 +56,16 @@ runops/
   templates/     project/case/survey/harness templates
 ```
 
-`core/` には pure domain rule だけを置きます。run 生成、submission、analysis、
-publication、notebook、harness upgrade の orchestration は `application/` に置き、
-外部 I/O は injected port / runner で渡します。`cli/` と `mcp/` は同じ application
-plan を翻訳し、state/script/input/command の規則を edge で複製しません。
+`core/` には domain/state/parsing と deterministic/runtime contract を置きます。
+filesystem / subprocess を扱う既存 runtime contract もありますが、強制する境界は
+application、CLI、MCP、Slurm、Adapter 実装、harness を import しないことです。
+`core/demo/replay.py` から `templates.render` への依存は既存 demo rendering contract の
+legacy exception とし、新しい `core/` 依存を増やしません。
+run 生成、submission、analysis、publication、notebook、harness upgrade の
+orchestration は `application/` に置きます。
+submission、notebook、operator utility の外部 effect は port / injected runner を使い、
+既存 run creation / analysis は top-level infrastructure registry を明示的に compose
+します。`cli/` と `mcp/` は同じ application plan を翻訳し、規則を複製しません。
 
 `src/runops/sites/` は runtime site 設定そのものではなく、`runo init` が読む bundled
 preset 集です。実行時 site の正本は project root の `site.toml` です。
@@ -678,6 +688,15 @@ insights のインポート       ← プロジェクト横断の知識共有
 
 ### Lab notebook (chronological)
 
+Research Workspace 全体の maturity flow は次です。
+
+```text
+raw notes/materials
+  -> research/agenda.md OR notes/reports/<topic>.md
+  -> analysis/publication artifact
+  -> .runops/insights/ / .runops/facts.toml
+```
+
 ```
 notes/YYYY-MM-DD.md        ← runo notes append (append-only)
 notes/history/YYYY/YYYY-MM-DD.md
@@ -693,7 +712,8 @@ curated knowledge と lab notebook は **二層構造**:
 - 時系列の意思決定・観察ログ (準備フェーズの意思決定・観察・仮説・TODO) は `notes/YYYY-MM-DD.md`
 - `runo notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
 - `runo notes archive` は古い日次ファイルだけを `notes/history/YYYY/` に移し、`notes list/show` は active と history を透過検索する
-- 価値が出てきたら notes → reports → insights / facts.toml の順に昇格
+- agenda / report で判断を整理し、analysis/publication artifact の evidence を経て
+  insight / fact へ昇格
 
 ### Research layer (decision ledger)
 

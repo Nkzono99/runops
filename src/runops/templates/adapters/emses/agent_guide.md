@@ -25,8 +25,8 @@ enable plugins; that remains user-local Codex state.
 - Keep `work/`, `input/`, `submit/`, and `manifest.toml` under runops control.
 - Keep MPI launch behavior in launcher/job.sh layers. Python should not become
   a rank wrapper.
-- Use `runo create`, `runo submit`, `runo status`, `runo summarize`, and
-  `runo collect` instead of ad hoc file movement.
+- Use `runo runs create`, `runo runs submit`, `runo runs status`,
+  `runo analyze summarize`, and `runo analyze collect` instead of ad hoc file movement.
 
 #### Minimal fallback facts
 

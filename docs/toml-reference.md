@@ -410,7 +410,7 @@ Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
 >
 > `case.toml` / `survey.toml` の `[job]` セクションでは上記の **`processes` / `threads` / `cores`** が user-facing
 > な名前です。ジョブスクリプトのレンダリングは内部で `ntasks` / `threads_per_process` / `cores_per_thread` の
-> 名前で受け取りますが、`runops.core.run_creation._build_job_config` が `site.toml` の `resource_style` を
+> 名前で受け取りますが、`runops.application.run_creation._build_job_config` が `site.toml` の `resource_style` を
 > 見て翻訳するので、`case.toml` / `survey.toml` 側で内部名を書く必要はありません (書いても無視されます)。
 > どちらの site タイプでも `[job]` の正しい書き方は次のとおりです:
 >

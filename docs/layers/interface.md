@@ -31,6 +31,11 @@ CLI は重要ですが、研究者が日常的に CLI の全体を操作する�
 
 ## 他 Layer との境界
 
+以下は project state の operational Layer です。product context との対応は、
+Experiment/Execution → **Execution Kernel**、Analysis/Research/Knowledge →
+**Research Workspace**、Interface/Harness → **Agent Gateway**、Upstream/operator →
+**Operator/Developer utilities** です。
+
 | Layer | Interface Layer から見た関係 |
 |-------|------------------------------|
 | Experiment Layer | `campaign.toml`、case、survey を生成・検証する入口 |
@@ -96,6 +101,9 @@ uvx --from runops runo plugins --check
 `runops` コマンドも同じ CLI を指す stable alias として残しています。
 
 全コマンドは、引数省略時にカレントディレクトリをデフォルトターゲットとします。
+以下は日常運用で使う主要導線の抜粋です。全 command path、required positional
+argument、主要 safety option は [`.codex/rules/commands.md`](../../.codex/rules/commands.md)、
+parser の完全な option は各 command の `--help` を正本とします。
 
 ### Project
 
@@ -137,7 +145,7 @@ MCP provider は Agent / host 向けの edge interface です。read / inspect /
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | `survey.toml` からパラメータ直積で run を一括生成 |
 | `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
-| `runo runs submit --all [DIR] [--yes]` | created な run を確認付きで一括投入 (`--yes` で確認省略) |
+| `runo runs submit --all [DIR] [--yes]` | ready plan の run を確認付きで一括投入 (`--yes` で確認省略) |
 | `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
 | `runo runs extend` | スナップショットから継続 run を生成 |
 | `runo runs retry [RUN] [--plan]` | failed / cancelled run の retry 準備 |
