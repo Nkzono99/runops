@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import errno
+import os
 from dataclasses import replace
 from datetime import date, datetime, timezone
 from pathlib import Path
@@ -21,6 +22,7 @@ from runops.application.research.notebook import (
     list_note_days,
     plan_note_archive,
     read_note,
+    resolve_notes_dir,
 )
 
 
@@ -45,6 +47,19 @@ def _assert_archive_apply_error(
     assert error.recovery_path == recovery_path
     assert isinstance(error.cause, Exception)
     return error
+
+
+def test_resolve_notes_dir_preserves_explicit_symlink_for_root_validation(
+    tmp_path: Path,
+) -> None:
+    actual_notes = tmp_path / "actual-notes"
+    actual_notes.mkdir()
+    notes_link = tmp_path / "notes"
+    notes_link.symlink_to(actual_notes, target_is_directory=True)
+
+    resolved = resolve_notes_dir(notes_link)
+
+    assert resolved == notes_link.absolute()
 
 
 def test_append_note_selects_jst_day_and_preserves_format(tmp_path: Path) -> None:
@@ -82,6 +97,138 @@ def test_append_note_uses_explicit_date_but_injected_timestamp(tmp_path: Path) -
     assert "## 12:05 catch up" in result.path.read_text(encoding="utf-8")
 
 
+def test_append_note_rejects_daily_symlink_without_mutating_target(
+    tmp_path: Path,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+    outside = tmp_path / "outside.md"
+    outside.write_text("outside\n", encoding="utf-8")
+    (notes_dir / "2026-04-08.md").symlink_to(outside)
+    request = NoteAppendRequest(
+        notes_dir=notes_dir,
+        title="must stay local",
+        body="entry",
+        note_date=date(2026, 4, 8),
+    )
+
+    with pytest.raises(NoteValidationError, match="unsafe daily notebook"):
+        append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+
+    assert outside.read_text(encoding="utf-8") == "outside\n"
+
+
+def test_append_note_rejects_non_regular_daily_file(tmp_path: Path) -> None:
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+    daily = notes_dir / "2026-04-08.md"
+    os.mkfifo(daily)
+    reader_fd = os.open(daily, os.O_RDONLY | os.O_NONBLOCK)
+    request = NoteAppendRequest(
+        notes_dir=notes_dir,
+        title="not a pipe",
+        body="entry",
+        note_date=date(2026, 4, 8),
+    )
+
+    try:
+        with pytest.raises(NoteValidationError, match="not a regular file"):
+            append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+    finally:
+        os.close(reader_fd)
+
+
+def test_append_note_rejects_symlink_notes_root(tmp_path: Path) -> None:
+    actual_notes = tmp_path / "actual-notes"
+    actual_notes.mkdir()
+    notes_link = tmp_path / "notes"
+    notes_link.symlink_to(actual_notes, target_is_directory=True)
+    request = NoteAppendRequest(
+        notes_dir=notes_link,
+        title="must stay anchored",
+        body="entry",
+        note_date=date(2026, 4, 8),
+    )
+
+    with pytest.raises(NoteValidationError, match="unsafe notes directory"):
+        append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+
+    assert list(actual_notes.iterdir()) == []
+
+
+def test_concurrent_initial_appends_write_one_header_and_whole_entries(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    note_date = date(2026, 4, 8)
+    daily_name = f"{note_date.isoformat()}.md"
+    worker_count = 4
+    parent_pid = os.getpid()
+    real_exists = Path.exists
+
+    def pretend_daily_file_is_absent(path: Path) -> bool:
+        if os.getpid() != parent_pid and path.name == daily_name:
+            return False
+        return real_exists(path)
+
+    # This makes the old path.exists()/open() race deterministic. The fixed
+    # implementation derives ``created`` from fstat() while holding the lock.
+    monkeypatch.setattr(Path, "exists", pretend_daily_file_is_absent)
+    start_read, start_write = os.pipe()
+    result_read, result_write = os.pipe()
+    children: list[int] = []
+
+    for index in range(worker_count):
+        child_pid = os.fork()
+        if child_pid == 0:
+            exit_code = 0
+            try:
+                os.close(start_write)
+                os.close(result_read)
+                os.read(start_read, 1)
+                result = append_note(
+                    NoteAppendRequest(
+                        notes_dir=notes_dir,
+                        title=f"entry-{index}",
+                        body=f"BEGIN-{index}\n{'x' * 32_000}\nEND-{index}",
+                        note_date=note_date,
+                    ),
+                    now=datetime(2026, 4, 8, tzinfo=timezone.utc),
+                )
+                os.write(result_write, b"1" if result.created else b"0")
+            except BaseException:
+                exit_code = 1
+            finally:
+                os.close(start_read)
+                os.close(result_write)
+            os._exit(exit_code)
+        children.append(child_pid)
+
+    os.close(start_read)
+    os.close(result_write)
+    os.write(start_write, b"x" * worker_count)
+    os.close(start_write)
+    statuses = b""
+    while chunk := os.read(result_read, worker_count):
+        statuses += chunk
+    os.close(result_read)
+    exit_codes = [
+        os.waitstatus_to_exitcode(os.waitpid(child_pid, 0)[1]) for child_pid in children
+    ]
+
+    assert exit_codes == [0] * worker_count
+    assert statuses.count(b"1") == 1
+    assert statuses.count(b"0") == worker_count - 1
+    text = (notes_dir / daily_name).read_text(encoding="utf-8")
+    assert text.count(f"# {note_date.isoformat()} — lab notebook") == 1
+    for index in range(worker_count):
+        expected_entry = (
+            f"## 09:00 entry-{index}\n\nBEGIN-{index}\n{'x' * 32_000}\nEND-{index}\n\n"
+        )
+        assert text.count(expected_entry) == 1
+
+
 def test_list_note_days_merges_active_and_history_with_active_winning(
     tmp_path: Path,
 ) -> None:
@@ -100,6 +247,55 @@ def test_list_note_days_merges_active_and_history_with_active_winning(
         ("2026-04-06", 1),
     ]
     assert summaries[0].path == active
+
+
+def test_list_note_days_skips_daily_symlinks(tmp_path: Path) -> None:
+    notes_dir = tmp_path / "notes"
+    active = notes_dir / "2026-04-08.md"
+    history = notes_dir / "history" / "2026" / "2026-04-06.md"
+    outside_active = tmp_path / "outside-active.md"
+    outside_history = tmp_path / "outside-history.md"
+    _write_note(notes_dir / "2026-04-07.md", "safe")
+    _write_note(outside_active, "outside active")
+    _write_note(outside_history, "outside history")
+    active.symlink_to(outside_active)
+    history.parent.mkdir(parents=True)
+    history.symlink_to(outside_history)
+
+    summaries = list_note_days(notes_dir, count=0)
+
+    assert [summary.note_date for summary in summaries] == [date(2026, 4, 7)]
+
+
+def test_read_note_skips_active_symlink_and_uses_regular_history_file(
+    tmp_path: Path,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    outside = tmp_path / "outside.md"
+    active = notes_dir / "2026-04-08.md"
+    history = notes_dir / "history" / "2026" / active.name
+    _write_note(outside, "outside")
+    notes_dir.mkdir()
+    active.symlink_to(outside)
+    _write_note(history, "history")
+
+    document = read_note(notes_dir, "2026-04-08", today=date(2026, 4, 9))
+
+    assert document.path == history
+    assert "history" in document.text
+    assert "outside" not in document.text
+
+
+def test_read_and_list_reject_symlink_notes_root(tmp_path: Path) -> None:
+    actual_notes = tmp_path / "actual-notes"
+    _write_note(actual_notes / "2026-04-08.md", "outside root")
+    notes_link = tmp_path / "notes"
+    notes_link.symlink_to(actual_notes, target_is_directory=True)
+
+    with pytest.raises(NoteValidationError, match="unsafe notes directory"):
+        read_note(notes_link, "2026-04-08", today=date(2026, 4, 8))
+    with pytest.raises(NoteValidationError, match="unsafe notes directory"):
+        list_note_days(notes_link, count=0)
 
 
 def test_read_note_supports_today_latest_and_explicit_history_date(

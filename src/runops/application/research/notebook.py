@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 import errno
+import fcntl
 import os
 import secrets
 import stat
@@ -164,6 +165,15 @@ class _ArchiveEntryError(Exception):
         super().__init__(message)
 
 
+@dataclass(frozen=True)
+class _LoadedNote:
+    """A regular daily note read through an anchored directory descriptor."""
+
+    note_date: date
+    path: Path
+    text: str
+
+
 def resolve_notes_dir(
     explicit: Path | None = None,
     *,
@@ -171,7 +181,7 @@ def resolve_notes_dir(
 ) -> Path:
     """Resolve the notes directory from an override or project context."""
     if explicit is not None:
-        return explicit.resolve()
+        return Path(os.path.abspath(explicit))
     start = (cwd or Path.cwd()).resolve()
     try:
         root = find_project_root(start)
@@ -194,49 +204,75 @@ def append_note(request: NoteAppendRequest, *, now: datetime) -> NoteAppendResul
         note_date = _parse_required_note_date(request.note_date)
     else:
         note_date = request.note_date or local_now.date()
-    notes_dir = request.notes_dir
-    notes_dir.mkdir(parents=True, exist_ok=True)
-    path = notes_dir / f"{note_date.isoformat()}.md"
-    created = not path.exists()
+    notes_dir, root_fd = _open_notes_root(request.notes_dir, create=True)
+    daily_name = f"{note_date.isoformat()}.md"
+    path = notes_dir / daily_name
+    entry_time = local_now.strftime("%H:%M")
+    daily_flags = (
+        os.O_WRONLY
+        | os.O_APPEND
+        | os.O_CREAT
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
 
-    with path.open("a", encoding="utf-8") as stream:
-        if created:
-            stream.write(f"# {note_date.isoformat()} — lab notebook\n\n")
-        stream.write(f"## {local_now.strftime('%H:%M')} {title}\n\n")
-        stream.write(body.rstrip() + "\n\n")
+    with ExitStack() as stack:
+        stack.callback(os.close, root_fd)
+        try:
+            daily_fd = os.open(daily_name, daily_flags, 0o644, dir_fd=root_fd)
+        except OSError as exc:
+            raise NoteValidationError(f"unsafe daily notebook: {path}") from exc
+        stack.callback(os.close, daily_fd)
+        try:
+            fcntl.flock(daily_fd, fcntl.LOCK_EX)
+            daily_stat = os.fstat(daily_fd)
+        except OSError as exc:
+            raise NoteValidationError(f"could not lock daily notebook: {path}") from exc
+        if not stat.S_ISREG(daily_stat.st_mode):
+            raise NoteValidationError(f"daily notebook is not a regular file: {path}")
+
+        created = daily_stat.st_size == 0
+        header = f"# {note_date.isoformat()} — lab notebook\n\n" if created else ""
+        entry = f"## {entry_time} {title}\n\n{body.rstrip()}\n\n"
+        payload = (header + entry).encode("utf-8")
+        try:
+            written = os.write(daily_fd, payload)
+        except OSError as exc:
+            raise NoteValidationError(
+                f"could not append daily notebook: {path}"
+            ) from exc
+        if written != len(payload):
+            raise NoteValidationError(
+                f"incomplete append to daily notebook: {path} "
+                f"({written}/{len(payload)} bytes)"
+            )
 
     return NoteAppendResult(
         path=path,
         note_date=note_date,
-        entry_time=local_now.strftime("%H:%M"),
+        entry_time=entry_time,
         created=created,
     )
 
 
 def list_note_days(notes_dir: Path, *, count: int = 14) -> tuple[NoteDaySummary, ...]:
     """Load recent daily-note metadata from active and history directories."""
-    _require_notes_dir(notes_dir)
-    summaries: list[NoteDaySummary] = []
-    for path in _iter_note_files(notes_dir):
-        try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        parsed = _parse_note_date(path.stem)
-        if parsed is None:  # Defensive: _iter_note_files already filters this.
-            continue
-        summaries.append(
-            NoteDaySummary(
-                note_date=parsed,
-                entry_count=sum(
-                    1 for line in text.splitlines() if line.startswith("## ")
-                ),
-                path=path,
-            )
+    root, root_fd = _open_notes_root(notes_dir)
+    with ExitStack() as stack:
+        stack.callback(os.close, root_fd)
+        loaded = _load_note_documents(root, root_fd)
+    summaries = tuple(
+        NoteDaySummary(
+            note_date=document.note_date,
+            entry_count=sum(
+                1 for line in document.text.splitlines() if line.startswith("## ")
+            ),
+            path=document.path,
         )
-        if count > 0 and len(summaries) >= count:
-            break
-    return tuple(summaries)
+        for document in loaded
+    )
+    return summaries[:count] if count > 0 else summaries
 
 
 def read_note(
@@ -246,30 +282,32 @@ def read_note(
     today: date,
 ) -> NoteDocument:
     """Read today's, the latest, or an explicitly dated notebook."""
-    _require_notes_dir(notes_dir)
+    root, root_fd = _open_notes_root(notes_dir)
+    with ExitStack() as stack:
+        stack.callback(os.close, root_fd)
+        loaded = _load_note_documents(root, root_fd)
     if selector is None or selector == "today":
         note_date = today
-        path = _find_note_file(notes_dir, note_date)
     elif selector == "latest":
-        files = _iter_note_files(notes_dir)
-        if not files:
+        if not loaded:
             raise NoteNotFoundError()
-        path = files[0]
-        parsed = _parse_note_date(path.stem)
-        if parsed is None:  # Defensive: _iter_note_files already filters this.
-            raise NoteValidationError(f"invalid notebook path: {path}")
-        note_date = parsed
+        latest = loaded[0]
+        return NoteDocument(
+            note_date=latest.note_date,
+            path=latest.path,
+            text=latest.text,
+        )
     else:
         note_date = _parse_required_note_date(selector)
-        path = _find_note_file(notes_dir, note_date)
 
-    if path is None or not path.is_file():
-        raise NoteNotFoundError(note_date)
-    return NoteDocument(
-        note_date=note_date,
-        path=path,
-        text=path.read_text(encoding="utf-8"),
-    )
+    for document in loaded:
+        if document.note_date == note_date:
+            return NoteDocument(
+                note_date=document.note_date,
+                path=document.path,
+                text=document.text,
+            )
+    raise NoteNotFoundError(note_date)
 
 
 def plan_note_archive(
@@ -532,6 +570,126 @@ def _require_notes_dir(notes_dir: Path) -> None:
         raise NoteDirectoryNotFoundError(f"notes directory not found: {notes_dir}")
 
 
+def _open_notes_root(notes_dir: Path, *, create: bool = False) -> tuple[Path, int]:
+    """Open the notes root itself without following a final symlink."""
+    root = Path(os.path.abspath(notes_dir))
+    if create:
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            raise NoteValidationError(f"unsafe notes directory: {notes_dir}") from exc
+    try:
+        root_fd = os.open(root, _directory_open_flags())
+    except FileNotFoundError as exc:
+        if not create:
+            raise NoteDirectoryNotFoundError(
+                f"notes directory not found: {notes_dir}"
+            ) from exc
+        raise NoteValidationError(f"unsafe notes directory: {notes_dir}") from exc
+    except OSError as exc:
+        raise NoteValidationError(f"unsafe notes directory: {notes_dir}") from exc
+    return root, root_fd
+
+
+def _load_note_documents(root: Path, root_fd: int) -> tuple[_LoadedNote, ...]:
+    """Load active/history daily notes without traversing symlink components."""
+    by_date: dict[date, _LoadedNote] = {}
+    try:
+        active_names = os.listdir(root_fd)
+    except OSError as exc:
+        raise NoteValidationError(f"could not inspect notes directory: {root}") from exc
+    for name in active_names:
+        note_date = _daily_note_date(name)
+        if note_date is None:
+            continue
+        text = _read_regular_text_at(root_fd, name)
+        if text is None:
+            continue
+        by_date[note_date] = _LoadedNote(
+            note_date=note_date,
+            path=root / name,
+            text=text,
+        )
+
+    history_fd = _open_directory_at(root_fd, _HISTORY_DIR)
+    if history_fd is not None:
+        with ExitStack() as history_stack:
+            history_stack.callback(os.close, history_fd)
+            try:
+                year_names = os.listdir(history_fd)
+            except OSError:
+                year_names = []
+            for year_name in year_names:
+                year_fd = _open_directory_at(history_fd, year_name)
+                if year_fd is None:
+                    continue
+                with ExitStack() as year_stack:
+                    year_stack.callback(os.close, year_fd)
+                    try:
+                        daily_names = os.listdir(year_fd)
+                    except OSError:
+                        continue
+                    for name in daily_names:
+                        note_date = _daily_note_date(name)
+                        if note_date is None or note_date in by_date:
+                            continue
+                        text = _read_regular_text_at(year_fd, name)
+                        if text is None:
+                            continue
+                        by_date[note_date] = _LoadedNote(
+                            note_date=note_date,
+                            path=root / _HISTORY_DIR / year_name / name,
+                            text=text,
+                        )
+
+    return tuple(
+        sorted(by_date.values(), key=lambda document: document.note_date, reverse=True)
+    )
+
+
+def _open_directory_at(parent_fd: int, name: str) -> int | None:
+    try:
+        return os.open(name, _directory_open_flags(), dir_fd=parent_fd)
+    except OSError:
+        return None
+
+
+def _read_regular_text_at(directory_fd: int, name: str) -> str | None:
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+        | getattr(os, "O_NONBLOCK", 0)
+    )
+    try:
+        daily_fd = os.open(name, flags, dir_fd=directory_fd)
+    except OSError:
+        return None
+    with ExitStack() as stack:
+        stack.callback(os.close, daily_fd)
+        try:
+            fcntl.flock(daily_fd, fcntl.LOCK_SH)
+            daily_stat = os.fstat(daily_fd)
+        except OSError:
+            return None
+        if not stat.S_ISREG(daily_stat.st_mode):
+            return None
+        chunks: list[bytes] = []
+        try:
+            while chunk := os.read(daily_fd, 64 * 1024):
+                chunks.append(chunk)
+        except OSError:
+            return None
+    return b"".join(chunks).decode("utf-8")
+
+
+def _daily_note_date(name: str) -> date | None:
+    path = Path(name)
+    if path.name != name or path.suffix != ".md":
+        return None
+    return _parse_note_date(path.stem)
+
+
 def _parse_note_date(value: str) -> date | None:
     try:
         return datetime.strptime(value, _NOTE_DATE_FORMAT).date()
@@ -559,41 +717,6 @@ def _parse_older_than(value: str) -> int:
     if days <= 0:
         raise NoteValidationError("duration must be positive")
     return days
-
-
-def _is_daily_note(path: Path) -> bool:
-    return path.suffix == ".md" and _parse_note_date(path.stem) is not None
-
-
-def _iter_note_files(notes_dir: Path) -> list[Path]:
-    by_date: dict[str, Path] = {}
-    for path in sorted(
-        notes_dir.glob("*.md"), key=lambda item: item.stem, reverse=True
-    ):
-        if _is_daily_note(path):
-            by_date[path.stem] = path
-
-    history_dir = notes_dir / _HISTORY_DIR
-    if history_dir.is_dir():
-        for path in sorted(
-            history_dir.rglob("*.md"),
-            key=lambda item: item.stem,
-            reverse=True,
-        ):
-            if _is_daily_note(path):
-                by_date.setdefault(path.stem, path)
-
-    return sorted(by_date.values(), key=lambda item: item.stem, reverse=True)
-
-
-def _find_note_file(notes_dir: Path, note_date: date) -> Path | None:
-    active = notes_dir / f"{note_date.isoformat()}.md"
-    if active.is_file():
-        return active
-    for path in _iter_note_files(notes_dir):
-        if path.stem == note_date.isoformat():
-            return path
-    return None
 
 
 def _history_path_for(notes_dir: Path, note_path: Path) -> Path:
