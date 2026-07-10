@@ -1192,12 +1192,23 @@ raw evidence、現在判断/refined narrative、解析・出版 artifact、再�
 
 ## 19.3 `submit`
 
-* plan は run を特定し、`created` state、`submit/job.sh` の存在・readable・
-  `#SBATCH` directive、non-empty input を確認する
+* plan は run を特定し、`created` state、未記録の `job_id`、空の durable claim、
+  `submit/job.sh` の存在・readable・`#SBATCH` directive、non-empty input を確認する
 * plan が返す exact scheduler command と precondition snapshot は CLI dry-run、
   MCP、bulk submit、実 submit で共有する
-* apply は scheduler 呼び出し直前に run_id と state を再確認し、stale plan は
-  scheduler を呼ばず拒否する
+* apply は run 単位の process-safe advisory lock を保持し、scheduler 呼び出し直前に
+  run_id、state、job_id、work directory 選択、durable claim を再確認する。stale plan は
+  scheduler を呼ばず拒否し、lock は scheduler acceptance と local persistence の
+  完了まで保持する
+* run root の `.runops-submit.lock` は lock inode を安定させるため unlink しない内部
+  artifact であり、manifest/state の正本ではなく Git 管理もしない。lock 内では
+  scheduler 呼び出し前に `pending`、acceptance 後に `accepted:<job_id>` を fsync し、
+  scheduler rejection または manifest/state の保存完了時だけ clear する
+* persistence failure や process interruption で残った durable claim は後続 submit を
+  block する。明示的 retry は同じ lock 内で terminal state を再検証し、claim を
+  durable に clear してから `created` へ reset する
+* `created` のまま `pending` / `accepted:<job_id>` claim が残る場合は scheduler の
+  acceptance を照合し、manifest と claim を手動 reconcile するまで submit を block する
 * scheduler failure では manifest と pre-submit state を変更しない
 * scheduler acceptance 後に job attempt、job_id、`submitted` state を manifest へ保存する
 * acceptance 後の persistence failure は accepted job_id と failure phase を持つ typed

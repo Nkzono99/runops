@@ -9,7 +9,9 @@ from typing import Annotated, Optional
 import typer
 
 from runops.application.actions import ActionStatus
-from runops.application.actions import submit_run as submit_run_action
+from runops.application.actions import (
+    submit_planned_run as submit_planned_run_action,
+)
 from runops.application.execution.submission import (
     SubmitPlan,
     SubmitRequest,
@@ -76,17 +78,14 @@ def _resolve_run_dir(identifier: str) -> Path:
 
 
 def _submit_single_run(
-    run_dir: Path,
+    plan: SubmitPlan,
     *,
     quiet: bool = False,
-    queue_name: str = "",
-    qos: str = "",
-    afterok: str | None = None,
 ) -> str | None:
     """Submit a single run and return the job_id, or None on skip/error.
 
     Args:
-        run_dir: Path to the run directory.
+        plan: Exact submission plan to apply.
         quiet: If True, suppress per-run output (used in --all mode).
 
     Returns:
@@ -95,12 +94,7 @@ def _submit_single_run(
     Raises:
         typer.Exit: On fatal errors (only in single-run mode, not --all).
     """
-    result = submit_run_action(
-        run_dir,
-        queue_name=queue_name,
-        qos=qos,
-        afterok=afterok or "",
-    )
+    result = submit_planned_run_action(plan)
 
     if result.status is not ActionStatus.SUCCESS:
         prefix = "Error"
@@ -114,7 +108,7 @@ def _submit_single_run(
         typer.echo(f"Warning: {warning}")
 
     job_id = str(result.data.get("job_id", ""))
-    run_id = str(result.data.get("run_id", run_dir.name))
+    run_id = str(result.data.get("run_id", plan.run_dir.name))
     if not quiet:
         typer.echo(f"Submitted {run_id}: job_id={job_id}")
 
@@ -217,23 +211,22 @@ def _submit_single_cwd(
             typer.echo(f"No run found in {cwd}")
             raise typer.Exit(code=1)
 
+    try:
+        plan = _build_submit_plan(
+            run_dir,
+            queue_name=queue_name,
+            qos=qos,
+            afterok=afterok,
+        )
+    except SimctlError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+
     if dry_run:
-        try:
-            plan = _build_submit_plan(
-                run_dir,
-                queue_name=queue_name,
-                qos=qos,
-                afterok=afterok,
-            )
-        except SimctlError as exc:
-            typer.echo(f"Error: {exc}")
-            raise typer.Exit(code=1) from exc
         _render_submit_plan(plan)
         return
 
-    result = _submit_single_run(
-        run_dir, queue_name=queue_name, qos=qos, afterok=afterok
-    )
+    result = _submit_single_run(plan)
     if result is None:
         raise typer.Exit(code=1)
 
@@ -275,23 +268,22 @@ def _submit_single(
 
     run_dir = _resolve_run_dir(run_arg)
 
+    try:
+        plan = _build_submit_plan(
+            run_dir,
+            queue_name=queue_name,
+            qos=qos,
+            afterok=afterok,
+        )
+    except SimctlError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
+
     if dry_run:
-        try:
-            plan = _build_submit_plan(
-                run_dir,
-                queue_name=queue_name,
-                qos=qos,
-                afterok=afterok,
-            )
-        except SimctlError as exc:
-            typer.echo(f"Error: {exc}")
-            raise typer.Exit(code=1) from exc
         _render_submit_plan(plan)
         return
 
-    result = _submit_single_run(
-        run_dir, queue_name=queue_name, qos=qos, afterok=afterok
-    )
+    result = _submit_single_run(plan)
     if result is None:
         raise typer.Exit(code=1)
 
@@ -390,11 +382,8 @@ def _submit_all(
 
     for plan in ready_plans:
         job_id = _submit_single_run(
-            plan.run_dir,
+            plan,
             quiet=True,
-            queue_name=queue_name,
-            qos=qos,
-            afterok=afterok,
         )
         if job_id is not None:
             typer.echo(f"  Submitted {plan.run_id}: job_id={job_id}")

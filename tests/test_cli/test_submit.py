@@ -9,8 +9,10 @@ from unittest.mock import patch
 import tomli_w
 from typer.testing import CliRunner
 
+from runops.application.actions import ActionResult, ActionStatus
 from runops.application.execution.submission import SubmitRequest, plan_submit
 from runops.cli.main import app
+from runops.core.manifest import update_manifest
 
 runner = CliRunner()
 
@@ -263,6 +265,96 @@ def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
     assert "About to submit 1 created run" in result.output
     assert "Cancelled." in result.output
     mock_submit.assert_not_called()
+
+
+def test_submit_all_passes_exact_confirmed_plan_to_application_mapper(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    survey_dir = tmp_path / "runs" / "survey1"
+    run_dir = survey_dir / "R20260327-0001"
+    _create_run(run_dir, run_id=run_dir.name)
+    confirmed_plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    mapped_plans: list[object] = []
+
+    def map_plan(plan: object) -> ActionResult:
+        mapped_plans.append(plan)
+        return ActionResult(
+            action="submit_run",
+            status=ActionStatus.SUCCESS,
+            message="Submitted job 22222",
+            data={
+                "job_id": "22222",
+                "run_id": confirmed_plan.run_id,
+                "warnings": [],
+            },
+        )
+
+    with (
+        patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
+        patch(
+            "runops.cli.submit._build_submit_plan",
+            return_value=confirmed_plan,
+        ),
+        patch(
+            "runops.cli.submit.submit_planned_run_action",
+            side_effect=map_plan,
+            create=True,
+        ),
+        patch(
+            "runops.cli.submit.submit_run_action",
+            return_value=ActionResult(
+                action="submit_run",
+                status=ActionStatus.SUCCESS,
+                message="legacy path",
+                data={
+                    "job_id": "legacy",
+                    "run_id": confirmed_plan.run_id,
+                    "warnings": [],
+                },
+            ),
+            create=True,
+        ) as legacy_action,
+    ):
+        result = runner.invoke(
+            app,
+            ["runs", "submit", "--all", str(survey_dir)],
+            input="y\n",
+        )
+
+    assert result.exit_code == 0
+    assert len(mapped_plans) == 1
+    assert mapped_plans[0] is confirmed_plan
+    legacy_action.assert_not_called()
+
+
+def test_submit_all_rejects_confirmed_plan_after_identity_and_workdir_change(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    survey_dir = tmp_path / "runs" / "survey1"
+    run_dir = survey_dir / "R20260327-0001"
+    _create_run(run_dir, run_id=run_dir.name)
+
+    def confirm_after_mutation(prompt: str) -> bool:
+        del prompt
+        update_manifest(run_dir, {"run": {"id": "R20260327-replaced"}})
+        (run_dir / "work").rmdir()
+        return True
+
+    with (
+        patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
+        patch("runops.cli.submit.typer.confirm", side_effect=confirm_after_mutation),
+        patch("runops.slurm.submit.submit_command") as scheduler,
+    ):
+        result = runner.invoke(
+            app,
+            ["runs", "submit", "--all", str(survey_dir)],
+        )
+
+    assert result.exit_code == 1
+    assert "stale" in result.output.lower()
+    scheduler.assert_not_called()
 
 
 def test_submit_all_skips_plan_read_error_and_continues(tmp_path: Path) -> None:

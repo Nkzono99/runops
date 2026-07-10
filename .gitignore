@@ -226,6 +226,7 @@ runs/**/work/tmp/
 runs/**/work/*.out
 runs/**/work/*.err
 runs/**/work/*.log
+**/.runops-submit.lock
 
 # Analysis cache
 runs/**/analysis/cache/

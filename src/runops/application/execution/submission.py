@@ -3,22 +3,28 @@
 from __future__ import annotations
 
 import copy
-from collections.abc import Callable
+import errno
+import fcntl
+import os
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Any, Literal, TypeVar, cast
 
 from runops.application.execution.retry import get_attempt_count
 from runops.application.ports.scheduler import Submitter
-from runops.core.exceptions import SimctlError
+from runops.core.exceptions import InvalidStateTransitionError, SimctlError
 from runops.core.manifest import read_manifest, update_manifest
 from runops.core.state import RunState, update_state
 
 Clock = Callable[[], datetime]
-PersistencePhase = Literal["manifest", "state"]
+PersistencePhase = Literal["claim", "manifest", "state"]
+_ResetResult = TypeVar("_ResetResult")
 
 _DIRTY_PRODUCTION_WARNING = "production run submitted with dirty git working tree"
+_SUBMISSION_LOCK_FILE = ".runops-submit.lock"
 
 
 @dataclass(frozen=True)
@@ -47,6 +53,8 @@ class SubmitPlan:
     run_id: str
     run_dir: Path
     state_before: str
+    job_id_before: str
+    claim_before: str
     job_script: Path
     work_dir: Path
     queue_name: str
@@ -91,7 +99,7 @@ class SubmissionBlockedError(RuntimeError):
 
 
 class SubmissionStaleError(RuntimeError):
-    """Raised when run identity or state changed after planning."""
+    """Raised when a submission snapshot changed after planning."""
 
     def __init__(
         self,
@@ -100,6 +108,12 @@ class SubmissionStaleError(RuntimeError):
         current_run_id: str,
         planned_state: str,
         current_state: str,
+        planned_job_id: str,
+        current_job_id: str,
+        planned_work_dir: Path,
+        current_work_dir: Path,
+        planned_claim: str,
+        current_claim: str,
     ) -> None:
         changes: list[str] = []
         if current_run_id != planned_run_id:
@@ -108,7 +122,36 @@ class SubmissionStaleError(RuntimeError):
             )
         if current_state != planned_state:
             changes.append(f"state changed from {planned_state!r} to {current_state!r}")
+        if current_job_id != planned_job_id:
+            changes.append(
+                f"job_id changed from {planned_job_id!r} to {current_job_id!r}"
+            )
+        if current_work_dir != planned_work_dir:
+            changes.append(
+                f"work_dir changed from {str(planned_work_dir)!r} "
+                f"to {str(current_work_dir)!r}"
+            )
+        if current_claim != planned_claim:
+            changes.append(f"claim changed from {planned_claim!r} to {current_claim!r}")
         super().__init__(f"Submission plan is stale: {'; '.join(changes)}")
+
+
+class SubmissionLockError(RuntimeError):
+    """Raised when the per-run process lock cannot be acquired."""
+
+    def __init__(self, lock_path: Path, cause: OSError) -> None:
+        self.lock_path = lock_path
+        self.cause = cause
+        super().__init__(f"Failed to lock {lock_path}: {cause}")
+
+
+class SubmissionClaimError(RuntimeError):
+    """Raised when durable submission-claim I/O fails."""
+
+    def __init__(self, operation: str, cause: OSError) -> None:
+        self.operation = operation
+        self.cause = cause
+        super().__init__(f"Failed to {operation}: {cause}")
 
 
 class SubmissionPersistenceError(RuntimeError):
@@ -121,7 +164,7 @@ class SubmissionPersistenceError(RuntimeError):
         attempt: int,
         submitted_at: str,
         phase: PersistencePhase,
-        cause: SimctlError | OSError,
+        cause: SimctlError | OSError | SubmissionClaimError,
     ) -> None:
         self.job_id = job_id
         self.attempt = attempt
@@ -142,6 +185,11 @@ def plan_submit(request: SubmitRequest) -> SubmitPlan:
     manifest = read_manifest(run_dir)
     run_id = str(manifest.run.get("id", run_dir.name))
     state_before = str(manifest.run.get("status", ""))
+    job_id_before = str(manifest.job.get("job_id", "") or "")
+    try:
+        claim_before = _read_submission_claim(run_dir)
+    except (SubmissionLockError, SubmissionClaimError) as exc:
+        claim_before = f"<unreadable: {type(exc).__name__}: {exc}>"
     job_script = run_dir / "submit" / "job.sh"
     input_dir = run_dir / "input"
 
@@ -154,6 +202,28 @@ def plan_submit(request: SubmitRequest) -> SubmitPlan:
             ),
         )
     ]
+    preconditions.append(
+        SubmitPrecondition(
+            name="job_id_empty",
+            passed=not job_id_before,
+            message=(
+                "No accepted job_id is recorded"
+                if not job_id_before
+                else f"Accepted job_id is already recorded: {job_id_before}"
+            ),
+        )
+    )
+    preconditions.append(
+        SubmitPrecondition(
+            name="submission_claim_empty",
+            passed=not claim_before,
+            message=(
+                "No durable submission claim is recorded"
+                if not claim_before
+                else f"Durable submission claim is recorded: {claim_before}"
+            ),
+        )
+    )
 
     script_exists = _is_file(job_script)
     preconditions.append(
@@ -215,9 +285,7 @@ def plan_submit(request: SubmitRequest) -> SubmitPlan:
         )
     )
 
-    work_dir = run_dir / "work"
-    if not _is_dir(work_dir):
-        work_dir = run_dir
+    work_dir = _select_work_dir(run_dir)
 
     command = ["sbatch", f"--chdir={work_dir}"]
     if request.afterok:
@@ -237,6 +305,8 @@ def plan_submit(request: SubmitRequest) -> SubmitPlan:
         run_id=run_id,
         run_dir=run_dir,
         state_before=state_before,
+        job_id_before=job_id_before,
+        claim_before=claim_before,
         job_script=job_script,
         work_dir=work_dir,
         queue_name=request.queue_name,
@@ -265,17 +335,49 @@ def apply_submit(
     ):
         raise ValueError("submission clock must return a timezone-aware datetime")
     submitted_at_datetime = submitted_at_datetime.astimezone(timezone.utc)
+    with _submission_lock(plan.run_dir) as lock_descriptor:
+        return _apply_submit_locked(
+            plan,
+            submitter,
+            submitted_at_datetime=submitted_at_datetime,
+            lock_descriptor=lock_descriptor,
+        )
+
+
+def _apply_submit_locked(
+    plan: SubmitPlan,
+    submitter: Submitter,
+    *,
+    submitted_at_datetime: datetime,
+    lock_descriptor: int,
+) -> SubmissionResult:
+    """Apply one plan while the caller holds its per-run process lock."""
     submitted_at = submitted_at_datetime.isoformat(timespec="seconds")
 
     manifest = read_manifest(plan.run_dir)
     current_run_id = str(manifest.run.get("id", plan.run_dir.name))
     current_state = str(manifest.run.get("status", ""))
-    if current_run_id != plan.run_id or current_state != plan.state_before:
+    current_job_id = str(manifest.job.get("job_id", "") or "")
+    current_work_dir = _select_work_dir(plan.run_dir)
+    current_claim = _read_submission_claim_from_descriptor(lock_descriptor)
+    if (
+        current_run_id != plan.run_id
+        or current_state != plan.state_before
+        or current_job_id != plan.job_id_before
+        or current_work_dir != plan.work_dir
+        or current_claim != plan.claim_before
+    ):
         raise SubmissionStaleError(
             planned_run_id=plan.run_id,
             current_run_id=current_run_id,
             planned_state=plan.state_before,
             current_state=current_state,
+            planned_job_id=plan.job_id_before,
+            current_job_id=current_job_id,
+            planned_work_dir=plan.work_dir,
+            current_work_dir=current_work_dir,
+            planned_claim=plan.claim_before,
+            current_claim=current_claim,
         )
 
     attempt = get_attempt_count(manifest.job) + 1
@@ -304,7 +406,37 @@ def apply_submit(
     if plan.afterok:
         job_updates["afterok"] = plan.afterok
 
-    job_id = submitter(plan.command)
+    _write_submission_claim(
+        lock_descriptor, "pending", operation="record pending claim"
+    )
+    try:
+        job_id = submitter(plan.command)
+    except Exception as scheduler_error:
+        try:
+            _write_submission_claim(
+                lock_descriptor,
+                "",
+                operation="clear rejected submission claim",
+            )
+        except SubmissionClaimError as claim_error:
+            raise claim_error from scheduler_error
+        raise
+
+    accepted_claim = f"accepted:{job_id}"
+    try:
+        _write_submission_claim(
+            lock_descriptor,
+            accepted_claim,
+            operation="record accepted submission claim",
+        )
+    except SubmissionClaimError as exc:
+        raise SubmissionPersistenceError(
+            job_id=job_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            phase="claim",
+            cause=exc,
+        ) from exc
     attempt_record["job_id"] = job_id
     job_updates["job_id"] = job_id
 
@@ -340,6 +472,21 @@ def apply_submit(
             cause=exc,
         ) from exc
 
+    try:
+        _write_submission_claim(
+            lock_descriptor,
+            "",
+            operation="clear persisted submission claim",
+        )
+    except SubmissionClaimError as exc:
+        raise SubmissionPersistenceError(
+            job_id=job_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            phase="claim",
+            cause=exc,
+        ) from exc
+
     return SubmissionResult(
         run_id=plan.run_id,
         job_id=job_id,
@@ -368,6 +515,121 @@ def _is_dir(path: Path) -> bool:
         return path.is_dir()
     except OSError:
         return False
+
+
+def _select_work_dir(run_dir: Path) -> Path:
+    work_dir = run_dir / "work"
+    return work_dir if _is_dir(work_dir) else run_dir
+
+
+def _read_submission_claim(run_dir: Path) -> str:
+    lock_path = run_dir / _SUBMISSION_LOCK_FILE
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    try:
+        descriptor = os.open(lock_path, flags)
+    except OSError as exc:
+        if exc.errno == errno.ENOENT:
+            return ""
+        raise SubmissionLockError(lock_path, exc) from exc
+    try:
+        return _read_submission_claim_from_descriptor(descriptor)
+    finally:
+        with suppress(OSError):
+            os.close(descriptor)
+
+
+def _read_submission_claim_from_descriptor(descriptor: int) -> str:
+    try:
+        os.lseek(descriptor, 0, os.SEEK_SET)
+        payload = os.read(descriptor, 4096)
+    except OSError as exc:
+        raise SubmissionClaimError("read submission claim", exc) from exc
+    if not payload:
+        return ""
+    claim = payload.decode("utf-8", errors="replace").strip()
+    return claim or "<invalid-nonempty-claim>"
+
+
+def _write_submission_claim(
+    descriptor: int,
+    claim: str,
+    *,
+    operation: str,
+) -> None:
+    payload = f"{claim}\n".encode() if claim else b""
+    previous_claim = (
+        _read_submission_claim_from_descriptor(descriptor) if not claim else ""
+    )
+    try:
+        _replace_submission_claim_payload(descriptor, payload)
+    except OSError as exc:
+        if previous_claim:
+            previous_payload = f"{previous_claim}\n".encode()
+            with suppress(OSError):
+                _replace_submission_claim_payload(descriptor, previous_payload)
+        raise SubmissionClaimError(operation, exc) from exc
+
+
+def _replace_submission_claim_payload(descriptor: int, payload: bytes) -> None:
+    os.lseek(descriptor, 0, os.SEEK_SET)
+    written = 0
+    while written < len(payload):
+        count = os.write(descriptor, payload[written:])
+        if count == 0:
+            raise OSError("zero-byte submission claim write")
+        written += count
+    os.ftruncate(descriptor, len(payload))
+    os.fsync(descriptor)
+
+
+@contextmanager
+def _submission_lock(run_dir: Path) -> Iterator[int]:
+    """Hold the persistent advisory lock for one run submission.
+
+    The file is intentionally never unlinked: deleting it after unlock permits
+    concurrent processes to lock different inodes for the same run.
+    """
+    lock_path = run_dir / _SUBMISSION_LOCK_FILE
+    flags = os.O_CREAT | os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
+
+    try:
+        descriptor = os.open(lock_path, flags, 0o600)
+    except OSError as exc:
+        raise SubmissionLockError(lock_path, exc) from exc
+
+    try:
+        try:
+            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        except OSError as exc:
+            raise SubmissionLockError(lock_path, exc) from exc
+        yield descriptor
+    finally:
+        with suppress(OSError):
+            os.close(descriptor)
+
+
+def reset_retry_under_submission_lock(
+    run_dir: Path,
+    resetter: Callable[[], _ResetResult],
+) -> _ResetResult:
+    """Validate terminal state, durably clear its claim, then reset under lock."""
+    with _submission_lock(run_dir) as lock_descriptor:
+        manifest = read_manifest(run_dir)
+        current_state = str(manifest.run.get("status", ""))
+        if current_state not in {
+            RunState.FAILED.value,
+            RunState.CANCELLED.value,
+        }:
+            raise InvalidStateTransitionError(
+                current_state,
+                RunState.CREATED.value,
+            )
+        _write_submission_claim(
+            lock_descriptor,
+            "",
+            operation="clear reconciled retry claim",
+        )
+        return resetter()
 
 
 def _check_input(input_dir: Path) -> tuple[bool, str]:
@@ -405,6 +667,8 @@ def _attempt_record(
 
 __all__ = [
     "SubmissionBlockedError",
+    "SubmissionClaimError",
+    "SubmissionLockError",
     "SubmissionPersistenceError",
     "SubmissionResult",
     "SubmissionStaleError",
@@ -413,4 +677,5 @@ __all__ = [
     "SubmitRequest",
     "apply_submit",
     "plan_submit",
+    "reset_retry_under_submission_lock",
 ]

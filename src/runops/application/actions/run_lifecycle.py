@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from runops.application.actions.helpers import (
     _error,
@@ -14,6 +14,9 @@ from runops.application.actions.result import ActionResult, ActionStatus
 from runops.core.event_log import logged_action
 from runops.core.exceptions import SimctlError
 from runops.core.state import RunState
+
+if TYPE_CHECKING:
+    from runops.application.execution.submission import SubmitPlan
 
 
 @logged_action("create_run")
@@ -123,16 +126,8 @@ def submit_run(
 ) -> ActionResult:
     """Submit a run to Slurm via sbatch."""
     from runops.application.execution.submission import (
-        SubmissionPersistenceError,
-        SubmissionStaleError,
         SubmitRequest,
-        apply_submit,
         plan_submit,
-    )
-    from runops.slurm.submit import (
-        SlurmNotFoundError,
-        SlurmSubmitError,
-        submit_command,
     )
 
     try:
@@ -146,6 +141,30 @@ def submit_run(
         )
     except SimctlError as e:
         return _error("submit_run", str(e))
+
+    return _apply_planned_submit(plan)
+
+
+@logged_action("submit_run")
+def submit_planned_run(plan: SubmitPlan) -> ActionResult:
+    """Apply an existing plan without rebuilding its confirmed snapshot."""
+    return _apply_planned_submit(plan)
+
+
+def _apply_planned_submit(plan: SubmitPlan) -> ActionResult:
+    """Map the shared submission apply result to the action envelope."""
+    from runops.application.execution.submission import (
+        SubmissionClaimError,
+        SubmissionLockError,
+        SubmissionPersistenceError,
+        SubmissionStaleError,
+        apply_submit,
+    )
+    from runops.slurm.submit import (
+        SlurmNotFoundError,
+        SlurmSubmitError,
+        submit_command,
+    )
 
     if not plan.ready:
         return _precondition_fail(
@@ -174,6 +193,10 @@ def submit_run(
         )
     except SubmissionStaleError as e:
         return _precondition_fail("submit_run", str(e))
+    except SubmissionClaimError as e:
+        return _error("submit_run", f"Submission claim failed: {e}")
+    except SubmissionLockError as e:
+        return _error("submit_run", f"Submission lock failed: {e}")
     except (SlurmNotFoundError, SlurmSubmitError, FileNotFoundError, RuntimeError) as e:
         return _error("submit_run", f"sbatch failed: {e}")
     except SimctlError as e:
@@ -337,6 +360,11 @@ def retry_run(
         assess_retry_for_run,
         get_attempt_count,
     )
+    from runops.application.execution.submission import (
+        SubmissionClaimError,
+        SubmissionLockError,
+        reset_retry_under_submission_lock,
+    )
     from runops.core.manifest import read_manifest
     from runops.core.state import reset_state_for_retry
 
@@ -360,17 +388,25 @@ def retry_run(
             "failure_reason 'exit_error' requires log review before retrying",
         )
 
-    reset_state_for_retry(
-        run_dir,
-        run_updates={
-            "retry_status": "retry_ready",
-            "partial_outputs": assessment.partial_outputs,
-        },
-        job_updates={
-            "attempt": attempt,
-            "retry_adjustments": adjustments or {},
-        },
-    )
+    def resetter() -> RunState:
+        return reset_state_for_retry(
+            run_dir,
+            run_updates={
+                "retry_status": "retry_ready",
+                "partial_outputs": assessment.partial_outputs,
+            },
+            job_updates={
+                "attempt": attempt,
+                "retry_adjustments": adjustments or {},
+            },
+        )
+
+    try:
+        reset_retry_under_submission_lock(run_dir, resetter)
+    except (SubmissionClaimError, SubmissionLockError) as e:
+        return _error("retry_run", f"Submission claim reconciliation failed: {e}")
+    except SimctlError as e:
+        return _precondition_fail("retry_run", str(e))
 
     return ActionResult(
         action="retry_run",

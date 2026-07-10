@@ -4,6 +4,12 @@ from runops.application.execution.submission import (
     SubmissionBlockedError as SubmissionBlockedError,
 )
 from runops.application.execution.submission import (
+    SubmissionClaimError as SubmissionClaimError,
+)
+from runops.application.execution.submission import (
+    SubmissionLockError as SubmissionLockError,
+)
+from runops.application.execution.submission import (
     SubmissionPersistenceError as SubmissionPersistenceError,
 )
 from runops.application.execution.submission import (
@@ -19,9 +25,14 @@ from runops.application.execution.submission import (
 from runops.application.execution.submission import SubmitRequest as SubmitRequest
 from runops.application.execution.submission import apply_submit as apply_submit
 from runops.application.execution.submission import plan_submit as plan_submit
+from runops.application.execution.submission import (
+    reset_retry_under_submission_lock as reset_retry_under_submission_lock,
+)
 
 __all__ = [
     "SubmissionBlockedError",
+    "SubmissionClaimError",
+    "SubmissionLockError",
     "SubmissionPersistenceError",
     "SubmissionResult",
     "SubmissionStaleError",
@@ -30,4 +41,5 @@ __all__ = [
     "SubmitRequest",
     "apply_submit",
     "plan_submit",
+    "reset_retry_under_submission_lock",
 ]

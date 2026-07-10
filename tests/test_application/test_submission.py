@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from threading import Event, Lock
 from typing import Any
 from unittest.mock import patch
 
@@ -13,6 +15,8 @@ import tomli_w
 
 from runops.application.execution.submission import (
     SubmissionBlockedError,
+    SubmissionClaimError,
+    SubmissionLockError,
     SubmissionPersistenceError,
     SubmissionResult,
     SubmissionStaleError,
@@ -21,11 +25,14 @@ from runops.application.execution.submission import (
     SubmitRequest,
     apply_submit,
     plan_submit,
+    reset_retry_under_submission_lock,
 )
 from runops.core.manifest import read_manifest
 
 EXPECTED_PRECONDITIONS = (
     "state_created",
+    "job_id_empty",
+    "submission_claim_empty",
     "job_script_exists",
     "job_script_readable",
     "job_script_has_sbatch",
@@ -165,6 +172,45 @@ def test_plan_submit_reports_non_created_state_without_omitting_checks(
         "state_created",
     )
     assert plan.ready is False
+
+
+def test_plan_submit_blocks_nonempty_accepted_job_id(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir, job={"job_id": "12345"})
+
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    check = _checks(plan)["job_id_empty"]
+    assert plan.job_id_before == "12345"
+    assert check.passed is False
+    assert "12345" in check.message
+    assert plan.ready is False
+
+
+def test_plan_submit_blocks_nonempty_submission_claim(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    (run_dir / ".runops-submit.lock").write_text("accepted:12345\n", encoding="utf-8")
+
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    check = _checks(plan)["submission_claim_empty"]
+    assert plan.claim_before == "accepted:12345"
+    assert check.passed is False
+    assert "accepted:12345" in check.message
+
+
+def test_plan_submit_blocks_unreadable_submission_claim(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    (run_dir / ".runops-submit.lock").symlink_to(run_dir / "manifest.toml")
+
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    check = _checks(plan)["submission_claim_empty"]
+    assert check.passed is False
+    assert "unreadable" in plan.claim_before
+    assert "unreadable" in check.message
 
 
 def test_plan_submit_reports_all_script_checks_when_script_is_missing(
@@ -320,6 +366,7 @@ def test_apply_submit_external_failure_leaves_manifest_and_state_unchanged(
     assert calls == [plan.command]
     assert (run_dir / "manifest.toml").read_bytes() == before
     assert not (run_dir / "status").exists()
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == ""
 
 
 @pytest.mark.parametrize(
@@ -327,6 +374,7 @@ def test_apply_submit_external_failure_leaves_manifest_and_state_unchanged(
     [
         ({"run": {"status": "submitted"}}, "state"),
         ({"run": {"id": "R20260710-replaced"}}, "run_id"),
+        ({"job": {"job_id": "12345"}}, "job_id"),
     ],
 )
 def test_apply_submit_rejects_stale_plan_before_scheduler_call(
@@ -355,6 +403,47 @@ def test_apply_submit_rejects_stale_plan_before_scheduler_call(
     assert not (run_dir / "status").exists()
 
 
+@pytest.mark.parametrize("initial_work_exists", [True, False])
+def test_apply_submit_rejects_changed_work_dir_selection_before_scheduler_call(
+    tmp_path: Path,
+    initial_work_exists: bool,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir, create_work=initial_work_exists)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    work_dir = run_dir / "work"
+    if initial_work_exists:
+        work_dir.rmdir()
+    else:
+        work_dir.mkdir()
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    with pytest.raises(SubmissionStaleError, match="work_dir"):
+        apply_submit(
+            plan,
+            lambda command: scheduler_calls.append(command) or "12345",
+        )
+
+    assert scheduler_calls == []
+
+
+def test_apply_submit_rejects_claim_created_after_planning(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    (run_dir / ".runops-submit.lock").write_text("pending\n", encoding="utf-8")
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    with pytest.raises(SubmissionStaleError, match=r"claim changed.*pending"):
+        apply_submit(
+            plan,
+            lambda command: scheduler_calls.append(command) or "12345",
+        )
+
+    assert scheduler_calls == []
+
+
 def test_apply_submit_fixed_clock_preserves_history_options_and_types(
     tmp_path: Path,
 ) -> None:
@@ -368,8 +457,8 @@ def test_apply_submit_fixed_clock_preserves_history_options_and_types(
     _create_ready_run(
         run_dir,
         job={
-            "job_id": "100",
-            "submitted_at": "2026-07-09T00:00:00+00:00",
+            "job_id": "",
+            "submitted_at": "",
             "attempt": 1,
             "attempts": [existing_attempt],
             "queue": "old",
@@ -507,6 +596,197 @@ def test_apply_submit_rechecks_freshness_after_clock_side_effect(
     assert not (run_dir / "status").exists()
 
 
+def test_concurrent_apply_submit_calls_scheduler_once_per_run(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    first_scheduler_call = Event()
+    second_scheduler_call = Event()
+    second_apply_started = Event()
+    release_scheduler = Event()
+    scheduler_call_lock = Lock()
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    def submitter(command: tuple[str, ...]) -> str:
+        with scheduler_call_lock:
+            scheduler_calls.append(command)
+            first_scheduler_call.set()
+            if len(scheduler_calls) == 2:
+                second_scheduler_call.set()
+        assert release_scheduler.wait(timeout=5)
+        return "12345"
+
+    def second_apply() -> SubmissionResult:
+        second_apply_started.set()
+        return apply_submit(plan, submitter)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        first = executor.submit(apply_submit, plan, submitter)
+        assert first_scheduler_call.wait(timeout=5)
+        second = executor.submit(second_apply)
+        assert second_apply_started.wait(timeout=5)
+        assert not second_scheduler_call.wait(timeout=0.5)
+        release_scheduler.set()
+
+        assert first.result(timeout=5).job_id == "12345"
+        with pytest.raises(SubmissionStaleError):
+            second.result(timeout=5)
+
+    assert scheduler_calls == [plan.command]
+    assert (run_dir / ".runops-submit.lock").is_file()
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == ""
+
+
+def test_concurrent_waiter_is_blocked_after_manifest_persistence_failure(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    first_scheduler_call = Event()
+    second_apply_started = Event()
+    release_scheduler = Event()
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    def submitter(command: tuple[str, ...]) -> str:
+        scheduler_calls.append(command)
+        first_scheduler_call.set()
+        assert release_scheduler.wait(timeout=5)
+        return "98765"
+
+    def second_apply() -> SubmissionResult:
+        second_apply_started.set()
+        return apply_submit(plan, submitter)
+
+    with (
+        patch(
+            "runops.application.execution.submission.update_manifest",
+            side_effect=OSError("manifest disk full"),
+        ),
+        ThreadPoolExecutor(max_workers=2) as executor,
+    ):
+        first = executor.submit(apply_submit, plan, submitter)
+        assert first_scheduler_call.wait(timeout=5)
+        second = executor.submit(second_apply)
+        assert second_apply_started.wait(timeout=5)
+        release_scheduler.set()
+
+        with pytest.raises(SubmissionPersistenceError):
+            first.result(timeout=5)
+        with pytest.raises(SubmissionStaleError, match="accepted:98765"):
+            second.result(timeout=5)
+
+    assert scheduler_calls == [plan.command]
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == (
+        "accepted:98765\n"
+    )
+
+
+def test_apply_submit_lock_failure_is_typed_and_calls_no_scheduler(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    with (
+        patch(
+            "runops.application.execution.submission.fcntl.flock",
+            side_effect=OSError("locking unsupported"),
+        ),
+        pytest.raises(SubmissionLockError, match="locking unsupported"),
+    ):
+        apply_submit(
+            plan,
+            lambda command: scheduler_calls.append(command) or "12345",
+        )
+
+    assert scheduler_calls == []
+
+
+def test_apply_submit_pending_claim_failure_is_typed_and_calls_no_scheduler(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    with (
+        patch(
+            "runops.application.execution.submission.os.fsync",
+            side_effect=OSError("claim fsync failed"),
+        ),
+        pytest.raises(SubmissionClaimError, match="claim fsync failed"),
+    ):
+        apply_submit(
+            plan,
+            lambda command: scheduler_calls.append(command) or "12345",
+        )
+
+    assert scheduler_calls == []
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") != ""
+
+
+def test_apply_submit_accepted_claim_failure_preserves_accepted_job(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    def submitter(command: tuple[str, ...]) -> str:
+        scheduler_calls.append(command)
+        return "98765"
+
+    with (
+        patch(
+            "runops.application.execution.submission.os.fsync",
+            side_effect=[None, OSError("accepted claim fsync failed")],
+        ),
+        pytest.raises(SubmissionPersistenceError) as error_info,
+    ):
+        apply_submit(plan, submitter)
+
+    assert error_info.value.job_id == "98765"
+    assert error_info.value.phase == "claim"
+    assert scheduler_calls == [plan.command]
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == (
+        "accepted:98765\n"
+    )
+
+
+def test_retry_interruption_after_claim_clear_keeps_terminal_manifest_guard(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(
+        run_dir,
+        status="cancelled",
+        job={"job_id": "12345"},
+    )
+    (run_dir / ".runops-submit.lock").write_text(
+        "accepted:12345\n",
+        encoding="utf-8",
+    )
+
+    def interrupted_reset() -> None:
+        assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == ""
+        raise RuntimeError("interrupted before reset")
+
+    with pytest.raises(RuntimeError, match="interrupted before reset"):
+        reset_retry_under_submission_lock(run_dir, interrupted_reset)
+
+    unchanged = read_manifest(run_dir)
+    assert unchanged.run["status"] == "cancelled"
+    assert unchanged.job["job_id"] == "12345"
+    recovery_plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    assert _checks(recovery_plan)["state_created"].passed is False
+    assert _checks(recovery_plan)["job_id_empty"].passed is False
+
+
 @pytest.mark.parametrize("clock_failure", ["naive", "raises"])
 def test_apply_submit_rejects_invalid_clock_before_scheduler_or_mutation(
     tmp_path: Path,
@@ -617,4 +897,9 @@ def test_apply_submit_preserves_scheduler_acceptance_on_persistence_failure(
     else:
         assert updated.job["job_id"] == "98765"
         assert updated.job["attempt"] == 1
+        recovery_plan = plan_submit(SubmitRequest(run_dir=run_dir))
+        assert _checks(recovery_plan)["job_id_empty"].passed is False
+        with pytest.raises(SubmissionBlockedError, match="job_id_empty"):
+            apply_submit(recovery_plan, submitter)
+        assert scheduler_calls == [plan.command]
     assert not (run_dir / "status").exists()

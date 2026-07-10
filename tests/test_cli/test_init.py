@@ -331,6 +331,7 @@ class TestInit:
         # wholesale rather than enumerating per-simulator output filenames.
         assert "runs/**/work/" in content
         assert "runs/**/status/" in content
+        assert "**/.runops-submit.lock" in content
         assert "runs/**/input/plasma.inp" in content
         assert "runs/**/analysis/scratch/" in content
         assert "materials/**/*.pdf" in content

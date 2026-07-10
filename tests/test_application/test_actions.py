@@ -322,6 +322,20 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
             },
         },
     )
+    (run_dir / "submit").mkdir()
+    (run_dir / "submit" / "job.sh").write_text(
+        "#!/bin/bash\n#SBATCH --job-name=retry\n",
+        encoding="utf-8",
+    )
+    (run_dir / "input").mkdir()
+    (run_dir / "input" / "params.toml").write_text(
+        "nx = 16\n",
+        encoding="utf-8",
+    )
+    (run_dir / ".runops-submit.lock").write_text(
+        "accepted:12345\n",
+        encoding="utf-8",
+    )
 
     result = retry_run(run_dir)
 
@@ -338,6 +352,14 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
     assert updated.job["job_id"] == ""
     assert updated.job["submitted_at"] == ""
 
+    from runops.application.execution.submission import SubmitRequest, plan_submit
+
+    retry_plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    assert retry_plan.ready is True
+    assert retry_plan.job_id_before == ""
+    assert retry_plan.claim_before == ""
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == ""
+
     state_file = run_dir / "status" / "state.json"
     assert state_file.exists()
     with open(state_file, encoding="utf-8") as f:
@@ -345,6 +367,47 @@ def test_retry_run_accepts_cancelled_state(tmp_path: Path) -> None:
     assert state_data["state"] == "created"
     assert state_data["previous_state"] == "cancelled"
     assert state_data["reason"] == "retry"
+
+
+def test_retry_run_claim_clear_failure_remains_fail_closed(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260418-0002"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_dir.name, "status": "cancelled"},
+            "job": {"attempt": 1, "job_id": "12345"},
+        },
+    )
+    (run_dir / ".runops-submit.lock").write_text(
+        "accepted:12345\n",
+        encoding="utf-8",
+    )
+
+    with patch(
+        "runops.application.execution.submission.os.fsync",
+        side_effect=OSError("claim clear failed"),
+    ):
+        result = retry_run(run_dir)
+
+    assert result.status is ActionStatus.ERROR
+    assert "claim clear failed" in result.message
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == (
+        "accepted:12345\n"
+    )
+
+    from runops.core.manifest import read_manifest
+
+    unchanged = read_manifest(run_dir)
+    assert unchanged.run["status"] == "cancelled"
+    assert unchanged.job["job_id"] == "12345"
+
+    from runops.application.execution.submission import SubmitRequest, plan_submit
+
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    claim_check = next(
+        check for check in plan.preconditions if check.name == "submission_claim_empty"
+    )
+    assert claim_check.passed is False
 
 
 def test_retry_run_respects_max_attempts(tmp_path: Path) -> None:

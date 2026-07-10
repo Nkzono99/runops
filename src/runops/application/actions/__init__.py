@@ -63,6 +63,9 @@ from runops.application.actions.run_lifecycle import (
     retry_run as retry_run,
 )
 from runops.application.actions.run_lifecycle import (
+    submit_planned_run as submit_planned_run,
+)
+from runops.application.actions.run_lifecycle import (
     submit_run as submit_run,
 )
 from runops.application.actions.run_lifecycle import (
@@ -104,6 +107,7 @@ __all__ = [
     "retry_run",
     "save_insight",
     "show_log",
+    "submit_planned_run",
     "submit_run",
     "summarize_run",
     "sync_run",

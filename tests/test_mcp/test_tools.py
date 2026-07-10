@@ -23,7 +23,12 @@ def _make_project(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _make_run(project_root: Path, *, status: str = "created") -> Path:
+def _make_run(
+    project_root: Path,
+    *,
+    status: str = "created",
+    job_id: str = "12345",
+) -> Path:
     run_dir = project_root / "runs" / "R20260512-0001"
     (run_dir / "submit").mkdir(parents=True)
     (run_dir / "input").mkdir()
@@ -45,7 +50,7 @@ def _make_run(project_root: Path, *, status: str = "created") -> Path:
             simulator={"name": "generic", "adapter": "generic"},
             job={
                 "scheduler": "slurm",
-                "job_id": "12345",
+                "job_id": job_id,
                 "partition": "debug",
                 "walltime": "00:10:00",
             },
@@ -338,7 +343,7 @@ def test_run_logs_returns_latest_log_tail(tmp_path: Path) -> None:
 
 def test_job_plan_submit_reports_sbatch_command(tmp_path: Path) -> None:
     project_root = _make_project(tmp_path)
-    run_dir = _make_run(project_root)
+    run_dir = _make_run(project_root, job_id="")
     plan = plan_submit(
         SubmitRequest(
             run_dir=run_dir,
@@ -391,7 +396,7 @@ def test_job_plan_submit_blocks_with_every_failed_shared_check(tmp_path: Path) -
         project_root=str(project_root),
     )
 
-    assert len(plan.failed_preconditions) == 5
+    assert len(plan.failed_preconditions) == 6
     assert result["status"] == "blocked"
     assert result["data"]["will_submit"] is False
     assert result["data"]["command"] == list(plan.command)

@@ -16,6 +16,7 @@ refs/
 # rather than trying to enumerate per-simulator output filenames.
 runs/**/work/
 runs/**/status/
+**/.runops-submit.lock
 
 # Preprocessor-generated input files (created by EMSES preinp from plasma.toml)
 runs/**/input/plasma.inp

@@ -480,15 +480,16 @@ CLI: runo runs submit RUN
   |      state / job.sh / input / work / exact sbatch command を 1 つの plan にする
   |      CLI --dry-run と MCP runops.job.plan_submit も同じ plan を翻訳する
   |
-  +--> application.actions.submit_run()
-  |      plan の stale 条件を再確認して apply_submit() を呼ぶ
+  +--> application.actions.submit_planned_run(plan)
+  |      確認済みの exact plan を再構築せず apply_submit() へ渡す
+  |      run 単位 lock 内で run_id / state / job_id / work dir / durable claim を再確認する
   |
   +--> slurm.submit_command(plan.command)
          accepted job_id を記録後、manifest を submitted へ遷移
 ```
 
 Slurm が job を受理した後の manifest 永続化に失敗した場合は job_id を保持した typed
-error を返し、同じ plan を再 submit しません。
+error を返し、`.runops-submit.lock` の accepted claim で後続 submit も拒否します。
 
 ### status (状態確認)
 

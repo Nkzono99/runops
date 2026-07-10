@@ -204,9 +204,14 @@ def extend(
 
     # Auto-submit if requested
     if submit:
-        from runops.cli.submit import _submit_single_run
+        from runops.cli.submit import _build_submit_plan, _submit_single_run
 
-        job_id = _submit_single_run(new_dir)
+        try:
+            plan = _build_submit_plan(new_dir)
+        except SimctlError as exc:
+            typer.echo(f"Warning: auto-submit planning failed: {exc}")
+            raise typer.Exit(code=1) from exc
+        job_id = _submit_single_run(plan)
         if job_id is None:
             typer.echo("Warning: auto-submit failed")
             raise typer.Exit(code=1)
