@@ -11,6 +11,8 @@ import pytest
 from runops.slurm.submit import (
     CommandResult,
     SlurmNotFoundError,
+    SlurmSubmissionOutcomeUnknownError,
+    SlurmSubmissionRejectedError,
     SlurmSubmitError,
     parse_job_id,
     sbatch_submit,
@@ -94,7 +96,7 @@ class TestSubmitCommand:
         calls, runner = _make_runner(stdout="Submitted batch job 67890\n")
 
         with pytest.raises(
-            SlurmSubmitError,
+            SlurmSubmissionRejectedError,
             match="submission command must start with 'sbatch'",
         ):
             submit_command(command, runner=runner)
@@ -108,7 +110,7 @@ class TestSubmitCommand:
         )
 
         with pytest.raises(
-            SlurmSubmitError,
+            SlurmSubmissionRejectedError,
             match=r"sbatch failed \(exit 2\):\nsbatch: error: invalid account",
         ):
             submit_command(("sbatch", "/runs/R1/submit/job.sh"), runner=runner)
@@ -116,7 +118,36 @@ class TestSubmitCommand:
     def test_parses_stdout_through_shared_parser(self) -> None:
         _, runner = _make_runner(stdout="not a job id\n")
 
-        with pytest.raises(SlurmSubmitError, match="Could not parse job ID"):
+        with pytest.raises(
+            SlurmSubmissionOutcomeUnknownError,
+            match="Could not parse job ID",
+        ):
+            submit_command(("sbatch", "/runs/R1/submit/job.sh"), runner=runner)
+
+    def test_timeout_is_reported_as_submission_outcome_unknown(self) -> None:
+        import subprocess
+
+        with (
+            patch(
+                "runops.slurm.submit.subprocess.run",
+                side_effect=subprocess.TimeoutExpired("sbatch", 60),
+            ),
+            pytest.raises(
+                SlurmSubmissionOutcomeUnknownError,
+                match="timed out",
+            ),
+        ):
+            submit_command(("sbatch", "/runs/R1/submit/job.sh"))
+
+    def test_signal_termination_is_reported_as_submission_outcome_unknown(
+        self,
+    ) -> None:
+        _, runner = _make_runner(returncode=-9, stderr="client killed")
+
+        with pytest.raises(
+            SlurmSubmissionOutcomeUnknownError,
+            match=r"signal 9.*acceptance is unknown",
+        ):
             submit_command(("sbatch", "/runs/R1/submit/job.sh"), runner=runner)
 
 
@@ -157,7 +188,7 @@ class TestSbatchSubmit:
             returncode=1,
             stderr="sbatch: error: invalid partition\n",
         )
-        with pytest.raises(SlurmSubmitError, match="invalid partition"):
+        with pytest.raises(SlurmSubmissionRejectedError, match="invalid partition"):
             sbatch_submit(job_sh, tmp_path, runner=runner)
 
     def test_unparseable_stdout(self, tmp_path: Path) -> None:
@@ -165,7 +196,10 @@ class TestSbatchSubmit:
         job_sh.write_text("#!/bin/bash")
 
         _, runner = _make_runner(stdout="Unexpected output\n")
-        with pytest.raises(SlurmSubmitError, match="Could not parse job ID"):
+        with pytest.raises(
+            SlurmSubmissionOutcomeUnknownError,
+            match="Could not parse job ID",
+        ):
             sbatch_submit(job_sh, tmp_path, runner=runner)
 
     def test_afterok_dependency(self, tmp_path: Path) -> None:

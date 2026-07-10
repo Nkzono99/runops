@@ -7,7 +7,9 @@ state, provenance, and job information.
 from __future__ import annotations
 
 import copy
+import os
 import sys
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -71,6 +73,12 @@ class ManifestData:
     params_snapshot: dict[str, Any] = field(default_factory=dict)
     files: dict[str, Any] = field(default_factory=dict)
     extra_sections: dict[str, Any] = field(default_factory=dict, repr=False)
+    _present_sections: set[str] = field(
+        default_factory=set,
+        init=False,
+        repr=False,
+        compare=False,
+    )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert the manifest to a TOML-serializable dictionary.
@@ -81,26 +89,25 @@ class ManifestData:
         result = copy.deepcopy(self.extra_sections)
         for section in _KNOWN_MANIFEST_SECTIONS:
             result.pop(section, None)
-        if self.run:
+        if self.run or "run" in self._present_sections:
             result["run"] = copy.deepcopy(self.run)
-        if self.path:
+        if self.path or "path" in self._present_sections:
             result["path"] = copy.deepcopy(self.path)
-        if self.origin:
+        if self.origin or "origin" in self._present_sections:
             result["origin"] = copy.deepcopy(self.origin)
-        if self.classification:
+        if self.classification or "classification" in self._present_sections:
             result["classification"] = copy.deepcopy(self.classification)
-        if self.simulator:
+        if self.simulator or "simulator" in self._present_sections:
             result["simulator"] = copy.deepcopy(self.simulator)
-        if self.launcher:
+        if self.launcher or "launcher" in self._present_sections:
             result["launcher"] = copy.deepcopy(self.launcher)
-        if self.simulator_source:
-            result["simulator_source"] = copy.deepcopy(self.simulator_source)
-        if self.job:
+        result["simulator_source"] = copy.deepcopy(self.simulator_source)
+        if self.job or "job" in self._present_sections:
             result["job"] = copy.deepcopy(self.job)
-        if self.variation:
+        if self.variation or "variation" in self._present_sections:
             result["variation"] = copy.deepcopy(self.variation)
         result["params_snapshot"] = copy.deepcopy(self.params_snapshot)
-        if self.files:
+        if self.files or "files" in self._present_sections:
             result["files"] = copy.deepcopy(self.files)
         return result
 
@@ -114,7 +121,7 @@ class ManifestData:
         Returns:
             ManifestData instance.
         """
-        return cls(
+        manifest = cls(
             run=_copy_manifest_section(data, "run"),
             path=_copy_manifest_section(data, "path"),
             origin=_copy_manifest_section(data, "origin"),
@@ -132,6 +139,10 @@ class ManifestData:
                 if key not in _KNOWN_MANIFEST_SECTIONS
             },
         )
+        manifest._present_sections = {
+            key for key in data if key in _KNOWN_MANIFEST_SECTIONS
+        }
+        return manifest
 
 
 def _copy_manifest_section(data: dict[str, Any], section: str) -> dict[str, Any]:
@@ -167,6 +178,10 @@ def read_manifest(run_dir: Path) -> ManifestData:
             data = tomllib.load(f)
     except tomllib.TOMLDecodeError as e:
         raise ManifestError(f"Invalid TOML in {manifest_path}: {e}") from e
+    except UnicodeDecodeError as e:
+        raise ManifestError(f"Invalid encoding in {manifest_path}: {e}") from e
+    except OSError as e:
+        raise ManifestError(f"Failed to read {manifest_path}: {e}") from e
 
     return ManifestData.from_dict(data)
 
@@ -197,9 +212,6 @@ def write_manifest(
     Raises:
         ManifestError: If the file cannot be written.
     """
-    import os
-    import tempfile
-
     manifest_path = run_dir / _MANIFEST_FILE
 
     display_path = event_path or manifest_path
@@ -214,7 +226,10 @@ def write_manifest(
         try:
             with os.fdopen(fd, "wb") as f:
                 tomli_w.dump(data.to_dict(), f)
+                f.flush()
+                os.fsync(f.fileno())
             os.replace(tmp_path, str(manifest_path))
+            _fsync_directory(run_dir)
         except BaseException:
             import contextlib
 
@@ -232,6 +247,16 @@ def write_manifest(
             artifact_kind="manifest",
             summary=f"{operation.title()} manifest.toml",
         )
+
+
+def _fsync_directory(directory: Path) -> None:
+    """Persist directory-entry changes made by an atomic manifest replace."""
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
 
 
 def update_manifest(run_dir: Path, updates: dict[str, Any]) -> ManifestData:

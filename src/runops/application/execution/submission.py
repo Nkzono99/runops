@@ -6,6 +6,7 @@ import copy
 import errno
 import fcntl
 import os
+import stat
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -14,7 +15,11 @@ from pathlib import Path
 from typing import Any, Literal, TypeVar, cast
 
 from runops.application.execution.retry import get_attempt_count
-from runops.application.ports.scheduler import Submitter
+from runops.application.ports.scheduler import (
+    SchedulerOutcomeUnknownError,
+    SchedulerRejectedError,
+    Submitter,
+)
 from runops.core.exceptions import InvalidStateTransitionError, SimctlError
 from runops.core.manifest import read_manifest, update_manifest
 from runops.core.state import RunState, update_state
@@ -152,6 +157,31 @@ class SubmissionClaimError(RuntimeError):
         self.operation = operation
         self.cause = cause
         super().__init__(f"Failed to {operation}: {cause}")
+
+
+class SubmissionOutcomeUnknownError(RuntimeError):
+    """Keep a fail-closed claim when scheduler acceptance cannot be determined."""
+
+    def __init__(
+        self,
+        *,
+        run_id: str,
+        attempt: int,
+        submitted_at: str,
+        cause: Exception,
+    ) -> None:
+        self.run_id = run_id
+        self.attempt = attempt
+        self.submitted_at = submitted_at
+        self.claim = "pending"
+        self.cause = cause
+        self.cause_type = type(cause).__name__
+        self.cause_message = str(cause)
+        super().__init__(
+            f"Scheduler submission outcome is unknown for {run_id}; pending claim "
+            f"retained; do not resubmit before reconciliation. Cause: "
+            f"{self.cause_type}: {self.cause_message}"
+        )
 
 
 class SubmissionPersistenceError(RuntimeError):
@@ -352,7 +382,7 @@ def _apply_submit_locked(
     lock_descriptor: int,
 ) -> SubmissionResult:
     """Apply one plan while the caller holds its per-run process lock."""
-    submitted_at = submitted_at_datetime.isoformat(timespec="seconds")
+    submitted_at = submitted_at_datetime.isoformat()
 
     manifest = read_manifest(plan.run_dir)
     current_run_id = str(manifest.run.get("id", plan.run_dir.name))
@@ -411,7 +441,7 @@ def _apply_submit_locked(
     )
     try:
         job_id = submitter(plan.command)
-    except Exception as scheduler_error:
+    except SchedulerRejectedError as scheduler_error:
         try:
             _write_submission_claim(
                 lock_descriptor,
@@ -421,6 +451,30 @@ def _apply_submit_locked(
         except SubmissionClaimError as claim_error:
             raise claim_error from scheduler_error
         raise
+    except SchedulerOutcomeUnknownError as scheduler_error:
+        raise SubmissionOutcomeUnknownError(
+            run_id=plan.run_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            cause=scheduler_error,
+        ) from scheduler_error
+    except Exception as scheduler_error:
+        raise SubmissionOutcomeUnknownError(
+            run_id=plan.run_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            cause=scheduler_error,
+        ) from scheduler_error
+
+    if not isinstance(job_id, str) or not job_id.strip():
+        invalid_result = ValueError("scheduler returned an empty job ID")
+        raise SubmissionOutcomeUnknownError(
+            run_id=plan.run_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            cause=invalid_result,
+        ) from invalid_result
+    job_id = job_id.strip()
 
     accepted_claim = f"accepted:{job_id}"
     try:
@@ -524,7 +578,7 @@ def _select_work_dir(run_dir: Path) -> Path:
 
 def _read_submission_claim(run_dir: Path) -> str:
     lock_path = run_dir / _SUBMISSION_LOCK_FILE
-    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_NOFOLLOW | os.O_NONBLOCK
     try:
         descriptor = os.open(lock_path, flags)
     except OSError as exc:
@@ -532,6 +586,10 @@ def _read_submission_claim(run_dir: Path) -> str:
             return ""
         raise SubmissionLockError(lock_path, exc) from exc
     try:
+        try:
+            _validate_submission_lock(lock_path, descriptor)
+        except OSError as exc:
+            raise SubmissionLockError(lock_path, exc) from exc
         return _read_submission_claim_from_descriptor(descriptor)
     finally:
         with suppress(OSError):
@@ -590,22 +648,85 @@ def _submission_lock(run_dir: Path) -> Iterator[int]:
     concurrent processes to lock different inodes for the same run.
     """
     lock_path = run_dir / _SUBMISSION_LOCK_FILE
-    flags = os.O_CREAT | os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
-
+    common_flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
+    created = False
     try:
-        descriptor = os.open(lock_path, flags, 0o600)
+        descriptor = os.open(
+            lock_path,
+            common_flags | os.O_CREAT | os.O_EXCL,
+            0o600,
+        )
+        created = True
     except OSError as exc:
-        raise SubmissionLockError(lock_path, exc) from exc
+        if exc.errno != errno.EEXIST:
+            raise SubmissionLockError(lock_path, exc) from exc
+        try:
+            descriptor = os.open(lock_path, common_flags)
+        except OSError as open_exc:
+            raise SubmissionLockError(lock_path, open_exc) from open_exc
 
     try:
         try:
             fcntl.flock(descriptor, fcntl.LOCK_EX)
         except OSError as exc:
             raise SubmissionLockError(lock_path, exc) from exc
+        try:
+            _validate_submission_lock(lock_path, descriptor)
+            if created:
+                os.fsync(descriptor)
+            _fsync_directory(run_dir)
+        except OSError as exc:
+            raise SubmissionLockError(lock_path, exc) from exc
         yield descriptor
     finally:
         with suppress(OSError):
             os.close(descriptor)
+
+
+def _validate_submission_lock(lock_path: Path, descriptor: int) -> None:
+    descriptor_stat = os.fstat(descriptor)
+    if not stat.S_ISREG(descriptor_stat.st_mode) or descriptor_stat.st_nlink != 1:
+        raise OSError(
+            errno.EINVAL,
+            "submission lock must be a regular single-link file",
+            lock_path,
+        )
+    path_stat = os.stat(lock_path, follow_symlinks=False)
+    if (
+        not stat.S_ISREG(path_stat.st_mode)
+        or path_stat.st_dev != descriptor_stat.st_dev
+        or path_stat.st_ino != descriptor_stat.st_ino
+    ):
+        raise OSError(
+            errno.ESTALE,
+            "submission lock path was replaced while acquiring the lock",
+            lock_path,
+        )
+
+
+def _fsync_directory(directory: Path) -> None:
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+@dataclass(frozen=True)
+class SubmissionGuard:
+    """Snapshot exposed while the caller holds a run's submission lock."""
+
+    claim: str
+
+
+@contextmanager
+def submission_guard(run_dir: Path) -> Iterator[SubmissionGuard]:
+    """Serialize destructive lifecycle work with submission and expose its claim."""
+    with _submission_lock(run_dir) as descriptor:
+        yield SubmissionGuard(
+            claim=_read_submission_claim_from_descriptor(descriptor),
+        )
 
 
 def reset_retry_under_submission_lock(
@@ -668,7 +789,9 @@ def _attempt_record(
 __all__ = [
     "SubmissionBlockedError",
     "SubmissionClaimError",
+    "SubmissionGuard",
     "SubmissionLockError",
+    "SubmissionOutcomeUnknownError",
     "SubmissionPersistenceError",
     "SubmissionResult",
     "SubmissionStaleError",
@@ -678,4 +801,5 @@ __all__ = [
     "apply_submit",
     "plan_submit",
     "reset_retry_under_submission_lock",
+    "submission_guard",
 ]

@@ -13,6 +13,11 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
+from runops.application.ports.scheduler import (
+    SchedulerOutcomeUnknownError,
+    SchedulerRejectedError,
+)
+
 # ---------------------------------------------------------------------------
 # Thin subprocess abstraction
 # ---------------------------------------------------------------------------
@@ -59,7 +64,9 @@ def _default_runner(cmd: list[str]) -> CommandResult:
             f"Command not found: {cmd[0]!r}. Is Slurm installed and on PATH?"
         ) from exc
     except subprocess.TimeoutExpired as exc:
-        raise SlurmSubmitError(f"sbatch timed out after 60 seconds: {exc}") from exc
+        raise SlurmSubmissionOutcomeUnknownError(
+            f"sbatch timed out after 60 seconds: {exc}"
+        ) from exc
     return CommandResult(
         returncode=proc.returncode,
         stdout=proc.stdout,
@@ -72,12 +79,23 @@ def _default_runner(cmd: list[str]) -> CommandResult:
 # ---------------------------------------------------------------------------
 
 
-class SlurmNotFoundError(RuntimeError):
+class SlurmNotFoundError(SchedulerRejectedError):
     """Raised when the Slurm command is not found on PATH."""
 
 
 class SlurmSubmitError(RuntimeError):
     """Raised when sbatch fails or returns unexpected output."""
+
+
+class SlurmSubmissionRejectedError(SlurmSubmitError, SchedulerRejectedError):
+    """Raised when sbatch definitively rejects or cannot receive a request."""
+
+
+class SlurmSubmissionOutcomeUnknownError(
+    SlurmSubmitError,
+    SchedulerOutcomeUnknownError,
+):
+    """Raised when sbatch may have accepted a request but no job ID is known."""
 
 
 class SlurmCancelError(RuntimeError):
@@ -105,7 +123,7 @@ def parse_job_id(sbatch_stdout: str) -> str:
     """
     match = _SBATCH_JOB_RE.search(sbatch_stdout)
     if match is None:
-        raise SlurmSubmitError(
+        raise SlurmSubmissionOutcomeUnknownError(
             f"Could not parse job ID from sbatch output: {sbatch_stdout!r}"
         )
     return match.group(1)
@@ -118,12 +136,20 @@ def submit_command(
 ) -> str:
     """Execute one validated, already-planned ``sbatch`` command vector."""
     if not command or command[0] != "sbatch":
-        raise SlurmSubmitError("submission command must start with 'sbatch'")
+        raise SlurmSubmissionRejectedError(
+            "submission command must start with 'sbatch'"
+        )
 
     run = runner or _default_runner
     result = run(list(command))
-    if result.returncode != 0:
-        raise SlurmSubmitError(
+    if result.returncode < 0:
+        raise SlurmSubmissionOutcomeUnknownError(
+            "sbatch client terminated by signal "
+            f"{-result.returncode}; scheduler acceptance is unknown: "
+            f"{result.stderr.strip()}"
+        )
+    if result.returncode > 0:
+        raise SlurmSubmissionRejectedError(
             f"sbatch failed (exit {result.returncode}):\n{result.stderr.strip()}"
         )
     return parse_job_id(result.stdout)

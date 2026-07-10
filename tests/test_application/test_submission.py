@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import stat
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import FrozenInstanceError
 from datetime import datetime, timedelta, timezone
@@ -17,6 +19,7 @@ from runops.application.execution.submission import (
     SubmissionBlockedError,
     SubmissionClaimError,
     SubmissionLockError,
+    SubmissionOutcomeUnknownError,
     SubmissionPersistenceError,
     SubmissionResult,
     SubmissionStaleError,
@@ -27,6 +30,7 @@ from runops.application.execution.submission import (
     plan_submit,
     reset_retry_under_submission_lock,
 )
+from runops.application.ports.scheduler import SchedulerRejectedError
 from runops.core.manifest import read_manifest
 
 EXPECTED_PRECONDITIONS = (
@@ -347,7 +351,7 @@ def test_apply_submit_rejects_blocked_plan_without_call_or_mutation(
     assert not (run_dir / "status").exists()
 
 
-def test_apply_submit_external_failure_leaves_manifest_and_state_unchanged(
+def test_apply_submit_unknown_external_failure_keeps_pending_claim(
     tmp_path: Path,
 ) -> None:
     run_dir = tmp_path / "R20260710-0001"
@@ -360,10 +364,40 @@ def test_apply_submit_external_failure_leaves_manifest_and_state_unchanged(
         calls.append(command)
         raise RuntimeError("scheduler unavailable")
 
-    with pytest.raises(RuntimeError, match="scheduler unavailable"):
+    with pytest.raises(
+        SubmissionOutcomeUnknownError,
+        match="scheduler unavailable",
+    ) as error_info:
         apply_submit(plan, submitter)
 
+    assert error_info.value.run_id == plan.run_id
+    assert error_info.value.attempt == 1
+    assert error_info.value.cause_type == "RuntimeError"
+    assert error_info.value.__cause__ is error_info.value.cause
     assert calls == [plan.command]
+    assert (run_dir / "manifest.toml").read_bytes() == before
+    assert not (run_dir / "status").exists()
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == (
+        "pending\n"
+    )
+    recovery_plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    assert _checks(recovery_plan)["submission_claim_empty"].passed is False
+
+
+def test_apply_submit_definitive_scheduler_rejection_clears_pending_claim(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    before = (run_dir / "manifest.toml").read_bytes()
+
+    def submitter(command: tuple[str, ...]) -> str:
+        raise SchedulerRejectedError("scheduler rejected request")
+
+    with pytest.raises(SchedulerRejectedError, match="scheduler rejected request"):
+        apply_submit(plan, submitter)
+
     assert (run_dir / "manifest.toml").read_bytes() == before
     assert not (run_dir / "status").exists()
     assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == ""
@@ -568,6 +602,27 @@ def test_apply_submit_calls_clock_once_and_normalizes_to_utc(tmp_path: Path) -> 
     assert result.submitted_at == "2026-07-10T03:04:05+00:00"
 
 
+def test_apply_submit_preserves_subsecond_attempt_boundary(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    fixed = datetime(
+        2026,
+        7,
+        10,
+        3,
+        4,
+        5,
+        900_000,
+        tzinfo=timezone.utc,
+    )
+
+    result = apply_submit(plan, lambda command: "12345", now=lambda: fixed)
+
+    assert result.submitted_at == "2026-07-10T03:04:05.900000+00:00"
+    assert read_manifest(run_dir).job["submitted_at"] == result.submitted_at
+
+
 def test_apply_submit_rechecks_freshness_after_clock_side_effect(
     tmp_path: Path,
 ) -> None:
@@ -705,7 +760,41 @@ def test_apply_submit_lock_failure_is_typed_and_calls_no_scheduler(
     assert scheduler_calls == []
 
 
-def test_apply_submit_pending_claim_failure_is_typed_and_calls_no_scheduler(
+def test_apply_submit_rejects_hardlinked_lock_without_mutating_target(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    target = tmp_path / "unrelated.txt"
+    target.write_text("", encoding="utf-8")
+    os.link(target, run_dir / ".runops-submit.lock")
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    with pytest.raises(SubmissionLockError, match="regular single-link file"):
+        apply_submit(
+            plan,
+            lambda command: scheduler_calls.append(command) or "12345",
+        )
+
+    assert scheduler_calls == []
+    assert target.read_text(encoding="utf-8") == ""
+
+
+def test_plan_submit_rejects_fifo_claim_without_blocking(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    os.mkfifo(run_dir / ".runops-submit.lock")
+
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    claim_check = _checks(plan)["submission_claim_empty"]
+    assert claim_check.passed is False
+    assert "unreadable" in plan.claim_before
+    assert "regular single-link file" in plan.claim_before
+
+
+def test_apply_submit_new_lock_directory_fsync_failure_calls_no_scheduler(
     tmp_path: Path,
 ) -> None:
     run_dir = tmp_path / "R20260710-0001"
@@ -715,8 +804,39 @@ def test_apply_submit_pending_claim_failure_is_typed_and_calls_no_scheduler(
 
     with (
         patch(
+            "runops.application.execution.submission._fsync_directory",
+            side_effect=OSError("directory fsync failed"),
+        ),
+        pytest.raises(SubmissionLockError, match="directory fsync failed"),
+    ):
+        apply_submit(
+            plan,
+            lambda command: scheduler_calls.append(command) or "12345",
+        )
+
+    assert scheduler_calls == []
+
+
+def test_apply_submit_pending_claim_failure_is_typed_and_calls_no_scheduler(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    (run_dir / ".runops-submit.lock").write_text("", encoding="utf-8")
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    scheduler_calls: list[tuple[str, ...]] = []
+    real_fsync = os.fsync
+
+    def fail_claim_fsync(descriptor: int) -> None:
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            real_fsync(descriptor)
+            return
+        raise OSError("claim fsync failed")
+
+    with (
+        patch(
             "runops.application.execution.submission.os.fsync",
-            side_effect=OSError("claim fsync failed"),
+            side_effect=fail_claim_fsync,
         ),
         pytest.raises(SubmissionClaimError, match="claim fsync failed"),
     ):
@@ -734,8 +854,21 @@ def test_apply_submit_accepted_claim_failure_preserves_accepted_job(
 ) -> None:
     run_dir = tmp_path / "R20260710-0001"
     _create_ready_run(run_dir)
+    (run_dir / ".runops-submit.lock").write_text("", encoding="utf-8")
     plan = plan_submit(SubmitRequest(run_dir=run_dir))
     scheduler_calls: list[tuple[str, ...]] = []
+    real_fsync = os.fsync
+    claim_fsync_calls = 0
+
+    def fail_accepted_claim_fsync(descriptor: int) -> None:
+        nonlocal claim_fsync_calls
+        if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+            real_fsync(descriptor)
+            return
+        claim_fsync_calls += 1
+        if claim_fsync_calls == 2:
+            raise OSError("accepted claim fsync failed")
+        real_fsync(descriptor)
 
     def submitter(command: tuple[str, ...]) -> str:
         scheduler_calls.append(command)
@@ -744,7 +877,7 @@ def test_apply_submit_accepted_claim_failure_preserves_accepted_job(
     with (
         patch(
             "runops.application.execution.submission.os.fsync",
-            side_effect=[None, OSError("accepted claim fsync failed")],
+            side_effect=fail_accepted_claim_fsync,
         ),
         pytest.raises(SubmissionPersistenceError) as error_info,
     ):

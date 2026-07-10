@@ -156,6 +156,7 @@ def _apply_planned_submit(plan: SubmitPlan) -> ActionResult:
     from runops.application.execution.submission import (
         SubmissionClaimError,
         SubmissionLockError,
+        SubmissionOutcomeUnknownError,
         SubmissionPersistenceError,
         SubmissionStaleError,
         apply_submit,
@@ -188,6 +189,23 @@ def _apply_planned_submit(plan: SubmitPlan) -> ActionResult:
                 "attempt": e.attempt,
                 "submitted_at": e.submitted_at,
                 "phase": e.phase,
+            },
+            state_before=plan.state_before,
+        )
+    except SubmissionOutcomeUnknownError as e:
+        return ActionResult(
+            action="submit_run",
+            status=ActionStatus.ERROR,
+            message=(
+                "Scheduler submission outcome is unknown; pending claim retained; "
+                "do not resubmit; reconcile scheduler and local state. "
+                f"Cause: {e.cause_type}: {e.cause_message}"
+            ),
+            data={
+                "run_id": e.run_id,
+                "attempt": e.attempt,
+                "submitted_at": e.submitted_at,
+                "claim": e.claim,
             },
             state_before=plan.state_before,
         )

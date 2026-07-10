@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from threading import Event
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -797,6 +799,40 @@ def test_submit_run_reports_accepted_job_when_persistence_fails(
     assert result.data["phase"] == phase
 
 
+def test_submit_run_reports_unknown_outcome_and_retains_claim(tmp_path: Path) -> None:
+    from runops.slurm.submit import SlurmSubmissionOutcomeUnknownError
+
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_dir.name, "status": "created"},
+            "job": {},
+        },
+    )
+    (run_dir / "submit").mkdir(parents=True)
+    (run_dir / "submit" / "job.sh").write_text(
+        "#!/bin/bash\n#SBATCH --job-name=test\n",
+        encoding="utf-8",
+    )
+    (run_dir / "input").mkdir()
+    (run_dir / "input" / "params.json").write_text("{}", encoding="utf-8")
+
+    with patch(
+        "runops.slurm.submit.submit_command",
+        side_effect=SlurmSubmissionOutcomeUnknownError("job id response lost"),
+    ):
+        result = submit_run(run_dir)
+
+    assert result.status is ActionStatus.ERROR
+    assert "outcome is unknown" in result.message.lower()
+    assert "do not resubmit" in result.message.lower()
+    assert result.data["claim"] == "pending"
+    assert (run_dir / ".runops-submit.lock").read_text(encoding="utf-8") == (
+        "pending\n"
+    )
+
+
 def test_execute_action_sync_run_updates_manifest_and_state_file(
     tmp_path: Path,
 ) -> None:
@@ -929,4 +965,177 @@ def test_execute_action_delete_run_removes_directory(tmp_path: Path) -> None:
     assert result.status is ActionStatus.SUCCESS
     assert result.data["run_id"] == "R20260330-0001"
     assert result.data["bytes_removed"] >= 256
+    assert not run_dir.exists()
+
+
+def test_delete_run_rejects_nonempty_submission_claim(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "created"}},
+    )
+    (run_dir / ".runops-submit.lock").write_text(
+        "accepted:98765\n",
+        encoding="utf-8",
+    )
+
+    result = execute_action("delete_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "submission claim" in result.message.lower()
+    assert "accepted:98765" in result.message
+    assert run_dir.exists()
+
+
+def test_delete_run_rejects_top_level_symlink_without_deleting_target(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "real" / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "created"}},
+    )
+    link = tmp_path / "linked-run"
+    link.symlink_to(run_dir, target_is_directory=True)
+
+    result = execute_action("delete_run", run_dir=link)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "symlink" in result.message.lower()
+    assert link.is_symlink()
+    assert run_dir.exists()
+
+
+def test_delete_run_normalizes_parent_symlink_before_atomic_deletion(
+    tmp_path: Path,
+) -> None:
+    real_parent = tmp_path / "real"
+    run_dir = real_parent / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "created"}},
+    )
+    alias = tmp_path / "alias"
+    alias.symlink_to(real_parent, target_is_directory=True)
+
+    result = execute_action("delete_run", run_dir=alias / run_dir.name)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert alias.is_symlink()
+    assert not run_dir.exists()
+
+
+def test_delete_run_waits_for_submit_then_rejects_submitted_run(
+    tmp_path: Path,
+) -> None:
+    from runops.application.execution.submission import (
+        SubmitRequest,
+        apply_submit,
+        plan_submit,
+    )
+
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_dir.name, "status": "created"},
+            "job": {},
+        },
+    )
+    (run_dir / "submit").mkdir(parents=True)
+    (run_dir / "submit" / "job.sh").write_text(
+        "#!/bin/bash\n#SBATCH --job-name=test\n",
+        encoding="utf-8",
+    )
+    (run_dir / "input").mkdir()
+    (run_dir / "input" / "params.json").write_text("{}", encoding="utf-8")
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    scheduler_entered = Event()
+    release_scheduler = Event()
+    delete_started = Event()
+
+    def submitter(command: tuple[str, ...]) -> str:
+        scheduler_entered.set()
+        assert release_scheduler.wait(timeout=5)
+        return "98765"
+
+    def delete() -> Any:
+        delete_started.set()
+        return execute_action("delete_run", run_dir=run_dir)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        submitted = executor.submit(apply_submit, plan, submitter)
+        assert scheduler_entered.wait(timeout=5)
+        deleted = executor.submit(delete)
+        assert delete_started.wait(timeout=5)
+        assert not deleted.done()
+        release_scheduler.set()
+
+        assert submitted.result(timeout=5).job_id == "98765"
+        delete_result = deleted.result(timeout=5)
+
+    assert delete_result.status is ActionStatus.PRECONDITION_FAILED
+    assert "submitted" in delete_result.message
+    assert run_dir.exists()
+
+
+def test_submit_cannot_enter_after_delete_atomically_removes_run_path(
+    tmp_path: Path,
+) -> None:
+    from runops.application.execution.submission import (
+        SubmissionLockError,
+        SubmitRequest,
+        apply_submit,
+        plan_submit,
+    )
+
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_dir.name, "status": "created"},
+            "job": {},
+        },
+    )
+    (run_dir / "submit").mkdir(parents=True)
+    (run_dir / "submit" / "job.sh").write_text(
+        "#!/bin/bash\n#SBATCH --job-name=test\n",
+        encoding="utf-8",
+    )
+    (run_dir / "input").mkdir()
+    (run_dir / "input" / "params.json").write_text("{}", encoding="utf-8")
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    deletion_entered = Event()
+    release_deletion = Event()
+    scheduler_calls: list[tuple[str, ...]] = []
+    real_rmtree = __import__("shutil").rmtree
+
+    def blocking_rmtree(path: Path) -> None:
+        assert path != run_dir
+        assert not run_dir.exists()
+        deletion_entered.set()
+        assert release_deletion.wait(timeout=5)
+        real_rmtree(path)
+
+    with (
+        patch(
+            "runops.application.actions.admin.shutil.rmtree",
+            side_effect=blocking_rmtree,
+        ),
+        ThreadPoolExecutor(max_workers=2) as executor,
+    ):
+        deleted = executor.submit(execute_action, "delete_run", run_dir=run_dir)
+        assert deletion_entered.wait(timeout=5)
+        submitted = executor.submit(
+            apply_submit,
+            plan,
+            lambda command: scheduler_calls.append(command) or "98765",
+        )
+        with pytest.raises(SubmissionLockError):
+            submitted.result(timeout=5)
+        release_deletion.set()
+        delete_result = deleted.result(timeout=5)
+
+    assert delete_result.status is ActionStatus.SUCCESS
+    assert scheduler_calls == []
     assert not run_dir.exists()

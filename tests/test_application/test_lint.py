@@ -165,6 +165,20 @@ def test_project_lint_reports_invalid_manifest(tmp_path: Path) -> None:
     assert report.error_count == 1
 
 
+def test_project_lint_reports_non_utf8_manifest_without_aborting(
+    tmp_path: Path,
+) -> None:
+    _write_project(tmp_path)
+    run_dir = tmp_path / "runs" / "R20260508-0001"
+    run_dir.mkdir(parents=True)
+    (run_dir / "manifest.toml").write_bytes(b"[run]\nid = \xff\n")
+
+    report = run_project_lint(tmp_path, scopes=("runs",))
+
+    assert [issue.issue_id for issue in report.issues] == ["runs.manifest_invalid"]
+    assert "Invalid encoding" in report.issues[0].message
+
+
 @pytest.mark.parametrize("table", _REQUIRED_MANIFEST_TABLES)
 def test_project_lint_reports_each_missing_required_manifest_table(
     tmp_path: Path,

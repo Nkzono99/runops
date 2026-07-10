@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
+import secrets
 import shutil
+import stat
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -292,24 +295,81 @@ def delete_run(run_dir: Path) -> ActionResult:
     or ``failed``) may be deleted.  Completed and archived runs hold valuable
     results and must go through the archive/purge flow instead.
     """
-    state_str, err = _require_state(
-        run_dir,
-        RunState.CREATED,
-        RunState.CANCELLED,
-        RunState.FAILED,
+    from runops.application.execution.submission import (
+        SubmissionClaimError,
+        SubmissionLockError,
+        submission_guard,
     )
-    if err:
-        return _precondition_fail("delete_run", err)
-
     from runops.core.manifest import read_manifest
 
-    run_id = read_manifest(run_dir).run.get("id", run_dir.name)
-    bytes_removed = _dir_size(run_dir)
-
+    requested_source = run_dir.absolute()
     try:
-        shutil.rmtree(run_dir)
+        requested_stat = os.lstat(requested_source)
     except OSError as e:
-        return _error("delete_run", f"Failed to remove {run_dir}: {e}")
+        return _error("delete_run", f"Failed to inspect {requested_source}: {e}")
+    if stat.S_ISLNK(requested_stat.st_mode):
+        return _precondition_fail(
+            "delete_run",
+            f"Refusing to delete a run through a symlink: {requested_source}",
+        )
+    try:
+        source = requested_source.resolve(strict=True)
+        source_stat = os.stat(source, follow_symlinks=False)
+    except (OSError, RuntimeError) as e:
+        return _error("delete_run", f"Failed to resolve {requested_source}: {e}")
+    if (
+        source_stat.st_dev != requested_stat.st_dev
+        or source_stat.st_ino != requested_stat.st_ino
+    ):
+        return _precondition_fail(
+            "delete_run",
+            f"Run path changed while resolving it: {requested_source}",
+        )
+    delete_path = source
+    try:
+        with submission_guard(source) as guard:
+            guarded_stat = os.stat(source, follow_symlinks=False)
+            if (
+                not stat.S_ISDIR(guarded_stat.st_mode)
+                or guarded_stat.st_dev != source_stat.st_dev
+                or guarded_stat.st_ino != source_stat.st_ino
+            ):
+                return _precondition_fail(
+                    "delete_run",
+                    f"Run path changed while acquiring its submission guard: {source}",
+                )
+            if guard.claim:
+                return _precondition_fail(
+                    "delete_run",
+                    "Run has a durable submission claim "
+                    f"{guard.claim!r}; reconcile it before deletion",
+                )
+
+            state_str, err = _require_state(
+                source,
+                RunState.CREATED,
+                RunState.CANCELLED,
+                RunState.FAILED,
+            )
+            if err:
+                return _precondition_fail("delete_run", err)
+
+            run_id = read_manifest(source).run.get("id", source.name)
+            bytes_removed = _dir_size(source)
+            delete_path = _unique_delete_staging_path(source)
+            os.rename(source, delete_path)
+            _fsync_directory(source.parent)
+            shutil.rmtree(delete_path)
+            _fsync_directory(source.parent)
+    except (SubmissionClaimError, SubmissionLockError) as e:
+        return _error("delete_run", f"Submission guard failed: {e}")
+    except OSError as e:
+        recovery = (
+            f"; staged path retained at {delete_path}"
+            if delete_path != source and delete_path.exists()
+            else ""
+        )
+        return _error("delete_run", f"Failed to remove {source}: {e}{recovery}")
 
     return ActionResult(
         action="delete_run",
@@ -319,3 +379,23 @@ def delete_run(run_dir: Path) -> ActionResult:
         state_before=state_str,
         state_after="",
     )
+
+
+def _unique_delete_staging_path(source: Path) -> Path:
+    """Choose a collision-resistant sibling used to hide a run before deletion."""
+    for _ in range(16):
+        candidate = source.with_name(
+            f".{source.name}.runops-delete-{secrets.token_hex(8)}"
+        )
+        if not os.path.lexists(candidate):
+            return candidate
+    raise OSError("failed to allocate a unique run deletion staging path")
+
+
+def _fsync_directory(directory: Path) -> None:
+    flags = os.O_RDONLY | os.O_CLOEXEC | os.O_DIRECTORY | os.O_NOFOLLOW
+    descriptor = os.open(directory, flags)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)

@@ -16,6 +16,7 @@ from runops.application.research.notebook import (
     NoteArchiveApplyError,
     NoteArchiveEntry,
     NoteArchivePlan,
+    NoteNotFoundError,
     NoteValidationError,
     append_note,
     apply_note_archive,
@@ -136,6 +137,110 @@ def test_append_note_rejects_non_regular_daily_file(tmp_path: Path) -> None:
             append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
     finally:
         os.close(reader_fd)
+
+
+def test_append_and_read_reject_hardlinked_daily_file_without_mutation(
+    tmp_path: Path,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+    outside = tmp_path / "outside.md"
+    _write_note(outside, "outside")
+    before = outside.read_bytes()
+    os.link(outside, notes_dir / "2026-04-08.md")
+    request = NoteAppendRequest(
+        notes_dir=notes_dir,
+        title="must not update alias",
+        body="entry",
+        note_date=date(2026, 4, 8),
+    )
+
+    with pytest.raises(NoteValidationError, match="single-link"):
+        append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+
+    assert outside.read_bytes() == before
+    assert list_note_days(notes_dir, count=0) == ()
+    with pytest.raises(NoteNotFoundError):
+        read_note(notes_dir, "2026-04-08", today=date(2026, 4, 8))
+
+
+def test_append_note_completes_short_write_while_holding_lock(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    request = NoteAppendRequest(
+        notes_dir=notes_dir,
+        title="short write",
+        body="complete entry",
+        note_date=date(2026, 4, 8),
+    )
+    real_write = os.write
+    calls = 0
+
+    def short_first_write(descriptor: int, payload: bytes) -> int:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            partial = max(1, len(payload) // 3)
+            return real_write(descriptor, payload[:partial])
+        return real_write(descriptor, payload)
+
+    monkeypatch.setattr(notebook_module.os, "write", short_first_write)
+
+    result = append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+
+    assert calls >= 2
+    assert result.path.read_text(encoding="utf-8") == (
+        "# 2026-04-08 — lab notebook\n\n## 09:00 short write\n\ncomplete entry\n\n"
+    )
+
+
+def test_append_note_retries_interrupted_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = NoteAppendRequest(
+        notes_dir=tmp_path / "notes",
+        title="interrupted",
+        body="complete entry",
+        note_date=date(2026, 4, 8),
+    )
+    real_write = os.write
+    interrupted = False
+
+    def interrupt_once(descriptor: int, payload: bytes) -> int:
+        nonlocal interrupted
+        if not interrupted:
+            interrupted = True
+            raise InterruptedError()
+        return real_write(descriptor, payload)
+
+    monkeypatch.setattr(notebook_module.os, "write", interrupt_once)
+
+    result = append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+
+    assert interrupted is True
+    assert "## 09:00 interrupted" in result.path.read_text(encoding="utf-8")
+
+
+def test_append_note_rejects_zero_byte_write_without_partial_entry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    request = NoteAppendRequest(
+        notes_dir=notes_dir,
+        title="zero write",
+        body="entry",
+        note_date=date(2026, 4, 8),
+    )
+    monkeypatch.setattr(notebook_module.os, "write", lambda fd, payload: 0)
+
+    with pytest.raises(NoteValidationError, match="zero-byte write"):
+        append_note(request, now=datetime(2026, 4, 8, tzinfo=timezone.utc))
+
+    assert (notes_dir / "2026-04-08.md").read_bytes() == b""
 
 
 def test_append_note_rejects_symlink_notes_root(tmp_path: Path) -> None:
@@ -298,6 +403,31 @@ def test_read_and_list_reject_symlink_notes_root(tmp_path: Path) -> None:
         list_note_days(notes_link, count=0)
 
 
+def test_read_io_error_is_not_reported_as_missing_note(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    _write_note(notes_dir / "2026-04-08.md", "entry")
+
+    def fail_read(descriptor: int, size: int) -> bytes:
+        raise OSError(errno.EIO, "storage read failed")
+
+    monkeypatch.setattr(notebook_module.os, "read", fail_read)
+
+    with pytest.raises(NoteValidationError, match="storage read failed"):
+        list_note_days(notes_dir, count=0)
+
+
+def test_invalid_utf8_note_is_reported_as_validation_error(tmp_path: Path) -> None:
+    notes_dir = tmp_path / "notes"
+    notes_dir.mkdir()
+    (notes_dir / "2026-04-08.md").write_bytes(b"# invalid \xff\n")
+
+    with pytest.raises(NoteValidationError, match="UTF-8"):
+        read_note(notes_dir, "2026-04-08", today=date(2026, 4, 8))
+
+
 def test_read_note_supports_today_latest_and_explicit_history_date(
     tmp_path: Path,
 ) -> None:
@@ -349,6 +479,22 @@ def test_archive_plan_is_non_mutating_and_apply_moves_only_ready_entries(
     assert (notes_dir / "history" / "2026" / old.name).is_file()
     assert blocked.is_file()
     assert recent.is_file()
+
+
+def test_archive_plan_rejects_symlink_notes_root_without_moving_target(
+    tmp_path: Path,
+) -> None:
+    actual_notes = tmp_path / "actual-notes"
+    old = actual_notes / "2026-04-01.md"
+    _write_note(old, "outside")
+    notes_link = tmp_path / "notes"
+    notes_link.symlink_to(actual_notes, target_is_directory=True)
+
+    with pytest.raises(NoteValidationError, match="unsafe notes directory"):
+        plan_note_archive(notes_link, older_than="7d", today=date(2026, 4, 10))
+
+    assert old.is_file()
+    assert not (actual_notes / "history").exists()
 
 
 def test_rejects_date_path_traversal_and_tampered_archive_plan(tmp_path: Path) -> None:

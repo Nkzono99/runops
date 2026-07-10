@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import os
 import shutil
+import stat
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -39,11 +42,12 @@ class TestManifestData:
         assert restored.origin == data.origin
         assert restored.params_snapshot == data.params_snapshot
 
-    def test_empty_sections_omitted(self) -> None:
+    def test_empty_sections_omit_optional_but_emit_required_table(self) -> None:
         data = ManifestData(run={"id": "R1"})
         d = data.to_dict()
         assert "run" in d
         assert "origin" not in d  # empty dict omitted
+        assert d["simulator_source"] == {}  # required even without known fields
         assert "params_snapshot" in d  # empty snapshot is still a frozen baseline
         assert d["params_snapshot"] == {}
 
@@ -108,6 +112,27 @@ class TestReadManifest:
         with pytest.raises(ManifestError, match="Invalid TOML"):
             read_manifest(tmp_path)
 
+    def test_non_utf8_manifest_is_reported_as_manifest_error(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "manifest.toml").write_bytes(b"[run]\nid = \xff\n")
+
+        with pytest.raises(ManifestError, match="Invalid encoding"):
+            read_manifest(tmp_path)
+
+    def test_manifest_io_failure_is_reported_as_manifest_error(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "manifest.toml").write_text('[run]\nid = "R1"\n')
+
+        with (
+            patch("builtins.open", side_effect=PermissionError("access denied")),
+            pytest.raises(ManifestError, match="access denied"),
+        ):
+            read_manifest(tmp_path)
+
 
 class TestWriteManifest:
     """Tests for write_manifest()."""
@@ -130,6 +155,51 @@ class TestWriteManifest:
         data = ManifestData(run={"id": "R1"})
         write_manifest(deep_dir, data)
         assert (deep_dir / "manifest.toml").exists()
+
+    def test_fsyncs_temp_file_before_replace_and_directory_afterward(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        events: list[str] = []
+        real_fsync = os.fsync
+        real_replace = os.replace
+
+        def tracking_fsync(descriptor: int) -> None:
+            kind = "directory" if stat.S_ISDIR(os.fstat(descriptor).st_mode) else "file"
+            events.append(f"fsync:{kind}")
+            real_fsync(descriptor)
+
+        def tracking_replace(source: str, destination: str) -> None:
+            events.append("replace")
+            real_replace(source, destination)
+
+        with (
+            patch("runops.core.manifest.os.fsync", side_effect=tracking_fsync),
+            patch("runops.core.manifest.os.replace", side_effect=tracking_replace),
+        ):
+            write_manifest(tmp_path, ManifestData(run={"id": "R1"}))
+
+        assert events == ["fsync:file", "replace", "fsync:directory"]
+
+    def test_directory_fsync_failure_is_reported_as_manifest_error(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        real_fsync = os.fsync
+
+        def fail_directory_fsync(descriptor: int) -> None:
+            if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+                raise OSError("directory fsync failed")
+            real_fsync(descriptor)
+
+        with (
+            patch(
+                "runops.core.manifest.os.fsync",
+                side_effect=fail_directory_fsync,
+            ),
+            pytest.raises(ManifestError, match="directory fsync failed"),
+        ):
+            write_manifest(tmp_path, ManifestData(run={"id": "R1"}))
 
     def test_manifest_roundtrip_preserves_unknown_sections(
         self, tmp_path: Path
@@ -171,6 +241,23 @@ class TestWriteManifest:
         raw = tomllib.loads((run_dir / "manifest.toml").read_text(encoding="utf-8"))
         assert raw["run"]["future_flag"] == "preserved"
         assert raw["run"]["future_metadata"] == {"items": ["a", "b"]}
+
+    def test_update_preserves_present_empty_canonical_tables(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        (tmp_path / "manifest.toml").write_text(
+            '[run]\nid = "R20260710-0001"\nstatus = "created"\n'
+            "[simulator_source]\n"
+            "[params_snapshot]\n",
+            encoding="utf-8",
+        )
+
+        update_manifest(tmp_path, {"run": {"display_name": "kept"}})
+
+        raw = tomllib.loads((tmp_path / "manifest.toml").read_text(encoding="utf-8"))
+        assert raw["simulator_source"] == {}
+        assert raw["params_snapshot"] == {}
 
 
 class TestUpdateManifest:

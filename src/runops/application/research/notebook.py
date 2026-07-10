@@ -231,22 +231,21 @@ def append_note(request: NoteAppendRequest, *, now: datetime) -> NoteAppendResul
             raise NoteValidationError(f"could not lock daily notebook: {path}") from exc
         if not stat.S_ISREG(daily_stat.st_mode):
             raise NoteValidationError(f"daily notebook is not a regular file: {path}")
+        if daily_stat.st_nlink != 1:
+            raise NoteValidationError(
+                f"daily notebook is not a regular single-link file: {path}"
+            )
 
         created = daily_stat.st_size == 0
         header = f"# {note_date.isoformat()} — lab notebook\n\n" if created else ""
         entry = f"## {entry_time} {title}\n\n{body.rstrip()}\n\n"
         payload = (header + entry).encode("utf-8")
         try:
-            written = os.write(daily_fd, payload)
+            _write_all(daily_fd, payload)
         except OSError as exc:
             raise NoteValidationError(
-                f"could not append daily notebook: {path}"
+                f"could not append daily notebook: {path}: {exc}"
             ) from exc
-        if written != len(payload):
-            raise NoteValidationError(
-                f"incomplete append to daily notebook: {path} "
-                f"({written}/{len(payload)} bytes)"
-            )
 
     return NoteAppendResult(
         path=path,
@@ -324,13 +323,7 @@ def plan_note_archive(
         raise NoteValidationError(
             "duration is out of range for notebook dates"
         ) from exc
-    _require_notes_dir(notes_dir)
-    root = notes_dir.resolve()
-    directory_flags = _directory_open_flags()
-    try:
-        root_fd = os.open(root, directory_flags)
-    except OSError as exc:
-        raise NoteValidationError(f"unsafe notes directory: {notes_dir}") from exc
+    root, root_fd = _open_notes_root(notes_dir)
 
     entries: list[NoteArchiveEntry] = []
     with ExitStack() as stack:
@@ -355,7 +348,7 @@ def plan_note_archive(
                 raise NoteValidationError(
                     f"could not inspect archive source: {path}"
                 ) from exc
-            if not stat.S_ISREG(source_stat.st_mode):
+            if not stat.S_ISREG(source_stat.st_mode) or source_stat.st_nlink != 1:
                 continue
             destination = _history_path_for(root, path)
             entries.append(
@@ -565,11 +558,6 @@ def _in_jst(value: datetime) -> datetime:
     return value.astimezone(JST)
 
 
-def _require_notes_dir(notes_dir: Path) -> None:
-    if not notes_dir.is_dir():
-        raise NoteDirectoryNotFoundError(f"notes directory not found: {notes_dir}")
-
-
 def _open_notes_root(notes_dir: Path, *, create: bool = False) -> tuple[Path, int]:
     """Open the notes root itself without following a final symlink."""
     root = Path(os.path.abspath(notes_dir))
@@ -602,7 +590,7 @@ def _load_note_documents(root: Path, root_fd: int) -> tuple[_LoadedNote, ...]:
         note_date = _daily_note_date(name)
         if note_date is None:
             continue
-        text = _read_regular_text_at(root_fd, name)
+        text = _read_regular_text_at(root_fd, name, root / name)
         if text is None:
             continue
         by_date[note_date] = _LoadedNote(
@@ -611,34 +599,41 @@ def _load_note_documents(root: Path, root_fd: int) -> tuple[_LoadedNote, ...]:
             text=text,
         )
 
-    history_fd = _open_directory_at(root_fd, _HISTORY_DIR)
+    history_path = root / _HISTORY_DIR
+    history_fd = _open_directory_at(root_fd, _HISTORY_DIR, history_path)
     if history_fd is not None:
         with ExitStack() as history_stack:
             history_stack.callback(os.close, history_fd)
             try:
                 year_names = os.listdir(history_fd)
-            except OSError:
-                year_names = []
+            except OSError as exc:
+                raise NoteValidationError(
+                    f"could not inspect notebook history: {history_path}: {exc}"
+                ) from exc
             for year_name in year_names:
-                year_fd = _open_directory_at(history_fd, year_name)
+                year_path = history_path / year_name
+                year_fd = _open_directory_at(history_fd, year_name, year_path)
                 if year_fd is None:
                     continue
                 with ExitStack() as year_stack:
                     year_stack.callback(os.close, year_fd)
                     try:
                         daily_names = os.listdir(year_fd)
-                    except OSError:
-                        continue
+                    except OSError as exc:
+                        raise NoteValidationError(
+                            f"could not inspect notebook history: {year_path}: {exc}"
+                        ) from exc
                     for name in daily_names:
                         note_date = _daily_note_date(name)
                         if note_date is None or note_date in by_date:
                             continue
-                        text = _read_regular_text_at(year_fd, name)
+                        path = year_path / name
+                        text = _read_regular_text_at(year_fd, name, path)
                         if text is None:
                             continue
                         by_date[note_date] = _LoadedNote(
                             note_date=note_date,
-                            path=root / _HISTORY_DIR / year_name / name,
+                            path=path,
                             text=text,
                         )
 
@@ -647,14 +642,18 @@ def _load_note_documents(root: Path, root_fd: int) -> tuple[_LoadedNote, ...]:
     )
 
 
-def _open_directory_at(parent_fd: int, name: str) -> int | None:
+def _open_directory_at(parent_fd: int, name: str, path: Path) -> int | None:
     try:
         return os.open(name, _directory_open_flags(), dir_fd=parent_fd)
-    except OSError:
-        return None
+    except OSError as exc:
+        if _is_skippable_notebook_node_error(exc):
+            return None
+        raise NoteValidationError(
+            f"could not open notebook directory: {path}: {exc}"
+        ) from exc
 
 
-def _read_regular_text_at(directory_fd: int, name: str) -> str | None:
+def _read_regular_text_at(directory_fd: int, name: str, path: Path) -> str | None:
     flags = (
         os.O_RDONLY
         | getattr(os, "O_CLOEXEC", 0)
@@ -663,24 +662,58 @@ def _read_regular_text_at(directory_fd: int, name: str) -> str | None:
     )
     try:
         daily_fd = os.open(name, flags, dir_fd=directory_fd)
-    except OSError:
-        return None
+    except OSError as exc:
+        if _is_skippable_notebook_node_error(exc):
+            return None
+        raise NoteValidationError(
+            f"could not open daily notebook: {path}: {exc}"
+        ) from exc
     with ExitStack() as stack:
         stack.callback(os.close, daily_fd)
         try:
             fcntl.flock(daily_fd, fcntl.LOCK_SH)
             daily_stat = os.fstat(daily_fd)
-        except OSError:
-            return None
-        if not stat.S_ISREG(daily_stat.st_mode):
+        except OSError as exc:
+            raise NoteValidationError(
+                f"could not inspect daily notebook: {path}: {exc}"
+            ) from exc
+        if not stat.S_ISREG(daily_stat.st_mode) or daily_stat.st_nlink != 1:
             return None
         chunks: list[bytes] = []
         try:
             while chunk := os.read(daily_fd, 64 * 1024):
                 chunks.append(chunk)
-        except OSError:
-            return None
-    return b"".join(chunks).decode("utf-8")
+        except OSError as exc:
+            raise NoteValidationError(
+                f"could not read daily notebook: {path}: {exc}"
+            ) from exc
+    try:
+        return b"".join(chunks).decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise NoteValidationError(
+            f"daily notebook is not valid UTF-8: {path}: {exc}"
+        ) from exc
+
+
+def _is_skippable_notebook_node_error(exc: OSError) -> bool:
+    return exc.errno in {
+        errno.ENOENT,
+        errno.ELOOP,
+        errno.ENOTDIR,
+        errno.ENXIO,
+    }
+
+
+def _write_all(descriptor: int, payload: bytes) -> None:
+    written = 0
+    while written < len(payload):
+        try:
+            count = os.write(descriptor, payload[written:])
+        except InterruptedError:
+            continue
+        if count == 0:
+            raise OSError(errno.EIO, "zero-byte write while appending notebook")
+        written += count
 
 
 def _daily_note_date(name: str) -> date | None:
@@ -736,7 +769,7 @@ def _validate_archive_entry(notes_dir: Path, entry: NoteArchiveEntry) -> None:
 
 
 def _directory_open_flags() -> int:
-    flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_DIRECTORY", 0)
     return flags | getattr(os, "O_NOFOLLOW", 0)
 
 
@@ -833,7 +866,7 @@ def _stat_regular_source(root_fd: int, entry: NoteArchiveEntry) -> os.stat_resul
         )
     except OSError as exc:
         raise NoteValidationError(f"unsafe archive source: {entry.source}") from exc
-    if not stat.S_ISREG(source_stat.st_mode):
+    if not stat.S_ISREG(source_stat.st_mode) or source_stat.st_nlink != 1:
         raise NoteValidationError(f"unsafe archive source: {entry.source}")
     return source_stat
 
