@@ -14,6 +14,7 @@ from runops.application.execution.submission import (
     plan_submit,
 )
 from runops.cli.main import app
+from runops.core.manifest import update_manifest
 from runops.mcp import tools
 
 runner = CliRunner()
@@ -66,6 +67,16 @@ def _serialized_preconditions(plan: SubmitPlan) -> list[dict[str, object]]:
         {"name": check.name, "ok": check.passed, "message": check.message}
         for check in plan.preconditions
     ]
+
+
+def _mark_dirty_production(run_dir: Path) -> None:
+    update_manifest(
+        run_dir,
+        {
+            "classification": {"tags": ["production"]},
+            "simulator_source": {"git_dirty": True},
+        },
+    )
 
 
 def test_ready_plan_matches_mcp_and_cli_exactly_without_mutation(
@@ -182,3 +193,60 @@ def test_multiply_blocked_plan_exposes_every_failure_without_mutation(
         assert check.message in cli_result.output
     assert manifest_path.read_bytes() == before
     assert state_path.read_bytes() == state_before
+
+
+def test_ready_plan_warning_matches_shared_plan_in_mcp_and_cli(
+    tmp_path: Path,
+) -> None:
+    project_root, ready_run, _ = _make_project(tmp_path)
+    _mark_dirty_production(ready_run)
+    plan = plan_submit(SubmitRequest(run_dir=ready_run))
+
+    mcp_result = tools.job_plan_submit(
+        ready_run.name,
+        project_root=str(project_root),
+    )
+    with patch("runops.cli.submit.Path.cwd", return_value=project_root):
+        cli_result = runner.invoke(
+            app,
+            ["runs", "submit", "--dry-run", str(ready_run)],
+        )
+
+    assert plan.ready is True
+    assert plan.warnings
+    assert mcp_result["status"] == "warning"
+    assert mcp_result["data"]["warnings"] == list(plan.warnings)
+    assert [item["message"] for item in mcp_result["warnings"]] == list(plan.warnings)
+    assert all(
+        item["code"] == "submission_plan_warning" for item in mcp_result["warnings"]
+    )
+    assert cli_result.exit_code == 0
+    for message in plan.warnings:
+        assert f"Warning: {message}" in cli_result.output
+
+
+def test_blocked_plan_preserves_shared_warning_in_mcp_and_cli(
+    tmp_path: Path,
+) -> None:
+    project_root, _, blocked_run = _make_project(tmp_path)
+    _mark_dirty_production(blocked_run)
+    plan = plan_submit(SubmitRequest(run_dir=blocked_run))
+
+    mcp_result = tools.job_plan_submit(
+        blocked_run.name,
+        project_root=str(project_root),
+    )
+    with patch("runops.cli.submit.Path.cwd", return_value=project_root):
+        cli_result = runner.invoke(
+            app,
+            ["runs", "submit", "--dry-run", str(blocked_run)],
+        )
+
+    assert plan.ready is False
+    assert plan.warnings
+    assert mcp_result["status"] == "blocked"
+    assert mcp_result["data"]["warnings"] == list(plan.warnings)
+    assert [item["message"] for item in mcp_result["warnings"]] == list(plan.warnings)
+    assert cli_result.exit_code == 0
+    for message in plan.warnings:
+        assert f"Warning: {message}" in cli_result.output

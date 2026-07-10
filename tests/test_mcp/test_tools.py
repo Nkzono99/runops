@@ -374,6 +374,7 @@ def test_job_plan_submit_reports_sbatch_command(tmp_path: Path) -> None:
             {"name": check.name, "ok": check.passed, "message": check.message}
             for check in plan.preconditions
         ],
+        "warnings": list(plan.warnings),
         "dry_run": True,
         "will_submit": plan.ready,
     }

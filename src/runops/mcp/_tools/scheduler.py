@@ -173,6 +173,10 @@ def job_plan_submit(
         {"name": check.name, "ok": check.passed, "message": check.message}
         for check in plan.preconditions
     ]
+    plan_warnings = list(plan.warnings)
+    warning_entries = [
+        warning("submission_plan_warning", message) for message in plan_warnings
+    ]
     data = {
         "run_id": plan.run_id,
         "run_dir": str(plan.run_dir),
@@ -180,6 +184,7 @@ def job_plan_submit(
         "work_dir": str(plan.work_dir),
         "command": list(plan.command),
         "preconditions": preconditions,
+        "warnings": plan_warnings,
         "dry_run": True,
         "will_submit": plan.ready,
     }
@@ -201,6 +206,7 @@ def job_plan_submit(
                 )
                 for check in plan.failed_preconditions
             ],
+            warnings=warning_entries,
             started_at=started_at,
             started_perf=started_perf,
             inputs=inputs,
@@ -209,10 +215,11 @@ def job_plan_submit(
     return envelope(
         tool=spec.name,
         safety=spec.safety,
-        status="ok",
+        status="warning" if warning_entries else "ok",
         summary=f"Run {plan.run_id} is ready to submit.",
         data=data,
         project_root=root,
+        warnings=warning_entries,
         next_actions=[
             {
                 "title": "Submit the planned job",
