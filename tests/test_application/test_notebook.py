@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from runops.application.research import notebook as notebook_module
 from runops.application.research.notebook import (
     NoteAppendRequest,
     NoteArchiveEntry,
@@ -154,3 +155,75 @@ def test_rejects_date_path_traversal_and_tampered_archive_plan(tmp_path: Path) -
     with pytest.raises(NoteValidationError):
         apply_note_archive(tampered)
     assert outside.is_file()
+
+
+def test_archive_validates_duration_before_missing_directory(tmp_path: Path) -> None:
+    with pytest.raises(NoteValidationError, match="expected a duration"):
+        plan_note_archive(
+            tmp_path / "missing",
+            older_than="soon",
+            today=date(2026, 4, 10),
+        )
+
+
+def test_archive_rejects_history_symlink_swapped_after_validation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    source = notes_dir / "2026-04-01.md"
+    _write_note(source, "old")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    plan = plan_note_archive(notes_dir, older_than="7d", today=date(2026, 4, 10))
+    validate = notebook_module._validate_archive_entry
+
+    def swap_history(notes: Path, entry: NoteArchiveEntry) -> None:
+        validate(notes, entry)
+        (notes / "history").symlink_to(outside, target_is_directory=True)
+
+    monkeypatch.setattr(notebook_module, "_validate_archive_entry", swap_history)
+
+    with pytest.raises(NoteValidationError, match="unsafe archive directory"):
+        apply_note_archive(plan)
+
+    assert source.is_file()
+    assert not (outside / source.name).exists()
+
+
+def test_archive_never_clobbers_destination_created_during_apply(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    notes_dir = tmp_path / "notes"
+    source = notes_dir / "2026-04-01.md"
+    _write_note(source, "old")
+    plan = plan_note_archive(notes_dir, older_than="7d", today=date(2026, 4, 10))
+    entry = plan.entries[0]
+    link = notebook_module.os.link
+
+    def create_destination_then_link(
+        src: str,
+        dst: str,
+        *,
+        src_dir_fd: int,
+        dst_dir_fd: int,
+        follow_symlinks: bool,
+    ) -> None:
+        entry.destination.write_text("concurrent\n", encoding="utf-8")
+        link(
+            src,
+            dst,
+            src_dir_fd=src_dir_fd,
+            dst_dir_fd=dst_dir_fd,
+            follow_symlinks=follow_symlinks,
+        )
+
+    monkeypatch.setattr(notebook_module.os, "link", create_destination_then_link)
+
+    result = apply_note_archive(plan)
+
+    assert result.archived == ()
+    assert result.skipped == (entry,)
+    assert source.is_file()
+    assert entry.destination.read_text(encoding="utf-8") == "concurrent\n"

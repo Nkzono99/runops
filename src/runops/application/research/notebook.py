@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import stat
+from contextlib import ExitStack
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
@@ -217,8 +220,8 @@ def plan_note_archive(
     today: date,
 ) -> NoteArchivePlan:
     """Plan moves for root-level daily notes older than a positive duration."""
-    _require_notes_dir(notes_dir)
     days = _parse_older_than(older_than)
+    _require_notes_dir(notes_dir)
     cutoff = today - timedelta(days=days)
     entries: list[NoteArchiveEntry] = []
     for path in sorted(notes_dir.glob("*.md"), key=lambda item: item.stem):
@@ -241,17 +244,72 @@ def plan_note_archive(
 
 
 def apply_note_archive(plan: NoteArchivePlan) -> NoteArchiveResult:
-    """Apply a validated archive plan, skipping occupied destinations."""
+    """Apply a plan through fixed directory handles without clobbering files."""
     archived: list[NoteArchiveEntry] = []
     skipped: list[NoteArchiveEntry] = []
-    for entry in plan.entries:
-        _validate_archive_entry(plan.notes_dir, entry)
-        if entry.destination.exists():
-            skipped.append(entry)
-            continue
-        entry.destination.parent.mkdir(parents=True, exist_ok=True)
-        entry.source.rename(entry.destination)
-        archived.append(entry)
+    root = plan.notes_dir.resolve()
+    directory_flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0)
+    directory_flags |= getattr(os, "O_NOFOLLOW", 0)
+    try:
+        root_fd = os.open(root, directory_flags)
+    except OSError as exc:
+        raise NoteValidationError(f"unsafe notes directory: {plan.notes_dir}") from exc
+
+    with ExitStack() as stack:
+        stack.callback(os.close, root_fd)
+        for entry in plan.entries:
+            _validate_archive_entry(plan.notes_dir, entry)
+            source_stat = _stat_regular_source(root_fd, entry)
+            year = entry.source.stem[:4]
+            with ExitStack() as entry_stack:
+                history_fd = _open_or_create_directory(
+                    root_fd,
+                    _HISTORY_DIR,
+                    directory_flags=directory_flags,
+                )
+                entry_stack.callback(os.close, history_fd)
+                year_fd = _open_or_create_directory(
+                    history_fd,
+                    year,
+                    directory_flags=directory_flags,
+                )
+                entry_stack.callback(os.close, year_fd)
+                try:
+                    os.link(
+                        entry.source.name,
+                        entry.destination.name,
+                        src_dir_fd=root_fd,
+                        dst_dir_fd=year_fd,
+                        follow_symlinks=False,
+                    )
+                except FileExistsError:
+                    skipped.append(entry)
+                    continue
+                except OSError as exc:
+                    raise NoteValidationError(
+                        f"could not archive notebook safely: {entry.source}"
+                    ) from exc
+
+                try:
+                    linked_stat = os.stat(
+                        entry.destination.name,
+                        dir_fd=year_fd,
+                        follow_symlinks=False,
+                    )
+                    if (
+                        linked_stat.st_dev != source_stat.st_dev
+                        or linked_stat.st_ino != source_stat.st_ino
+                    ):
+                        raise NoteValidationError(
+                            "archive destination changed unexpectedly: "
+                            f"{entry.destination}"
+                        )
+                    os.unlink(entry.source.name, dir_fd=root_fd)
+                except OSError as exc:
+                    raise NoteValidationError(
+                        f"could not finalize notebook archive: {entry.source}"
+                    ) from exc
+            archived.append(entry)
     return NoteArchiveResult(archived=tuple(archived), skipped=tuple(skipped))
 
 
@@ -344,6 +402,40 @@ def _validate_archive_entry(notes_dir: Path, entry: NoteArchiveEntry) -> None:
     expected = _history_path_for(notes_dir, entry.source).resolve()
     if destination != expected or not destination.is_relative_to(root):
         raise NoteValidationError(f"unsafe archive destination: {entry.destination}")
+
+
+def _stat_regular_source(root_fd: int, entry: NoteArchiveEntry) -> os.stat_result:
+    try:
+        source_stat = os.stat(
+            entry.source.name,
+            dir_fd=root_fd,
+            follow_symlinks=False,
+        )
+    except OSError as exc:
+        raise NoteValidationError(f"unsafe archive source: {entry.source}") from exc
+    if not stat.S_ISREG(source_stat.st_mode):
+        raise NoteValidationError(f"unsafe archive source: {entry.source}")
+    return source_stat
+
+
+def _open_or_create_directory(
+    parent_fd: int,
+    name: str,
+    *,
+    directory_flags: int,
+) -> int:
+    try:
+        os.mkdir(name, dir_fd=parent_fd)
+    except FileExistsError:
+        pass
+    except OSError as exc:
+        raise NoteValidationError(
+            f"could not create archive directory: {name}"
+        ) from exc
+    try:
+        return os.open(name, directory_flags, dir_fd=parent_fd)
+    except OSError as exc:
+        raise NoteValidationError(f"unsafe archive directory: {name}") from exc
 
 
 __all__ = [

@@ -303,8 +303,8 @@ def archive(
         source_text = source_display.as_posix()
         dest_text = dest_display.as_posix()
 
-        if entry.destination_exists or entry in skipped_entries:
-            if dry_run:
+        if (dry_run and entry.destination_exists) or entry in skipped_entries:
+            if dry_run and entry.destination_exists:
                 skipped += 1
             typer.echo(f"Skipped {source_text}: destination exists ({dest_text})")
             continue

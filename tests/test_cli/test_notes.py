@@ -486,3 +486,15 @@ def test_archive_rejects_invalid_older_than(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert "invalid --older-than" in result.output
+
+
+def test_archive_rejects_invalid_older_than_before_missing_notes_dir(
+    tmp_path: Path,
+) -> None:
+    project = _make_project(tmp_path)
+
+    with patch("runops.cli.notes.Path.cwd", return_value=project):
+        result = runner.invoke(app, ["notes", "archive", "--older-than", "soon"])
+
+    assert result.exit_code == 2
+    assert "invalid --older-than" in result.output
