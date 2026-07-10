@@ -10,16 +10,54 @@ import typer
 
 from runops.application.actions import ActionStatus
 from runops.application.actions import submit_run as submit_run_action
+from runops.application.execution.submission import (
+    SubmitPlan,
+    SubmitRequest,
+    plan_submit,
+)
 from runops.cli.run_lookup import resolve_project_run_dir
 from runops.core.discovery import discover_runs
-from runops.core.exceptions import (
-    ManifestNotFoundError,
-    SimctlError,
-)
-from runops.core.manifest import read_manifest
-from runops.core.state import RunState
+from runops.core.exceptions import SimctlError
 
 logger = logging.getLogger(__name__)
+
+
+def _build_submit_plan(
+    run_dir: Path,
+    *,
+    queue_name: str = "",
+    qos: str = "",
+    afterok: str | None = None,
+) -> SubmitPlan:
+    """Build the shared submission plan for one CLI target."""
+    return plan_submit(
+        SubmitRequest(
+            run_dir=run_dir,
+            queue_name=queue_name,
+            qos=qos,
+            afterok=afterok or "",
+        )
+    )
+
+
+def _render_submit_plan(plan: SubmitPlan, *, bulk: bool = False) -> None:
+    """Render one typed submission plan without applying it."""
+    if bulk:
+        marker = "[would submit]" if plan.ready else "[skip]"
+        typer.echo(f"  {plan.run_id} ({plan.state_before}) {marker}")
+        indent = "    "
+    else:
+        verb = "Would submit" if plan.ready else "Would skip"
+        typer.echo(f"{verb}: {plan.run_dir}")
+        indent = "  "
+
+    typer.echo(f"{indent}Command: {' '.join(plan.command)}")
+    typer.echo(f"{indent}Preconditions:")
+    for check in plan.preconditions:
+        status = "pass" if check.passed else "fail"
+        typer.echo(f"{indent}  {check.name} [{status}]: {check.message}")
+    for warning in plan.warnings:
+        typer.echo(f"{indent}Warning: {warning}")
 
 
 def _resolve_run_dir(identifier: str) -> Path:
@@ -180,10 +218,17 @@ def _submit_single_cwd(
             raise typer.Exit(code=1)
 
     if dry_run:
-        job_script = run_dir / "submit" / "job.sh"
-        typer.echo(f"Would submit: {run_dir}")
-        typer.echo(f"  Job script: {job_script}")
-        typer.echo(f"  Exists: {job_script.exists()}")
+        try:
+            plan = _build_submit_plan(
+                run_dir,
+                queue_name=queue_name,
+                qos=qos,
+                afterok=afterok,
+            )
+        except SimctlError as exc:
+            typer.echo(f"Error: {exc}")
+            raise typer.Exit(code=1) from exc
+        _render_submit_plan(plan)
         return
 
     result = _submit_single_run(
@@ -231,10 +276,17 @@ def _submit_single(
     run_dir = _resolve_run_dir(run_arg)
 
     if dry_run:
-        job_script = run_dir / "submit" / "job.sh"
-        typer.echo(f"Would submit: {run_dir}")
-        typer.echo(f"  Job script: {job_script}")
-        typer.echo(f"  Exists: {job_script.exists()}")
+        try:
+            plan = _build_submit_plan(
+                run_dir,
+                queue_name=queue_name,
+                qos=qos,
+                afterok=afterok,
+            )
+        except SimctlError as exc:
+            typer.echo(f"Error: {exc}")
+            raise typer.Exit(code=1) from exc
+        _render_submit_plan(plan)
         return
 
     result = _submit_single_run(
@@ -279,39 +331,43 @@ def _submit_all(
         typer.echo(f"No runs found under {target_dir}")
         return
 
+    plans: dict[Path, SubmitPlan] = {}
+    plan_errors: dict[Path, str] = {}
+    for run_dir in run_dirs:
+        try:
+            plans[run_dir] = _build_submit_plan(
+                run_dir,
+                queue_name=queue_name,
+                qos=qos,
+                afterok=afterok,
+            )
+        except SimctlError as exc:
+            plan_errors[run_dir] = str(exc)
+
     if dry_run:
         typer.echo(f"Found {len(run_dirs)} run(s) under {target_dir}")
-        for rd in run_dirs:
-            try:
-                manifest = read_manifest(rd)
-                status = manifest.run.get("status", "unknown")
-                run_id = manifest.run.get("id", rd.name)
-            except SimctlError:
-                status = "error"
-                run_id = rd.name
-            would_submit = status == RunState.CREATED.value
-            marker = " [would submit]" if would_submit else " [skip]"
-            typer.echo(f"  {run_id} ({status}){marker}")
+        for run_dir in run_dirs:
+            plan = plans.get(run_dir)
+            if plan is None:
+                typer.echo(f"  {run_dir.name} (error) [skip]")
+                typer.echo(f"    Error: {plan_errors[run_dir]}")
+                continue
+            _render_submit_plan(plan, bulk=True)
         return
 
-    created_runs: list[tuple[Path, str]] = []
-    skipped = 0
+    for run_dir in run_dirs:
+        if run_dir in plan_errors:
+            typer.echo(f"  {run_dir.name} (error) [skip]")
+            typer.echo(f"    Error: {plan_errors[run_dir]}")
 
-    for rd in run_dirs:
-        try:
-            manifest = read_manifest(rd)
-        except ManifestNotFoundError:
-            skipped += 1
-            continue
+    ready_plans = [
+        plans[run_dir]
+        for run_dir in run_dirs
+        if run_dir in plans and plans[run_dir].ready
+    ]
+    skipped = len(run_dirs) - len(ready_plans)
 
-        current_status = manifest.run.get("status", "")
-        if current_status != RunState.CREATED.value:
-            skipped += 1
-            continue
-
-        created_runs.append((rd, str(manifest.run.get("id", rd.name))))
-
-    if not created_runs:
+    if not ready_plans:
         typer.echo(
             f"Summary: 0 submitted, {skipped} skipped, 0 failed "
             f"(total: {len(run_dirs)} runs)"
@@ -320,7 +376,7 @@ def _submit_all(
 
     if not yes:
         typer.echo(
-            f"About to submit {len(created_runs)} created run(s) under {target_dir}."
+            f"About to submit {len(ready_plans)} created run(s) under {target_dir}."
         )
         if not typer.confirm("Continue?"):
             typer.echo("Cancelled.")
@@ -329,12 +385,16 @@ def _submit_all(
     submitted = 0
     failed = 0
 
-    for rd, run_id in created_runs:
+    for plan in ready_plans:
         job_id = _submit_single_run(
-            rd, quiet=True, queue_name=queue_name, qos=qos, afterok=afterok
+            plan.run_dir,
+            quiet=True,
+            queue_name=queue_name,
+            qos=qos,
+            afterok=afterok,
         )
         if job_id is not None:
-            typer.echo(f"  Submitted {run_id}: job_id={job_id}")
+            typer.echo(f"  Submitted {plan.run_id}: job_id={job_id}")
             submitted += 1
         else:
             failed += 1

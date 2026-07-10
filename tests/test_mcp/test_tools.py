@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from runops.application.execution.submission import SubmitRequest, plan_submit
 from runops.core.manifest import ManifestData, write_manifest
 from runops.mcp import tools
 
@@ -336,7 +337,16 @@ def test_run_logs_returns_latest_log_tail(tmp_path: Path) -> None:
 
 def test_job_plan_submit_reports_sbatch_command(tmp_path: Path) -> None:
     project_root = _make_project(tmp_path)
-    _make_run(project_root)
+    run_dir = _make_run(project_root)
+    plan = plan_submit(
+        SubmitRequest(
+            run_dir=run_dir,
+            queue_name="debug",
+            qos="normal",
+            afterok="111",
+        )
+    )
+    before = (run_dir / "manifest.toml").read_bytes()
 
     result = tools.job_plan_submit(
         "R20260512-0001",
@@ -348,13 +358,51 @@ def test_job_plan_submit_reports_sbatch_command(tmp_path: Path) -> None:
 
     assert result["status"] == "ok"
     assert result["data"]["will_submit"] is True
-    assert result["data"]["command"][:2] == [
-        "sbatch",
-        f"--chdir={project_root / 'runs' / 'R20260512-0001' / 'work'}",
+    assert result["data"] == {
+        "run_id": plan.run_id,
+        "run_dir": str(plan.run_dir),
+        "job_script": str(plan.job_script),
+        "work_dir": str(plan.work_dir),
+        "command": list(plan.command),
+        "preconditions": [
+            {"name": check.name, "ok": check.passed, "message": check.message}
+            for check in plan.preconditions
+        ],
+        "dry_run": True,
+        "will_submit": plan.ready,
+    }
+    assert result["next_actions"][0]["arguments"]["run"] == plan.run_id
+    assert (run_dir / "manifest.toml").read_bytes() == before
+    assert not (run_dir / "status").exists()
+
+
+def test_job_plan_submit_blocks_with_every_failed_shared_check(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    run_dir = _make_run(project_root, status="running")
+    (run_dir / "submit" / "job.sh").unlink()
+    for input_file in (run_dir / "input").iterdir():
+        input_file.unlink()
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    before = (run_dir / "manifest.toml").read_bytes()
+
+    result = tools.job_plan_submit(
+        "R20260512-0001",
+        project_root=str(project_root),
+    )
+
+    assert len(plan.failed_preconditions) == 5
+    assert result["status"] == "blocked"
+    assert result["data"]["will_submit"] is False
+    assert result["data"]["command"] == list(plan.command)
+    assert result["data"]["preconditions"] == [
+        {"name": check.name, "ok": check.passed, "message": check.message}
+        for check in plan.preconditions
     ]
-    assert "--dependency=afterok:111" in result["data"]["command"]
-    assert "--partition=debug" in result["data"]["command"]
-    assert "--qos=normal" in result["data"]["command"]
+    assert [item["code"] for item in result["errors"]] == ["precondition_failed"] * len(
+        plan.failed_preconditions
+    )
+    assert (run_dir / "manifest.toml").read_bytes() == before
+    assert not (run_dir / "status").exists()
 
 
 def test_job_plan_submit_blocks_non_created_run(tmp_path: Path) -> None:

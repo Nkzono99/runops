@@ -17,6 +17,7 @@ from runops import __version__
 from runops.application.analysis.artifacts import read_artifacts_index
 from runops.application.context import build_project_context
 from runops.application.execution.readiness import evaluate_run_readiness
+from runops.application.execution.submission import SubmitRequest, plan_submit
 from runops.application.gateway.plugins import check_project_codex_plugins
 from runops.core.discovery import discover_runs, resolve_run, validate_uniqueness
 from runops.core.exceptions import SimctlError
@@ -2157,7 +2158,14 @@ def job_plan_submit(
     try:
         root = _resolve_project_root(project_root)
         run_dir = _resolve_run_dir(run, root)
-        manifest = read_manifest(run_dir)
+        plan = plan_submit(
+            SubmitRequest(
+                run_dir=run_dir,
+                queue_name=queue_name or "",
+                qos=qos or "",
+                afterok=afterok or "",
+            )
+        )
     except SimctlError as exc:
         return blocked_envelope(
             tool=spec.name,
@@ -2167,80 +2175,37 @@ def job_plan_submit(
             inputs=inputs,
         )
 
-    preconditions: list[dict[str, Any]] = []
-
-    def add_precondition(name: str, ok: bool, message: str) -> None:
-        preconditions.append({"name": name, "ok": ok, "message": message})
-
-    status = str(manifest.run.get("status", ""))
-    add_precondition(
-        "state_created",
-        status == RunState.CREATED.value,
-        f"run status is {status!r}",
-    )
-    job_script = run_dir / "submit" / "job.sh"
-    add_precondition(
-        "job_script_exists",
-        job_script.is_file(),
-        f"job script: {job_script}",
-    )
-    if job_script.is_file():
-        try:
-            job_text = job_script.read_text(encoding="utf-8")
-            add_precondition(
-                "job_script_has_sbatch",
-                "#SBATCH" in job_text,
-                "job.sh contains #SBATCH directives"
-                if "#SBATCH" in job_text
-                else "job.sh does not contain #SBATCH directives",
-            )
-        except OSError as exc:
-            add_precondition("job_script_readable", False, str(exc))
-    input_dir = run_dir / "input"
-    input_ready = input_dir.is_dir() and any(input_dir.iterdir())
-    add_precondition(
-        "input_ready",
-        input_ready,
-        f"input directory: {input_dir}",
-    )
-
-    work_dir = run_dir / "work"
-    if not work_dir.is_dir():
-        work_dir = run_dir
-    command = ["sbatch", f"--chdir={work_dir}"]
-    if afterok:
-        command.append(f"--dependency=afterok:{afterok}")
-    if queue_name:
-        command.append(f"--partition={queue_name}")
-    if qos:
-        command.append(f"--qos={qos}")
-    command.append(str(job_script))
-
-    failed = [item for item in preconditions if not item["ok"]]
+    preconditions = [
+        {"name": check.name, "ok": check.passed, "message": check.message}
+        for check in plan.preconditions
+    ]
     data = {
-        "run_id": str(manifest.run.get("id", run_dir.name)),
-        "run_dir": str(run_dir),
-        "job_script": str(job_script),
-        "work_dir": str(work_dir),
-        "command": command,
+        "run_id": plan.run_id,
+        "run_dir": str(plan.run_dir),
+        "job_script": str(plan.job_script),
+        "work_dir": str(plan.work_dir),
+        "command": list(plan.command),
         "preconditions": preconditions,
         "dry_run": True,
-        "will_submit": not failed,
+        "will_submit": plan.ready,
     }
-    if failed:
+    if not plan.ready:
         return envelope(
             tool=spec.name,
             safety=spec.safety,
             status="blocked",
-            summary=f"Submission plan is blocked by {len(failed)} precondition(s).",
+            summary=(
+                "Submission plan is blocked by "
+                f"{len(plan.failed_preconditions)} precondition(s)."
+            ),
             data=data,
             project_root=root,
             errors=[
                 error(
                     "precondition_failed",
-                    f"{item['name']}: {item['message']}",
+                    f"{check.name}: {check.message}",
                 )
-                for item in failed
+                for check in plan.failed_preconditions
             ],
             started_at=started_at,
             started_perf=started_perf,
@@ -2251,7 +2216,7 @@ def job_plan_submit(
         tool=spec.name,
         safety=spec.safety,
         status="ok",
-        summary=f"Run {manifest.run.get('id', run_dir.name)} is ready to submit.",
+        summary=f"Run {plan.run_id} is ready to submit.",
         data=data,
         project_root=root,
         next_actions=[
@@ -2260,7 +2225,7 @@ def job_plan_submit(
                 "kind": "apply",
                 "tool": "runops.job.submit",
                 "arguments": {
-                    "run": str(manifest.run.get("id", run_dir.name)),
+                    "run": plan.run_id,
                     "confirm": True,
                     "dry_run": False,
                 },

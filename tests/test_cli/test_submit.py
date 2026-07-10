@@ -9,6 +9,7 @@ from unittest.mock import patch
 import tomli_w
 from typer.testing import CliRunner
 
+from runops.application.execution.submission import SubmitRequest, plan_submit
 from runops.cli.main import app
 
 runner = CliRunner()
@@ -139,20 +140,69 @@ def test_submit_success(tmp_path: Path) -> None:
 
 
 def test_submit_dry_run(tmp_path: Path) -> None:
-    """Dry-run should show info without actually submitting."""
+    """Single-target dry-run renders the shared plan without mutation."""
     (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
     run_dir = tmp_path / "runs" / "R20260327-0001"
     _create_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    before = (run_dir / "manifest.toml").read_bytes()
 
     with patch("runops.cli.submit.Path.cwd", return_value=tmp_path):
         result = runner.invoke(app, ["runs", "submit", "--dry-run", str(run_dir)])
 
     assert result.exit_code == 0
     assert "Would submit" in result.output
+    for argument in plan.command:
+        assert argument in result.output
+    for check in plan.preconditions:
+        assert check.name in result.output
+        assert check.message in result.output
+    assert (run_dir / "manifest.toml").read_bytes() == before
+    assert not (run_dir / "status").exists()
+
+
+def test_submit_cwd_dry_run_passes_options_to_shared_plan(tmp_path: Path) -> None:
+    """Cwd dry-run renders exact option-bearing command without mutation."""
+    run_dir = tmp_path / "R20260327-0001"
+    _create_run(run_dir)
+    plan = plan_submit(
+        SubmitRequest(
+            run_dir=run_dir,
+            queue_name="compute",
+            qos="normal",
+            afterok="123",
+        )
+    )
+    before = (run_dir / "manifest.toml").read_bytes()
+
+    with patch("runops.cli.submit.Path.cwd", return_value=run_dir):
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "submit",
+                "--dry-run",
+                "--queue-name",
+                "compute",
+                "--qos",
+                "normal",
+                "--afterok",
+                "123",
+            ],
+        )
+
+    assert result.exit_code == 0
+    for argument in plan.command:
+        assert argument in result.output
+    for check in plan.preconditions:
+        assert check.name in result.output
+        assert check.message in result.output
+    assert (run_dir / "manifest.toml").read_bytes() == before
+    assert not (run_dir / "status").exists()
 
 
 def test_submit_all(tmp_path: Path) -> None:
-    """--all should submit all created runs and skip non-created ones."""
+    """--all submits only ready plans and skips every blocked plan."""
     (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
     survey_dir = tmp_path / "runs" / "survey1"
 
@@ -165,6 +215,10 @@ def test_submit_all(tmp_path: Path) -> None:
         status="submitted",
         job_id="11111",
     )
+    blocked_created = survey_dir / "R20260327-0004"
+    _create_run(blocked_created, run_id="R20260327-0004")
+    for input_file in (blocked_created / "input").iterdir():
+        input_file.unlink()
 
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
@@ -182,7 +236,7 @@ def test_submit_all(tmp_path: Path) -> None:
     assert "22222" in result.output
     assert "33333" in result.output
     assert "2 submitted" in result.output
-    assert "1 skipped" in result.output
+    assert "2 skipped" in result.output
 
 
 def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
@@ -207,17 +261,55 @@ def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
     mock_submit.assert_not_called()
 
 
+def test_submit_all_skips_plan_read_error_and_continues(tmp_path: Path) -> None:
+    """A malformed run is reported and does not block other ready plans."""
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    survey_dir = tmp_path / "runs" / "survey1"
+    ready_run = survey_dir / "R20260327-0001"
+    _create_run(ready_run, run_id=ready_run.name)
+    malformed_run = survey_dir / "R20260327-0002"
+    malformed_run.mkdir(parents=True)
+    (malformed_run / "manifest.toml").write_text(
+        "[run\nid = broken\n",
+        encoding="utf-8",
+    )
+
+    with (
+        patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
+        patch("runops.slurm.submit.submit_command", return_value="22222"),
+    ):
+        result = runner.invoke(
+            app,
+            ["runs", "submit", "--all", "--yes", str(survey_dir)],
+        )
+
+    assert result.exit_code == 0
+    assert "R20260327-0002 (error) [skip]" in result.output
+    assert "22222" in result.output
+    assert "1 submitted" in result.output
+    assert "1 skipped" in result.output
+
+
 def test_submit_all_dry_run(tmp_path: Path) -> None:
-    """--all --dry-run should list runs without submitting."""
+    """Bulk dry-run renders ready and multiply-blocked shared plans."""
     (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
     survey_dir = tmp_path / "runs" / "survey1"
     _create_run(survey_dir / "R20260327-0001", run_id="R20260327-0001")
+    blocked_run = survey_dir / "R20260327-0002"
     _create_run(
-        survey_dir / "R20260327-0002",
+        blocked_run,
         run_id="R20260327-0002",
-        status="submitted",
+        status="running",
         job_id="11111",
     )
+    (blocked_run / "submit" / "job.sh").unlink()
+    for input_file in (blocked_run / "input").iterdir():
+        input_file.unlink()
+    blocked_plan = plan_submit(SubmitRequest(run_dir=blocked_run))
+    manifests = {
+        run_dir: (run_dir / "manifest.toml").read_bytes()
+        for run_dir in (survey_dir / "R20260327-0001", blocked_run)
+    }
 
     with patch("runops.cli.submit.Path.cwd", return_value=tmp_path):
         result = runner.invoke(
@@ -228,6 +320,12 @@ def test_submit_all_dry_run(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "would submit" in result.output
     assert "skip" in result.output
+    for check in blocked_plan.failed_preconditions:
+        assert check.name in result.output
+        assert check.message in result.output
+    for run_dir, before in manifests.items():
+        assert (run_dir / "manifest.toml").read_bytes() == before
+        assert not (run_dir / "status").exists()
 
 
 def test_submit_empty_input_dir(tmp_path: Path) -> None:
