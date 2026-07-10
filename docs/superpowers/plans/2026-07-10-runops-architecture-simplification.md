@@ -15,7 +15,7 @@
 - Manifest mutation preserves unknown top-level sections and unknown fields inside known sections by semantic value; comments and TOML table order are not preservation guarantees.
 - This change does not add a manifest schema-version field or a partial version migration protocol.
 - CLI dry-run, MCP plan, and actual submit use one `SubmitPlan`; an invalid plan cannot be applied.
-- `runops.core` must not import `runops.cli`, `runops.mcp`, `runops.slurm`, `runops.adapters`, or `runops.harness`.
+- `runops.core` must not import `runops.application`, `runops.cli`, `runops.mcp`, `runops.slurm`, `runops.adapters`, or `runops.harness`.
 - Story acceptance remains experimental; grouped `runo runs ...` and `runo analyze ...` commands are the current v0 surface.
 - No new runtime dependency, build backend, package manager, or Python-version change.
 - Python/test payloads on KUDPC login nodes run inside a `tssrun` or `sbatch` compute allocation; git and small text inspection may run on the login node.
@@ -201,6 +201,7 @@ git commit -m "refactor: introduce application orchestration layer"
 - Move: `src/runops/core/retry.py` → `src/runops/application/execution/retry.py`
 - Move: `src/runops/core/plugins.py` → `src/runops/application/gateway/plugins.py`
 - Move: `src/runops/core/lint/` → `src/runops/application/operator/lint/`
+- Move: `src/runops/core/migrations/` → `src/runops/application/operator/migrations/`
 - Move: `tests/test_core/test_analysis.py` → `tests/test_application/test_analysis.py`
 - Move: `tests/test_core/test_analysis_comparison.py` → `tests/test_application/test_analysis_comparison.py`
 - Move: `tests/test_core/test_analysis_story.py` → `tests/test_application/test_analysis_story.py`
@@ -209,9 +210,10 @@ git commit -m "refactor: introduce application orchestration layer"
 - Move: `tests/test_core/test_publication.py` → `tests/test_application/test_publication.py`
 - Move: `tests/test_core/test_readiness.py` → `tests/test_application/test_readiness.py`
 - Move: `tests/test_core/test_retry.py` → `tests/test_application/test_retry.py`
+- Move: `tests/test_core/test_migrations.py` → `tests/test_application/test_migrations.py`
 - Create: `src/runops/core/project_files.py`
 - Create: `tests/test_architecture/test_core_import_boundaries.py`
-- Modify: affected CLI, MCP, harness, application, and test imports
+- Modify: affected CLI, MCP, harness, application, migration, and test imports
 
 **Interfaces:**
 - Produces capability packages under `runops.application`
@@ -221,7 +223,7 @@ git commit -m "refactor: introduce application orchestration layer"
 - [ ] **Step 1: Add the failing AST boundary test**
 
 ```python
-FORBIDDEN = {"cli", "mcp", "slurm", "adapters", "harness"}
+FORBIDDEN = {"application", "cli", "mcp", "slurm", "adapters", "harness"}
 
 def test_core_does_not_import_interface_or_infrastructure_packages() -> None:
     violations: list[str] = []
@@ -250,16 +252,16 @@ Expected: violations from analysis, readiness, retry, plugins, and lint structur
 
 - [ ] **Step 3: Move the capability packages and neutralize the gitignore marker**
 
-Move whole cohesive packages rather than leaving `core` facades that import outward. Put the managed `.gitignore` marker in `core/project_files.py`; `harness/builder.py` re-exports it for existing harness tests while `application.operator.lint` imports the neutral definition.
+Move whole cohesive packages rather than leaving `core` facades that import outward. Put the managed `.gitignore` marker in `core/project_files.py`; `harness/builder.py` re-exports it for existing harness tests while `application.operator.lint` imports the neutral definition. Move migrations with the operator capability because v0 migration handlers use analysis artifact workflows; leaving a `core.migrations` facade would reintroduce `core -> application`.
 
 - [ ] **Step 4: Update call sites and test layout**
 
-Move capability tests from `tests/test_core/` to `tests/test_application/` when their subject moved. Keep manifest/state/project/case/survey tests in `tests/test_core/`. Preserve behavior assertions; only imports and patch targets change.
+Move capability tests from `tests/test_core/` to `tests/test_application/` when their subject moved. Keep manifest/state/project/case/survey tests in `tests/test_core/`. Update `cli/migrate.py` to the operator migration package and include `tests/test_cli/test_migrate.py` in verification. Preserve behavior assertions; only imports and patch targets change.
 
 - [ ] **Step 5: Verify GREEN and commit**
 
 ```bash
-uv run pytest tests/test_architecture tests/test_application tests/test_cli/test_analyze.py tests/test_cli/test_retry.py tests/test_cli/test_plugins.py tests/test_cli/test_lint.py tests/test_mcp -q
+uv run pytest tests/test_architecture tests/test_application tests/test_cli/test_analyze.py tests/test_cli/test_retry.py tests/test_cli/test_plugins.py tests/test_cli/test_lint.py tests/test_cli/test_migrate.py tests/test_mcp -q
 uv run ruff check src/runops/core src/runops/application tests/test_architecture tests/test_application
 git diff --check
 git add src/runops tests src/runops/harness
