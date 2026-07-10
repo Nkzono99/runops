@@ -168,6 +168,9 @@ def list_notes(
     except NoteDirectoryNotFoundError:
         typer.echo("No notes/ directory found.")
         return
+    except NoteValidationError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from None
 
     if not summaries:
         typer.echo("No notes yet.")

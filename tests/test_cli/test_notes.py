@@ -257,6 +257,20 @@ def test_list_empty(tmp_path: Path) -> None:
     assert "No notes" in result.output
 
 
+def test_list_rejects_symlink_notes_directory_cleanly(tmp_path: Path) -> None:
+    project = _make_project(tmp_path)
+    outside = tmp_path / "outside-notes"
+    outside.mkdir()
+    (outside / "2026-04-08.md").write_text("outside\n", encoding="utf-8")
+    (project / "notes").symlink_to(outside, target_is_directory=True)
+
+    with patch("runops.cli.notes.Path.cwd", return_value=project):
+        result = runner.invoke(app, ["notes", "list"])
+
+    assert result.exit_code == 2
+    assert "unsafe notes directory" in result.output
+
+
 def test_list_shows_recent_days_with_entry_count(tmp_path: Path) -> None:
     """List shows files newest first with the number of ## entries."""
     project = _make_project(tmp_path)
