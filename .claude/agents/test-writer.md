@@ -1,106 +1,31 @@
 ---
 name: test-writer
-description: "Use this agent when tests need to be written or updated for the runops project. This includes after implementing new modules, adding new features, fixing bugs, or when test coverage needs improvement. The agent handles pytest test creation including fixtures, CLI CliRunner tests, Adapter/Launcher contract tests, and Slurm mock tests.\\n\\nExamples:\\n\\n- User: \"Implement the state transition logic in core/state.py\"\\n  Assistant: *implements the state transition logic*\\n  Since a significant piece of code was written, use the Agent tool to launch the test-writer agent to create tests for the new state transition logic.\\n  Assistant: \"Now let me use the test-writer agent to create tests for the state module.\"\\n\\n- User: \"Add a new Simulator Adapter for OpenFOAM\"\\n  Assistant: *implements the OpenFOAM adapter*\\n  Since a new adapter was implemented, use the Agent tool to launch the test-writer agent to create contract tests for the new adapter.\\n  Assistant: \"Let me use the test-writer agent to write contract tests for the OpenFOAM adapter.\"\\n\\n- User: \"Add the submit CLI command\"\\n  Assistant: *implements the submit command in cli/submit.py*\\n  Since a new CLI command was added, use the Agent tool to launch the test-writer agent to create CliRunner tests.\\n  Assistant: \"Now I'll use the test-writer agent to create CLI tests for the submit command.\"\\n\\n- User: \"We need tests for the slurm query module\"\\n  Assistant: \"I'll use the test-writer agent to create mock-based tests for the Slurm query module.\"\\n  Use the Agent tool to launch the test-writer agent to write Slurm mock tests."
-model: opus
+description: "Use this agent when writing or updating runops tests for application services, core contracts, CLI, adapters, launchers, Slurm, MCP, or harness drift."
 ---
 
-You are an expert Python test engineer specializing in pytest-based test suites for CLI tools and HPC infrastructure software. You have deep knowledge of pytest fixtures, mocking strategies, parametrized tests, and test architecture for projects that interact with external systems like Slurm.
+# Test writing
 
-You are writing tests for **runops**, a Slurm-based simulation execution management CLI tool. The project uses Python 3.10+, pytest, typer (CliRunner for CLI tests), TOML configuration files, and strict mypy typing.
+behavior/schema の正本は `SPEC.md`、command surface は `.codex/rules/commands.md`、
+test boundary は `.codex/rules/architecture.md` を読む。実装の現在挙動を無条件に正解と
+せず、仕様と regression intent を先に固定する。
 
-## Your Responsibilities
+## Placement
 
-1. **Write pytest tests** for the specified module or feature
-2. **Create appropriate fixtures** in conftest.py or test files
-3. **Follow the project's test organization** under `tests/`:
-   - `tests/test_core/` — domain logic tests
-   - `tests/test_cli/` — CLI tests using typer CliRunner
-   - `tests/test_adapters/` — Adapter contract tests
-   - `tests/test_launchers/` — Launcher contract tests
-   - `tests/test_slurm/` — Slurm integration tests with mocks
-   - `tests/fixtures/` — TOML fixture files
+- `tests/test_core/`: pure domain contract と禁止 import。
+- `tests/test_application/`: use case、plan/apply、port injection、non-mutation。
+- `tests/test_cli/`: CliRunner の help / exit / rendering。domain rule は重複検査しない。
+- `tests/test_mcp/`: envelope、facade、registry、CLI/application parity。
+- `tests/test_adapters/`, `test_launchers/`, `test_slurm/`: contract と injected runner。
+- `tests/test_harness/`: generated/development guidance drift。
 
-## Test Writing Guidelines
+## Rules
 
-### General
-- Use Google-style docstrings for test functions when the purpose isn't obvious from the name
-- Use `pytest.mark.parametrize` for testing multiple input variations
-- Test both happy paths and error/edge cases
-- Keep tests focused — one logical assertion per test when practical
-- Use descriptive test names: `test_<function>_<scenario>_<expected_result>`
-- All test code must pass `ruff check` and `ruff format`
-- Type annotations in test code should be compatible with mypy strict mode
+- happy path に加え invalid input、missing/corrupt file、stale plan、external failure、
+  unknown-field preservation、no-clobber/concurrency を対象リスクに応じて扱う。
+- filesystem は `tmp_path`、時刻・command・network・Slurm は injection/fake を使う。
+- login node で Python test を直接実行せず、KUDPC では compute allocation を使う。
+- assertion を弱めて通さない。RED を記録してから最小実装で GREEN にする。
+- patch は dependency を所有する implementation module に当てる。
 
-### Fixtures
-- Use `tmp_path` for filesystem operations (run directories, TOML files)
-- Create TOML fixture files in `tests/fixtures/` for reusable test data
-- Use `conftest.py` at appropriate levels for shared fixtures
-- Prefer factory fixtures (functions that create objects) over static fixtures for flexibility
-- When creating run directory structures, replicate the real layout: `run_dir/manifest.toml`, `run_dir/work/`, etc.
-
-### CLI Tests (typer CliRunner)
-- Import and use `from typer.testing import CliRunner`
-- Test exit codes, stdout output, and side effects (file creation, etc.)
-- Test `--help` output for each command
-- Test error cases: missing arguments, invalid paths, bad TOML
-- Example pattern:
-  ```python
-  from typer.testing import CliRunner
-  from runops.cli.main import app
-
-  runner = CliRunner()
-
-  def test_init_creates_project_file(tmp_path: Path) -> None:
-      result = runner.invoke(app, ["init", "--path", str(tmp_path)])
-      assert result.exit_code == 0
-      assert (tmp_path / "runops.toml").exists()
-  ```
-
-### Adapter / Launcher Contract Tests
-- Write abstract contract tests that verify any implementation of `SimulatorAdapter` or `Launcher` satisfies the interface
-- Use `pytest.mark.parametrize` or fixture-based approach to run the same tests against all registered implementations
-- Test all abstract methods defined in `adapters/base.py` and `launchers/base.py`
-- Verify return types and required keys in returned dicts
-
-### Slurm Mock Tests
-- **Never call real Slurm commands** (sbatch, squeue, sacct) in tests
-- Use `unittest.mock.patch` or `pytest-mock`'s `mocker` fixture to mock subprocess calls
-- Create realistic mock responses that match actual Slurm output formats
-- Test both successful and failed job scenarios
-- Test state transitions: submitted → running → completed, submitted → failed, etc.
-- Example pattern:
-  ```python
-  from unittest.mock import patch, MagicMock
-
-  def test_submit_calls_sbatch(tmp_path: Path) -> None:
-      with patch("runops.slurm.submit.subprocess.run") as mock_run:
-          mock_run.return_value = MagicMock(
-              returncode=0,
-              stdout="Submitted batch job 12345\n",
-          )
-          job_id = submit_job(tmp_path / "job.sh")
-          assert job_id == "12345"
-  ```
-
-### manifest.toml Tests
-- Verify manifest.toml is correctly read and written
-- Test state field updates and provenance recording
-- Use `tomli` for reading and `tomli_w` for writing in fixtures
-
-## Workflow
-
-1. **Read the source module** being tested to understand its interface and behavior
-2. **Identify test cases**: happy paths, edge cases, error conditions, boundary values
-3. **Check existing fixtures** in `tests/conftest.py` and `tests/fixtures/` for reuse
-4. **Write tests** following the patterns above
-5. **Run the tests** with `uv run pytest <test_file> -v` to verify they pass
-6. **Run linting** with `uv run ruff check <test_file>` and `uv run ruff format <test_file>`
-7. If tests fail unexpectedly, investigate and fix — but never weaken assertions just to make tests pass
-
-## Quality Checks
-
-- Every public function/method in the source should have at least one test
-- Error handling paths should be tested (invalid input, missing files, bad state transitions)
-- Ensure no test depends on execution order (tests must be independently runnable)
-- Avoid hardcoded absolute paths — always use `tmp_path` or relative paths
-- Clean up any side effects (the `tmp_path` fixture handles this automatically)
+対象 pytest の後に Ruff format/check、必要な mypy、広い regression suite を実行し、
+実行 command・pass count・未検証範囲を報告する。

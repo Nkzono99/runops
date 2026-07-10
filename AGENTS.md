@@ -73,7 +73,8 @@ repo 内 `harness-lab/` は再作成・Git 管理しない。
 ```text
 src/runops/
   cli/        Typer entrypoints。薄い層に保つ
-  core/       ドメインロジック。CLI / Slurm に依存しない
+  core/       pure domain。application / CLI / infrastructure に依存しない
+  application/ use case / orchestration / port
   adapters/   Simulator Adapter
   launchers/  Launcher Profile
   jobgen/     job.sh 生成
@@ -82,7 +83,7 @@ src/runops/
   harness/    project 側 harness 生成 / 更新
   templates/  project / case / survey 用テンプレート
 tests/
-  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/
+  test_core/ test_application/ test_cli/ test_mcp/ test_adapters/ test_launchers/ test_slurm/
 ```
 
 ## ビルドと検証
@@ -106,7 +107,7 @@ CLI の詳細は `.codex/rules/commands.md` を参照し、コマンド追加・
 - run ディレクトリが主単位。すべての操作は run_id または run dir を基点にする。
 - run_id は不変、パスは分類・整理用に可変。
 - `manifest.toml` が正本。状態・由来・provenance は manifest に記録する。
-- CLI は薄くし、実処理は `core/` または専用レイヤに置く。
+- CLI / MCP は薄くし、workflow は `application/`、pure rule は `core/` に置く。
 - simulator 固有処理は Adapter、MPI 起動方式は Launcher に閉じ込める。
 - Python ツールは MPI rank ごとのラッパにならない。job.sh で srun/mpirun を直接実行する。
 - 全コマンドはカレントディレクトリをデフォルトターゲットとする。

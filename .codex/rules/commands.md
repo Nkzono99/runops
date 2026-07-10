@@ -23,7 +23,7 @@
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 (対話型) |
 | `runo config add-launcher` | ランチャー追加 (対話型) |
-| `runo update` | シミュレータパッケージのアップグレード |
+| `runo update [--yes]` | シミュレータパッケージのアップグレード (`--force` は hidden compatibility alias) |
 | `runo update-harness [--plan] [--apply-chain]` | ハーネスファイル再生成 / versioned chain 更新 |
 | `runo update-refs` | 任意 refs mirror 更新 + ナレッジインデックス再生成 |
 
@@ -35,7 +35,7 @@
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 |
 | `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
-| `runo runs submit --all [DIR] [--yes]` | created な run を確認付きで一括投入 (`--yes` で確認省略) |
+| `runo runs submit --all [DIR] [--yes]` | ready plan の run を確認付きで一括投入 (`--yes` で確認省略) |
 | `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備 (`--plan` は状態を戻さず記録のみ) |

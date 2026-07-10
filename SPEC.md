@@ -104,6 +104,29 @@ v1 で public contract として固定する対象は、まず以下に絞る。
 内部 Python API、console output の細かな文言、generated harness template の内部構造は、
 別途明示しない限り public contract とはみなさない。
 
+### 3.7 Bounded contexts と internal dependency
+
+runops は 1 package の中を次の 4 context に分ける。
+
+* **Execution Kernel**: run identity、manifest/state、run 生成・実行 lifecycle
+* **Research Workspace**: notes、analysis、publication、knowledge、paper request
+* **Agent Gateway**: action facade、MCP、project harness、plugin metadata
+* **Operator/Developer utilities**: init、migration、lint、update、diagnostics
+
+内側から外側へのレイヤは次の順である。
+
+```text
+core -> application -> interfaces/infrastructure
+```
+
+source import は外側から内側へ向ける。`core/` は application / interface /
+infrastructure を import せず、application use case が port を介して workflow を
+組み立てる。CLI と MCP は同じ use case/plan を翻訳し、domain rule を複製しない。
+
+Execution Kernel は candidate-stable contract、Research Workspace と Agent Gateway は
+evolving surface とする。story / narrative generation は experimental であり、v0 中の
+regroup / removal を許す。
+
 ---
 
 ## 4. 非目標
@@ -111,7 +134,7 @@ v1 で public contract として固定する対象は、まず以下に絞る。
 v1 では以下を対象外とする。
 
 * Web UI
-* リアルタイム監視ダッシュボード
+* 常駐 Web/API と push 配信を持つ persistent real-time dashboard service
 * DB 必須設計
 * 複数 scheduler の完全汎用化
 * すべての simulator の入力仕様の共通 schema 化
@@ -202,7 +225,7 @@ sim-manager/
             ...
 
   notes/                 # project-wide lab notebook (chronological)
-    YYYY-MM-DD.md        # 日次の append-only ノート (`runops notes append`)
+    YYYY-MM-DD.md        # 日次の append-only ノート (`runo notes append`)
     reports/             # 長文 refined レポート
     README.md            # 二層 (curated vs lab notebook) 規約
   research/              # current high-level research decision ledger
@@ -806,10 +829,10 @@ submitted/running -> cancelled
 completed -> archived -> purged
 ```
 
-`runops runs cancel` は `submitted` / `running` の run に対して `scancel` と
+`runo runs cancel` は `submitted` / `running` の run に対して `scancel` と
 `sync` を組み合わせて発行し、`cancelled` 状態に遷移させる。
 
-ライフサイクル外操作として、`runops runs delete` は `created` /
+ライフサイクル外操作として、`runo runs delete` は `created` /
 `cancelled` / `failed` の run ディレクトリをハード削除する。
 `completed` / `archived` の run には適用できず、その場合は
 `archive → purge-work` を使う。
@@ -1019,31 +1042,37 @@ production tag を持つ run では、以下を推奨または要求する。
 
 ## 18. CLI 仕様
 
+preferred executable は `runo` で、`runops` は同じ command tree を指す alias とする。
+現行 v0 surface は grouped command である。全 command inventory と option の正本は
+`.codex/rules/commands.md` とし、この仕様では behavior contract のみを定める。
+確認省略の正規 option は `--yes` とする。`runo update --force` は既存 script 用の
+hidden compatibility alias で、`--yes` と別 semantics を持たない。
+
 ## 18.1 初期化
 
-* `runops init`
-* `runops doctor`
+* `runo init`
+* `runo doctor`
 
 ---
 
 ## 18.2 run 生成
 
-* `runops create CASE_NAME --dest <survey_dir>`
-* `runops sweep <survey.toml のあるディレクトリ>`
+* `runo runs create CASE_NAME`
+* `runo runs sweep [<survey.toml のあるディレクトリ>]`
 
 ---
 
 ## 18.3 job 実行
 
-* `runops submit <run_dir or run_id>`
-* `runops submit --all <survey_dir>` — created run を一括投入する。通常は確認を要求し、明示済みの自動実行では `--yes` で省略できる。
+* `runo runs submit [<run_dir or run_id>]`
+* `runo runs submit --all [<survey_dir>]` — ready plan の run を一括投入する。通常は確認を要求し、明示済みの自動実行では `--yes` で省略できる。
 
 ---
 
 ## 18.4 状態追跡
 
-* `runops runs status [RUNS...]`
-* `runops runs sync [RUNS...]`
+* `runo runs status [RUNS...]`
+* `runo runs sync [RUNS...]`
 
 `runs status` / `runs sync` は run_id・run dir・survey dir を複数指定できる。
 `runs sync` を bulk モード (survey dir または複数指定) で呼び出した場合、
@@ -1057,35 +1086,34 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 ## 18.5 一覧
 
-* `runops list`
-* `runops list <path>`
-* `runops list --status failed`
-* `runops list --tag production`
+* `runo runs list [PATHS...]`
+* `runo runs list --status failed`
+* `runo runs list --tag production`
 
 ---
 
 ## 18.6 複製・派生
 
-* `runops clone <run_dir or run_id> --dest <survey_dir>`
-* `runops clone <run_id> --set key=value` — `origin.case` と `params_snapshot` から input/job を再生成し、manifest だけの差し替えで派生 run を作らない。
+* `runo runs clone [<run_dir or run_id>] --dest <survey_dir>`
+* `runo runs clone <run_id> --set key=value` — `origin.case` と `params_snapshot` から input/job を再生成し、manifest だけの差し替えで派生 run を作らない。
 
 ---
 
 ## 18.7 解析補助
 
-* `runops summarize <run_dir or run_id>`
-* `runops collect <survey_dir>`
+* `runo analyze summarize [<run_dir or run_id>]`
+* `runo analyze collect [<survey_dir>]`
 
 ---
 
 ## 18.8 整理
 
-* `runops runs archive <run_dir or run_id>` — completed → archived。既定では `runs/_archive/<元の runs/ 相対パス>` へ移動する
-* `runops runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
-* `runops runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
-* `runops runs purge-work <run_dir or run_id>` — archived → purged
-* `runops runs cancel <run_dir or run_id>` — submitted/running → cancelled (`scancel` と `sync` をまとめて実行する安全経路)
-* `runops runs delete <run_dir or run_id>` — created / cancelled / failed の run ディレクトリをハード削除 (ライフサイクル外、completed/archived には不可)
+* `runo runs archive <run_dir or run_id>` — completed → archived。既定では `runs/_archive/<元の runs/ 相対パス>` へ移動する
+* `runo runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
+* `runo runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
+* `runo runs purge-work [<run_dir or run_id>]` — archived → purged
+* `runo runs cancel [<run_dir or run_id>]` — submitted/running → cancelled (`scancel` と `sync` をまとめて実行する安全経路)
+* `runo runs delete [<run_dir or run_id>]` — created / cancelled / failed の run ディレクトリをハード削除 (ライフサイクル外、completed/archived には不可)
 
 ---
 
@@ -1095,10 +1123,11 @@ curated knowledge (`.runops/insights/`, `.runops/facts.toml`) と並列に運用
 **append-only な時系列ノート**。1 ファイル = 1 日 (`notes/YYYY-MM-DD.md`)、
 各エントリは `## HH:MM <title>` で始まる。
 
-* `runops notes append TITLE [BODY]` — 今日 (JST) の lab notebook に追記。
+* `runo notes append TITLE [BODY]` — 今日 (JST) の lab notebook に追記。
   本文は引数 (inline) または `-` / 引数省略で stdin から読む。
-* `runops notes list [-n N]` — 最近の lab notebook 日付一覧 (新しい順, デフォルト 14 日)
-* `runops notes show [DATE|today|latest]` — 指定日の内容を表示
+* `runo notes list [-n N]` — 最近の lab notebook 日付一覧 (新しい順, デフォルト 14 日)
+* `runo notes show [DATE|today|latest]` — 指定日の内容を表示
+* `runo notes archive [--older-than 7d]` — 古い active note を year 別 history へ no-clobber で移動
 
 書き込みポリシー:
 

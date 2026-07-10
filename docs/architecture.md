@@ -2,6 +2,29 @@
 
 このドキュメントでは、runops のシステムアーキテクチャと設計思想を説明します。
 
+## 現在の bounded contexts と maturity
+
+runops は 1 package のまま、責務を 4 context に分けます。
+
+| Context | 主な責務 | Maturity |
+|---------|----------|----------|
+| **Execution Kernel** | run identity、manifest/state、run 生成、submission、Adapter/Launcher/Slurm port | candidate-stable |
+| **Research Workspace** | notes、analysis、publication、knowledge、paper request | evolving |
+| **Agent Gateway** | action facade、MCP、project harness、plugin metadata | evolving |
+| **Operator/Developer utilities** | init、migration、lint、update、diagnostics | operator-facing |
+
+story / narrative generation は **experimental** です。Execution Kernel の contract と
+同じ安定性を前提にせず、v0 中に regroup / removal できます。
+
+内側から外側へのレイヤの並びは次です。
+
+```text
+core -> application -> interfaces/infrastructure
+```
+
+import は外側から内側へ向けます。`core/` は外側を import せず、`application/` が
+use case / port を持ち、CLI・MCP・Slurm・harness が composition と I/O を担います。
+
 ## 設計原則
 
 1. **run ディレクトリが主単位**: すべての操作は run_id または run ディレクトリを基点とする
@@ -15,69 +38,27 @@
 
 ## モジュール構成
 
-```
+```text
 runops/
-  cli/                 -----> CLI 層 (typer)
-    |                         ユーザー入力のパース・出力フォーマット
-    v
-  core/                -----> ドメインロジック層
-    |                         Project / Case / Survey / Run / Manifest / State
-    |
-    +----> adapters/   -----> Simulator Adapter 層
-    |                         シミュレータ固有処理の抽象化
-    |
-    +----> launchers/  -----> Launcher Profile 層
-    |                         MPI 起動方式の抽象化
-    |
-    +----> jobgen/     -----> Job Script 生成
-    |                         Slurm batch script のテンプレート生成
-    |
-    +----> slurm/      -----> Slurm 連携層
-                              sbatch / squeue / sacct のラッパー
+  core/          pure domain: project/case/survey/run/manifest/state
+  application/   use cases: actions, run_creation, execution, research, operator
+  cli/           Typer input, confirmation, rendering
+  mcp/           Agent-facing transport facade and capability tools
+  adapters/      Simulator-specific behavior
+  launchers/     MPI launcher profiles
+  slurm/         scheduler command adapter
+  jobgen/        job.sh generation
+  harness/       generated project harness implementation
+  templates/     project/case/survey/harness templates
 ```
 
-### モジュール依存関係
+`core/` には pure domain rule だけを置きます。run 生成、submission、analysis、
+publication、notebook、harness upgrade の orchestration は `application/` に置き、
+外部 I/O は injected port / runner で渡します。`cli/` と `mcp/` は同じ application
+plan を翻訳し、state/script/input/command の規則を edge で複製しません。
 
-```
-cli/
- |
- +--> core/project    (プロジェクト読込)
- +--> core/case       (Case 読込)
- +--> core/survey     (Survey 展開)
- +--> core/run        (Run 生成)
- +--> core/manifest   (Manifest 読書き)
- +--> core/state      (状態遷移)
- +--> core/discovery  (Run 探索)
- +--> core/provenance (Provenance 収集)
- +--> adapters/       (Adapter 取得・使用)
- +--> launchers/      (Launcher 取得・使用)
- +--> jobgen/         (job.sh 生成)
- +--> slurm/          (Slurm 連携)
-
-core/
- +--> core/exceptions (共通例外)
-
-adapters/
- +--> adapters/base   (抽象基底)
- +--> adapters/registry (登録・lookup)
-
-launchers/
- +--> launchers/base  (抽象基底 + ファクトリ)
-```
-
-重要なルール: `core/` の大半は simulator 非依存を保ちますが、現在の実装では
-`core/actions/` と `core/run_creation/` が orchestration 層として
-`adapters/`、`launchers/`、`core/site/`、`jobgen/`、`slurm/` を接続しています。
-
-特に run 生成時は `core/run_creation/` が project、case、survey override を読み、
-simulator entry から Adapter を解決し、launcher profile と site profile を組み合わせて
-`jobgen.generate_job_script()` に渡します。つまり Adapter は「何を実行するか」と
-「入出力がどう見えるか」、Launcher は「program command を MPI でどう包むか」、
-Site は「cluster が job script に何を要求するか」を担当します。
-
-`src/runops/sites/` は runtime site 設定そのものではなく、`runo init` が一度だけ読む
-bundled preset 集です。実行時に使われる site の本体は project root の `site.toml` で、
-解決ロジックは `src/runops/core/site/` にあります。
+`src/runops/sites/` は runtime site 設定そのものではなく、`runo init` が読む bundled
+preset 集です。実行時 site の正本は project root の `site.toml` です。
 
 ---
 
@@ -482,22 +463,22 @@ CLI: runo runs sweep DIR
 ```
 CLI: runo runs submit RUN
   |
-  +--> resolve_run()
+  +--> resolve_run_dir()
   |      run_id またはパスから run ディレクトリを特定
   |
-  +--> read_manifest()
-  |      現在の状態が "created" であることを確認
+  +--> application.execution.plan_submit(SubmitRequest)
+  |      state / job.sh / input / work / exact sbatch command を 1 つの plan にする
+  |      CLI --dry-run と MCP runops.job.plan_submit も同じ plan を翻訳する
   |
-  +--> sbatch_submit()
-  |      sbatch --chdir=work/ submit/job.sh
-  |      job_id をパース
+  +--> application.actions.submit_run()
+  |      plan の stale 条件を再確認して apply_submit() を呼ぶ
   |
-  +--> update_manifest()
-  |      job.job_id を記録
-  |
-  +--> update_state(SUBMITTED)
-         manifest.toml と status/state.json を更新
+  +--> slurm.submit_command(plan.command)
+         accepted job_id を記録後、manifest を submitted へ遷移
 ```
+
+Slurm が job を受理した後の manifest 永続化に失敗した場合は job_id を保持した typed
+error を返し、同じ plan を再 submit しません。
 
 ### status (状態確認)
 

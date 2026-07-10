@@ -7,6 +7,16 @@ Interface Layer は、Agent、harness、人間 operator が runops の project s
 通常の研究運用では、人間は Agent に研究意図と確認を渡し、Agent が runops の
 interface を使って Execution Kernel や Experiment Layer を更新します。
 
+現在の bounded context は **Execution Kernel**、**Research Workspace**、
+**Agent Gateway**、**Operator/Developer utilities** の 4 つです。レイヤの並びは
+
+```text
+core -> application -> interfaces/infrastructure
+```
+
+であり、Interface Layer は application use case を呼ぶ外側です。CLI / MCP が domain
+precondition や command vector を再実装してはいけません。
+
 ## 位置づけ
 
 runops の CLI は、以下のためにあります。
@@ -35,7 +45,7 @@ CLI は重要ですが、研究者が日常的に CLI の全体を操作する�
 CLI command、Agent-facing action facade、project harness、確認フローを含む
 運用上の境界として扱います。
 
-Agent-facing action は `src/runops/core/actions/specs.py` の `ActionSpec` を
+Agent-facing action は `src/runops/application/actions/specs.py` の `ActionSpec` を
 machine-readable な契約として持ちます。各 action spec には対応する CLI command
 path と MCP tool 名を記録し、テストで Typer の登録済み command と MCP registry
 に存在することを確認します。これにより CLI / action facade / MCP metadata の
@@ -102,7 +112,7 @@ uvx --from runops runo plugins --check
 | `runo config show` | 設定表示 |
 | `runo config add-simulator` | シミュレータ追加 |
 | `runo config add-launcher` | ランチャー追加 |
-| `runo update` | シミュレータパッケージのアップグレード |
+| `runo update [--yes]` | シミュレータパッケージのアップグレード。`--yes` が確認省略の正規 option |
 | `runo update-harness [--plan] [--apply-chain]` | project 側 Agent harness / managed scaffold を versioned chain で再生成 |
 | `runo update-refs [SIMS...]` | 任意 refs mirror 更新 + knowledge index 再生成 |
 | `runo mcp serve --transport stdio` | local MCP provider を stdio で起動 |
@@ -111,6 +121,9 @@ uvx --from runops runo plugins --check
 | `runo mcp tools --json` | MCP tool metadata を JSON で表示 |
 | `runo mcp resources --json` | MCP resources metadata を JSON で表示 (現状は空) |
 | `runo mcp prompts --json` | MCP prompts metadata を JSON で表示 (現状は空) |
+
+`runo update --force` は既存 script 用の hidden compatibility alias で、`--yes` と
+同じ semantics です。新しい手順や文書では `--yes` を使います。
 
 MCP provider は Agent / host 向けの edge interface です。read / inspect / plan tool
 だけを初期公開し、submit / cancel / delete などの external / destructive tool は
@@ -147,6 +160,9 @@ Agent との会話上で対象 run、queue、資源量を確認済みの場合�
 
 `runo runs status` は表示用で、正本更新は `runo runs sync` が行います。
 bulk sync では created run と terminal state の run は silent skip されます。
+`runs jobs --watch` / `runs dashboard --watch` は CLI が一定間隔で問い合わせ直す
+polling view です。常駐 Web/API と push 配信を持つ persistent real-time dashboard
+service ではありません。
 
 ### Analysis / Lifecycle
 

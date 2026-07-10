@@ -2,6 +2,30 @@
 
 AI エージェントがシミュレーション実行・解析を自律的に行うための知識管理アーキテクチャ。
 
+## Architecture context
+
+runops の 4 bounded context は **Execution Kernel**、**Research Workspace**、
+**Agent Gateway**、**Operator/Developer utilities** です。知識層は Research
+Workspace が所有し、Execution Kernel の run/manifest を参照して Agent Gateway へ
+context を提供します。レイヤの並びは次です。
+
+```text
+core -> application -> interfaces/infrastructure
+```
+
+source of truth の成熟は一方向です。
+
+```text
+notes/ (raw chronological evidence)
+  -> research/agenda.md (mutable current decision)
+  -> notes/reports/ (refined narrative)
+  -> .runops/insights/ + .runops/facts.toml (curated reusable knowledge)
+```
+
+段階を飛ばして生成 context や会話ログを正本にしません。story / narrative generation
+は **experimental** であり、curated knowledge や Execution Kernel contract と同じ
+安定性を持ちません。
+
 ## 概要
 
 runops の知識層は 5 つのドメインで構成される:

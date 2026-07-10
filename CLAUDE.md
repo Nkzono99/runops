@@ -64,7 +64,8 @@ src/runops/
     init/        # runo init / doctor / scaffold / bootstrap
     knowledge/   # runo knowledge / knowledge source
     mcp.py       # runo mcp serve / check / tools
-  core/          # ドメインロジック (CLI / Slurm に依存しない)
+  core/          # pure domain (application / CLI / infrastructure に依存しない)
+  application/   # use case / orchestration / port
   adapters/      # Simulator Adapter (抽象基底 + registry)
   launchers/     # Launcher Profile (srun / mpirun / mpiexec)
   jobgen/        # job.sh 生成
@@ -74,7 +75,7 @@ src/runops/
   harness/       # project 側 harness 生成 / 更新 (builder / claude / codex)
   templates/     # project / case / survey 用 静的テンプレート
 tests/
-  test_core/ test_cli/ test_adapters/ test_launchers/ test_slurm/
+  test_core/ test_application/ test_cli/ test_mcp/ test_adapters/ test_launchers/ test_slurm/
   fixtures/      # テスト用 TOML ファイル等
 ```
 
@@ -114,28 +115,14 @@ completed → archived → purged
 ## 後方互換性
 
 **現在は private / v0 系**のため、後方互換性は強く維持しなくてよい。
-コマンド名・引数・ファイル形式は自由に変更可能。エイリアスや互換レイヤーは原則不要。
+internal import の互換 shim は原則不要。`runops` executable は `runo` の alias として残す。
 project-state に影響する breaking change は `docs/migrations/v0.md` に移行方法を残す。
 将来 v1 で public 化する際に CLI / project schema / manifest / analysis artifact schema を固める。
 
 ## 主要コマンド (抜粋)
 
-| コマンド | 説明 |
-|---------|------|
-| `runo --version` | version 確認 |
-| `runo init` / `setup` / `doctor` | プロジェクト管理 |
-| `runo context --json` / `runo lint` | project context と health check |
-| `runo mcp serve` / `mcp check` / `mcp tools/resources/prompts --json` | MCP provider の起動・検査 |
-| `runo update-harness --plan` / `--apply-chain` | project harness の versioned chain 更新 |
-| `runo migrate list/show/apply` | project-state migration |
-| `runo case new` / `runs create` / `runs sweep` | case / run 生成 |
-| `runo runs submit [--all] [-qn] [--qos] [--afterok] [--yes]` | ジョブ投入 (`--all` は確認付き、`--yes` で省略) |
-| `runo runs status` / `sync` / `log` / `dashboard` | モニタリング |
-| `runo analyze summarize` / `collect` / `plot` / `export` / `new-comparison` | 解析 |
-| `runo notes append` / `notes archive` / `knowledge save` | 知見管理 |
-| `runo runs archive` / `purge-work` / `cancel` / `delete` | ライフサイクル |
-
-全コマンド一覧: `.claude/rules/commands.md`
+grouped `runo ...` が現行 surface で、`runops` は alias。全コマンド一覧は
+`.claude/rules/commands.md` (`.codex/rules/commands.md` の mirror) を正本とする。
 
 ## 開発ルール
 
