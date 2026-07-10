@@ -103,6 +103,8 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".agents/skills/setup-runops/SKILL.md" in bundle.files
     assert ".agents/skills/setup-plugins/SKILL.md" in bundle.files
     assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
+    assert ".agents/skills/research-director/SKILL.md" in bundle.files
+    assert ".agents/skills/review-pilot/SKILL.md" in bundle.files
     assert ".agents/skills/summarize-script/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
     assert ".agents/skills/update-runops/SKILL.md" in bundle.files
@@ -127,6 +129,8 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "emout Context" in agents
     assert "委譲役割: input-review, parameter-design" in agents
     assert "$research-agenda" in agents
+    assert "$research-director" in agents
+    assert "$review-pilot" in agents
     assert "$summarize-script" in agents
     assert "$patch-runops" in agents
     assert "$update-runops" in agents
@@ -163,6 +167,24 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     codex_run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
     assert "runo runs submit --dry-run --all" in codex_run_all
     assert "runo runs submit --all --dry-run" not in codex_run_all
+    assert "Decision: EXPAND" in codex_run_all
+    assert "full submit" in codex_run_all
+    assert "pilot" in codex_run_all
+    codex_create_run = bundle.files[".agents/skills/create-run/SKILL.md"]
+    assert "`$run-all` へ委譲" in codex_create_run
+    assert "runo runs submit --all -qn" not in codex_create_run
+    codex_reference = bundle.files[".agents/skills/runops-reference/SKILL.md"]
+    assert "直接実行せず `$run-all`" in codex_reference
+    codex_director = bundle.files[".agents/skills/research-director/SKILL.md"]
+    assert "research/proposals/<date>-<topic>.md" in codex_director
+    assert "Active Experiment Portfolio" in codex_director
+    assert "falsification" in codex_director
+    codex_review_pilot = bundle.files[".agents/skills/review-pilot/SKILL.md"]
+    assert "EXPAND" in codex_review_pilot
+    assert "REVISE" in codex_review_pilot
+    assert "STOP" in codex_review_pilot
+    assert "WAIT" in codex_review_pilot
+    assert "research/reviews/<date>-<topic>.md" in codex_review_pilot
     codex_refactor = bundle.files[".agents/skills/python-package-refactor/SKILL.md"]
     claude_refactor = bundle.files[".claude/skills/python-package-refactor/SKILL.md"]
     assert ".agents/skills/python-package-refactor/scripts/" in codex_refactor

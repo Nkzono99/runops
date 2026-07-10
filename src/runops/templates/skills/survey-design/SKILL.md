@@ -7,15 +7,20 @@ description: Design a parameter survey. Use when planning a parameter sweep, cre
 
 ## 手順
 
-1. 指定されたケースの `case.toml` と入力ファイルを読む
-2. simulator plugin skill、enabled knowledge、`materials/` で既存の入力例や制約を探す
-3. `refs/` mirror がある場合だけ cookbook を fallback として確認する
+1. `research/agenda.md` の Active Experiment Portfolio と対応する
+   `research/proposals/<date>-<topic>.md` を読む。proposal がない production / large
+   survey は `{{ skill_prefix }}research-director` へ戻す
+2. 指定されたケースの `case.toml` と入力ファイルを読む
+3. simulator plugin skill、enabled knowledge、`materials/` で既存の入力例や制約を探す
+4. `refs/` mirror がある場合だけ cookbook を fallback として確認する
    - `cookbook/index.toml` で `tags` と `recommended_for` から候補を絞る
    - 候補の `meta.toml` で `[recommended].vary_first` と `[edit_policy]` を確認
    - `[cost]` から計算コストを見積もる
-4. `.runops/facts.toml` で既知の制約を確認する
-5. `survey.toml` を生成する
-6. 生成される run 数とコスト見積もりを報告する
+5. `.runops/facts.toml` で既知の制約を確認する
+6. proposal の pilot matrix と full matrix candidate を区別して `survey.toml` を生成する
+7. pilot に使う exact parameter point と、sweep 後に対応する run_id を proposal / note
+   へ記録する
+8. pilot / full 別の run 数とコスト見積もりを報告する
 
 ## cookbook の活用
 
@@ -46,6 +51,8 @@ runo runs list runs/<category>/<survey_name>
 
 ## 注意
 
+- pilot review の `Decision: EXPAND` 前に full submit しない
+- pilot は control、failure-detecting edge、代表点を含む最小集合にする
 - cookbook の `[edit_policy].immutable` パラメータは survey 軸にしない
 - `[edit_policy].sensitive` パラメータを振る場合は理由を plan に書く
 - `status = "stable"` の entry をベースにする

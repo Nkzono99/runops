@@ -180,6 +180,9 @@ class TestInit:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         readme = (tmp_path / "research" / "README.md").read_text(encoding="utf-8")
         agenda = (tmp_path / "research" / "agenda.md").read_text(encoding="utf-8")
+        assert "Active Experiment Portfolio" in agenda
+        assert "Expand criterion" in agenda
+        assert "Stop criterion" in agenda
 
         assert "研究判断の台帳" in readme
         assert "TODO リストではなく" in readme

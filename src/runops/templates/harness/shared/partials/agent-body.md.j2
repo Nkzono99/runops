@@ -43,6 +43,8 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | `{{ skill_prefix }}learn` | 知見を記録する (curated, 名前付き) |
 | `{{ skill_prefix }}note` | lab notebook に時系列エントリを追記する |
 | `{{ skill_prefix }}research-agenda` | `research/agenda.md` の現在判断を更新する |
+| `{{ skill_prefix }}research-director` | 次の bounded experiment と pilot proposal を決める |
+| `{{ skill_prefix }}review-pilot` | pilot 結果を review し EXPAND / REVISE / STOP / WAIT を決める |
 | `{{ skill_prefix }}feedback-runops` | runops 本体へのバグ報告・機能要望を HarnessOps 経由で記録し、issue 下書きを作る |
 | `{{ skill_prefix }}patch-runops` | 必要時に別 checkout で runops 本体を修正し、HarnessOps feedback/PR/local-only を判定 |
 | `{{ skill_prefix }}update-runops` | uvx で runops tool と project harness を更新し、migration guide を確認する |
@@ -66,6 +68,10 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 - 初回の大規模 survey / `runo runs submit --all` / 資源増加を伴う retry
 - `runo runs purge-work` / `runo runs delete` (実ファイル削除)
 - 実行バイナリ、モジュール、launcher の変更
+
+production / large survey の full submit は、proposal に定義した pilot と
+`research/reviews/` の `Decision: EXPAND` を確認してから行う。`--yes` はこの research
+gate を省略しない。
 
 ### 報告してから進めるもの
 - `runo runs cancel` (実行中の job を停止するが、追加確認プロンプトは不要)

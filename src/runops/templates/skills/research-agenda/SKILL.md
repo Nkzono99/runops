@@ -68,7 +68,12 @@ Do not put chronological notes or artifact inventories back into agenda.md.
 5. What Would Change Our Mind / 判断が変わる条件
    - observations that would strengthen/weaken/kill the current direction
 
-6. Next Actions / 次の行動
+6. Active Experiment Portfolio / 実験ポートフォリオ
+   - experiment id / phase / active question
+   - proposal / pilot run_id / review path / decision
+   - cost budget / stop criterion / expand criterion / human gate
+
+7. Next Actions / 次の行動
    - 具体的な行動 (exact action)
    - なぜ今 (why now)
    - 期待する出力 (expected output)
@@ -76,12 +81,12 @@ Do not put chronological notes or artifact inventories back into agenda.md.
    - 作る根拠 path (evidence path to produce)
    - human gate yes/no
 
-7. Paused / Killed / 保留・終了した方向
+8. Paused / Killed / 保留・終了した方向
    - 状態 (status)
    - 理由 (reason)
    - 再検討条件 (revisit condition)
 
-8. Feedback To runops / runops 本体へのフィードバック候補
+9. Feedback To runops / runops 本体へのフィードバック候補
    - only repeated workflow friction, missing commands, docs gaps, bugs, or
      upstream improvements
 
@@ -110,6 +115,7 @@ Do not put chronological notes or artifact inventories back into agenda.md.
 - evidence path なしに判断を書かない。
 - model 名だけで議論しない。
 - 新しい production run / new model family / large sweep は proposal なしに進めない。
+- full survey は pilot review の `Decision: EXPAND` なしに進めない。
 - `paused` / `killed` を消さない。理由と revisit condition を残す。
 - 詳細な時系列は note へ、現在判断は agenda へ置く。
 - report の読む順番や artifact index は `notes/reports/README.md` に置く。

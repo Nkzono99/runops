@@ -62,6 +62,18 @@ Do not put chronological notes or artifact inventories back into agenda.md.
 - 同じ story が 3 件以上の note に分散した
 - pivot / pause / kill を決めた
 
+## Pilot → review → expand
+
+production / large survey は次の順で進めます。
+
+1. `research-director` で proposal、falsification、pilot、stop / expand criterion を定義
+2. `survey-design` で pilot point と full matrix candidate を分離
+3. `run-all` で pilot だけを投入
+4. `review-pilot` で `research/reviews/<date>-<topic>.md` を作成
+5. review と agenda の decision がともに `EXPAND` の場合だけ remaining run を full submit
+
+`--yes` は CLI prompt を省略するだけで、この research gate は省略しません。
+
 ## Human gate
 
 次の判断には human gate が必要です。

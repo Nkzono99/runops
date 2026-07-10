@@ -46,6 +46,20 @@ Do not put chronological notes or artifact inventories back into agenda.md.
 - もし ... が未解決のままなら、... を pause / kill する。
 - もし cost が ... を超えるなら、human review を要求する。
 
+## Active Experiment Portfolio / 実験ポートフォリオ
+
+- E1:
+  - Phase: proposed/pilot-running/pilot-review/expanded/paused/stopped
+  - Active question:
+  - Proposal: research/proposals/<date>-<topic>.md
+  - Pilot runs:
+  - Review: research/reviews/<date>-<topic>.md
+  - Decision: WAIT/EXPAND/REVISE/STOP
+  - Cost budget:
+  - Stop criterion:
+  - Expand criterion:
+  - Human gate: yes/no
+
 ## Next Actions / 次の行動
 
 1. 行動 (Action):

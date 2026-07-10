@@ -101,20 +101,18 @@ runo runs status
 # 単一 run を投入
 cd runs/test/basic/Rxxxxxxxx-xxxx
 runo runs submit -qn <partition>
-
-# survey 全体を投入 ({{ skill_prefix }}run-all スキル推奨)
-cd runs/sheath/angle_scan
-runo runs submit --all -qn <partition>
-# 明示確認済みの場合のみ --yes で CLI prompt を省略
-runo runs submit --all --yes -qn <partition>
 ```
+
+survey 全体の投入はここから直接行わず、必ず `{{ skill_prefix }}run-all` へ委譲する。
+production / large survey は proposal の pilot と review の `Decision: EXPAND` が揃うまで
+full submit しない。`--yes` はこの gate を省略しない。
 
 ## 注意
 
 - run ディレクトリを手で作らない (必ず `runo runs create` / `runo runs sweep` を使う)
 - manifest.toml を手動編集しない
 - input/ や submit/job.sh を直接作らない
-- survey の run 数が多い場合は投入前に plan を出して承認を取る
+- survey の run 数にかかわらず bulk submit は `{{ skill_prefix }}run-all` を使う
 - `runo runs submit --dry-run --all` で投入前に確認できる
 
 ## `{{ skill_prefix }}note` で残すべきこと
