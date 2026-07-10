@@ -15,11 +15,6 @@ the user can merge manually.
 
 from __future__ import annotations
 
-import json
-import shutil
-import subprocess
-import urllib.error
-import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Annotated, Optional
@@ -28,6 +23,14 @@ import typer
 
 from runops import __version__
 from runops.application.gateway.plugins import build_project_codex_plugin_inventory
+from runops.application.operator.harness_upgrade import (
+    HarnessUpgradePlan,
+    HarnessUpgradeRequest,
+    HarnessUpgradeStep,
+    HarnessUpgradeStepError,
+    apply_harness_upgrade,
+    plan_harness_upgrade,
+)
 from runops.cli.init.knowledge import _prepare_knowledge_imports
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
@@ -36,12 +39,7 @@ from runops.cli.init.scaffold import (
 )
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
-from runops.core.upgrade_chain import (
-    UpgradePlan,
-    UpgradePlanError,
-    build_upgrade_plan,
-    latest_version_in_versions,
-)
+from runops.core.upgrade_chain import UpgradePlanError
 from runops.harness._adapters import collect_doc_repos
 from runops.harness.builder import (
     GITIGNORE_PATH,
@@ -57,8 +55,6 @@ from runops.harness.builder import (
     replace_managed_gitignore_block,
     save_harness_lock,
 )
-
-_PYPI_JSON_URL = "https://pypi.org/pypi/runops/json"
 
 
 def _workspace_target_requested(
@@ -148,71 +144,7 @@ def _missing_workspace_scaffold(
     return missing
 
 
-def _fetch_pypi_runops_versions(timeout: float = 2.0) -> tuple[str, ...]:
-    """Return published runops versions from PyPI."""
-    request = urllib.request.Request(
-        _PYPI_JSON_URL,
-        headers={"User-Agent": "runops upgrade-chain"},
-    )
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            payload = json.loads(response.read().decode("utf-8"))
-    except (
-        OSError,
-        TimeoutError,
-        urllib.error.URLError,
-        json.JSONDecodeError,
-        UnicodeDecodeError,
-    ):
-        return ()
-
-    if not isinstance(payload, dict):
-        return ()
-    releases = payload.get("releases")
-    if not isinstance(releases, dict):
-        return ()
-    return tuple(str(version) for version in releases if isinstance(version, str))
-
-
-def _resolve_upgrade_target(
-    *,
-    requested_target: str | None,
-    available_versions: tuple[str, ...],
-) -> str:
-    """Resolve a user target specifier to an exact version string."""
-    if requested_target is None:
-        return __version__
-    if requested_target == "latest":
-        latest = latest_version_in_versions(available_versions)
-        if latest is None:
-            msg = "Could not resolve latest runops version from PyPI."
-            raise UpgradePlanError(msg)
-        return latest
-    return requested_target
-
-
-def _build_chain_plan(
-    *,
-    project_dir: Path,
-    target: str | None,
-    allow_major: bool,
-) -> UpgradePlan:
-    """Build an update-harness upgrade chain for ``project_dir``."""
-    available_versions = _fetch_pypi_runops_versions()
-    target_version = _resolve_upgrade_target(
-        requested_target=target,
-        available_versions=available_versions,
-    )
-    return build_upgrade_plan(
-        applied_version=applied_harness_runops_version(project_dir),
-        current_runtime_version=__version__,
-        target_version=target_version,
-        available_versions=available_versions,
-        allow_major=allow_major,
-    )
-
-
-def _echo_upgrade_plan(plan: UpgradePlan) -> None:
+def _echo_upgrade_plan(plan: HarnessUpgradePlan) -> None:
     """Print a human-readable update-harness chain plan."""
     typer.echo(f"project harness applied: {plan.applied_version}")
     typer.echo(f"current runops runtime:  {plan.current_runtime_version}")
@@ -226,89 +158,14 @@ def _echo_upgrade_plan(plan: UpgradePlan) -> None:
         typer.echo(f"{index}. {step.from_version} -> {step.to_version}")
 
 
-def _run_upgrade_step_command(
-    command: list[str],
-    *,
-    project_dir: Path,
-) -> subprocess.CompletedProcess[str]:
-    """Run one exact-version update-harness step."""
-    return subprocess.run(
-        command,
-        cwd=project_dir,
-        text=True,
-        check=False,
-    )
-
-
-def _uvx_update_harness_command(
-    *,
-    project_dir: Path,
-    to_version: str,
-    from_version: str,
-    force: bool,
-    no_harnessops: bool,
-) -> list[str]:
-    """Build the uvx command for one update-harness upgrade step."""
-    uvx = shutil.which("uvx") or "uvx"
-    command = [
-        uvx,
-        "--from",
-        f"runops=={to_version}",
-        "runo",
-        "update-harness",
-        str(project_dir),
-        "--upgrade-step",
-        "--from-version",
-        from_version,
-    ]
-    if force:
-        command.append("--force")
-    if no_harnessops:
-        command.append("--no-harnessops")
-    return command
-
-
-def _apply_upgrade_chain(
-    plan: UpgradePlan,
-    *,
-    project_dir: Path,
-    force: bool,
-    no_harnessops: bool,
+def _echo_upgrade_step(
+    index: int,
+    total: int,
+    step: HarnessUpgradeStep,
 ) -> None:
-    """Execute an update-harness upgrade chain via uvx exact versions."""
-    if not plan.steps:
-        typer.echo("Harness is already at the requested runops target.")
-        return
-
-    for index, step in enumerate(plan.steps, start=1):
-        command = _uvx_update_harness_command(
-            project_dir=project_dir,
-            to_version=step.to_version,
-            from_version=step.from_version,
-            force=force,
-            no_harnessops=no_harnessops,
-        )
-        typer.echo(
-            f"\n[{index}/{len(plan.steps)}] "
-            f"runops {step.from_version} -> {step.to_version}"
-        )
-        typer.echo(" ".join(command))
-        result = _run_upgrade_step_command(command, project_dir=project_dir)
-        if result.returncode != 0:
-            msg = f"Upgrade step failed: {step.from_version} -> {step.to_version}"
-            typer.echo(msg, err=True)
-            raise typer.Exit(code=result.returncode)
-
-
-def _plain_update_chain_plan(project_dir: Path) -> UpgradePlan:
-    """Build the local-runtime plan used to guard plain update-harness."""
-    return build_upgrade_plan(
-        applied_version=applied_harness_runops_version(project_dir),
-        current_runtime_version=__version__,
-        target_version=__version__,
-        available_versions=(),
-        allow_major=True,
-    )
+    """Render one exact-version command immediately before application."""
+    typer.echo(f"\n[{index}/{total}] runops {step.from_version} -> {step.to_version}")
+    typer.echo(" ".join(step.command))
 
 
 def update_harness(
@@ -457,22 +314,32 @@ def update_harness(
             )
             raise typer.Exit(code=1)
         try:
-            upgrade_plan = _build_chain_plan(
-                project_dir=project_dir,
-                target=target,
-                allow_major=allow_major,
+            upgrade_plan = plan_harness_upgrade(
+                HarnessUpgradeRequest(
+                    project_dir=project_dir,
+                    current_runtime_version=__version__,
+                    target=target,
+                    allow_major=allow_major,
+                    force=force,
+                    no_harnessops=no_harnessops,
+                ),
             )
         except UpgradePlanError as exc:
             typer.echo(f"Error planning upgrade chain: {exc}", err=True)
             raise typer.Exit(code=1) from None
         _echo_upgrade_plan(upgrade_plan)
         if apply_chain:
-            _apply_upgrade_chain(
-                upgrade_plan,
-                project_dir=project_dir,
-                force=force,
-                no_harnessops=no_harnessops,
-            )
+            if not upgrade_plan.steps:
+                typer.echo("Harness is already at the requested runops target.")
+            else:
+                try:
+                    apply_harness_upgrade(
+                        upgrade_plan,
+                        before_step=_echo_upgrade_step,
+                    )
+                except HarnessUpgradeStepError as exc:
+                    typer.echo(str(exc), err=True)
+                    raise typer.Exit(code=exc.returncode) from None
         return
 
     if target is not None or allow_major:
@@ -484,15 +351,18 @@ def update_harness(
 
     if not upgrade_step and not dry_run and not adopt and only is None:
         try:
-            plain_plan = _plain_update_chain_plan(project_dir)
-        except UpgradePlanError:
-            plain_plan = UpgradePlan(
-                applied_version=__version__,
-                current_runtime_version=__version__,
-                target_version=__version__,
-                steps=(),
+            plain_plan = plan_harness_upgrade(
+                HarnessUpgradeRequest(
+                    project_dir=project_dir,
+                    current_runtime_version=__version__,
+                    target=__version__,
+                    allow_major=True,
+                ),
+                version_source=lambda: (),
             )
-        if plain_plan.steps:
+        except UpgradePlanError:
+            plain_plan = None
+        if plain_plan is not None and plain_plan.steps:
             _echo_upgrade_plan(plain_plan)
             typer.echo("")
             typer.echo(

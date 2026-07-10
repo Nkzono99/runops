@@ -273,7 +273,7 @@ class TestUpdateHarnessBasic:
         lock = load_harness_lock(tmp_path)
         save_harness_lock(tmp_path, lock, runops_version="0.8.0")
         monkeypatch.setattr(
-            "runops.cli.update_harness._fetch_pypi_runops_versions",
+            "runops.application.operator.harness_upgrade._fetch_pypi_runops_versions",
             lambda: ("0.8.2", "0.9.0"),
         )
 
@@ -303,26 +303,26 @@ class TestUpdateHarnessBasic:
         lock = load_harness_lock(tmp_path)
         save_harness_lock(tmp_path, lock, runops_version="0.8.0")
         monkeypatch.setattr(
-            "runops.cli.update_harness._fetch_pypi_runops_versions",
+            "runops.application.operator.harness_upgrade._fetch_pypi_runops_versions",
             lambda: ("0.8.2", "0.9.0"),
         )
         monkeypatch.setattr(
-            "runops.cli.update_harness.shutil.which",
+            "runops.application.operator.harness_upgrade.shutil.which",
             lambda _name: "uvx",
         )
         commands: list[list[str]] = []
 
         def _fake_run(
-            command: list[str],
+            command: tuple[str, ...],
             *,
             project_dir: Path,
         ) -> subprocess.CompletedProcess[str]:
             assert project_dir == tmp_path
-            commands.append(command)
-            return subprocess.CompletedProcess(command, 0)
+            commands.append(list(command))
+            return subprocess.CompletedProcess(list(command), 0)
 
         monkeypatch.setattr(
-            "runops.cli.update_harness._run_upgrade_step_command",
+            "runops.application.operator.harness_upgrade._run_upgrade_step_command",
             _fake_run,
         )
 
