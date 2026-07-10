@@ -17,106 +17,25 @@ Conventions:
 from __future__ import annotations
 
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
-from runops.core.exceptions import SimctlError
-from runops.core.project import find_project_root
-
-JST = timezone(timedelta(hours=9))
-_HISTORY_DIR = "history"
-_NOTE_DATE_FORMAT = "%Y-%m-%d"
-
-
-def _resolve_notes_dir(explicit: Optional[Path] = None) -> Path:
-    """Locate the project's ``notes/`` directory.
-
-    Falls back to ``<cwd>/notes`` if no ``runops.toml`` is found, so the
-    command remains usable in lightweight contexts.
-    """
-    if explicit is not None:
-        return explicit.resolve()
-    try:
-        root = find_project_root(Path.cwd())
-        return root / "notes"
-    except SimctlError:
-        return Path.cwd() / "notes"
-
-
-def _today_path(notes_dir: Path, *, now: Optional[datetime] = None) -> Path:
-    today = (now or datetime.now(JST)).date().isoformat()
-    return notes_dir / f"{today}.md"
-
-
-def _parse_note_date(value: str) -> datetime | None:
-    try:
-        return datetime.strptime(value, _NOTE_DATE_FORMAT)
-    except ValueError:
-        return None
-
-
-def _is_daily_note(path: Path) -> bool:
-    return path.suffix == ".md" and _parse_note_date(path.stem) is not None
-
-
-def _iter_note_files(notes_dir: Path) -> list[Path]:
-    """Return daily notebook files from active notes and history.
-
-    Active files in ``notes/YYYY-MM-DD.md`` win if the same date also exists
-    under ``notes/history/``.
-    """
-    by_date: dict[str, Path] = {}
-    for path in sorted(
-        notes_dir.glob("*.md"),
-        key=lambda item: item.stem,
-        reverse=True,
-    ):
-        if _is_daily_note(path):
-            by_date[path.stem] = path
-
-    history_dir = notes_dir / _HISTORY_DIR
-    if history_dir.is_dir():
-        for path in sorted(
-            history_dir.rglob("*.md"),
-            key=lambda item: item.stem,
-            reverse=True,
-        ):
-            if _is_daily_note(path):
-                by_date.setdefault(path.stem, path)
-
-    return sorted(by_date.values(), key=lambda item: item.stem, reverse=True)
-
-
-def _find_note_file(notes_dir: Path, date_str: str) -> Path | None:
-    active = notes_dir / f"{date_str}.md"
-    if active.is_file():
-        return active
-    for path in _iter_note_files(notes_dir):
-        if path.stem == date_str:
-            return path
-    return None
-
-
-def _parse_older_than(value: str) -> int:
-    raw = value.strip().lower()
-    if raw.endswith("d"):
-        raw = raw[:-1]
-    try:
-        days = int(raw)
-    except ValueError as exc:
-        msg = "expected a duration like '7d' or a positive day count"
-        raise ValueError(msg) from exc
-    if days <= 0:
-        raise ValueError("duration must be positive")
-    return days
-
-
-def _history_path_for(notes_dir: Path, note_path: Path) -> Path:
-    year = note_path.stem[:4]
-    return notes_dir / _HISTORY_DIR / year / note_path.name
+from runops.application.research.notebook import (
+    JST,
+    NoteAppendRequest,
+    NoteDirectoryNotFoundError,
+    NoteNotFoundError,
+    NoteValidationError,
+    append_note,
+    apply_note_archive,
+    list_note_days,
+    plan_note_archive,
+    read_note,
+    resolve_notes_dir,
+)
 
 
 def _read_body(body_args: list[str]) -> str:
@@ -182,8 +101,8 @@ def append(
         echo "..." | runo notes append "today's TODO"
         runo notes append --date 2026-04-10 "yesterday's continuation" "..."
     """
-    title = title.strip()
-    if not title:
+    clean_title = title.strip()
+    if not clean_title:
         typer.echo("Error: title must be non-empty.", err=True)
         raise typer.Exit(code=2)
 
@@ -195,33 +114,28 @@ def append(
         )
         raise typer.Exit(code=2)
 
-    target_dir = _resolve_notes_dir(notes_dir)
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    now = datetime.now(JST)
-    if date is not None:
-        try:
-            entry_date = datetime.strptime(date, "%Y-%m-%d").date()
-        except ValueError as exc:
+    target_dir = resolve_notes_dir(notes_dir, cwd=Path.cwd())
+    try:
+        result = append_note(
+            NoteAppendRequest(
+                notes_dir=target_dir,
+                title=clean_title,
+                body=text,
+                note_date=date,
+            ),
+            now=datetime.now(JST),
+        )
+    except NoteValidationError as exc:
+        if date is not None:
             typer.echo(f"Error: invalid --date '{date}': {exc}", err=True)
-            raise typer.Exit(code=2) from None
-        path = target_dir / f"{entry_date.isoformat()}.md"
-        header_date = entry_date.isoformat()
-    else:
-        path = _today_path(target_dir, now=now)
-        header_date = now.date().isoformat()
-    needs_header = not path.exists()
-
-    with open(path, "a", encoding="utf-8") as f:
-        if needs_header:
-            f.write(f"# {header_date} — lab notebook\n\n")
-        f.write(f"## {now.strftime('%H:%M')} {title}\n\n")
-        f.write(text.rstrip() + "\n\n")
+        else:
+            typer.echo(f"Error: {exc}.", err=True)
+        raise typer.Exit(code=2) from None
 
     try:
-        display = path.relative_to(Path.cwd())
+        display = result.path.relative_to(Path.cwd())
     except ValueError:
-        display = path
+        display = result.path
     typer.echo(f"Appended to {display.as_posix()}")
 
 
@@ -247,32 +161,25 @@ def list_notes(
     Shows the most recent ``notes/YYYY-MM-DD.md`` files together with the
     number of entries (``## `` headings) inside each.
     """
-    target_dir = _resolve_notes_dir(notes_dir)
-    if not target_dir.is_dir():
+    target_dir = resolve_notes_dir(notes_dir, cwd=Path.cwd())
+    try:
+        summaries = list_note_days(target_dir, count=count)
+    except NoteDirectoryNotFoundError:
         typer.echo("No notes/ directory found.")
         return
 
-    files = _iter_note_files(target_dir)
-    if not files:
+    if not summaries:
         typer.echo("No notes yet.")
         return
 
-    if count > 0:
-        files = files[:count]
-
     headers = ("DATE", "ENTRIES", "PATH")
     rows: list[tuple[str, str, str]] = []
-    for path in files:
+    for summary in summaries:
         try:
-            text = path.read_text(encoding="utf-8")
-        except OSError:
-            continue
-        n_entries = sum(1 for line in text.splitlines() if line.startswith("## "))
-        try:
-            rel = path.relative_to(Path.cwd()).as_posix()
+            rel = summary.path.relative_to(Path.cwd()).as_posix()
         except ValueError:
-            rel = path.as_posix()
-        rows.append((path.stem, str(n_entries), rel))
+            rel = summary.path.as_posix()
+        rows.append((summary.note_date.isoformat(), str(summary.entry_count), rel))
 
     widths = [len(h) for h in headers]
     for row in rows:
@@ -310,33 +217,27 @@ def show(
     most recent day that has a file on disk; an explicit ``YYYY-MM-DD``
     selects that exact day.
     """
-    target_dir = _resolve_notes_dir(notes_dir)
-    if not target_dir.is_dir():
+    target_dir = resolve_notes_dir(notes_dir, cwd=Path.cwd())
+    try:
+        document = read_note(
+            target_dir,
+            date,
+            today=datetime.now(JST).date(),
+        )
+    except NoteDirectoryNotFoundError:
         typer.echo("No notes/ directory found.")
-        raise typer.Exit(code=1)
-
-    if date is None or date == "today":
-        path = _today_path(target_dir)
-    elif date == "latest":
-        files = _iter_note_files(target_dir)
-        if not files:
+        raise typer.Exit(code=1) from None
+    except NoteValidationError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from None
+    except NoteNotFoundError as exc:
+        if exc.note_date is None:
             typer.echo("No notes yet.")
-            raise typer.Exit(code=1)
-        path = files[0]
-    else:
-        date_str: str = date
-        try:
-            datetime.strptime(date_str, _NOTE_DATE_FORMAT)
-        except ValueError as exc:
-            typer.echo(f"Error: invalid date '{date_str}': {exc}", err=True)
-            raise typer.Exit(code=2) from None
-        path = _find_note_file(target_dir, date_str) or target_dir / f"{date_str}.md"
+        else:
+            typer.echo(f"No notes for {exc.note_date.isoformat()}.")
+        raise typer.Exit(code=1) from None
 
-    if not path.is_file():
-        typer.echo(f"No notes for {path.stem}.")
-        raise typer.Exit(code=1)
-
-    typer.echo(path.read_text(encoding="utf-8"), nl=False)
+    typer.echo(document.text, nl=False)
 
 
 def archive(
@@ -367,45 +268,44 @@ def archive(
     Only root-level daily notebooks (``notes/YYYY-MM-DD.md``) are moved.
     ``notes/reports/`` and existing history files are never touched.
     """
+    target_dir = resolve_notes_dir(notes_dir, cwd=Path.cwd())
     try:
-        days = _parse_older_than(older_than)
-    except ValueError as exc:
+        plan = plan_note_archive(
+            target_dir,
+            older_than=older_than,
+            today=datetime.now(JST).date(),
+        )
+    except NoteValidationError as exc:
         typer.echo(f"Error: invalid --older-than '{older_than}': {exc}", err=True)
         raise typer.Exit(code=2) from None
-
-    target_dir = _resolve_notes_dir(notes_dir)
-    if not target_dir.is_dir():
+    except NoteDirectoryNotFoundError:
         typer.echo("No notes/ directory found.")
         return
 
-    cutoff = datetime.now(JST).date() - timedelta(days=days)
-    candidates: list[tuple[Path, Path]] = []
-    for path in sorted(target_dir.glob("*.md"), key=lambda item: item.stem):
-        parsed = _parse_note_date(path.stem)
-        if parsed is None or parsed.date() >= cutoff:
-            continue
-        candidates.append((path, _history_path_for(target_dir, path)))
-
-    if not candidates:
+    if not plan.entries:
         typer.echo("No active daily notebooks to archive.")
         return
 
-    moved = 0
-    skipped = 0
-    for source, dest in candidates:
+    application_result = None if dry_run else apply_note_archive(plan)
+    archived = set(application_result.archived) if application_result else set()
+    skipped_entries = set(application_result.skipped) if application_result else set()
+    moved = len(archived) if application_result else 0
+    skipped = len(skipped_entries) if application_result else 0
+    for entry in plan.entries:
         try:
-            source_display = source.relative_to(Path.cwd())
+            source_display = entry.source.relative_to(Path.cwd())
         except ValueError:
-            source_display = source
+            source_display = entry.source
         try:
-            dest_display = dest.relative_to(Path.cwd())
+            dest_display = entry.destination.relative_to(Path.cwd())
         except ValueError:
-            dest_display = dest
+            dest_display = entry.destination
         source_text = source_display.as_posix()
         dest_text = dest_display.as_posix()
 
-        if dest.exists():
-            skipped += 1
+        if entry.destination_exists or entry in skipped_entries:
+            if dry_run:
+                skipped += 1
             typer.echo(f"Skipped {source_text}: destination exists ({dest_text})")
             continue
 
@@ -414,10 +314,8 @@ def archive(
             moved += 1
             continue
 
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        source.rename(dest)
-        typer.echo(f"Archived {source_text} -> {dest_text}")
-        moved += 1
+        if entry in archived:
+            typer.echo(f"Archived {source_text} -> {dest_text}")
 
     action = "would be archived" if dry_run else "archived"
     typer.echo(f"\n{moved} note(s) {action}; {skipped} skipped.")

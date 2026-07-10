@@ -271,7 +271,11 @@ def update(
     ] = False,
     force: Annotated[
         bool,
-        typer.Option("--force", help="Skip editable-install confirmation."),
+        typer.Option(
+            "--force",
+            help="Skip editable-install confirmation.",
+            hidden=True,
+        ),
     ] = False,
 ) -> None:
     """Upgrade simulator packages in the project .venv.
@@ -282,6 +286,8 @@ def update(
       runo update --dry-run    # show what would be upgraded
       runo update --yes        # upgrade without confirmation prompts
     """
+    assume_yes = yes or force
+
     # Determine which simulators to update
     if not simulators:
         simulators = _get_project_simulators()
@@ -323,7 +329,7 @@ def update(
             "Continuing will replace them with the package specs used by runo update.",
             err=True,
         )
-        if not (yes or force) and not typer.confirm("Proceed?", default=False):
+        if not assume_yes and not typer.confirm("Proceed?", default=False):
             typer.echo("Aborted.", err=True)
             raise typer.Exit(code=1)
 

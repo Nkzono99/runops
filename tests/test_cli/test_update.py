@@ -307,6 +307,39 @@ def test_update_yes_replaces_editable_install(tmp_path: Path) -> None:
     assert mock_run.call_args.args[0][-1] == "MPIEMSES3D"
 
 
+def test_update_help_hides_force_compatibility_alias() -> None:
+    result = runner.invoke(app, ["update", "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "--yes" in result.output
+    assert "--force" not in result.output
+
+
+def test_update_force_alias_keeps_yes_behavior(tmp_path: Path) -> None:
+    completed = SimpleNamespace(returncode=0)
+    venv_py = tmp_path / ".venv" / "bin" / "python"
+
+    with (
+        patch("runops.cli.update._collect_packages", return_value=["MPIEMSES3D"]),
+        patch("runops.cli.update._find_venv_python", return_value=venv_py),
+        patch(
+            "runops.cli.update._find_editable_installs",
+            return_value=[
+                SimpleNamespace(
+                    name="MPIEMSES3D",
+                    url="file:///project/refs/MPIEMSES3D",
+                )
+            ],
+        ),
+        patch("runops.cli.update._find_uv", return_value="/usr/local/bin/uv"),
+        patch("runops.cli.update.subprocess.run", return_value=completed) as mock_run,
+    ):
+        result = runner.invoke(app, ["update", "emses", "--force"])
+
+    assert result.exit_code == 0, result.output
+    assert mock_run.call_args.args[0][-1] == "MPIEMSES3D"
+
+
 def test_update_runs_uv_pip_install_for_selected_simulators(tmp_path: Path) -> None:
     completed = SimpleNamespace(returncode=0)
     venv_py = tmp_path / ".venv" / "bin" / "python"
