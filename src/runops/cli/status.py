@@ -9,12 +9,12 @@ import typer
 
 from runops.application.actions import ActionStatus
 from runops.application.actions import sync_run as sync_run_action
+from runops.application.execution.readiness import RunReadiness, evaluate_run_readiness
 from runops.cli.run_lookup import resolve_run_targets
 from runops.core.exceptions import (
     ManifestNotFoundError,
 )
 from runops.core.manifest import ManifestData, read_manifest
-from runops.core.readiness import RunReadiness, evaluate_run_readiness
 from runops.core.state import RunState
 from runops.slurm.query import SlurmQueryError, query_job_status
 from runops.slurm.submit import SlurmNotFoundError

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.lint.models import LintContext, LintIssue
-from runops.core.plugins import check_project_codex_plugins
+from runops.application.gateway.plugins import check_project_codex_plugins
+from runops.application.operator.lint.models import LintContext, LintIssue
 
 
 def check_plugins(context: LintContext) -> list[LintIssue]:

@@ -10,9 +10,9 @@ from typing import Annotated, Optional
 import typer
 
 from runops import __version__
+from runops.application.gateway.plugins import build_project_codex_plugin_inventory
 from runops.cli.init.github_auth import ensure_github_auth_for_simulators
 from runops.core.exceptions import ProjectConfigError
-from runops.core.plugins import build_project_codex_plugin_inventory
 from runops.core.project import ProjectConfig, load_project
 from runops.core.repository import repo_name_from_url
 from runops.harness._plugins import (

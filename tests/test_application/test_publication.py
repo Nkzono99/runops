@@ -9,11 +9,11 @@ from typing import Any
 import pytest
 import tomli_w
 
-from runops.core.publication import (
+from runops.application.publication import (
     PublicationSourceArtifact,
     export_publication_bundle,
 )
-from runops.core.publication.files import (
+from runops.application.publication.files import (
     materialize_export_files as _materialize_export_files,
 )
 
@@ -156,7 +156,7 @@ def test_force_export_preserves_existing_bundle_on_failure(
         raise RuntimeError("boom")
 
     monkeypatch.setattr(
-        "runops.core.publication.workflow._write_export_readme",
+        "runops.application.publication.workflow._write_export_readme",
         fail_readme,
     )
 

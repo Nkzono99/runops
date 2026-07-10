@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.lint import run_project_lint
+from runops.application.operator.lint import run_project_lint
 from runops.core.manifest import ManifestData, write_manifest
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import tomli_w
 
-from runops.core.readiness import evaluate_run_readiness
+from runops.application.execution.readiness import evaluate_run_readiness
 from tests.factories import create_run_manifest
 
 

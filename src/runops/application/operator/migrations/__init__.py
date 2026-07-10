@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from runops.core.migrations.models import (
+from runops.application.operator.migrations.models import (
     Migration,
     MigrationContext,
     MigrationError,
     MigrationNotFoundError,
     MigrationResult,
 )
-from runops.core.migrations.registry import (
+from runops.application.operator.migrations.registry import (
     available_migrations,
     get_migration,
     normalize_number,

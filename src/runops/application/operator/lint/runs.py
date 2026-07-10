@@ -5,9 +5,9 @@ from __future__ import annotations
 from collections import defaultdict
 from pathlib import Path
 
+from runops.application.operator.lint.models import LintContext, LintIssue
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
-from runops.core.lint.models import LintContext, LintIssue
 from runops.core.manifest import ManifestData, read_manifest
 
 

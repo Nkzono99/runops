@@ -4,18 +4,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from runops.core.codex_plugin import (
-    CODEX_PLUGIN_ACTIVATION_SCOPE,
-    CODEX_PLUGIN_INVENTORY_SCHEMA_VERSION,
-    CodexPluginRecommendation,
-    codex_plugin_management_policy,
-)
-from runops.core.plugins import (
+from runops.application.gateway.plugins import (
     adapter_lookup_entries,
     adapter_lookup_names,
     check_codex_plugin_inventory,
     delegated_codex_plugin_capabilities,
     load_project_codex_plugin_inventory,
+)
+from runops.core.codex_plugin import (
+    CODEX_PLUGIN_ACTIVATION_SCOPE,
+    CODEX_PLUGIN_INVENTORY_SCHEMA_VERSION,
+    CodexPluginRecommendation,
+    codex_plugin_management_policy,
 )
 
 

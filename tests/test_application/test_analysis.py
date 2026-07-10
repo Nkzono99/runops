@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 import tomli_w
 
-from runops.core.analysis import (
+from runops.application.analysis import (
     collect_survey_summaries,
     list_survey_plot_recipes,
     prepare_survey_plot_data,
@@ -18,7 +18,7 @@ from runops.core.analysis import (
 )
 from runops.core.exceptions import SimctlError
 
-ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
+ADAPTER_PATCH = "runops.application.analysis.workflow.get_adapter"
 
 
 def _create_run(

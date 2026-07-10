@@ -6,16 +6,20 @@ import json
 from pathlib import Path
 from typing import Any
 
-from runops.core.analysis.artifacts import (
+from runops.application.analysis.artifacts import (
     build_survey_artifacts,
     collect_run_artifacts,
     read_artifacts_index,
     write_artifacts_index,
 )
+from runops.application.operator.migrations.models import (
+    Migration,
+    MigrationContext,
+    MigrationResult,
+)
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
-from runops.core.migrations.models import Migration, MigrationContext, MigrationResult
 from runops.templates import load_static
 
 

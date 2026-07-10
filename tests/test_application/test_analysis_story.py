@@ -9,7 +9,7 @@ from typing import Any
 import pytest
 import tomli_w
 
-from runops.core.analysis import audit_story_workspace, create_story_workspace
+from runops.application.analysis import audit_story_workspace, create_story_workspace
 from runops.core.exceptions import SimctlError
 
 

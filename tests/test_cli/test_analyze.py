@@ -12,8 +12,8 @@ from unittest.mock import MagicMock, patch
 import tomli_w
 from typer.testing import CliRunner
 
+from runops.application.analysis import ResolvedSurveyPlotRecipe, SurveyPlotRecipe
 from runops.cli.main import app
-from runops.core.analysis import ResolvedSurveyPlotRecipe, SurveyPlotRecipe
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -22,7 +22,7 @@ else:
 
 runner = CliRunner()
 
-ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
+ADAPTER_PATCH = "runops.application.analysis.workflow.get_adapter"
 _PROJECT_TOML: dict[str, Any] = {"project": {"name": "test-project"}}
 
 

@@ -5,14 +5,16 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from runops.core.migrations.models import (
+from runops.application.operator.migrations.models import (
     Migration,
     MigrationContext,
     MigrationError,
     MigrationNotFoundError,
     MigrationResult,
 )
-from runops.core.migrations.v0 import registered_migrations as v0_migrations
+from runops.application.operator.migrations.v0 import (
+    registered_migrations as v0_migrations,
+)
 
 
 def available_migrations(version: str | None = None) -> tuple[Migration, ...]:

@@ -57,7 +57,7 @@ def summarize_run(run_dir: Path) -> ActionResult:
         return _precondition_fail("summarize_run", err)
 
     try:
-        from runops.core.analysis import generate_run_summary
+        from runops.application.analysis import generate_run_summary
 
         result = generate_run_summary(run_dir)
     except (KeyError, OSError, TypeError, json.JSONDecodeError, SimctlError) as e:
@@ -114,7 +114,7 @@ def collect_survey(survey_dir: Path) -> ActionResult:
         )
 
     try:
-        from runops.core.analysis import collect_survey_summaries
+        from runops.application.analysis import collect_survey_summaries
 
         result = collect_survey_summaries(survey_dir)
     except (OSError, TypeError, json.JSONDecodeError, SimctlError) as e:
@@ -155,7 +155,7 @@ def export_publication(
     force: bool = False,
 ) -> ActionResult:
     """Create a project-side publication export bundle."""
-    from runops.core.publication import export_publication_bundle
+    from runops.application.publication import export_publication_bundle
 
     try:
         result = export_publication_bundle(

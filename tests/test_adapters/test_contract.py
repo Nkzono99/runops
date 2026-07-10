@@ -16,11 +16,11 @@ from runops.adapters import (
     list_adapters,
 )
 from runops.adapters.base import SimulatorAdapter
-from runops.core.codex_plugin import CodexPluginRecommendation
-from runops.core.plugins import (
+from runops.application.gateway.plugins import (
     detect_codex_plugin_conflicts,
     validate_codex_plugin_recommendation,
 )
+from runops.core.codex_plugin import CodexPluginRecommendation
 from tests.factories import write_toml
 
 

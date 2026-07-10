@@ -6,13 +6,13 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+from runops.application.operator.lint.analysis import check_analysis
+from runops.application.operator.lint.knowledge import check_knowledge
+from runops.application.operator.lint.models import LintContext, LintIssue, LintReport
+from runops.application.operator.lint.plugins import check_plugins
+from runops.application.operator.lint.runs import check_provenance, check_runs
+from runops.application.operator.lint.structure import check_structure
 from runops.core.exceptions import SimctlError
-from runops.core.lint.analysis import check_analysis
-from runops.core.lint.knowledge import check_knowledge
-from runops.core.lint.models import LintContext, LintIssue, LintReport
-from runops.core.lint.plugins import check_plugins
-from runops.core.lint.runs import check_provenance, check_runs
-from runops.core.lint.structure import check_structure
 
 LintCheck = Callable[[LintContext], list[LintIssue]]
 

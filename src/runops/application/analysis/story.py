@@ -12,7 +12,7 @@ from typing import Any
 
 import tomli_w
 
-from runops.core.analysis.artifacts import read_artifacts_index
+from runops.application.analysis.artifacts import read_artifacts_index
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import ProjectNotFoundError, SimctlError
 from runops.core.project import find_project_root

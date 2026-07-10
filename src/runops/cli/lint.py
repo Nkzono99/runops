@@ -8,9 +8,13 @@ from typing import Annotated
 
 import typer
 
+from runops.application.operator.lint import (
+    LintError,
+    available_scopes,
+    run_project_lint,
+)
+from runops.application.operator.lint.models import LintReport
 from runops.core.exceptions import SimctlError
-from runops.core.lint import LintError, available_scopes, run_project_lint
-from runops.core.lint.models import LintReport
 from runops.core.project import find_project_root
 
 

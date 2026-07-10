@@ -5,10 +5,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from runops.core.codex_plugin import CodexPluginRecommendation
-from runops.core.plugins import (
+from runops.application.gateway.plugins import (
     collect_codex_plugin_recommendations,
 )
+from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.site import SiteProfile, load_site_profile
 
 

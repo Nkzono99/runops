@@ -27,6 +27,7 @@ from typing import Annotated, Optional
 import typer
 
 from runops import __version__
+from runops.application.gateway.plugins import build_project_codex_plugin_inventory
 from runops.cli.init.knowledge import _prepare_knowledge_imports
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
@@ -34,7 +35,6 @@ from runops.cli.init.scaffold import (
     _create_research_skeleton,
 )
 from runops.core.exceptions import SimctlError
-from runops.core.plugins import build_project_codex_plugin_inventory
 from runops.core.project import find_project_root, load_project
 from runops.core.upgrade_chain import (
     UpgradePlan,

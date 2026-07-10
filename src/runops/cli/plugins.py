@@ -8,12 +8,12 @@ from typing import Annotated
 
 import typer
 
-from runops.core.exceptions import SimctlError
-from runops.core.plugins import (
+from runops.application.gateway.plugins import (
     CodexPluginCheckResult,
     CodexPluginInventory,
     CodexPluginIssue,
 )
+from runops.core.exceptions import SimctlError
 
 
 def plugins(
@@ -47,7 +47,7 @@ def plugins(
     ] = False,
 ) -> None:
     """List or check external Codex plugins recommended for the project."""
-    from runops.core.plugins import (
+    from runops.application.gateway.plugins import (
         check_project_codex_plugins,
         load_project_codex_plugin_inventory,
     )

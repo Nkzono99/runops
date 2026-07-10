@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from runops.core.lint.models import LintContext, LintIssue
-from runops.harness.builder import GITIGNORE_MANAGED_START
+from runops.application.operator.lint.models import LintContext, LintIssue
+from runops.core.project_files import GITIGNORE_MANAGED_START
 
 
 def check_structure(context: LintContext) -> list[LintIssue]:

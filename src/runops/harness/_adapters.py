@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from runops.application.gateway.plugins import collect_adapter_codex_plugins
 from runops.core.codex_plugin import CodexPluginRecommendation
-from runops.core.plugins import collect_adapter_codex_plugins
 
 
 def collect_doc_repos(simulator_names: list[str]) -> list[tuple[str, str]]:

@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 import tomli_w
 
-from runops.core.analysis import (
+from runops.application.analysis import (
     create_comparison_workspace,
     slugify_comparison_id,
 )

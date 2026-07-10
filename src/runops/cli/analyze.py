@@ -8,8 +8,7 @@ from pathlib import Path
 import typer
 
 from runops.application.actions import ActionStatus, execute_action
-from runops.cli.run_lookup import find_project_runs_dir, resolve_run_or_cwd
-from runops.core.analysis import (
+from runops.application.analysis import (
     audit_story_workspace,
     create_comparison_workspace,
     create_story_workspace,
@@ -18,6 +17,7 @@ from runops.core.analysis import (
     render_survey_plot,
     resolve_survey_plot_recipe,
 )
+from runops.cli.run_lookup import find_project_runs_dir, resolve_run_or_cwd
 from runops.core.discovery import discover_runs, resolve_run
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root

@@ -11,6 +11,7 @@ from typing import Annotated, Any, Optional
 import typer
 
 from runops import __version__
+from runops.application.gateway.plugins import check_project_codex_plugins
 from runops.cli.init.github_auth import ensure_github_auth_for_simulators
 from runops.cli.init.knowledge import _clone_doc_repos, _prepare_knowledge_imports
 from runops.cli.init.prompting import _BundledSiteProfile
@@ -30,7 +31,6 @@ from runops.cli.init.serialization import (
 )
 from runops.core.discovery import validate_uniqueness
 from runops.core.exceptions import DuplicateRunIdError, ProjectConfigError
-from runops.core.plugins import check_project_codex_plugins
 from runops.core.project import load_project
 from runops.harness._plugins import (
     collect_plugin_recommendations,

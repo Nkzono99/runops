@@ -9,11 +9,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from runops.application.execution.readiness import evaluate_run_readiness
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.models import analysis as analysis_models
-from runops.core.readiness import evaluate_run_readiness
 
 from .artifacts import (
     artifact_path_relative_to_summary,

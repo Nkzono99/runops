@@ -6,7 +6,7 @@ from pathlib import Path
 
 import tomli_w
 
-from runops.core.retry import (
+from runops.application.execution.retry import (
     assess_retry_for_run,
     get_attempt_count,
     suggest_retry,

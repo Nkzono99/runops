@@ -32,7 +32,7 @@ from runops.core.knowledge import list_insights, load_facts
 from runops.core.state import RunState
 from runops.slurm.query import JobStatus
 
-ADAPTER_PATCH = "runops.core.analysis.workflow.get_adapter"
+ADAPTER_PATCH = "runops.application.analysis.workflow.get_adapter"
 
 
 def test_application_actions_expose_registered_actions() -> None:

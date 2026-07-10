@@ -14,14 +14,14 @@ from typing import Any
 import tomli_w
 
 from runops import __version__
+from runops.application.analysis.artifacts import read_artifacts_index
 from runops.application.context import build_project_context
-from runops.core.analysis.artifacts import read_artifacts_index
+from runops.application.execution.readiness import evaluate_run_readiness
+from runops.application.gateway.plugins import check_project_codex_plugins
 from runops.core.discovery import discover_runs, resolve_run, validate_uniqueness
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
-from runops.core.plugins import check_project_codex_plugins
 from runops.core.project import ProjectConfig, find_project_root, load_project
-from runops.core.readiness import evaluate_run_readiness
 from runops.core.state import RunState
 from runops.mcp.registry import (
     CODEX_PLUGIN_POLICY,

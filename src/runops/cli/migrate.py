@@ -7,8 +7,7 @@ from typing import Annotated
 
 import typer
 
-from runops.core.exceptions import SimctlError
-from runops.core.migrations import (
+from runops.application.operator.migrations import (
     Migration,
     MigrationError,
     MigrationResult,
@@ -17,6 +16,7 @@ from runops.core.migrations import (
     parse_migration_reference,
     run_migration,
 )
+from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root
 
 migrate_app = typer.Typer(

@@ -11,7 +11,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
-from runops.core.migrations import (
+from runops.application.operator.migrations import (
     get_migration,
     normalize_number,
     normalize_version,

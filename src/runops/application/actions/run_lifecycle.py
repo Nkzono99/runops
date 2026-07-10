@@ -123,8 +123,8 @@ def submit_run(
     afterok: str = "",
 ) -> ActionResult:
     """Submit a run to Slurm via sbatch."""
+    from runops.application.execution.retry import get_attempt_count
     from runops.core.manifest import read_manifest, update_manifest
-    from runops.core.retry import get_attempt_count
     from runops.core.state import update_state
     from runops.slurm.submit import (
         SlurmNotFoundError,
@@ -320,8 +320,8 @@ def plan_retry(
     note: str = "",
 ) -> ActionResult:
     """Record retry intent for a failed or cancelled run without resetting it."""
+    from runops.application.execution.retry import assess_retry_for_run
     from runops.core.manifest import read_manifest, update_manifest
-    from runops.core.retry import assess_retry_for_run
 
     state_str, err = _require_state(run_dir, RunState.FAILED, RunState.CANCELLED)
     if err:
@@ -383,8 +383,11 @@ def retry_run(
     reviewed_log: bool = False,
 ) -> ActionResult:
     """Resubmit a failed or cancelled run as a new attempt."""
+    from runops.application.execution.retry import (
+        assess_retry_for_run,
+        get_attempt_count,
+    )
     from runops.core.manifest import read_manifest
-    from runops.core.retry import assess_retry_for_run, get_attempt_count
     from runops.core.state import reset_state_for_retry
 
     state_str, err = _require_state(run_dir, RunState.FAILED, RunState.CANCELLED)

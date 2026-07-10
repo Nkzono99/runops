@@ -324,9 +324,9 @@ def _collect_run_stats(
         return {"total": 0}
 
     try:
+        from runops.application.execution.readiness import evaluate_run_readiness
         from runops.core.discovery import discover_runs
         from runops.core.manifest import read_manifest
-        from runops.core.readiness import evaluate_run_readiness
 
         run_dirs = discover_runs(runs_dir)
         counts: dict[str, int] = {s.value: 0 for s in RunState}
@@ -569,7 +569,7 @@ def _collect_codex_plugins(
 ) -> dict[str, Any]:
     """Collect advisory Codex plugin recommendations for the project."""
     try:
-        from runops.core.plugins import (
+        from runops.application.gateway.plugins import (
             build_project_codex_plugin_inventory,
             check_codex_plugin_inventory,
         )

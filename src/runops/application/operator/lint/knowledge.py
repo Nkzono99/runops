@@ -11,7 +11,7 @@ if sys.version_info >= (3, 11):
 else:
     import tomli as tomllib
 
-from runops.core.lint.models import LintContext, LintIssue
+from runops.application.operator.lint.models import LintContext, LintIssue
 from runops.core.research import summarize_research_agenda
 
 

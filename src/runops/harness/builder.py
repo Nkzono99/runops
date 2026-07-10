@@ -25,8 +25,9 @@ from pathlib import Path
 from typing import Any
 
 from runops import __version__
+from runops.application.gateway.plugins import collect_adapter_codex_plugins
 from runops.core.codex_plugin import CodexPluginRecommendation
-from runops.core.plugins import collect_adapter_codex_plugins
+from runops.core.project_files import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 from runops.harness._skills import render_skill_files as _render_skill_files
 
@@ -57,8 +58,6 @@ CODEX_CONFIG = ".codex/config.toml"
 CODEX_README = ".codex/README.md"
 CODEX_RULES = ".codex/rules/runops.rules"
 AGENTS_SKILLS_PREFIX = ".agents/skills/"
-GITIGNORE_MANAGED_START = "# >>> runops managed (auto-updated by runo update-harness)"
-GITIGNORE_MANAGED_END = "# <<< runops managed"
 
 _CLAUDE_MD_TEMPLATE = "harness/claude/CLAUDE.md.j2"
 _AGENTS_MD_TEMPLATE = "harness/codex/AGENTS.md.j2"
