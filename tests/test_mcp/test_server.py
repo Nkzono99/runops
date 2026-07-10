@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from runops.mcp import server as mcp_server
@@ -65,6 +67,81 @@ _TOOL_ATTRS = {
     "runops.slurm.job.inspect": "slurm_job_inspect",
     "runops.job.plan_submit": "job_plan_submit",
 }
+
+
+def test_tools_facade_exposes_exact_registered_callable_names() -> None:
+    expected = set(_TOOL_ATTRS.values())
+    actual = {
+        name
+        for name, value in vars(mcp_server.tools).items()
+        if not name.startswith("_")
+        and callable(value)
+        and (
+            getattr(value, "__module__", "") == mcp_server.tools.__name__
+            or getattr(value, "__module__", "").startswith("runops.mcp._tools.")
+        )
+    }
+
+    assert actual == expected
+
+
+def test_tools_facade_declares_exact_public_contract() -> None:
+    assert set(mcp_server.tools.__all__) == set(_TOOL_ATTRS.values())
+    assert mcp_server.tools.__all__ == sorted(mcp_server.tools.__all__)
+
+
+def test_tools_facade_contains_only_explicit_reexports() -> None:
+    source_path = Path(mcp_server.tools.__file__)
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+
+    for node in tree.body:
+        if isinstance(node, ast.Expr):
+            assert isinstance(node.value, ast.Constant)
+            assert isinstance(node.value.value, str)
+        elif isinstance(node, ast.ImportFrom):
+            assert all(alias.name != "*" for alias in node.names)
+        elif isinstance(node, ast.Assign):
+            assert len(node.targets) == 1
+            assert isinstance(node.targets[0], ast.Name)
+            assert node.targets[0].id == "__all__"
+        else:
+            raise AssertionError(f"Unexpected facade statement: {ast.dump(node)}")
+
+
+def test_capability_modules_own_facade_callables() -> None:
+    from runops.mcp._tools import (
+        analysis,
+        paper_requests,
+        project,
+        provider,
+        publication,
+        runs,
+        scheduler,
+    )
+
+    owners = {
+        provider: ("health", "provider_info", "capabilities"),
+        project: (
+            "project_list",
+            "project_status",
+            "project_inspect",
+            "project_plugins",
+            "project_doctor",
+        ),
+        publication: ("publication_exports_list", "publication_export_inspect"),
+        analysis: ("analysis_artifacts", "survey_summary", "analysis_plot_columns"),
+        paper_requests: (
+            "paper_requests_list",
+            "paper_request_draft",
+            "paper_request_plan",
+        ),
+        runs: ("run_list", "run_inspect", "run_logs"),
+        scheduler: ("slurm_queue", "slurm_job_inspect", "job_plan_submit"),
+    }
+
+    for owner, names in owners.items():
+        for name in names:
+            assert getattr(mcp_server.tools, name) is getattr(owner, name)
 
 
 def test_register_tools_matches_exposed_registry() -> None:

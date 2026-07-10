@@ -9,6 +9,7 @@ from typing import Any
 from runops.application.execution.submission import SubmitRequest, plan_submit
 from runops.core.manifest import ManifestData, write_manifest
 from runops.mcp import tools
+from runops.mcp._tools import project as project_tools
 
 
 def _make_project(tmp_path: Path) -> Path:
@@ -292,7 +293,7 @@ def test_project_doctor_reports_codex_plugin_metadata_errors(
         'display_name = "Incomplete Plugin"\n',
         encoding="utf-8",
     )
-    monkeypatch.setattr(tools.shutil, "which", lambda _cmd: "/usr/bin/sbatch")
+    monkeypatch.setattr(project_tools.shutil, "which", lambda _cmd: "/usr/bin/sbatch")
 
     result = tools.project_doctor(project_root=str(project_root))
 
