@@ -131,6 +131,9 @@ HTML を作ったあとは、ブラウザで `replay.html` を開いて録画し
 - session log には絶対パスやユーザー名が入りうるので、公開前に確認する
 - 機密の project 名やサーバ名が summary に出る場合は、session log 側または replay HTML 側でマスクする
 - runops 側の `--event-log` は将来の統合・補助用途には有用だが、現時点の built-in importer は Codex session log を主対象としている
+- runops event log の `cli_invocation` は raw argv / option value を保存しない。action data
+  も secret-bearing key、token assignment、authorization value、URL userinfo を best-effort
+  で redact する。ただし公開前の確認を不要にする完全な秘密検出器ではない
 
 ## 今後の拡張候補
 

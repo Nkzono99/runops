@@ -92,10 +92,36 @@ expansion / submit は明示操作に残します。
 - 同じ story が 3 件以上の note に分散した
 - pivot / pause / kill を決めた
 
+## Scientific execution gate
+
+production / large survey は、計算資源の一括投入前に次の state machine を通します。
+
+```text
+agenda active question
+  -> proposal + bounded pilot
+  -> pilot execution
+  -> evidence review
+  -> EXPAND | REVISE | STOP | WAIT
+  -> full submit (EXPAND only)
+```
+
+`research-director` は active question から 1 件の bounded experiment を選び、
+`research/proposals/<date>-<topic>.md` に仮説、反証条件、pilot matrix、required
+artifact、cost ceiling、stop / expand criterion を事前登録します。agenda の
+`Active Experiment Portfolio` は proposal、pilot run_id、review path、decision を
+結びます。
+
+pilot 完了後は `review-pilot` が事前基準と実 artifact を照合し、
+`research/reviews/<date>-<topic>.md` に `EXPAND`, `REVISE`, `STOP`, `WAIT` のいずれかを
+記録します。review と portfolio が `EXPAND` で一致するときだけ `run-all` が
+`runo runs submit --dry-run --all` と full submit へ進みます。`--yes` は CLI prompt
+だけを省略し、この scientific gate は省略しません。
+
 ## Agent skill
 
-project 側には `research-agenda` skill が展開されます。
-Claude Code では `/research-agenda`、Codex では `$research-agenda` として呼びます。
+project 側には `research-agenda`, `research-director`, `review-pilot` skill が
+展開されます。Claude Code では `/research-director`、Codex では
+`$research-director` のように呼びます。
 
 この skill は `campaign.toml`、`research/agenda.md`、最近の `notes/`、
 関連 run の manifest / summary / figure を必要範囲で読み、`agenda.md` に

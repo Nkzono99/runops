@@ -70,6 +70,11 @@ submission、notebook、operator utility の外部 effect は port / injected ru
 `src/runops/sites/` は runtime site 設定そのものではなく、`runo init` が読む bundled
 preset 集です。実行時 site の正本は project root の `site.toml` です。
 
+CLI の `main.py` は root option と top-level composition だけを持ち、`case`, `runs`,
+`analyze`, `notes` の complete Typer app は `cli/groups/` で command callback を登録します。
+Action-facing semantics は `application.actions.ActionSpec` と use case が正本であり、
+Typer signature から domain rule や MCP contract を生成しません。
+
 ---
 
 ## コアコンセプト
@@ -490,6 +495,12 @@ CLI: runo runs submit RUN
 
 Slurm が job を受理した後の manifest 永続化に失敗した場合は job_id を保持した typed
 error を返し、`.runops-submit.lock` の accepted claim で後続 submit も拒否します。
+timeout や exit 0 後の job_id parse failure のように受付結果が不明な場合は pending
+claim を保持し、自動再投入を禁止します。lock の新規 directory entry と manifest の
+atomic replace は file/親 directory の fsync を完了してから claim を clear します。
+`runs delete` も top-level symlink を拒否し、同じ lock 内で state と claim を再確認します。
+許可後は run directory を同一親の hidden tombstone へ atomic rename して入口を先に
+閉じるため、投入中・recovery 待ちの削除と delete 中の新規 submit の両方を防ぎます。
 
 ### status (状態確認)
 

@@ -153,6 +153,9 @@ MCP provider は Agent / host 向けの edge interface です。read / inspect /
 
 `runo runs submit --all` は HPC 資源・queue・quota に影響する高コスト操作です。
 Agent との会話上で対象 run、queue、資源量を確認済みの場合だけ `--yes` を使います。
+production / large survey では、`--yes` は proposal / pilot / review の scientific gate を
+省略しません。`research/reviews/` の `Decision: EXPAND` 後だけ remaining run を
+full submit します。
 
 ### Monitoring
 
@@ -181,6 +184,8 @@ service ではありません。
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 |
 | `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace を作成 |
+| `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | strict source/schema の story acceptance workspace を作成 |
+| `runo analyze audit-story [STORY_DIR]` | source artifact を照合し `audit.json` / `audit.md` を生成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
 | `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | completed run を archived にし、既定で `runs/_archive/` へ移動 |
 | `runo runs purge-work [RUN]` | archived run の `work/` 内不要ファイル削除 |

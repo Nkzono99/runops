@@ -75,6 +75,6 @@ analysis/
 
 ## Out of Scope
 
-- Do not edit `/home/b/b36291/large1/project_dust_release`.
+- Do not edit `<external-read-only-project>`.
 - Do not migrate existing project files.
 - Do not add a new CLI compaction command in this slice.

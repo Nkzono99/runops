@@ -1,5 +1,8 @@
 # runops Architecture Simplification Implementation Plan
 
+**Status:** completed
+**Outcome:** Architecture simplification completed through the commit series ending in `beb2774`, with full quality gates and independent review passing on 2026-07-10.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Restore one coherent Execution Kernel and Agent gateway by repairing the manifest contract, introducing capability-oriented application services, removing duplicated submit rules, and reducing the largest interface/adapter hotspots.

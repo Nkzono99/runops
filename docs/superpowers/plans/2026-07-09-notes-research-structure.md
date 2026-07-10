@@ -1,5 +1,8 @@
 # Notes Research Structure Implementation Plan
 
+**Status:** completed
+**Outcome:** Notes and research scaffolding delivered in commit `22997ba`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add scaffold and skill guidance that keeps daily notes, reports, research decisions, and cross-run artifacts separated.
@@ -10,7 +13,7 @@
 
 ## Global Constraints
 
-- Do not edit `/home/b/b36291/large1/project_dust_release`; use it only as read-only evidence.
+- Do not edit `<external-read-only-project>`; use it only as read-only evidence.
 - Keep project-state guidance in `src/runops/templates/`.
 - Use TDD: tests first, then template/scaffold edits.
 - Run tests through KUDPC Slurm from `gardenia` login nodes.
@@ -53,7 +56,7 @@ Run:
 
 ```bash
 tssrun -p gr20001g -t 0:10:0 --rsc p=1:t=2:c=2 \
-  bash -lc 'cd /LARGE1/gr20001/b36291/Github/runops && uv run pytest tests/test_cli/test_init.py::TestInit::test_init_creates_all_files tests/test_cli/test_init.py::TestInit::test_init_reports_readme_content -q'
+  bash -lc 'cd <repo-root> && uv run pytest tests/test_cli/test_init.py::TestInit::test_init_creates_all_files tests/test_cli/test_init.py::TestInit::test_init_reports_readme_content -q'
 ```
 
 Expected: fail because `notes/reports/README.md`, `archive/`, and `figures/` are missing.
@@ -128,7 +131,7 @@ Run:
 
 ```bash
 tssrun -p gr20001g -t 0:30:0 --rsc p=1:t=2:c=2 \
-  bash -lc 'cd /LARGE1/gr20001/b36291/Github/runops && uv run ruff format --check src/runops/cli/init/scaffold.py tests/test_cli/test_init.py tests/test_harness/test_codex.py && uv run ruff check src/runops/cli/init/scaffold.py tests/test_cli/test_init.py tests/test_harness/test_codex.py'
+  bash -lc 'cd <repo-root> && uv run ruff format --check src/runops/cli/init/scaffold.py tests/test_cli/test_init.py tests/test_harness/test_codex.py && uv run ruff check src/runops/cli/init/scaffold.py tests/test_cli/test_init.py tests/test_harness/test_codex.py'
 ```
 
 - [x] **Step 2: Run relevant tests**
@@ -137,7 +140,7 @@ Run:
 
 ```bash
 tssrun -p gr20001g -t 0:30:0 --rsc p=1:t=2:c=2 \
-  bash -lc 'cd /LARGE1/gr20001/b36291/Github/runops && uv run pytest tests/test_cli/test_init.py tests/test_harness/test_codex.py -q'
+  bash -lc 'cd <repo-root> && uv run pytest tests/test_cli/test_init.py tests/test_harness/test_codex.py -q'
 ```
 
 - [x] **Step 3: Review diff**

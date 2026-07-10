@@ -28,6 +28,8 @@ contract の明示的な legacy exception とし、新しい依存を増やさ�
 ## 守るべき境界
 
 - CLI と MCP は薄く保ち、同じ規則を再実装せず application use case を呼ぶ。
+- CLI root は complete group app を合成し、group ごとの command registration は
+  `cli/groups/` に閉じ込める。Typer signature から domain rule を生成しない。
 - run 生成・submit・archive 等の orchestration を `core/` に戻さない。
 - simulator 固有処理は `SimulatorAdapter`、MPI 起動方式は `Launcher` に閉じ込める。
 - Python は MPI rank ごとのラッパにならず、job script が `srun` / `mpirun` /

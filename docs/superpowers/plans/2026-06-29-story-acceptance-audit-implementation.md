@@ -1,5 +1,8 @@
 # Story Acceptance Audit Implementation Plan
 
+**Status:** completed
+**Outcome:** Initial story audit delivered in commit `e5d14f0`; strict schema and source follow-ups are tracked by `2026-07-10-review-followups.md`.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement deterministic story acceptance audit workspaces for issue #107.
@@ -69,7 +72,7 @@ Run:
 
 ```bash
 tssrun -p gr20001g -t 0:20:0 --rsc p=1:t=2:c=2 \
-  bash -lc 'cd /LARGE1/gr20001/b36291/Github/runops && uv run pytest tests/test_core/test_analysis_story.py -q'
+  bash -lc 'cd <repo-root> && uv run pytest tests/test_core/test_analysis_story.py -q'
 ```
 
 Expected: FAIL because `runops.core.analysis.story` does not exist.
@@ -139,7 +142,7 @@ Run:
 
 ```bash
 tssrun -p gr20001g -t 0:20:0 --rsc p=1:t=2:c=2 \
-  bash -lc 'cd /LARGE1/gr20001/b36291/Github/runops && uv run pytest tests/test_cli/test_analyze.py::TestStoryAudit -q'
+  bash -lc 'cd <repo-root> && uv run pytest tests/test_cli/test_analyze.py::TestStoryAudit -q'
 ```
 
 Expected: FAIL because CLI commands are missing.
@@ -195,7 +198,7 @@ Expected: command names and workspace path appear.
 
 ```bash
 tssrun -p gr20001g -t 0:30:0 --rsc p=1:t=2:c=2 \
-  bash -lc 'cd /LARGE1/gr20001/b36291/Github/runops && uv run pytest tests/test_core/test_analysis_story.py tests/test_cli/test_analyze.py::TestStoryAudit -q'
+  bash -lc 'cd <repo-root> && uv run pytest tests/test_core/test_analysis_story.py tests/test_cli/test_analyze.py::TestStoryAudit -q'
 ```
 
 - [ ] **Step 2: Run style checks**

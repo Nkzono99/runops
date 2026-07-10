@@ -64,7 +64,7 @@
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 |
 | `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
-| `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | story acceptance audit workspace (`analysis/stories/`) を作成 |
+| `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | story acceptance audit workspace (`analysis/stories/`) を作成。relative source は project root 基準 |
 | `runo analyze audit-story [STORY_DIR]` | story の要求 step と artifact index を照合し `audit.json` / `audit.md` を生成 |
 | `runo notes append TITLE [BODY]` | lab notebook に追記 |
 | `runo notes list` | active/history の lab notebook 日付一覧 |

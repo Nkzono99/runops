@@ -899,6 +899,14 @@ class SimulatorAdapter:
 Adapter は **実行準備と後処理のみ** を担当する。
 MPI 実行中の rank ごとのホットパスには介入しない。
 
+## 14.4 Attempt-aware output detection
+
+再投入可能な simulator の Adapter は、manifest の current `job.job_id` と
+`job.submitted_at` を attempt 境界として使う。current job の log が存在する場合、
+過去 attempt の stdout / stderr / completion artifact を status や progress の根拠へ
+混ぜない。`batch N/N` のような進捗表示は正常終了の証拠ではなく、simulator 固有の
+completion artifact または scheduler の terminal state を完了判定に使う。
+
 ---
 
 ## 15. Launcher Profile 仕様
@@ -1164,6 +1172,24 @@ raw evidence、現在判断/refined narrative、解析・出版 artifact、再�
 * `notes/YYYY-MM-DD.md` は append-only な時系列ログ、`research/agenda.md` は現在判断の正本
 * `research/proposals/` は高コスト・方向転換・新 model などの実行前判断を必要時に残す
 * `research/reviews/` は主要 result / failed run / pause / kill / pivot などの checkpoint snapshot を残す
+* production / large survey は proposal で bounded pilot と stop / expand criterion を
+  先に定義し、pilot review の `Decision: EXPAND` 後だけ full submit する
+* `--yes` は CLI confirmation の省略であり、proposal / pilot / review の research gate
+  を省略しない
+
+### 18.9.2 Story acceptance audit (experimental)
+
+`analysis/stories/<story-id>/story.toml` は `schema_version = 1` を持ち、各 step の
+`required_artifacts` と `acceptable_status` は 1 件以上の非空文字列からなる TOML array
+とする。source `kind` は `run`, `survey`, `comparison`, `path` のいずれかで、実際に
+検出した source 種別と一致しなければ audit を生成しない。relative source path は
+process の cwd ではなく project root から解決する。
+
+source が 1 件でも欠落した audit は、別 source に十分な artifact があっても
+`blocked` とする。artifact index 不在などの warning がある場合、全 step が covered
+でも overall status は `partial` を上限とする。story の明示 `--id` は validation 後も
+変更せず、人間向け name が ASCII slug を生成できない場合だけ deterministic な
+`story-<hash>` を生成する。
 
 ---
 
@@ -1203,16 +1229,28 @@ raw evidence、現在判断/refined narrative、解析・出版 artifact、再�
 * run root の `.runops-submit.lock` は lock inode を安定させるため unlink しない内部
   artifact であり、manifest/state の正本ではなく Git 管理もしない。lock 内では
   scheduler 呼び出し前に `pending`、acceptance 後に `accepted:<job_id>` を fsync し、
-  scheduler rejection または manifest/state の保存完了時だけ clear する
+  新規 lock の directory entry も親 run directory の fsync で永続化する。claim は
+  definitive な scheduler rejection または manifest/state の保存完了時だけ clear する
+* scheduler timeout、exit 0 後の job_id parse failure、その他受付結果を確定できない
+  error は outcome-unknown として `pending` claim を保持する。自動再 submit せず、
+  scheduler と local state を reconcile する
 * persistence failure や process interruption で残った durable claim は後続 submit を
   block する。明示的 retry は同じ lock 内で terminal state を再検証し、claim を
   durable に clear してから `created` へ reset する
 * `created` のまま `pending` / `accepted:<job_id>` claim が残る場合は scheduler の
   acceptance を照合し、manifest と claim を手動 reconcile するまで submit を block する
 * scheduler failure では manifest と pre-submit state を変更しない
-* scheduler acceptance 後に job attempt、job_id、`submitted` state を manifest へ保存する
+* scheduler acceptance 後に job attempt、job_id、`submitted` state を manifest へ保存する。
+  `submitted_at` は attempt 前の artifact と同一秒内でも順序を判別できるよう、clock が
+  持つ subsecond 精度を切り捨てず ISO 8601 で保存する
+  manifest の atomic replace は temp file と親 run directory を fsync してから claim を
+  clear する
 * acceptance 後の persistence failure は accepted job_id と failure phase を持つ typed
   error として返し、同じ plan を自動再 submit しない
+* `runs delete` は top-level symlink を拒否し、submit と同じ run lock を保持して state
+  と claim を再確認する。許可後は run directory を同一親の hidden tombstone へ atomic
+  rename して元 path を先に閉じ、non-empty claim、submit 済み state、並行 submit の
+  いずれからも orphan job を作らない
 
 ---
 

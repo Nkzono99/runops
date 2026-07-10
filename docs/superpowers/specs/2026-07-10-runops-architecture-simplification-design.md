@@ -193,11 +193,21 @@ Submission establishes the migration pattern for other application behavior.
 - `SubmitPlan`: normalized run identity, paths, scheduler-neutral options,
   preconditions, and the exact argument vector that will be applied;
 - `plan_submit()`: deterministic validation and plan construction;
-- `submit()`: apply an already-valid plan through a scheduler port, then update state.
+- `apply_submit()`: apply an already-valid plan through a scheduler port, then update
+  state.
 
 CLI `--dry-run`, MCP `runops.job.plan_submit`, bulk submission, and actual submit use
 the same plan. An invalid plan cannot be applied. The scheduler call is injected and
 tests use a complete fake result rather than invoking Slurm.
+
+Apply holds one persistent per-run lock from stale-plan validation through durable
+local persistence. A definitive scheduler rejection clears the pending claim;
+timeout, response parsing failure, or any other acceptance-unknown outcome retains
+it and blocks resubmission until reconciliation. New lock entries and atomic manifest
+replacement are directory-fsynced before a claim can be cleared. Destructive deletion
+uses the same guard, rejects every non-empty claim and top-level symlink, then atomically
+renames the run to a same-parent tombstone before recursive removal so no new submit can
+enter through the original path.
 
 The initial port can be intentionally narrow—submission only. Query/cancel ports are
 added when their corresponding use cases move; no speculative universal scheduler

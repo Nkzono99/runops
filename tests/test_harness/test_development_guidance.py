@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -57,6 +58,7 @@ CONTEXT_MODEL_DOCS = (
     "SPEC.md",
 )
 PROJECT_GUIDANCE = ("AGENTS.md", "CLAUDE.md")
+SUPERPOWERS_DOCS = ROOT / "docs" / "superpowers"
 
 
 def _read(relative_path: str) -> str:
@@ -210,3 +212,26 @@ def test_v0_migration_note_records_surface_and_internal_moves() -> None:
     assert "hidden" in text
     assert "core/" in text
     assert "application/" in text
+
+
+def test_implementation_plans_declare_lifecycle_status_and_outcome() -> None:
+    allowed_statuses = {"active", "completed", "superseded"}
+
+    for path in sorted((SUPERPOWERS_DOCS / "plans").glob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        match = re.search(r"^\*\*Status:\*\* (\w+)$", text, flags=re.MULTILINE)
+        assert match is not None, f"missing Status metadata: {path}"
+        status = match.group(1)
+        assert status in allowed_statuses, f"invalid plan status: {path}: {status}"
+        if status == "completed":
+            assert re.search(r"^\*\*Outcome:\*\* .+", text, flags=re.MULTILINE), (
+                f"completed plan is missing Outcome metadata: {path}"
+            )
+
+
+def test_superpowers_docs_have_no_machine_specific_absolute_paths() -> None:
+    machine_path = re.compile(r"/(?:LARGE[01]|home|Users)/")
+
+    for path in sorted(SUPERPOWERS_DOCS.rglob("*.md")):
+        text = path.read_text(encoding="utf-8")
+        assert machine_path.search(text) is None, f"machine-specific path: {path}"
