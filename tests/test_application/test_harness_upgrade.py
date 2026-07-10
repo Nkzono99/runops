@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import ast
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from runops.application.operator import harness_upgrade as harness_upgrade_module
 from runops.application.operator.harness_upgrade import (
     HarnessUpgradeRequest,
     HarnessUpgradeStepError,
@@ -154,3 +156,15 @@ def test_apply_stops_at_first_failed_command(tmp_path: Path) -> None:
     assert caught.value.returncode == 17
     assert caught.value.step == plan.steps[0]
     assert commands == [plan.steps[0].command]
+
+
+def test_harness_upgrade_application_does_not_import_harness_implementation() -> None:
+    source_path = Path(harness_upgrade_module.__file__)
+    tree = ast.parse(source_path.read_text(encoding="utf-8"))
+    imported_modules = {
+        node.module
+        for node in ast.walk(tree)
+        if isinstance(node, ast.ImportFrom) and node.module is not None
+    }
+
+    assert not any(module.startswith("runops.harness") for module in imported_modules)

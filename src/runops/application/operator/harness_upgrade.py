@@ -17,7 +17,6 @@ from runops.core.upgrade_chain import (
     build_upgrade_plan,
     latest_version_in_versions,
 )
-from runops.harness.builder import applied_harness_runops_version
 
 _PYPI_JSON_URL = "https://pypi.org/pypi/runops/json"
 
@@ -101,8 +100,8 @@ class HarnessUpgradeStepError(RuntimeError):
 def plan_harness_upgrade(
     request: HarnessUpgradeRequest,
     *,
+    applied_version_source: AppliedVersionSource,
     version_source: VersionSource | None = None,
-    applied_version_source: AppliedVersionSource | None = None,
     executable_lookup: ExecutableLookup | None = None,
 ) -> HarnessUpgradePlan:
     """Resolve versions and exact command vectors without mutating the project."""
@@ -115,9 +114,7 @@ def plan_harness_upgrade(
         current_runtime_version=request.current_runtime_version,
         available_versions=available_versions,
     )
-    applied_version = (applied_version_source or applied_harness_runops_version)(
-        project_dir
-    )
+    applied_version = applied_version_source(project_dir)
     core_plan = build_upgrade_plan(
         applied_version=applied_version,
         current_runtime_version=request.current_runtime_version,

@@ -323,6 +323,7 @@ def update_harness(
                     force=force,
                     no_harnessops=no_harnessops,
                 ),
+                applied_version_source=applied_harness_runops_version,
             )
         except UpgradePlanError as exc:
             typer.echo(f"Error planning upgrade chain: {exc}", err=True)
@@ -358,6 +359,7 @@ def update_harness(
                     target=__version__,
                     allow_major=True,
                 ),
+                applied_version_source=applied_harness_runops_version,
                 version_source=lambda: (),
             )
         except UpgradePlanError:
