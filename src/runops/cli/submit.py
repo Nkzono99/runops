@@ -356,9 +356,12 @@ def _submit_all(
         return
 
     for run_dir in run_dirs:
-        if run_dir in plan_errors:
+        plan = plans.get(run_dir)
+        if plan is None:
             typer.echo(f"  {run_dir.name} (error) [skip]")
             typer.echo(f"    Error: {plan_errors[run_dir]}")
+        elif not plan.ready:
+            _render_submit_plan(plan, bulk=True)
 
     ready_plans = [
         plans[run_dir]

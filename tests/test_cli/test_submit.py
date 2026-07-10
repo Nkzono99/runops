@@ -219,6 +219,7 @@ def test_submit_all(tmp_path: Path) -> None:
     _create_run(blocked_created, run_id="R20260327-0004")
     for input_file in (blocked_created / "input").iterdir():
         input_file.unlink()
+    blocked_plan = plan_submit(SubmitRequest(run_dir=blocked_created))
 
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
@@ -237,6 +238,9 @@ def test_submit_all(tmp_path: Path) -> None:
     assert "33333" in result.output
     assert "2 submitted" in result.output
     assert "2 skipped" in result.output
+    for check in blocked_plan.failed_preconditions:
+        assert check.name in result.output
+        assert check.message in result.output
 
 
 def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
@@ -305,7 +309,14 @@ def test_submit_all_dry_run(tmp_path: Path) -> None:
     (blocked_run / "submit" / "job.sh").unlink()
     for input_file in (blocked_run / "input").iterdir():
         input_file.unlink()
-    blocked_plan = plan_submit(SubmitRequest(run_dir=blocked_run))
+    blocked_plan = plan_submit(
+        SubmitRequest(
+            run_dir=blocked_run,
+            queue_name="compute",
+            qos="normal",
+            afterok="123",
+        )
+    )
     manifests = {
         run_dir: (run_dir / "manifest.toml").read_bytes()
         for run_dir in (survey_dir / "R20260327-0001", blocked_run)
@@ -314,7 +325,19 @@ def test_submit_all_dry_run(tmp_path: Path) -> None:
     with patch("runops.cli.submit.Path.cwd", return_value=tmp_path):
         result = runner.invoke(
             app,
-            ["runs", "submit", "--all", "--dry-run", str(survey_dir)],
+            [
+                "runs",
+                "submit",
+                "--all",
+                "--dry-run",
+                "--queue-name",
+                "compute",
+                "--qos",
+                "normal",
+                "--afterok",
+                "123",
+                str(survey_dir),
+            ],
         )
 
     assert result.exit_code == 0
@@ -323,6 +346,8 @@ def test_submit_all_dry_run(tmp_path: Path) -> None:
     for check in blocked_plan.failed_preconditions:
         assert check.name in result.output
         assert check.message in result.output
+    for argument in blocked_plan.command:
+        assert argument in result.output
     for run_dir, before in manifests.items():
         assert (run_dir / "manifest.toml").read_bytes() == before
         assert not (run_dir / "status").exists()

@@ -81,6 +81,10 @@ def test_ready_plan_matches_mcp_and_cli_exactly_without_mutation(
     plan = plan_submit(request)
     manifest_path = ready_run / "manifest.toml"
     before = manifest_path.read_bytes()
+    state_path = ready_run / "status" / "state.json"
+    state_path.parent.mkdir()
+    state_path.write_bytes(b'{"source":"existing"}\n')
+    state_before = state_path.read_bytes()
 
     mcp_result = tools.job_plan_submit(
         ready_run.name,
@@ -117,7 +121,7 @@ def test_ready_plan_matches_mcp_and_cli_exactly_without_mutation(
         assert check.name in cli_result.output
         assert check.message in cli_result.output
     assert manifest_path.read_bytes() == before
-    assert not (ready_run / "status").exists()
+    assert state_path.read_bytes() == state_before
 
 
 def test_multiply_blocked_plan_exposes_every_failure_without_mutation(
@@ -133,6 +137,10 @@ def test_multiply_blocked_plan_exposes_every_failure_without_mutation(
     plan = plan_submit(request)
     manifest_path = blocked_run / "manifest.toml"
     before = manifest_path.read_bytes()
+    state_path = blocked_run / "status" / "state.json"
+    state_path.parent.mkdir()
+    state_path.write_bytes(b'{"source":"existing"}\n')
+    state_before = state_path.read_bytes()
 
     assert len(plan.failed_preconditions) == 5
     mcp_result = tools.job_plan_submit(
@@ -173,4 +181,4 @@ def test_multiply_blocked_plan_exposes_every_failure_without_mutation(
         assert check.name in cli_result.output
         assert check.message in cli_result.output
     assert manifest_path.read_bytes() == before
-    assert not (blocked_run / "status").exists()
+    assert state_path.read_bytes() == state_before
