@@ -111,6 +111,24 @@ def parse_job_id(sbatch_stdout: str) -> str:
     return match.group(1)
 
 
+def submit_command(
+    command: tuple[str, ...],
+    *,
+    runner: CommandRunner | None = None,
+) -> str:
+    """Execute one validated, already-planned ``sbatch`` command vector."""
+    if not command or command[0] != "sbatch":
+        raise SlurmSubmitError("submission command must start with 'sbatch'")
+
+    run = runner or _default_runner
+    result = run(list(command))
+    if result.returncode != 0:
+        raise SlurmSubmitError(
+            f"sbatch failed (exit {result.returncode}):\n{result.stderr.strip()}"
+        )
+    return parse_job_id(result.stdout)
+
+
 def sbatch_submit(
     job_script: Path,
     working_dir: Path,
@@ -145,21 +163,13 @@ def sbatch_submit(
     if not job_script.exists():
         raise FileNotFoundError(f"Job script not found: {job_script}")
 
-    run = runner or _default_runner
     cmd = ["sbatch", f"--chdir={working_dir}"]
     if afterok:
         cmd.append(f"--dependency=afterok:{afterok}")
     if extra_args:
         cmd.extend(extra_args)
     cmd.append(str(job_script))
-    result = run(cmd)
-
-    if result.returncode != 0:
-        raise SlurmSubmitError(
-            f"sbatch failed (exit {result.returncode}):\n{result.stderr.strip()}"
-        )
-
-    return parse_job_id(result.stdout)
+    return submit_command(tuple(cmd), runner=runner)
 
 
 def scancel_job(

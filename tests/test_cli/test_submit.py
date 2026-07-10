@@ -117,7 +117,7 @@ def test_submit_success(tmp_path: Path) -> None:
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
         patch(
-            "runops.slurm.submit.sbatch_submit",
+            "runops.slurm.submit.submit_command",
             return_value="99999",
         ),
     ):
@@ -169,7 +169,7 @@ def test_submit_all(tmp_path: Path) -> None:
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
         patch(
-            "runops.slurm.submit.sbatch_submit",
+            "runops.slurm.submit.submit_command",
             side_effect=["22222", "33333"],
         ),
     ):
@@ -193,7 +193,7 @@ def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
 
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
-        patch("runops.slurm.submit.sbatch_submit") as mock_submit,
+        patch("runops.slurm.submit.submit_command") as mock_submit,
     ):
         result = runner.invoke(
             app,
@@ -243,7 +243,7 @@ def test_submit_empty_input_dir(tmp_path: Path) -> None:
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
         patch(
-            "runops.slurm.submit.sbatch_submit",
+            "runops.slurm.submit.submit_command",
             return_value="99999",
         ),
     ):
@@ -264,7 +264,7 @@ def test_submit_sbatch_failure(tmp_path: Path) -> None:
     with (
         patch("runops.cli.submit.Path.cwd", return_value=tmp_path),
         patch(
-            "runops.slurm.submit.sbatch_submit",
+            "runops.slurm.submit.submit_command",
             side_effect=SlurmSubmitError("sbatch failed (exit 1):\nPermission denied"),
         ),
     ):

@@ -574,11 +574,21 @@ def test_submit_run_updates_manifest_and_state_file(tmp_path: Path) -> None:
     (run_dir / "input").mkdir(parents=True, exist_ok=True)
     (run_dir / "input" / "params.json").write_text("{}", encoding="utf-8")
 
-    with patch("runops.slurm.submit.sbatch_submit", return_value="12345"):
+    with patch(
+        "runops.slurm.submit.submit_command",
+        return_value="12345",
+    ) as submit:
         result = submit_run(run_dir)
 
     assert result.status is ActionStatus.SUCCESS
     assert result.data["job_id"] == "12345"
+    submit.assert_called_once_with(
+        (
+            "sbatch",
+            f"--chdir={run_dir}",
+            str(run_dir / "submit" / "job.sh"),
+        )
+    )
     assert (run_dir / "status" / "state.json").exists()
 
     from runops.core.manifest import read_manifest
@@ -637,7 +647,8 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
     (run_dir / "work").mkdir(parents=True, exist_ok=True)
 
     with patch(
-        "runops.slurm.submit.sbatch_submit", return_value="12345"
+        "runops.slurm.submit.submit_command",
+        return_value="12345",
     ) as mock_submit:
         result = execute_action(
             "submit_run",
@@ -649,14 +660,16 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
 
     assert result.status is ActionStatus.SUCCESS
     assert result.data["job_id"] == "12345"
-    mock_submit.assert_called_once()
-    assert mock_submit.call_args.args[0] == run_dir / "submit" / "job.sh"
-    assert mock_submit.call_args.args[1] == run_dir / "work"
-    assert mock_submit.call_args.kwargs["extra_args"] == [
-        "--partition=compute",
-        "--qos=debugqos",
-    ]
-    assert mock_submit.call_args.kwargs["afterok"] == "67890"
+    mock_submit.assert_called_once_with(
+        (
+            "sbatch",
+            f"--chdir={run_dir / 'work'}",
+            "--dependency=afterok:67890",
+            "--partition=compute",
+            "--qos=debugqos",
+            str(run_dir / "submit" / "job.sh"),
+        )
+    )
 
     from runops.core.manifest import read_manifest
 

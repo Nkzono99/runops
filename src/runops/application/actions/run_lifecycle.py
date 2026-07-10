@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -123,124 +122,57 @@ def submit_run(
     afterok: str = "",
 ) -> ActionResult:
     """Submit a run to Slurm via sbatch."""
-    from runops.application.execution.retry import get_attempt_count
-    from runops.core.manifest import read_manifest, update_manifest
-    from runops.core.state import update_state
+    from runops.application.execution.submission import (
+        SubmissionStaleError,
+        SubmitRequest,
+        apply_submit,
+        plan_submit,
+    )
     from runops.slurm.submit import (
         SlurmNotFoundError,
         SlurmSubmitError,
-        sbatch_submit,
+        submit_command,
     )
 
-    state_str, err = _require_state(run_dir, RunState.CREATED)
-    if err:
-        return _precondition_fail("submit_run", err)
+    try:
+        plan = plan_submit(
+            SubmitRequest(
+                run_dir=run_dir,
+                queue_name=queue_name,
+                qos=qos,
+                afterok=afterok,
+            )
+        )
+    except SimctlError as e:
+        return _error("submit_run", str(e))
 
-    job_script = run_dir / "submit" / "job.sh"
-    if not job_script.exists():
-        return _precondition_fail("submit_run", f"Job script not found: {job_script}")
-
-    input_dir = run_dir / "input"
-    if not input_dir.is_dir() or not any(input_dir.iterdir()):
+    if not plan.ready:
         return _precondition_fail(
             "submit_run",
-            f"input/ directory is empty or missing in {run_dir}",
+            plan.failed_preconditions[0].message,
         )
 
     try:
-        job_content = job_script.read_text(encoding="utf-8")
-    except OSError as e:
-        return _error("submit_run", f"Failed to read job script: {e}")
-
-    if "#SBATCH" not in job_content:
-        return _precondition_fail(
-            "submit_run",
-            "job.sh does not contain expected #SBATCH directives",
-        )
-
-    manifest = read_manifest(run_dir)
-    run_id = manifest.run.get("id", run_dir.name)
-    warnings: list[str] = []
-    tags = manifest.classification.get("tags", [])
-    if "production" in tags and manifest.simulator_source.get("git_dirty", False):
-        warnings.append("production run submitted with dirty git working tree")
-
-    work_dir = run_dir / "work"
-    if not work_dir.is_dir():
-        work_dir = run_dir
-
-    extra_args: list[str] = []
-    if queue_name:
-        extra_args.append(f"--partition={queue_name}")
-    if qos:
-        extra_args.append(f"--qos={qos}")
-
-    try:
-        job_id = sbatch_submit(
-            job_script,
-            work_dir,
-            extra_args=extra_args or None,
-            afterok=afterok or None,
-        )
+        result = apply_submit(plan, submit_command)
+    except SubmissionStaleError as e:
+        return _precondition_fail("submit_run", str(e))
     except (SlurmNotFoundError, SlurmSubmitError, FileNotFoundError, RuntimeError) as e:
         return _error("submit_run", f"sbatch failed: {e}")
-
-    now = datetime.now(tz=timezone.utc).isoformat(timespec="seconds")
-    attempt = get_attempt_count(manifest.job) + 1
-    existing_attempts: list[dict[str, str]] = list(manifest.job.get("attempts", []))
-    attempt_record = {
-        "job_id": job_id,
-        "submitted_at": now,
-        "attempt": str(attempt),
-    }
-    if queue_name:
-        attempt_record["partition"] = queue_name
-        attempt_record["queue"] = queue_name
-    if qos:
-        attempt_record["qos"] = qos
-    if afterok:
-        attempt_record["afterok"] = afterok
-    existing_attempts.append(attempt_record)
-    job_updates: dict[str, Any] = {
-        "job_id": job_id,
-        "submitted_at": now,
-        "attempt": attempt,
-        "attempts": existing_attempts,
-        "queue": queue_name or manifest.job.get("queue", ""),
-    }
-    if queue_name:
-        job_updates["partition"] = queue_name
-    if qos:
-        job_updates["qos"] = qos
-    if afterok:
-        job_updates["afterok"] = afterok
-
-    update_manifest(
-        run_dir,
-        {
-            "run": {
-                "last_slurm_state": "",
-            },
-            "job": job_updates,
-        },
-    )
-    try:
-        update_state(run_dir, RunState.SUBMITTED)
     except SimctlError as e:
         return _error("submit_run", f"State transition failed: {e}")
 
     return ActionResult(
         action="submit_run",
         status=ActionStatus.SUCCESS,
-        message=f"Submitted job {job_id} (attempt {attempt})",
+        message=f"Submitted job {result.job_id} (attempt {result.attempt})",
         data={
-            "job_id": job_id,
-            "attempt": attempt,
-            "run_id": run_id,
-            "warnings": warnings,
+            "job_id": result.job_id,
+            "attempt": result.attempt,
+            "run_id": result.run_id,
+            "warnings": list(result.warnings),
         },
-        state_before=state_str,
-        state_after=RunState.SUBMITTED.value,
+        state_before=result.state_before,
+        state_after=result.state_after,
     )
 
 
