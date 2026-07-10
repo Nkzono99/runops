@@ -7,14 +7,16 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
 from runops.application.execution.retry import get_attempt_count
 from runops.application.ports.scheduler import Submitter
+from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest, update_manifest
 from runops.core.state import RunState, update_state
 
 Clock = Callable[[], datetime]
+PersistencePhase = Literal["manifest", "state"]
 
 _DIRTY_PRODUCTION_WARNING = "production run submitted with dirty git working tree"
 
@@ -109,9 +111,34 @@ class SubmissionStaleError(RuntimeError):
         super().__init__(f"Submission plan is stale: {'; '.join(changes)}")
 
 
+class SubmissionPersistenceError(RuntimeError):
+    """Report a local persistence failure after scheduler acceptance."""
+
+    def __init__(
+        self,
+        *,
+        job_id: str,
+        attempt: int,
+        submitted_at: str,
+        phase: PersistencePhase,
+        cause: SimctlError | OSError,
+    ) -> None:
+        self.job_id = job_id
+        self.attempt = attempt
+        self.submitted_at = submitted_at
+        self.phase = phase
+        self.cause = cause
+        self.cause_type = type(cause).__name__
+        self.cause_message = str(cause)
+        super().__init__(
+            f"Scheduler accepted job {job_id}, but {phase} persistence failed: "
+            f"{self.cause_type}: {self.cause_message}"
+        )
+
+
 def plan_submit(request: SubmitRequest) -> SubmitPlan:
     """Build a complete, read-only plan for one run submission."""
-    run_dir = request.run_dir
+    run_dir = request.run_dir.resolve()
     manifest = read_manifest(run_dir)
     run_id = str(manifest.run.get("id", run_dir.name))
     state_before = str(manifest.run.get("status", ""))
@@ -148,7 +175,7 @@ def plan_submit(request: SubmitRequest) -> SubmitPlan:
         try:
             job_content = job_script.read_text(encoding="utf-8")
             script_readable = True
-        except OSError as exc:
+        except (OSError, UnicodeError) as exc:
             read_error = str(exc)
     else:
         read_error = "job script does not exist"
@@ -231,6 +258,15 @@ def apply_submit(
     if not plan.ready:
         raise SubmissionBlockedError(plan.failed_preconditions)
 
+    submitted_at_datetime = (now or _utc_now)()
+    if (
+        submitted_at_datetime.tzinfo is None
+        or submitted_at_datetime.utcoffset() is None
+    ):
+        raise ValueError("submission clock must return a timezone-aware datetime")
+    submitted_at_datetime = submitted_at_datetime.astimezone(timezone.utc)
+    submitted_at = submitted_at_datetime.isoformat(timespec="seconds")
+
     manifest = read_manifest(plan.run_dir)
     current_run_id = str(manifest.run.get("id", plan.run_dir.name))
     current_state = str(manifest.run.get("status", ""))
@@ -241,15 +277,6 @@ def apply_submit(
             planned_state=plan.state_before,
             current_state=current_state,
         )
-
-    submitted_at_datetime = (now or _utc_now)()
-    if (
-        submitted_at_datetime.tzinfo is None
-        or submitted_at_datetime.utcoffset() is None
-    ):
-        raise ValueError("submission clock must return a timezone-aware datetime")
-    submitted_at_datetime = submitted_at_datetime.astimezone(timezone.utc)
-    submitted_at = submitted_at_datetime.isoformat(timespec="seconds")
 
     attempt = get_attempt_count(manifest.job) + 1
     existing_attempts = copy.deepcopy(
@@ -281,18 +308,37 @@ def apply_submit(
     attempt_record["job_id"] = job_id
     job_updates["job_id"] = job_id
 
-    update_manifest(
-        plan.run_dir,
-        {
-            "run": {"last_slurm_state": ""},
-            "job": job_updates,
-        },
-    )
-    update_state(
-        plan.run_dir,
-        RunState.SUBMITTED,
-        timestamp=submitted_at_datetime,
-    )
+    try:
+        update_manifest(
+            plan.run_dir,
+            {
+                "run": {"last_slurm_state": ""},
+                "job": job_updates,
+            },
+        )
+    except (SimctlError, OSError) as exc:
+        raise SubmissionPersistenceError(
+            job_id=job_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            phase="manifest",
+            cause=exc,
+        ) from exc
+
+    try:
+        update_state(
+            plan.run_dir,
+            RunState.SUBMITTED,
+            timestamp=submitted_at_datetime,
+        )
+    except (SimctlError, OSError) as exc:
+        raise SubmissionPersistenceError(
+            job_id=job_id,
+            attempt=attempt,
+            submitted_at=submitted_at,
+            phase="state",
+            cause=exc,
+        ) from exc
 
     return SubmissionResult(
         run_id=plan.run_id,
@@ -359,6 +405,7 @@ def _attempt_record(
 
 __all__ = [
     "SubmissionBlockedError",
+    "SubmissionPersistenceError",
     "SubmissionResult",
     "SubmissionStaleError",
     "SubmitPlan",

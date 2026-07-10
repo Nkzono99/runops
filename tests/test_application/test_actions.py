@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
 
+import pytest
 import tomli_w
 
 from runops.application.actions import (
@@ -684,6 +685,53 @@ def test_execute_action_submit_run_updates_manifest_and_passes_options(
     assert updated.job["attempts"][0]["qos"] == "debugqos"
     assert updated.job["attempts"][0]["afterok"] == "67890"
     assert (run_dir / "status" / "state.json").exists()
+
+
+@pytest.mark.parametrize(
+    ("phase", "target"),
+    [
+        ("manifest", "runops.application.execution.submission.update_manifest"),
+        ("state", "runops.application.execution.submission.update_state"),
+    ],
+)
+def test_submit_run_reports_accepted_job_when_persistence_fails(
+    tmp_path: Path,
+    phase: str,
+    target: str,
+) -> None:
+    from runops.core.exceptions import ManifestError
+
+    run_dir = tmp_path / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": "R20260330-0001", "status": "created"},
+            "job": {},
+        },
+    )
+    (run_dir / "submit").mkdir(parents=True)
+    (run_dir / "submit" / "job.sh").write_text(
+        "#!/bin/bash\n#SBATCH --job-name=test\n",
+        encoding="utf-8",
+    )
+    (run_dir / "input").mkdir()
+    (run_dir / "input" / "params.json").write_text("{}", encoding="utf-8")
+
+    with (
+        patch("runops.slurm.submit.submit_command", return_value="98765"),
+        patch(target, side_effect=ManifestError(f"{phase} write failed")),
+    ):
+        result = submit_run(run_dir)
+
+    assert result.status is ActionStatus.ERROR
+    message = result.message.lower()
+    assert "scheduler accepted job 98765" in message
+    assert "persistence failed" in message
+    assert "do not resubmit" in message
+    assert "reconcile" in message
+    assert result.data["job_id"] == "98765"
+    assert result.data["attempt"] == 1
+    assert result.data["phase"] == phase
 
 
 def test_execute_action_sync_run_updates_manifest_and_state_file(

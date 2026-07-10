@@ -4,6 +4,9 @@ from runops.application.execution.submission import (
     SubmissionBlockedError as SubmissionBlockedError,
 )
 from runops.application.execution.submission import (
+    SubmissionPersistenceError as SubmissionPersistenceError,
+)
+from runops.application.execution.submission import (
     SubmissionResult as SubmissionResult,
 )
 from runops.application.execution.submission import (
@@ -19,6 +22,7 @@ from runops.application.execution.submission import plan_submit as plan_submit
 
 __all__ = [
     "SubmissionBlockedError",
+    "SubmissionPersistenceError",
     "SubmissionResult",
     "SubmissionStaleError",
     "SubmitPlan",

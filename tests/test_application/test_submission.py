@@ -13,6 +13,7 @@ import tomli_w
 
 from runops.application.execution.submission import (
     SubmissionBlockedError,
+    SubmissionPersistenceError,
     SubmissionResult,
     SubmissionStaleError,
     SubmitPlan,
@@ -112,6 +113,28 @@ def test_plan_submit_builds_ready_exact_command_in_stable_order(
     )
 
 
+def test_plan_submit_resolves_relative_run_dir_to_absolute_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    run_dir = tmp_path / "relative-run"
+    _create_ready_run(run_dir)
+    monkeypatch.chdir(tmp_path)
+
+    plan = plan_submit(SubmitRequest(run_dir=Path("relative-run")))
+
+    resolved_run_dir = run_dir.resolve()
+    assert plan.run_dir == resolved_run_dir
+    assert plan.run_dir.is_absolute()
+    assert plan.job_script == resolved_run_dir / "submit" / "job.sh"
+    assert plan.work_dir == resolved_run_dir / "work"
+    assert plan.command == (
+        "sbatch",
+        f"--chdir={resolved_run_dir / 'work'}",
+        str(resolved_run_dir / "submit" / "job.sh"),
+    )
+
+
 def test_plan_submit_falls_back_to_run_dir_when_work_is_absent(
     tmp_path: Path,
 ) -> None:
@@ -181,6 +204,21 @@ def test_plan_submit_reports_unreadable_script_and_missing_directive(
     assert checks["job_script_exists"].passed is True
     assert checks["job_script_readable"].passed is False
     assert "permission denied" in checks["job_script_readable"].message
+    assert checks["job_script_has_sbatch"].passed is False
+
+
+def test_plan_submit_reports_non_utf8_script_as_unreadable(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    (run_dir / "submit" / "job.sh").write_bytes(b"\xff\xfe\x00")
+
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    checks = _checks(plan)
+    assert tuple(checks) == EXPECTED_PRECONDITIONS
+    assert checks["job_script_exists"].passed is True
+    assert checks["job_script_readable"].passed is False
+    assert "decode" in checks["job_script_readable"].message.lower()
     assert checks["job_script_has_sbatch"].passed is False
 
 
@@ -337,6 +375,15 @@ def test_apply_submit_fixed_clock_preserves_history_options_and_types(
             "queue": "old",
         },
     )
+    from runops.core.manifest import update_manifest
+
+    update_manifest(
+        run_dir,
+        {
+            "job": {"future_scheduler_field": "preserve-job-value"},
+            "extensions": {"future_tool": {"token": "preserve-top-level"}},
+        },
+    )
     plan = plan_submit(
         SubmitRequest(
             run_dir=run_dir,
@@ -376,6 +423,10 @@ def test_apply_submit_fixed_clock_preserves_history_options_and_types(
     assert updated.job["partition"] == "compute"
     assert updated.job["qos"] == "debugqos"
     assert updated.job["afterok"] == "67890"
+    assert updated.job["future_scheduler_field"] == "preserve-job-value"
+    assert updated.extra_sections["extensions"] == {
+        "future_tool": {"token": "preserve-top-level"}
+    }
     assert updated.job["attempts"][0] == existing_attempt
     new_attempt = updated.job["attempts"][1]
     assert new_attempt == {
@@ -426,6 +477,34 @@ def test_apply_submit_calls_clock_once_and_normalizes_to_utc(tmp_path: Path) -> 
 
     assert calls == 1
     assert result.submitted_at == "2026-07-10T03:04:05+00:00"
+
+
+def test_apply_submit_rechecks_freshness_after_clock_side_effect(
+    tmp_path: Path,
+) -> None:
+    from runops.core.manifest import update_manifest
+
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    def clock() -> datetime:
+        update_manifest(run_dir, {"run": {"status": "submitted"}})
+        return datetime(2026, 7, 10, 3, 4, 5, tzinfo=timezone.utc)
+
+    def submitter(command: tuple[str, ...]) -> str:
+        scheduler_calls.append(command)
+        return "12345"
+
+    with pytest.raises(SubmissionStaleError, match="state changed"):
+        apply_submit(plan, submitter, now=clock)
+
+    assert scheduler_calls == []
+    updated = read_manifest(run_dir)
+    assert updated.run["status"] == "submitted"
+    assert updated.job.get("job_id", "") == ""
+    assert not (run_dir / "status").exists()
 
 
 @pytest.mark.parametrize("clock_failure", ["naive", "raises"])
@@ -483,3 +562,59 @@ def test_apply_submit_keeps_existing_unspecified_scheduler_options(
     assert updated.job["partition"] == "existing-partition"
     assert updated.job["qos"] == "existing-qos"
     assert updated.job["afterok"] == "existing-dependency"
+
+
+@pytest.mark.parametrize(
+    ("phase", "target", "failure"),
+    [
+        (
+            "manifest",
+            "runops.application.execution.submission.update_manifest",
+            OSError("manifest disk full"),
+        ),
+        (
+            "state",
+            "runops.application.execution.submission.update_state",
+            OSError("state disk full"),
+        ),
+    ],
+)
+def test_apply_submit_preserves_scheduler_acceptance_on_persistence_failure(
+    tmp_path: Path,
+    phase: str,
+    target: str,
+    failure: OSError,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    plan = plan_submit(SubmitRequest(run_dir=run_dir))
+    fixed = datetime(2026, 7, 10, 3, 4, 5, tzinfo=timezone.utc)
+    scheduler_calls: list[tuple[str, ...]] = []
+
+    def submitter(command: tuple[str, ...]) -> str:
+        scheduler_calls.append(command)
+        return "98765"
+
+    with (
+        patch(target, side_effect=failure),
+        pytest.raises(SubmissionPersistenceError) as error_info,
+    ):
+        apply_submit(plan, submitter, now=lambda: fixed)
+
+    error = error_info.value
+    assert error.job_id == "98765"
+    assert error.attempt == 1
+    assert error.submitted_at == "2026-07-10T03:04:05+00:00"
+    assert error.phase == phase
+    assert error.cause is failure
+    assert error.__cause__ is failure
+    assert "98765" in str(error)
+    assert scheduler_calls == [plan.command]
+
+    updated = read_manifest(run_dir)
+    if phase == "manifest":
+        assert updated.job.get("job_id", "") == ""
+    else:
+        assert updated.job["job_id"] == "98765"
+        assert updated.job["attempt"] == 1
+    assert not (run_dir / "status").exists()

@@ -123,6 +123,7 @@ def submit_run(
 ) -> ActionResult:
     """Submit a run to Slurm via sbatch."""
     from runops.application.execution.submission import (
+        SubmissionPersistenceError,
         SubmissionStaleError,
         SubmitRequest,
         apply_submit,
@@ -154,6 +155,23 @@ def submit_run(
 
     try:
         result = apply_submit(plan, submit_command)
+    except SubmissionPersistenceError as e:
+        return ActionResult(
+            action="submit_run",
+            status=ActionStatus.ERROR,
+            message=(
+                f"Scheduler accepted job {e.job_id}; persistence failed during "
+                f"{e.phase}; do not resubmit; reconcile local state. "
+                f"Cause: {e.cause_type}: {e.cause_message}"
+            ),
+            data={
+                "job_id": e.job_id,
+                "attempt": e.attempt,
+                "submitted_at": e.submitted_at,
+                "phase": e.phase,
+            },
+            state_before=plan.state_before,
+        )
     except SubmissionStaleError as e:
         return _precondition_fail("submit_run", str(e))
     except (SlurmNotFoundError, SlurmSubmitError, FileNotFoundError, RuntimeError) as e:
