@@ -11,6 +11,16 @@ from runops.core.project import ProjectConfig
 from runops.core.run import RunInfo
 from runops.core.site import SiteProfile
 
+_SIMULATOR_SOURCE_STRING_FIELDS = (
+    "resolver_mode",
+    "source_repo",
+    "git_commit",
+    "build_command",
+    "executable",
+    "exe_hash",
+    "package_version",
+)
+
 
 def get_simulator_config(
     project: ProjectConfig,
@@ -93,7 +103,10 @@ def build_manifest(
     variation_keys: list[str] | None = None,
 ) -> ManifestData:
     sim_config = get_simulator_config(project, case_data.simulator)
-    provenance = adapter.collect_provenance(runtime_info)
+    provenance = _normalize_simulator_source(
+        runtime_info,
+        adapter.collect_provenance(runtime_info),
+    )
 
     return ManifestData(
         run={
@@ -137,6 +150,31 @@ def build_manifest(
             "status_dir": "status",
         },
     )
+
+
+def _normalize_simulator_source(
+    runtime_info: dict[str, Any],
+    provenance: dict[str, Any],
+) -> dict[str, Any]:
+    """Return the stable canonical ``[simulator_source]`` shape."""
+    source: dict[str, Any] = {
+        "resolver_mode": runtime_info.get("resolver_mode", ""),
+        "source_repo": runtime_info.get("source_repo", ""),
+        "git_commit": runtime_info.get("git_commit", ""),
+        "git_dirty": runtime_info.get("git_dirty", False),
+        "build_command": runtime_info.get("build_command", ""),
+        "executable": runtime_info.get("executable", ""),
+        "exe_hash": runtime_info.get("exe_hash", ""),
+        "package_version": runtime_info.get("package_version", ""),
+    }
+    source.update(provenance)
+
+    for field in _SIMULATOR_SOURCE_STRING_FIELDS:
+        value = source[field]
+        source[field] = value if isinstance(value, str) else str(value or "")
+    if not isinstance(source["git_dirty"], bool):
+        source["git_dirty"] = False
+    return source
 
 
 def merge_site_modules(

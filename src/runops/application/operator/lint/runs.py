@@ -2,13 +2,29 @@
 
 from __future__ import annotations
 
+import sys
 from collections import defaultdict
 from pathlib import Path
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from runops.application.operator.lint.models import LintContext, LintIssue
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
+
+_REQUIRED_MANIFEST_FIELDS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("run", ("id", "status")),
+    ("origin", ("case",)),
+    ("simulator", ("name",)),
+    ("launcher", ("name",)),
+    ("simulator_source", ()),
+    ("job", ("scheduler", "job_id", "submitted_at")),
+    ("params_snapshot", ()),
+)
 
 
 def check_runs(context: LintContext) -> list[LintIssue]:
@@ -18,6 +34,7 @@ def check_runs(context: LintContext) -> list[LintIssue]:
     id_to_paths: defaultdict[str, list[Path]] = defaultdict(list)
 
     for run_dir, manifest in manifests:
+        issues.extend(_manifest_contract_issues(run_dir))
         run_id = str(manifest.run.get("id", "")).strip()
         if not run_id:
             issues.append(
@@ -47,6 +64,80 @@ def check_runs(context: LintContext) -> list[LintIssue]:
             )
         )
 
+    return issues
+
+
+def _manifest_contract_issues(run_dir: Path) -> list[LintIssue]:
+    """Validate the required SPEC 12.3 table, field, and type contract."""
+    manifest_path = run_dir / "manifest.toml"
+    try:
+        with manifest_path.open("rb") as file:
+            document = tomllib.load(file)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return [
+            LintIssue(
+                severity="error",
+                issue_id="runs.manifest_invalid",
+                path=manifest_path,
+                message=f"Cannot inspect manifest contract: {exc}",
+                recommendation="Fix manifest.toml before using this run.",
+            )
+        ]
+
+    issues: list[LintIssue] = []
+    for table, required_fields in _REQUIRED_MANIFEST_FIELDS:
+        if table not in document:
+            issues.append(
+                LintIssue(
+                    severity="error",
+                    issue_id="runs.manifest_table_missing",
+                    path=manifest_path,
+                    message=f"manifest.toml is missing required [{table}] table.",
+                    recommendation=(
+                        f"Add [{table}] according to SPEC section 12.3 and "
+                        "schemas/manifest.json."
+                    ),
+                )
+            )
+            continue
+
+        table_data = document[table]
+        if not isinstance(table_data, dict):
+            # read_manifest() normally reports this as runs.manifest_invalid before
+            # contract validation. Keep this guard for a concurrent file rewrite.
+            continue
+
+        for field in required_fields:
+            qualified_name = f"[{table}].{field}"
+            if field not in table_data:
+                issues.append(
+                    LintIssue(
+                        severity="error",
+                        issue_id="runs.manifest_field_missing",
+                        path=manifest_path,
+                        message=(
+                            f"manifest.toml is missing required {qualified_name} field."
+                        ),
+                        recommendation=(
+                            f"Add {qualified_name} according to SPEC section 12.3 and "
+                            "schemas/manifest.json."
+                        ),
+                    )
+                )
+                continue
+            if not isinstance(table_data[field], str):
+                issues.append(
+                    LintIssue(
+                        severity="error",
+                        issue_id="runs.manifest_field_type",
+                        path=manifest_path,
+                        message=f"manifest.toml {qualified_name} must be a string.",
+                        recommendation=(
+                            f"Store {qualified_name} as a TOML string according to "
+                            "schemas/manifest.json."
+                        ),
+                    )
+                )
     return issues
 
 

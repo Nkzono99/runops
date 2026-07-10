@@ -3,10 +3,35 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+
+import pytest
 
 from runops.application.operator.lint import run_project_lint
-from runops.core.manifest import ManifestData, write_manifest
+from runops.core.manifest import ManifestData, read_manifest, write_manifest
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
+from tests.factories import write_toml
+
+_REQUIRED_MANIFEST_TABLES = (
+    "run",
+    "origin",
+    "simulator",
+    "launcher",
+    "simulator_source",
+    "job",
+    "params_snapshot",
+)
+
+_REQUIRED_MANIFEST_FIELDS = (
+    ("run", "id"),
+    ("run", "status"),
+    ("origin", "case"),
+    ("simulator", "name"),
+    ("launcher", "name"),
+    ("job", "scheduler"),
+    ("job", "job_id"),
+    ("job", "submitted_at"),
+)
 
 
 def _write_project(path: Path) -> None:
@@ -44,33 +69,65 @@ name = "demo"
     )
 
 
+def _canonical_manifest(path: Path, run_id: str, status: str) -> ManifestData:
+    return ManifestData(
+        run={
+            "id": run_id,
+            "display_name": run_id,
+            "status": status,
+            "created_at": "2026-05-08T12:00:00+09:00",
+        },
+        path={"run_dir": path.as_posix()},
+        origin={"case": "demo", "survey": "", "parent_run": ""},
+        classification={"model": "demo", "submodel": "", "tags": []},
+        simulator={
+            "name": "demo",
+            "adapter": "generic",
+            "resolver_mode": "package",
+        },
+        launcher={"name": "srun"},
+        simulator_source={
+            "resolver_mode": "package",
+            "source_repo": "",
+            "git_commit": "abc123",
+            "git_dirty": False,
+            "build_command": "",
+            "executable": "solver",
+            "exe_hash": "sha256:demo",
+            "package_version": "1.0.0",
+        },
+        job={
+            "scheduler": "slurm",
+            "job_id": "",
+            "partition": "debug",
+            "submitted_at": "",
+        },
+        variation={"changed_keys": []},
+        params_snapshot={},
+        files={
+            "input_dir": "input",
+            "submit_dir": "submit",
+            "work_dir": "work",
+            "analysis_dir": "analysis",
+            "status_dir": "status",
+        },
+    )
+
+
 def _write_run(path: Path, run_id: str, status: str) -> None:
     path.mkdir(parents=True, exist_ok=True)
-    write_manifest(
-        path,
-        ManifestData(
-            run={"id": run_id, "status": status},
-            simulator_source={
-                "git_commit": "abc123",
-                "exe_hash": "sha256:demo",
-                "package_version": "1.0.0",
-            },
-        ),
-    )
+    write_manifest(path, _canonical_manifest(path, run_id, status))
 
 
 def _write_run_with_slurm_state(path: Path, status: str, slurm_state: str) -> None:
     path.mkdir(parents=True, exist_ok=True)
-    write_manifest(
-        path,
-        ManifestData(
-            run={
-                "id": path.name,
-                "status": status,
-                "last_slurm_state": slurm_state,
-            },
-        ),
-    )
+    manifest = _canonical_manifest(path, path.name, status)
+    manifest.run["last_slurm_state"] = slurm_state
+    write_manifest(path, manifest)
+
+
+def _write_manifest_dict(path: Path, manifest: dict[str, Any]) -> None:
+    write_toml(path / "manifest.toml", manifest)
 
 
 def test_project_lint_accepts_healthy_minimal_project(tmp_path: Path) -> None:
@@ -106,6 +163,121 @@ def test_project_lint_reports_invalid_manifest(tmp_path: Path) -> None:
 
     assert [issue.issue_id for issue in report.issues] == ["runs.manifest_invalid"]
     assert report.error_count == 1
+
+
+@pytest.mark.parametrize("table", _REQUIRED_MANIFEST_TABLES)
+def test_project_lint_reports_each_missing_required_manifest_table(
+    tmp_path: Path,
+    table: str,
+) -> None:
+    _write_project(tmp_path)
+    run_dir = tmp_path / "runs" / "R20260508-0001"
+    manifest = _canonical_manifest(
+        run_dir,
+        "R20260508-0001",
+        "created",
+    ).to_dict()
+    del manifest[table]
+    _write_manifest_dict(run_dir, manifest)
+
+    report = run_project_lint(tmp_path, scopes=("runs",))
+
+    issue = next(
+        issue
+        for issue in report.issues
+        if issue.issue_id == "runs.manifest_table_missing"
+    )
+    assert f"[{table}]" in issue.message
+
+
+@pytest.mark.parametrize(("table", "field"), _REQUIRED_MANIFEST_FIELDS)
+def test_project_lint_reports_each_missing_required_manifest_field(
+    tmp_path: Path,
+    table: str,
+    field: str,
+) -> None:
+    _write_project(tmp_path)
+    run_dir = tmp_path / "runs" / "R20260508-0001"
+    manifest = _canonical_manifest(
+        run_dir,
+        "R20260508-0001",
+        "created",
+    ).to_dict()
+    del manifest[table][field]
+    _write_manifest_dict(run_dir, manifest)
+
+    report = run_project_lint(tmp_path, scopes=("runs",))
+
+    issue = next(
+        issue
+        for issue in report.issues
+        if issue.issue_id == "runs.manifest_field_missing"
+    )
+    assert f"[{table}].{field}" in issue.message
+
+
+@pytest.mark.parametrize(("table", "field"), _REQUIRED_MANIFEST_FIELDS)
+def test_project_lint_reports_each_invalid_required_manifest_field_type(
+    tmp_path: Path,
+    table: str,
+    field: str,
+) -> None:
+    _write_project(tmp_path)
+    run_dir = tmp_path / "runs" / "R20260508-0001"
+    manifest = _canonical_manifest(
+        run_dir,
+        "R20260508-0001",
+        "created",
+    ).to_dict()
+    manifest[table][field] = 42
+    _write_manifest_dict(run_dir, manifest)
+
+    report = run_project_lint(tmp_path, scopes=("runs",))
+
+    issue = next(
+        issue for issue in report.issues if issue.issue_id == "runs.manifest_field_type"
+    )
+    assert f"[{table}].{field}" in issue.message
+
+
+@pytest.mark.parametrize("table", _REQUIRED_MANIFEST_TABLES)
+def test_project_lint_reports_each_invalid_required_manifest_table_type(
+    tmp_path: Path,
+    table: str,
+) -> None:
+    _write_project(tmp_path)
+    run_dir = tmp_path / "runs" / "R20260508-0001"
+    manifest = _canonical_manifest(
+        run_dir,
+        "R20260508-0001",
+        "created",
+    ).to_dict()
+    manifest[table] = "not-a-table"
+    _write_manifest_dict(run_dir, manifest)
+
+    report = run_project_lint(tmp_path, scopes=("runs",))
+
+    assert [issue.issue_id for issue in report.issues] == ["runs.manifest_invalid"]
+    assert f"{table!r} must be a TOML table" in report.issues[0].message
+
+
+def test_project_lint_keeps_sparse_legacy_manifest_readable(tmp_path: Path) -> None:
+    _write_project(tmp_path)
+    run_dir = tmp_path / "runs" / "R20260508-0001"
+    _write_manifest_dict(
+        run_dir,
+        {"run": {"id": "R20260508-0001", "status": "created"}},
+    )
+
+    manifest = read_manifest(run_dir)
+    report = run_project_lint(tmp_path, scopes=("runs",))
+
+    assert manifest.run == {"id": "R20260508-0001", "status": "created"}
+    assert "runs.manifest_invalid" not in {issue.issue_id for issue in report.issues}
+    assert (
+        sum(issue.issue_id == "runs.manifest_table_missing" for issue in report.issues)
+        == 6
+    )
 
 
 def test_project_lint_reports_duplicate_run_id(tmp_path: Path) -> None:

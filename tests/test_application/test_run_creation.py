@@ -9,11 +9,14 @@ consumed by ``runops.jobgen.generator._render_script``
 
 from __future__ import annotations
 
+import json
 import shlex
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pytest
+from jsonschema import Draft7Validator
 
 from runops.adapters.generic import GenericAdapter
 from runops.application.run_creation import (
@@ -184,6 +187,13 @@ class TestBuildManifestJob:
         assert "processes" not in result
 
 
+class EmptyProvenanceAdapter(GenericAdapter):
+    """Valid adapter that has no provenance values to report."""
+
+    def collect_provenance(self, runtime_info: dict[str, Any]) -> dict[str, Any]:
+        return {}
+
+
 def test_build_manifest_emits_canonical_required_contract(tmp_path: Path) -> None:
     run_info = RunInfo(
         run_id="R20260710-0001",
@@ -200,7 +210,7 @@ def test_build_manifest_emits_canonical_required_contract(tmp_path: Path) -> Non
             "resolver_mode": "local_executable",
             "executable": "/nonexistent/solver",
         },
-        GenericAdapter(),
+        EmptyProvenanceAdapter(),
         _standard_site(),
     )
 
@@ -225,6 +235,20 @@ def test_build_manifest_emits_canonical_required_contract(tmp_path: Path) -> Non
     assert raw["job"]["scheduler"] == "slurm"
     assert raw["job"]["job_id"] == ""
     assert raw["job"]["submitted_at"] == ""
+    assert raw["simulator_source"] == {
+        "resolver_mode": "local_executable",
+        "source_repo": "",
+        "git_commit": "",
+        "git_dirty": False,
+        "build_command": "",
+        "executable": "/nonexistent/solver",
+        "exe_hash": "",
+        "package_version": "",
+    }
+
+    schema_path = Path(__file__).resolve().parents[2] / "schemas" / "manifest.json"
+    schema = json.loads(schema_path.read_text(encoding="utf-8"))
+    Draft7Validator(schema).validate(raw)
 
 
 class TestSurveyOverrides:
