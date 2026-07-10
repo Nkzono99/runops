@@ -68,4 +68,3 @@ description: Select the next bounded scientific experiment from the research age
 - portfolio の phase / proposal / budget / gate が一致する
 - 次に投入してよい範囲が pilot までと明記されている
 - 判断理由を `{{ skill_prefix }}note` へ追記している
-
