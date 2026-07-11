@@ -12,7 +12,8 @@ uv run ruff format --check src/ tests/
 uv run ruff check src/ tests/
 uv run mypy src/
 uv run pytest tests/ -x -q
-uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
+uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
+uv run python -m runops.application.operator.coverage_policy coverage.json
 ```
 
 失敗したステップがあればエラーを表示し、修正案を提示する。

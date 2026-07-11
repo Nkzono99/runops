@@ -58,6 +58,14 @@ CONTEXT_MODEL_DOCS = (
     "SPEC.md",
 )
 PROJECT_GUIDANCE = ("AGENTS.md", "CLAUDE.md")
+QUALITY_GATE_GUIDANCE = (
+    ".github/workflows/ci.yml",
+    ".github/workflows/publish.yml",
+    ".agents/skills/check/SKILL.md",
+    ".claude/skills/check/SKILL.md",
+    ".codex/rules/dev-workflow.md",
+    ".claude/rules/dev-workflow.md",
+)
 SUPERPOWERS_DOCS = ROOT / "docs" / "superpowers"
 
 
@@ -201,6 +209,16 @@ def test_project_guidance_names_application_boundary(relative_path: str) -> None
 
     assert "application/" in text
     assert "core/" in text
+
+
+@pytest.mark.parametrize("relative_path", QUALITY_GATE_GUIDANCE)
+def test_quality_gates_enforce_critical_module_coverage(relative_path: str) -> None:
+    text = _read(relative_path)
+
+    assert "--cov-report=json:coverage.json" in text
+    assert (
+        "python -m runops.application.operator.coverage_policy coverage.json" in text
+    )
 
 
 def test_v0_migration_note_records_surface_and_internal_moves() -> None:

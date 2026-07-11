@@ -48,4 +48,6 @@ jobs:
 
       - name: Run tests with coverage floor
         # Enforce the project's target minimum coverage.
-        run: uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-fail-under=80
+        run: |
+          uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
+          uv run python -m runops.application.operator.coverage_policy coverage.json
