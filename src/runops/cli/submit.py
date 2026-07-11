@@ -17,6 +17,7 @@ from runops.application.execution.submission import (
     SubmitRequest,
     plan_submit,
 )
+from runops.application.research.experiments import validate_bulk_experiment_gate
 from runops.cli.run_lookup import resolve_project_run_dir
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
@@ -317,6 +318,12 @@ def _submit_all(
     if not target_dir.is_dir():
         typer.echo(f"Error: Directory not found: {target_dir}")
         raise typer.Exit(code=1)
+
+    try:
+        validate_bulk_experiment_gate(target_dir)
+    except SimctlError as exc:
+        typer.echo(f"Error: {exc}")
+        raise typer.Exit(code=1) from exc
 
     run_dirs = discover_runs(target_dir)
     if not run_dirs:

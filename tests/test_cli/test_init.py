@@ -240,6 +240,7 @@ class TestInit:
         assert "notes/reports/README.md" in codex_content
         assert "analysis/cross_run/<comparison_id>/" in codex_content
         assert (tmp_path / "research" / "paper_requests.toml").is_file()
+        assert (tmp_path / "research" / "experiments.toml").is_file()
 
     def test_init_creates_migrate_runops_skill(self, tmp_path: Path) -> None:
         """The migrate-runops skill is rendered for Claude and Codex."""

@@ -37,7 +37,7 @@
 | `runo runs create CASE` | case から単一 run を生成 |
 | `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 |
 | `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
-| `runo runs submit --all [DIR] [--yes]` | ready plan の run を確認付きで一括投入 (`--yes` で確認省略) |
+| `runo runs submit --all [DIR] [--yes]` | ready plan を一括投入。survey は structured experiment gate 必須 (`--yes` は確認のみ省略) |
 | `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備 (`--plan` は状態を戻さず記録のみ) |

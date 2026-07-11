@@ -44,3 +44,5 @@ Decision の意味:
   一致しない場合、`{{ skill_prefix }}run-all` は full submit へ進まない。
 - Decision 後に `research/agenda.md` の Active Experiment Portfolio と Current
   Decision を更新し、`{{ skill_prefix }}note` に checkpoint を追記する。
+- 同じ Experiment ID の `research/experiments.toml` も更新する。`decision` は review
+  と同じ値、`review` は project-relative path にする。

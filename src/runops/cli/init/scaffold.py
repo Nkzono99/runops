@@ -144,6 +144,12 @@ def _create_research_skeleton(project_dir: Path, created: list[str]) -> None:
         load_static("scaffold/research/paper_requests.toml"),
     ):
         created.append("research/paper_requests.toml")
+    experiments_path = research_dir / "experiments.toml"
+    if _write_if_missing(
+        experiments_path,
+        load_static("scaffold/research/experiments.toml"),
+    ):
+        created.append("research/experiments.toml")
     for dirname in ("proposals", "reviews"):
         keep_path = research_dir / dirname / ".gitkeep"
         template_path = f"scaffold/research/{dirname}/.gitkeep"

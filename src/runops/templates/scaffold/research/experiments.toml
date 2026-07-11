@@ -1,0 +1,23 @@
+# Machine-readable experiment gate ledger. Keep rationale in proposals/reviews.
+schema_version = 1
+
+# [[experiments]]
+# id = "E1"
+# decision = "WAIT"
+# proposal = "research/proposals/YYYY-MM-DD-topic.md"
+# review = ""
+# selected_candidate = "C1"
+#
+# [[experiments.candidates]]
+# id = "C1"
+# information_gain = "high"
+# falsification = "observable that rejects the hypothesis"
+# estimated_core_hours = 1.0
+# operational_risk = "low"
+#
+# [[experiments.candidates]]
+# id = "C2"
+# information_gain = "medium"
+# falsification = "alternative rejection observation"
+# estimated_core_hours = 2.0
+# operational_risk = "medium"

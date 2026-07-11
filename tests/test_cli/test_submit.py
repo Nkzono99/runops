@@ -245,6 +245,28 @@ def test_submit_all(tmp_path: Path) -> None:
         assert check.message in result.output
 
 
+def test_submit_all_gates_survey_before_planning_even_with_dry_run_and_yes(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    survey_dir = tmp_path / "runs" / "survey1"
+    _create_run(survey_dir / "R20260327-0001")
+    (survey_dir / "survey.toml").write_text(
+        '[survey]\nbase_case = "base"\nsimulator = "test"\nlauncher = "srun"\n',
+        encoding="utf-8",
+    )
+
+    with patch("runops.cli.submit._build_submit_plan") as build_plan:
+        result = runner.invoke(
+            app,
+            ["runs", "submit", "--all", "--dry-run", "--yes", str(survey_dir)],
+        )
+
+    assert result.exit_code == 1
+    assert "requires [research]" in result.output
+    build_plan.assert_not_called()
+
+
 def test_submit_all_confirmation_decline(tmp_path: Path) -> None:
     """--all should ask for confirmation before submitting created runs."""
     (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')

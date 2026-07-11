@@ -36,6 +36,11 @@ description: Select the next bounded scientific experiment from the research age
 
 同時に `research/agenda.md` の `Active Experiment Portfolio` を更新する。
 
+さらに `research/experiments.toml` の同じ Experiment ID に最低 2 候補を
+`[[experiments.candidates]]` として記録する。各候補は `information_gain`,
+`falsification`, `estimated_core_hours`, `operational_risk` を持つ。
+`selected_candidate` と proposal 本文の選定理由を一致させる。
+
 ```text
 - E1:
   - Phase: proposed

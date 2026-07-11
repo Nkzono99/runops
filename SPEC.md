@@ -1177,7 +1177,17 @@ raw evidence、現在判断/refined narrative、解析・出版 artifact、再�
 * `--yes` は CLI confirmation の省略であり、proposal / pilot / review の research gate
   を省略しない
 
-### 18.9.2 Story acceptance audit (experimental)
+### 18.9.2 Structured experiment gate
+
+survey-backed `runo runs submit --all` は `survey.toml [research]` の
+`experiment_id` と `stage = "pilot" | "full"` を必須とする。
+`research/experiments.toml` は candidate comparison と expansion decision の機械正本で、
+各 experiment は最低 2 候補、選択候補、proposal path を持つ。候補は
+`information_gain`, `falsification`, `estimated_core_hours`, `operational_risk` を持つ。
+`stage = "full"` は decision `EXPAND` と存在する review path が一致する場合だけ許可する。
+この gate は dry-run にも適用し、`--yes` では省略できない。
+
+### 18.9.3 Story acceptance audit (experimental)
 
 `analysis/stories/<story-id>/story.toml` は `schema_version = 1` を持ち、各 step の
 `required_artifacts` と `acceptable_status` は 1 件以上の非空文字列からなる TOML array

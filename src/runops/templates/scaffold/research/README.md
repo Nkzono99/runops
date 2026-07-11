@@ -5,6 +5,7 @@
 
 - `agenda.md` — mutable な現在の研究判断の正本
 - `paper_requests.toml` — paper draft から戻る解析・図表・追加実験要望
+- `experiments.toml` — candidate comparison と pilot/full gate の機械正本
 - `proposals/` — 高コスト・方向転換・新 model など、実行前に残す任意の判断記録
 - `reviews/` — 主要結果・意外な失敗・pause/kill/pivot などの checkpoint snapshot
 
@@ -71,6 +72,9 @@ production / large survey は次の順で進めます。
 3. `run-all` で pilot だけを投入
 4. `review-pilot` で `research/reviews/<date>-<topic>.md` を作成
 5. review と agenda の decision がともに `EXPAND` の場合だけ remaining run を full submit
+
+survey-backed bulk submit は `survey.toml [research]` の `experiment_id` / `stage` と
+`experiments.toml` を機械検査する。full stage は EXPAND と review path が必須。
 
 `--yes` は CLI prompt を省略するだけで、この research gate は省略しません。
 

@@ -15,6 +15,7 @@ description: Generate and submit all runs from a survey. Use when ready to launc
    `research/reviews/<date>-<topic>.md` を作る
 5. review の proposal / run_id / criteria、文字列 `Decision: EXPAND`、portfolio の
    review path と decision が一致する場合だけ full submit plan を作る
+   - `survey.toml [research]` と `research/experiments.toml` の machine gate も一致必須
 6. `runo runs submit --dry-run --all` で投入対象と skip を確認する
 7. remaining run 数、queue、資源量、cost ceiling、実行 command を報告して明示確認を取る
 8. `runo runs submit --all` で full submit する
@@ -38,6 +39,7 @@ runo runs submit --all --yes -qn <queue>
 
 - `runs submit --all` は破壊的操作ではないが、HPC 資源・queue・quota に影響する高コスト操作
 - `--yes` は CLI prompt を省略するだけで、pilot review gate を省略しない
+- `--dry-run` も machine gate を通す。gate failure を個別 submit 分解で迂回しない
 - review が `REVISE`, `STOP`, `WAIT`、または欠落なら full submit を行わない
 - 初回の大規模 survey と EXPAND 後の full submit は承認を取る
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。
