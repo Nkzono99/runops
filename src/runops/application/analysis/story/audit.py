@@ -53,9 +53,7 @@ def audit_step(
         if accepted:
             matched.extend(ArtifactEvidence(selector, item) for item in accepted)
         elif selector_matches:
-            weak.extend(
-                ArtifactEvidence(selector, item) for item in selector_matches
-            )
+            weak.extend(ArtifactEvidence(selector, item) for item in selector_matches)
         else:
             missing.append(selector)
 

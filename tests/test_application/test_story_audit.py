@@ -28,9 +28,7 @@ def _artifact(**changes: object) -> ArtifactRecord:
         "title": "Surface Potential",
         "status": "main",
         "quantity": "surface_potential",
-        "present_fields": frozenset(
-            {"kind", "path", "title", "status", "quantity"}
-        ),
+        "present_fields": frozenset({"kind", "path", "title", "status", "quantity"}),
     }
     values.update(changes)
     return ArtifactRecord(**values)  # type: ignore[arg-type]
@@ -54,9 +52,7 @@ def test_audit_step_classifies_covered_weak_and_missing_evidence() -> None:
     assert tuple(item.selector for item in result.matched_artifacts) == (
         "figure:surface_potential",
     )
-    assert tuple(item.selector for item in result.weak_artifacts) == (
-        "figure:force",
-    )
+    assert tuple(item.selector for item in result.weak_artifacts) == ("figure:force",)
     assert result.missing_artifacts == ("data:density",)
 
 

@@ -6,7 +6,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 from runops.application.analysis.artifacts import read_artifacts_index
 from runops.core.discovery import discover_runs

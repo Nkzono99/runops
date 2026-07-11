@@ -9,16 +9,21 @@ from typing import Any
 
 import pytest
 import tomli_w
-from runops.application import analysis
-from runops.application.analysis import story
 
 if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
 
-from runops.application.analysis import audit_story_workspace, create_story_workspace
+from runops.application import analysis
+from runops.application.analysis import (
+    audit_story_workspace,
+    create_story_workspace,
+    story,
+)
 from runops.core.exceptions import SimctlError
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _write_project_file(project_root: Path) -> None:
@@ -66,6 +71,25 @@ def test_story_module_exports_public_analysis_symbols() -> None:
 
     for name in public_names:
         assert getattr(story, name) is getattr(analysis, name)
+
+
+def test_story_package_has_typed_responsibility_boundaries() -> None:
+    package = ROOT / "src" / "runops" / "application" / "analysis" / "story"
+
+    assert not (package.parent / "story.py").exists()
+    assert {path.name for path in package.glob("*.py")} == {
+        "__init__.py",
+        "audit.py",
+        "models.py",
+        "render.py",
+        "schema.py",
+        "sources.py",
+        "workspace.py",
+    }
+    for name in ("models.py", "audit.py", "render.py"):
+        text = (package / name).read_text(encoding="utf-8")
+        assert "import Any" not in text
+        assert "dict[str, Any]" not in text
 
 
 def test_create_story_workspace_writes_story_toml(tmp_path: Path) -> None:

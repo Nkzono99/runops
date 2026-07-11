@@ -14,6 +14,8 @@ from runops.application.operator.coverage_policy import (
     main,
 )
 
+ROOT = Path(__file__).resolve().parents[2]
+
 
 def _write_report(path: Path, percentages: dict[str, float]) -> None:
     path.write_text(
@@ -155,3 +157,21 @@ def test_coverage_policy_main_reports_invalid_input(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "coverage policy error:" in captured.err
+
+
+def test_repository_policy_covers_typed_story_package() -> None:
+    policy = load_coverage_policy(ROOT / "pyproject.toml")
+
+    assert "src/runops/application/analysis/story.py" not in policy
+    assert {
+        path: policy[path]
+        for path in policy
+        if path.startswith("src/runops/application/analysis/story/")
+    } == {
+        "src/runops/application/analysis/story/models.py": 95.0,
+        "src/runops/application/analysis/story/schema.py": 90.0,
+        "src/runops/application/analysis/story/audit.py": 95.0,
+        "src/runops/application/analysis/story/sources.py": 80.0,
+        "src/runops/application/analysis/story/render.py": 90.0,
+        "src/runops/application/analysis/story/workspace.py": 80.0,
+    }

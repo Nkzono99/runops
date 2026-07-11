@@ -110,9 +110,7 @@ def _read_sources(story: dict[str, Any]) -> tuple[StorySource, ...]:
         if not isinstance(raw_kind, str) or raw_kind not in _SOURCE_KINDS:
             valid = ", ".join(sorted(_SOURCE_KINDS))
             raise SimctlError(f"story source #{index} kind must be one of: {valid}")
-        sources.append(
-            StorySource(kind=cast(SourceKind, raw_kind), path=path)
-        )
+        sources.append(StorySource(kind=cast("SourceKind", raw_kind), path=path))
     return tuple(sources)
 
 

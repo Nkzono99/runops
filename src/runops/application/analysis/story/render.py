@@ -17,8 +17,7 @@ def audit_payload(audit: StoryAudit) -> dict[str, object]:
             "path": audit.story_path,
         },
         "sources": [
-            {"kind": source.kind, "path": source.path}
-            for source in audit.spec.sources
+            {"kind": source.kind, "path": source.path} for source in audit.spec.sources
         ],
         "overall_status": audit.overall_status,
         "warnings": list(audit.warnings),
@@ -53,7 +52,9 @@ def render_audit_markdown(audit: StoryAudit) -> str:
             lines.append(f"- Claim ceiling: {step.claim_ceiling}")
         if step.matched_artifacts:
             lines.append("- Covered evidence:")
-            lines.extend(_evidence_line(item.to_dict()) for item in step.matched_artifacts)
+            lines.extend(
+                _evidence_line(item.to_dict()) for item in step.matched_artifacts
+            )
         if step.weak_artifacts:
             lines.append("- Weak evidence:")
             lines.extend(_evidence_line(item.to_dict()) for item in step.weak_artifacts)

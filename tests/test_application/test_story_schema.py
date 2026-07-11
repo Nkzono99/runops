@@ -11,8 +11,10 @@ import tomli_w
 
 from runops.application.analysis.story.models import StorySource, StoryStep
 from runops.application.analysis.story.schema import (
+    parse_story_spec,
     read_story_spec,
     story_spec_payload,
+    validate_story_id,
 )
 from runops.core.exceptions import SimctlError
 
@@ -167,3 +169,111 @@ def test_read_story_spec_preserves_validation_errors(
 
     with pytest.raises(SimctlError, match=re.escape(message)):
         read_story_spec(path, default_id="fallback")
+
+
+@pytest.mark.parametrize(
+    ("story_id", "message"),
+    [
+        ("", "story id must be non-empty"),
+        ("Bad ID", "story id must start with"),
+    ],
+)
+def test_validate_story_id_rejects_invalid_values(
+    story_id: str,
+    message: str,
+) -> None:
+    with pytest.raises(SimctlError, match=message):
+        validate_story_id(story_id)
+
+
+def test_read_story_spec_translates_file_and_toml_errors(tmp_path: Path) -> None:
+    missing = tmp_path / "missing.toml"
+    with pytest.raises(SimctlError, match="Failed to read"):
+        read_story_spec(missing, default_id="fallback")
+
+    malformed = tmp_path / "story.toml"
+    malformed.write_text("[broken", encoding="utf-8")
+    with pytest.raises(SimctlError, match="Invalid TOML"):
+        read_story_spec(malformed, default_id="fallback")
+
+
+@pytest.mark.parametrize(
+    ("sources", "message"),
+    [
+        (None, ""),
+        ({}, "story sources must be a list"),
+        (["runs/scan"], "story source #1 must be a table"),
+        ([{"path": 1}], "story source #1 path must be a string"),
+        ([{"path": "  "}], "story source #1 is missing path"),
+    ],
+)
+def test_parse_story_spec_validates_source_container_shapes(
+    sources: object,
+    message: str,
+) -> None:
+    payload: dict[str, Any] = {
+        "schema_version": 1,
+        "id": "story",
+        "sources": sources,
+        "steps": [
+            {
+                "id": "step",
+                "required_artifacts": ["figure:x"],
+                "acceptable_status": ["main"],
+            }
+        ],
+    }
+    if not message:
+        assert parse_story_spec(payload, default_id="fallback").sources == ()
+        return
+    with pytest.raises(SimctlError, match=message):
+        parse_story_spec(payload, default_id="fallback")
+
+
+@pytest.mark.parametrize(
+    ("step", "message"),
+    [
+        ("step", "story step #1 must be a table"),
+        (
+            {
+                "required_artifacts": ["figure:x"],
+                "acceptable_status": ["main"],
+            },
+            "story step #1 is missing id",
+        ),
+        (
+            {
+                "id": "step",
+                "required_artifacts": ["  "],
+                "acceptable_status": ["main"],
+            },
+            "must contain only non-empty strings",
+        ),
+    ],
+)
+def test_parse_story_spec_validates_step_container_shapes(
+    step: object,
+    message: str,
+) -> None:
+    with pytest.raises(SimctlError, match=message):
+        parse_story_spec(
+            {"schema_version": 1, "id": "story", "steps": [step]},
+            default_id="fallback",
+        )
+
+
+def test_parse_story_spec_requires_an_id_when_default_is_empty() -> None:
+    with pytest.raises(SimctlError, match="story id must be non-empty"):
+        parse_story_spec(
+            {
+                "schema_version": 1,
+                "steps": [
+                    {
+                        "id": "step",
+                        "required_artifacts": ["figure:x"],
+                        "acceptable_status": ["main"],
+                    }
+                ],
+            },
+            default_id="",
+        )

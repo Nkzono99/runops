@@ -15,7 +15,7 @@ from runops.core.exceptions import ProjectNotFoundError, SimctlError
 from runops.core.project import find_project_root
 
 from .audit import audit_step, overall_status
-from .models import StoryAudit, StorySpec, StoryStep
+from .models import ArtifactRecord, StoryAudit, StorySpec, StoryStep
 from .render import audit_payload, render_audit_markdown
 from .schema import read_story_spec, story_spec_payload, validate_story_id
 from .sources import collect_source_artifacts, display_path, source_from_path
@@ -129,7 +129,7 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
 
     project_root = _find_project_root_for_story(story_root)
     spec = read_story_spec(story_path, default_id=story_root.name)
-    artifacts = []
+    artifacts: list[ArtifactRecord] = []
     warnings: list[str] = []
     for source in spec.sources:
         collection = collect_source_artifacts(project_root, source)
@@ -168,7 +168,7 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
         audit_json_path=audit_json_path,
         audit_md_path=audit_md_path,
         overall_status=audit.overall_status,
-        steps=[cast(dict[str, Any], step.to_dict()) for step in step_results],
+        steps=[cast("dict[str, Any]", step.to_dict()) for step in step_results],
         warnings=warnings,
     )
 
