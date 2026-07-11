@@ -113,7 +113,16 @@ def plan_create_experiment(request: ExperimentCreateRequest) -> ExperimentCreate
 
 def apply_create_experiment(plan: ExperimentCreatePlan) -> ExperimentCreateResult:
     """Apply a creation plan with stale-state checks and rollback."""
-    if _identity(plan.ledger_path) != plan.ledger_identity:
+    try:
+        current_ledger_bytes = plan.ledger_path.read_bytes()
+    except OSError as exc:
+        raise ExperimentStalePlanError(
+            f"experiment ledger cannot be revalidated: {exc}"
+        ) from exc
+    if (
+        _identity(plan.ledger_path) != plan.ledger_identity
+        or current_ledger_bytes != plan.original_ledger_bytes
+    ):
         raise ExperimentStalePlanError("experiment ledger changed after planning")
     if plan.proposal_path.exists():
         raise ExperimentStalePlanError("experiment proposal appeared after planning")

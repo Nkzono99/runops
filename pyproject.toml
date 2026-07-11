@@ -107,3 +107,6 @@ testpaths = ["tests"]
 "src/runops/application/analysis/story/sources.py" = 80
 "src/runops/application/analysis/story/render.py" = 90
 "src/runops/application/analysis/story/workspace.py" = 80
+"src/runops/application/research/experiments/projection.py" = 94
+"src/runops/application/research/experiments/schema.py" = 93
+"src/runops/application/research/experiments/workspace.py" = 86

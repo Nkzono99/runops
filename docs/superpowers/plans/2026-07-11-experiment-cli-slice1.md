@@ -8,7 +8,12 @@
 
 **Tech Stack:** Python 3.10+, frozen dataclasses, TOML/JSON, Typer, pytest, Ruff, strict mypy.
 
-**Status:** active
+**Status:** completed
+
+**Outcome:** Implemented schema v2, derived readiness projection, atomic create,
+`runo experiment new/show/check`, M0-0004 migration, and critical coverage floors.
+Final verification passed 1,637 tests at 82.53% branch coverage. Module coverage:
+projection 94.81%, schema 93.93%, workspace 86.67%.
 
 ## Global Constraints
 
@@ -40,7 +45,7 @@
 - Preserves: `validate_bulk_experiment_gate(survey_dir: Path) -> ExperimentAuthorization | None`
 - Produces immutable `ExperimentCandidate`, `ExperimentAuthorizationScope`, `ExperimentRecord`, `ExperimentLedger`, and `ExperimentCreateSpec`.
 
-- [ ] **Step 1: Write failing schema-v2 and compatibility tests**
+- [x] **Step 1: Write failing schema-v2 and compatibility tests**
 
 ```python
 def test_schema_v2_loads_complete_typed_record(project_root: Path) -> None:
@@ -64,7 +69,7 @@ def test_schema_v1_bulk_gate_remains_compatible(tmp_path: Path) -> None:
     assert validate_bulk_experiment_gate(survey) is not None
 ```
 
-- [ ] **Step 2: Run tests and verify the red state**
+- [x] **Step 2: Run tests and verify the red state**
 
 Run:
 
@@ -74,7 +79,7 @@ tssrun -p gr20001b uv run pytest tests/test_application/test_experiment_schema.p
 
 Expected: collection fails because the package models and `load_experiment_ledger` do not exist.
 
-- [ ] **Step 3: Implement frozen models**
+- [x] **Step 3: Implement frozen models**
 
 ```python
 ExperimentStage = Literal["pilot", "full"]
@@ -142,7 +147,7 @@ class ExperimentCreateSpec:
 
 `identity` is `(st_dev, st_ino, st_mtime_ns)` and is captured from the opened ledger after parsing.
 
-- [ ] **Step 4: Implement strict schema parsing and spec input**
+- [x] **Step 4: Implement strict schema parsing and spec input**
 
 `schema.py` must accept ledger schema 1 or 2, reject duplicate IDs/candidate IDs, booleans as numeric costs, absolute/escaping project paths, unknown decisions/stages, selected candidates not in the candidate set, and persisted `phase`. Schema 1 is converted in memory without rewriting: missing v2 scientific fields become `None` and synthetic migration blockers, while the compatibility gate enforces the original v1 fields only. Schema 2 accepts `migration_blockers` only when non-empty and rejects authorization unless all four authorization fields are valid. Complete schema-2 records reject `None` for title, question, or cost ceiling.
 
@@ -169,7 +174,7 @@ estimated_core_hours = 64.0
 operational_risk = "medium"
 ```
 
-- [ ] **Step 5: Move the existing bulk gate behind the facade**
+- [x] **Step 5: Move the existing bulk gate behind the facade**
 
 `gate.py` consumes `load_experiment_ledger()` for schema 2 and retains the existing schema-1 behavior. A schema-2 record with migration blockers fails closed. A full-stage survey additionally requires matching `authorization.stage`, resolved survey path, review path, and a selected-candidate cost not exceeding both authorization and record ceilings.
 
@@ -180,7 +185,7 @@ from .gate import validate_bulk_experiment_gate
 from .schema import load_experiment_ledger, read_experiment_spec
 ```
 
-- [ ] **Step 6: Run focused tests and commit**
+- [x] **Step 6: Run focused tests and commit**
 
 Run the command from Step 2. Expected: all experiment schema/gate tests pass.
 
@@ -204,7 +209,7 @@ git commit -m "refactor: type experiment ledger schema"
 - Produces: `project_experiment(project_root: Path, experiment_id: str) -> ExperimentProjection`
 - Produces: `list_experiment_projections(project_root: Path) -> tuple[ExperimentProjection, ...]`
 
-- [ ] **Step 1: Write failing projection tests**
+- [x] **Step 1: Write failing projection tests**
 
 ```python
 def test_projection_derives_blocked_without_persisting_phase(project_root: Path) -> None:
@@ -224,7 +229,7 @@ def test_projection_derives_full_authorized_from_scope(project_root: Path) -> No
     )
 ```
 
-- [ ] **Step 2: Verify the tests fail because projection APIs are absent**
+- [x] **Step 2: Verify the tests fail because projection APIs are absent**
 
 Run:
 
@@ -234,7 +239,7 @@ tssrun -p gr20001b uv run pytest tests/test_application/test_experiment_projecti
 
 Expected: import/attribute failure for `project_experiment`.
 
-- [ ] **Step 3: Add projection types**
+- [x] **Step 3: Add projection types**
 
 ```python
 IssueSeverity = Literal["error", "warning"]
@@ -304,7 +309,7 @@ class ExperimentProjection:
         }
 ```
 
-- [ ] **Step 4: Implement deterministic discovery and phase priority**
+- [x] **Step 4: Implement deterministic discovery and phase priority**
 
 Scan project-local `survey.toml` files under `runs/`, select `[research].experiment_id`, then discover their run manifests by origin survey path. Read artifact indexes only through existing analysis artifact helpers. Phase priority is exact:
 
@@ -324,7 +329,7 @@ otherwise -> proposed
 
 Missing/invalid referenced paths are issues, not uncaught exceptions. Unknown run states and stale artifact indexes are warnings. Output ordering is experiment ID, path, and issue code stable.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run the Step 2 command. Expected: all projection tests pass.
 
@@ -348,7 +353,7 @@ git commit -m "feat: project experiment readiness"
 - Produces: `plan_create_experiment(request: ExperimentCreateRequest) -> ExperimentCreatePlan`
 - Produces: `apply_create_experiment(plan: ExperimentCreatePlan) -> ExperimentCreateResult`
 
-- [ ] **Step 1: Write failing plan/apply and rollback tests**
+- [x] **Step 1: Write failing plan/apply and rollback tests**
 
 ```python
 def test_create_plan_is_non_mutating(project_root: Path, spec_path: Path) -> None:
@@ -377,7 +382,7 @@ def test_apply_rolls_back_proposal_when_ledger_publish_fails(project_root: Path,
     assert caught.value.recovery_path is None
 ```
 
-- [ ] **Step 2: Verify the focused tests fail**
+- [x] **Step 2: Verify the focused tests fail**
 
 Run:
 
@@ -387,7 +392,7 @@ tssrun -p gr20001b uv run pytest tests/test_application/test_experiment_workspac
 
 Expected: missing workspace APIs.
 
-- [ ] **Step 3: Add immutable request/plan/result/error types**
+- [x] **Step 3: Add immutable request/plan/result/error types**
 
 ```python
 @dataclass(frozen=True)
@@ -417,13 +422,13 @@ class ExperimentCreateResult:
 
 Add `ExperimentStalePlanError` and `ExperimentCreateApplyError` carrying completed paths, failed path, recovery path, and cause.
 
-- [ ] **Step 4: Implement validation, rendering, staging, and rollback**
+- [x] **Step 4: Implement validation, rendering, staging, and rollback**
 
 Experiment IDs use `^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$`; duplicates compare exactly. The proposal is `research/proposals/<id>.md`, created from a deterministic template containing title, question, candidate table, falsification criteria, budget, evidence, and review sections. The plan rejects existing proposal paths and non-schema-2 ledgers.
 
 Apply rechecks the ledger identity and proposal absence, retains the original ledger bytes for rollback, stages both sibling files with mode `0o600`, fsyncs each file, publishes the proposal with no-replace semantics, atomically replaces the ledger, and fsyncs both directories. On any failure after proposal publication it restores the original ledger when replacement occurred and removes only the proposal inode it created. An ambiguous restore or cleanup reports the retained recovery path and completed effects.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run the Step 2 command. Expected: all workspace tests pass.
 
@@ -459,7 +464,7 @@ git commit -m "feat: create experiments atomically"
 - CLI: `runo experiment check [EXPERIMENT] [--json]`
 - Action: `create_experiment(project_root: Path, experiment_id: str, spec_path: Path, dry_run: bool = False) -> ActionResult`
 
-- [ ] **Step 1: Write failing command-tree and behavior tests**
+- [x] **Step 1: Write failing command-tree and behavior tests**
 
 ```python
 def test_experiment_new_from_spec_and_show_json(project_root: Path, spec_path: Path) -> None:
@@ -480,7 +485,7 @@ def test_experiment_check_returns_one_for_errors(project_root: Path) -> None:
 
 Update the exact command-tree expectation with `experiment new`, `experiment show`, and `experiment check` for both executables.
 
-- [ ] **Step 2: Verify CLI tests fail with an unknown command**
+- [x] **Step 2: Verify CLI tests fail with an unknown command**
 
 Run:
 
@@ -490,7 +495,7 @@ tssrun -p gr20001b uv run pytest tests/test_cli/test_experiment.py tests/test_cl
 
 Expected: `No such command 'experiment'` and missing action binding.
 
-- [ ] **Step 3: Implement the thin Typer group and rendering**
+- [x] **Step 3: Implement the thin Typer group and rendering**
 
 Use a common envelope:
 
@@ -508,7 +513,7 @@ def _envelope(status: str, *, data: dict[str, Any], warnings: Sequence[str] = ()
 
 `new --dry-run` renders `ExperimentCreatePlan` and writes nothing. For machine use, `new --json` without `--yes` returns the plan and performs no writes; `new --json --yes` applies and returns created ledger/proposal paths. Human output may apply without `--yes` after showing the low-risk plan. Without `--from`, prompt for title, question, selected candidate, cost ceiling, and at least two complete candidates before planning. `show` requires an ID when multiple records exist and selects the sole record when omitted. `check` prints every issue and exits 1 only when an error-level issue exists.
 
-- [ ] **Step 4: Add action registry metadata**
+- [x] **Step 4: Add action registry metadata**
 
 Add a `create_experiment` action and dispatch entry with exact signature parity:
 
@@ -569,7 +574,7 @@ ToolSpec(
 
 Bind `("experiment", "new")` as a `write` operation. Add `WRITE_DISABLED = SafetyMetadata(level=3, safety_class="write", side_effects=True, writes_files=True)` and a disabled, unexposed `runops.experiment.create` ToolSpec pointing back to `create_experiment`; no MCP handler is exposed in Slice 1. `show` and `check` remain unbound read operations because the governed action catalog does not require every read-only command.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run the Step 2 command. Expected: all CLI/action tests pass.
 
@@ -597,7 +602,7 @@ git commit -m "feat: add experiment inspection CLI"
 - Migration: `M0-0004 Experiment ledger schema 2`
 - Handler: `apply_experiment_ledger_v2(context: MigrationContext) -> MigrationResult`
 
-- [ ] **Step 1: Write failing migration/scaffold tests**
+- [x] **Step 1: Write failing migration/scaffold tests**
 
 ```python
 def test_experiment_v2_migration_preserves_unknown_fields_and_blocks_missing_science(project_root: Path) -> None:
@@ -618,7 +623,7 @@ def test_new_project_scaffolds_empty_schema_v2_ledger(tmp_path: Path) -> None:
     assert _read_toml(tmp_path / "project/research/experiments.toml") == {"schema_version": 2}
 ```
 
-- [ ] **Step 2: Verify migration and init tests fail**
+- [x] **Step 2: Verify migration and init tests fail**
 
 Run:
 
@@ -628,15 +633,15 @@ tssrun -p gr20001b uv run pytest tests/test_application/test_migrations.py tests
 
 Expected: M0-0004 is unregistered and scaffold schema is 1.
 
-- [ ] **Step 3: Implement human-gated idempotent migration**
+- [x] **Step 3: Implement human-gated idempotent migration**
 
 Register number `0004`, type `breaking-project-state`, impact `("research", "experiment-ledger")`, `human_gate=True`. Dry-run reports only `research/experiments.toml`. Empty schema-1 ledgers become `{schema_version = 2}`. Existing records retain all known and unknown fields; missing `title`, `question`, or non-negative `cost_ceiling_core_hours` are listed in stable `migration_blockers`. Repeated application returns `skipped`. Invalid TOML and non-list experiments return warnings without replacing the source file.
 
-- [ ] **Step 4: Update scaffold, specification, command references, and migration notes**
+- [x] **Step 4: Update scaffold, specification, command references, and migration notes**
 
 Document state ownership, derived phase, schema 2, the three canonical commands, JSON envelope, explicit migration command, and schema-1 compatibility window. Mirror shared command guidance in Codex and Claude rules intentionally.
 
-- [ ] **Step 5: Run tests and commit**
+- [x] **Step 5: Run tests and commit**
 
 Run the Step 2 command. Expected: all migration/init/update-harness tests pass.
 
@@ -656,7 +661,7 @@ git commit -m "feat: migrate experiment ledger to schema 2"
 **Interfaces:**
 - Adds critical floors for `experiments/schema.py`, `experiments/projection.py`, and `experiments/workspace.py` at verified baselines no lower than 85%.
 
-- [ ] **Step 1: Run focused quality checks**
+- [x] **Step 1: Run focused quality checks**
 
 ```bash
 tssrun -p gr20001b uv run ruff format --check src/ tests/
@@ -667,7 +672,7 @@ tssrun -p gr20001b uv run pytest tests/test_application/test_experiment_gate.py 
 
 Expected: all commands pass.
 
-- [ ] **Step 2: Run the full branch-coverage gate**
+- [x] **Step 2: Run the full branch-coverage gate**
 
 ```bash
 tssrun -p gr20001b uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
@@ -675,7 +680,7 @@ tssrun -p gr20001b uv run pytest --cov=runops --cov-branch --cov-report=term-mis
 
 Expected: all tests pass and total branch coverage is at least 80%.
 
-- [ ] **Step 3: Set and verify meaningful critical floors**
+- [x] **Step 3: Set and verify meaningful critical floors**
 
 Read exact `percent_covered` values for the three new implementation modules from `coverage.json`; set floors to the greatest whole number not exceeding each baseline, with a minimum of 85. Do not put a floor on the facade or thin CLI.
 
@@ -685,11 +690,11 @@ tssrun -p gr20001b uv run python -m runops.application.operator.coverage_policy 
 
 Expected: every governed module meets its floor.
 
-- [ ] **Step 4: Review compatibility and close the plan**
+- [x] **Step 4: Review compatibility and close the plan**
 
 Confirm schema-v1 bulk gate tests still pass, no public import moved without a facade, `runo`/`runops` command trees match, migration preserves unknown fields, generated skills have not yet been changed, and `git diff --check` is clean. Change plan status to `completed` and add an Outcome line with test count and coverage.
 
-- [ ] **Step 5: Commit closeout**
+- [x] **Step 5: Commit closeout**
 
 ```bash
 git add pyproject.toml docs/superpowers/plans/2026-07-11-experiment-cli-slice1.md

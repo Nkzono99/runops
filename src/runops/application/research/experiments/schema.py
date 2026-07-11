@@ -123,6 +123,10 @@ def _parse_record(
             isinstance(item, str) and item.strip() for item in raw_blockers
         ):
             raise SimctlError(f"{context} migration_blockers must be strings")
+        if "migration_blockers" in payload and not raw_blockers:
+            raise SimctlError(
+                f"{context} migration_blockers must be omitted when empty"
+            )
         blockers = [item.strip() for item in raw_blockers]
         title = _optional_string(payload.get("title"))
         question = _optional_string(payload.get("question"))

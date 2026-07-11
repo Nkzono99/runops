@@ -135,3 +135,154 @@ def test_read_experiment_spec_rejects_unknown_suffix(tmp_path: Path) -> None:
 
     with pytest.raises(SimctlError, match="must be TOML or JSON"):
         read_experiment_spec(path)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("decision", "GO", "decision must be"),
+        ("proposal", "/tmp/outside.md", "project-relative"),
+        ("proposal", "../outside.md", "project-relative"),
+        ("cost_ceiling_core_hours", True, "cost_ceiling_core_hours"),
+    ],
+)
+def test_schema_v2_rejects_invalid_record_fields(
+    tmp_path: Path, field: str, value: object, message: str
+) -> None:
+    root = _project(tmp_path)
+    experiment = _complete_experiment()
+    experiment[field] = value
+    _write_ledger(root, experiment)
+
+    with pytest.raises(SimctlError, match=message):
+        load_experiment_ledger(root)
+
+
+def test_schema_v2_rejects_duplicate_experiment_and_candidate_ids(
+    tmp_path: Path,
+) -> None:
+    root = _project(tmp_path)
+    experiment = _complete_experiment()
+    with open(root / "research" / "experiments.toml", "wb") as stream:
+        tomli_w.dump(
+            {"schema_version": 2, "experiments": [experiment, experiment]}, stream
+        )
+    with pytest.raises(SimctlError, match="experiment ids must be unique"):
+        load_experiment_ledger(root)
+
+    candidates = experiment["candidates"]
+    assert isinstance(candidates, list)
+    second = candidates[1]
+    assert isinstance(second, dict)
+    second["id"] = "C1"
+    _write_ledger(root, experiment)
+    with pytest.raises(SimctlError, match="candidate ids must be unique"):
+        load_experiment_ledger(root)
+
+
+def test_schema_v1_loads_with_synthetic_migration_blockers(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    experiment = _complete_experiment()
+    experiment.pop("title")
+    experiment.pop("question")
+    experiment.pop("cost_ceiling_core_hours")
+    with open(root / "research" / "experiments.toml", "wb") as stream:
+        tomli_w.dump({"schema_version": 1, "experiments": [experiment]}, stream)
+
+    record = load_experiment_ledger(root).experiments[0]
+
+    assert record.title is None
+    assert record.migration_blockers == (
+        "title",
+        "question",
+        "cost_ceiling_core_hours",
+    )
+
+
+def test_schema_v2_allows_explicit_blockers_but_validates_authorization(
+    tmp_path: Path,
+) -> None:
+    root = _project(tmp_path)
+    experiment = _complete_experiment()
+    experiment.pop("title")
+    experiment["migration_blockers"] = ["title"]
+    experiment["authorization"] = {
+        "stage": "production",
+        "survey": "runs/scan",
+        "review": "research/reviews/e1.md",
+        "max_core_hours": 10.0,
+    }
+    _write_ledger(root, experiment)
+
+    with pytest.raises(SimctlError, match="authorization stage"):
+        load_experiment_ledger(root)
+
+    authorization = experiment["authorization"]
+    assert isinstance(authorization, dict)
+    authorization["stage"] = "full"
+    authorization["max_core_hours"] = False
+    _write_ledger(root, experiment)
+    with pytest.raises(SimctlError, match="max_core_hours"):
+        load_experiment_ledger(root)
+
+
+def test_read_experiment_spec_rejects_non_object_json(tmp_path: Path) -> None:
+    path = tmp_path / "experiment.json"
+    path.write_text("[]", encoding="utf-8")
+
+    with pytest.raises(SimctlError, match="must be an object"):
+        read_experiment_spec(path)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "message"),
+    [
+        ({"migration_blockers": []}, "must be omitted when empty"),
+        ({"migration_blockers": [""]}, "migration_blockers"),
+        ({"authorization": "full"}, "authorization must be a table"),
+        ({"review": "../review.md"}, "project-relative"),
+        ({"selected_candidate": "missing"}, "selected_candidate"),
+        ({"candidates": []}, "at least two candidates"),
+    ],
+)
+def test_schema_v2_rejects_invalid_structural_values(
+    tmp_path: Path, mutation: dict[str, object], message: str
+) -> None:
+    root = _project(tmp_path)
+    experiment = _complete_experiment()
+    experiment.update(mutation)
+    _write_ledger(root, experiment)
+
+    with pytest.raises(SimctlError, match=message):
+        load_experiment_ledger(root)
+
+
+def test_ledger_rejects_invalid_top_level_and_table_shapes(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    ledger = root / "research" / "experiments.toml"
+    with open(ledger, "wb") as stream:
+        tomli_w.dump({"schema_version": 3}, stream)
+    with pytest.raises(SimctlError, match="schema_version"):
+        load_experiment_ledger(root)
+
+    with open(ledger, "wb") as stream:
+        tomli_w.dump({"schema_version": 2, "experiments": {}}, stream)
+    with pytest.raises(SimctlError, match=r"\[\[experiments\]\]"):
+        load_experiment_ledger(root)
+
+    with open(ledger, "wb") as stream:
+        tomli_w.dump({"schema_version": 2, "experiments": ["bad"]}, stream)
+    with pytest.raises(SimctlError, match="must be a table"):
+        load_experiment_ledger(root)
+
+
+def test_ledger_reports_missing_and_invalid_toml(tmp_path: Path) -> None:
+    root = _project(tmp_path)
+    ledger = root / "research" / "experiments.toml"
+    ledger.unlink(missing_ok=True)
+    with pytest.raises(SimctlError, match="Failed to read"):
+        load_experiment_ledger(root)
+
+    ledger.write_text("broken = [", encoding="utf-8")
+    with pytest.raises(SimctlError, match="Invalid experiment TOML"):
+        load_experiment_ledger(root)
