@@ -214,6 +214,9 @@ __marimo__/
 # Codex
 **/AGENTS.override.md
 
+# Local Superpowers design and implementation notes
+docs/superpowers/
+
 # HarnessOps local runtime cache
 .harnessops/cache/
 harness-lab/
