@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,6 +16,11 @@ from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.environment import EnvironmentInfo
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 from runops.harness.harnessops import HarnessOpsResult
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 runner = CliRunner()
 
@@ -61,6 +67,13 @@ class TestInit:
         assert (tmp_path / "cases").is_dir()
         assert (tmp_path / "runs").is_dir()
         assert (tmp_path / ".gitignore").exists()
+
+    def test_new_project_scaffolds_empty_schema_v2_ledger(self, tmp_path: Path) -> None:
+        result = runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
+
+        assert result.exit_code == 0
+        with open(tmp_path / "research" / "experiments.toml", "rb") as stream:
+            assert tomllib.load(stream) == {"schema_version": 2}
 
     def test_init_invokes_harnessops(
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch

@@ -6,6 +6,8 @@ import json
 import sys
 from pathlib import Path
 
+import tomli_w
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
@@ -166,3 +168,72 @@ title = "Legacy figure index"
         artifact_index = tomllib.load(f)
     paths = [item["path"] for item in artifact_index["artifacts"]]
     assert paths == ["survey_summary.csv"]
+
+
+def test_experiment_v2_migration_preserves_unknown_fields_and_blocks_missing_science(
+    tmp_path: Path,
+) -> None:
+    ledger = tmp_path / "research" / "experiments.toml"
+    ledger.parent.mkdir()
+    with open(ledger, "wb") as stream:
+        tomli_w.dump(
+            {
+                "schema_version": 1,
+                "experiments": [
+                    {
+                        "id": "E1",
+                        "decision": "WAIT",
+                        "proposal": "research/proposals/E1.md",
+                        "review": "",
+                        "selected_candidate": "C1",
+                        "private_note": "keep",
+                        "candidates": [
+                            {
+                                "id": "C1",
+                                "information_gain": "gain",
+                                "falsification": "criterion",
+                                "estimated_core_hours": 1.0,
+                                "operational_risk": "low",
+                            },
+                            {
+                                "id": "C2",
+                                "information_gain": "other",
+                                "falsification": "other criterion",
+                                "estimated_core_hours": 2.0,
+                                "operational_risk": "medium",
+                            },
+                        ],
+                    }
+                ],
+            },
+            stream,
+        )
+
+    result = run_migration("v0", "0004", project_root=tmp_path, yes=True)
+
+    with open(ledger, "rb") as stream:
+        raw = tomllib.load(stream)
+    assert result.status == "applied"
+    assert raw["schema_version"] == 2
+    assert raw["experiments"][0]["private_note"] == "keep"
+    assert set(raw["experiments"][0]["migration_blockers"]) == {
+        "title",
+        "question",
+        "cost_ceiling_core_hours",
+    }
+
+
+def test_experiment_v2_migration_is_dry_run_and_idempotent(tmp_path: Path) -> None:
+    ledger = tmp_path / "research" / "experiments.toml"
+    ledger.parent.mkdir()
+    ledger.write_text("schema_version = 1\n", encoding="utf-8")
+
+    planned = run_migration("v0", "0004", project_root=tmp_path, dry_run=True)
+    assert planned.status == "planned"
+    assert planned.planned == (Path("research/experiments.toml"),)
+    assert ledger.read_text(encoding="utf-8") == "schema_version = 1\n"
+
+    applied = run_migration("v0", "0004", project_root=tmp_path, yes=True)
+    repeated = run_migration("v0", "0004", project_root=tmp_path, yes=True)
+    assert applied.status == "applied"
+    assert repeated.status == "skipped"

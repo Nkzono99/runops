@@ -1176,6 +1176,51 @@ human_gate = true
 `open | planned | in_progress | blocked | done | rejected`。
 追加実験の実行は明示操作に残し、MCP 経由で自動 submit しない。
 
+## research/experiments.toml
+
+scientific experiment の候補比較、選択、human decision、full-stage authorization の
+機械正本。schema 2 の phase は保存せず、`runo experiment show` が project state から
+導出する。空 ledger は `schema_version = 2` だけでよい。
+
+```toml
+schema_version = 2
+
+[[experiments]]
+id = "E1"
+title = "Ion depletion pilot"
+question = "Does vti widen the depletion cone?"
+decision = "EXPAND"
+proposal = "research/proposals/E1.md"
+review = "research/reviews/E1.md"
+selected_candidate = "C1"
+cost_ceiling_core_hours = 128.0
+
+[experiments.authorization]
+stage = "full"
+survey = "runs/full-scan"
+review = "research/reviews/E1.md"
+max_core_hours = 128.0
+
+[[experiments.candidates]]
+id = "C1"
+information_gain = "Separates thermal and drift scaling"
+falsification = "No monotonic cone-angle response"
+estimated_core_hours = 32.0
+operational_risk = "low"
+
+[[experiments.candidates]]
+id = "C2"
+information_gain = "Tests resolution sensitivity first"
+falsification = "Resolution changes the inferred trend"
+estimated_core_hours = 64.0
+operational_risk = "medium"
+```
+
+`decision` は `WAIT | EXPAND | REVISE | STOP`、authorization `stage` は
+`pilot | full`。path は project-relative で project 外へ出てはならない。
+schema 1 からは `runo migrate apply M0-0004 --yes` で移行し、復元不能な
+`title`, `question`, `cost_ceiling_core_hours` は `migration_blockers` に残す。
+
 ---
 
 ## JSON Schema

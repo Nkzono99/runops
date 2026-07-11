@@ -85,6 +85,14 @@
 | `runo knowledge profile enable SOURCE_NAME PROFILE_NAMES...` | source profile を有効化 |
 | `runo knowledge profile disable SOURCE_NAME PROFILE_NAMES...` | source profile を無効化 |
 
+## Experiment workflow
+
+| コマンド | 説明 |
+|---------|------|
+| `runo experiment new NAME [--from SPEC] [--dry-run] [--yes] [--json]` | schema 2 ledger と proposal を原子的に作成。`--json` は `--yes` がない限り plan のみ返す |
+| `runo experiment show [EXPERIMENT] [--json]` | ledger、survey、run、artifact から導出した phase と次の操作を表示 |
+| `runo experiment check [EXPERIMENT] [--json]` | experiment の参照整合性を検査。error があれば exit 1 |
+
 ## Demo replay
 
 | コマンド | 説明 |

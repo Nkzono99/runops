@@ -1181,11 +1181,19 @@ raw evidence、現在判断/refined narrative、解析・出版 artifact、再�
 
 survey-backed `runo runs submit --all` は `survey.toml [research]` の
 `experiment_id` と `stage = "pilot" | "full"` を必須とする。
-`research/experiments.toml` は candidate comparison と expansion decision の機械正本で、
-各 experiment は最低 2 候補、選択候補、proposal path を持つ。候補は
+`research/experiments.toml` schema 2 は candidate comparison と expansion decision の
+機械正本で、各 experiment は不変 ID、title、question、最低 2 候補、選択候補、
+proposal path、cost ceiling を持つ。候補は
 `information_gain`, `falsification`, `estimated_core_hours`, `operational_risk` を持つ。
-`stage = "full"` は decision `EXPAND` と存在する review path が一致する場合だけ許可する。
+`stage = "full"` は decision `EXPAND`、存在する review path、対象 survey、stage、
+最大 core-hours を含む authorization scope が一致する場合だけ許可する。
 この gate は dry-run にも適用し、`--yes` では省略できない。
+
+experiment phase は永続化 field ではない。ledger、`survey.toml`、run manifest、
+analysis artifact index から決定的に導出し、保存済み `phase` は schema error とする。
+schema 1 は bulk gate の互換 read に限り受理し、schema 2 への明示 migration は
+`runo migrate apply M0-0004 --yes` で行う。migrated record の不足情報は
+`migration_blockers` として fail closed にする。
 
 ### 18.9.3 Story acceptance audit (experimental)
 
@@ -1307,6 +1315,19 @@ source が 1 件でも欠落した audit は、別 source に十分な artifact 
 
 * 指定 survey 配下の各 run の summary を収集
 * `survey_summary.csv` などを生成
+
+---
+
+## 19.8 `experiment new/show/check`
+
+* `experiment new NAME --from SPEC` は TOML/JSON spec を検証し、schema 2 ledger record と
+  `research/proposals/NAME.md` を同じ plan から原子的に作成する
+* `--dry-run` は常に無変更。`--json` は `--yes` を同時指定しない限り plan のみ返す
+* JSON 出力は `schema_version`, `status`, `data`, `warnings`, `blockers`,
+  `next_actions` を持つ versioned envelope とする
+* `experiment show` は phase、blocker、warning、次の command を導出して表示する
+* `experiment check` は error-level issue が 1 件以上あれば exit 1 とする
+* これらの command は科学的候補の選択や WAIT/EXPAND/REVISE/STOP decision を自動化しない
 
 ---
 

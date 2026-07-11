@@ -1,12 +1,15 @@
 # Machine-readable experiment gate ledger. Keep rationale in proposals/reviews.
-schema_version = 1
+schema_version = 2
 
 # [[experiments]]
 # id = "E1"
+# title = "Bounded pilot title"
+# question = "What observation separates the candidates?"
 # decision = "WAIT"
-# proposal = "research/proposals/YYYY-MM-DD-topic.md"
+# proposal = "research/proposals/E1.md"
 # review = ""
 # selected_candidate = "C1"
+# cost_ceiling_core_hours = 4.0
 #
 # [[experiments.candidates]]
 # id = "C1"

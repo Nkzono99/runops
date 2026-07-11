@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any
+
+import tomli_w
 
 from runops.application.analysis.artifacts import (
     build_survey_artifacts,
@@ -21,6 +26,11 @@ from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
 from runops.templates import load_static
+
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 
 def registered_migrations() -> tuple[Migration, ...]:
@@ -64,6 +74,19 @@ def registered_migrations() -> tuple[Migration, ...]:
             impact=("analysis-artifact",),
             human_gate=False,
             handler=apply_remove_legacy_figure_index,
+        ),
+        Migration(
+            version="v0",
+            number="0004",
+            title="Experiment ledger schema 2",
+            description=(
+                "Upgrade the experiment ledger to typed schema 2 while "
+                "marking missing scientific fields explicitly."
+            ),
+            migration_type="breaking-project-state",
+            impact=("research", "experiment-ledger"),
+            human_gate=True,
+            handler=apply_experiment_ledger_v2,
         ),
     )
 
@@ -305,6 +328,124 @@ def apply_remove_legacy_figure_index(context: MigrationContext) -> MigrationResu
         skipped=tuple(skipped),
         warnings=tuple(warnings),
     )
+
+
+def apply_experiment_ledger_v2(context: MigrationContext) -> MigrationResult:
+    """Upgrade a schema-1 experiment ledger without inventing scientific data."""
+    project_root = context.project_root
+    ledger_path = project_root / "research" / "experiments.toml"
+    relative = Path("research/experiments.toml")
+    title = "Experiment ledger schema 2"
+    if not ledger_path.is_file():
+        return MigrationResult(
+            migration_id="M0-0004",
+            title=title,
+            status="skipped",
+            summary="No experiment ledger was found.",
+            skipped=(f"{relative.as_posix()} missing",),
+        )
+    try:
+        with open(ledger_path, "rb") as stream:
+            payload = tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return _experiment_migration_warning(title, relative, exc)
+
+    version = payload.get("schema_version")
+    if version == 2 and not isinstance(version, bool):
+        return MigrationResult(
+            migration_id="M0-0004",
+            title=title,
+            status="skipped",
+            summary="Experiment ledger is already schema 2.",
+            skipped=(f"{relative.as_posix()} already schema 2",),
+        )
+    if version != 1 or isinstance(version, bool):
+        return _experiment_migration_warning(
+            title, relative, ValueError("schema_version must be 1")
+        )
+    experiments = payload.get("experiments", [])
+    if not isinstance(experiments, list) or not all(
+        isinstance(item, dict) for item in experiments
+    ):
+        return _experiment_migration_warning(
+            title, relative, ValueError("experiments must be a list of tables")
+        )
+    if context.dry_run:
+        return MigrationResult(
+            migration_id="M0-0004",
+            title=title,
+            status="planned",
+            summary="Would upgrade the experiment ledger to schema 2.",
+            planned=(relative,),
+        )
+
+    migrated = dict(payload)
+    migrated["schema_version"] = 2
+    migrated_records: list[dict[str, Any]] = []
+    for raw in experiments:
+        record = dict(raw)
+        record.pop("phase", None)
+        blockers: list[str] = []
+        for field in ("title", "question"):
+            value = record.get(field)
+            if not isinstance(value, str) or not value.strip():
+                blockers.append(field)
+        cost = record.get("cost_ceiling_core_hours")
+        if isinstance(cost, bool) or not isinstance(cost, (int, float)) or cost < 0:
+            blockers.append("cost_ceiling_core_hours")
+        if blockers:
+            record["migration_blockers"] = blockers
+        else:
+            record.pop("migration_blockers", None)
+        migrated_records.append(record)
+    if migrated_records:
+        migrated["experiments"] = migrated_records
+    else:
+        migrated.pop("experiments", None)
+    try:
+        _write_toml_atomic(ledger_path, migrated)
+    except OSError as exc:
+        return _experiment_migration_warning(title, relative, exc)
+    return MigrationResult(
+        migration_id="M0-0004",
+        title=title,
+        status="applied",
+        summary="Upgraded the experiment ledger to schema 2.",
+        updated=(relative,),
+    )
+
+
+def _experiment_migration_warning(
+    title: str, relative: Path, exc: BaseException
+) -> MigrationResult:
+    return MigrationResult(
+        migration_id="M0-0004",
+        title=title,
+        status="skipped",
+        summary="Experiment ledger was not changed.",
+        warnings=(f"{relative.as_posix()}: {exc}",),
+    )
+
+
+def _write_toml_atomic(path: Path, payload: dict[str, Any]) -> None:
+    fd, raw_staged = tempfile.mkstemp(
+        dir=path.parent, prefix=".experiments-migration-", suffix=".tmp"
+    )
+    staged = Path(raw_staged)
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            tomli_w.dump(payload, stream)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(staged, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    except BaseException:
+        staged.unlink(missing_ok=True)
+        raise
 
 
 class _ScaffoldTarget:
