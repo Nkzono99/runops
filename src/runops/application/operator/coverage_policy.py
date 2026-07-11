@@ -47,9 +47,7 @@ def load_coverage_policy(config_path: Path) -> dict[str, float]:
     try:
         modules = data["tool"]["runops"]["coverage-policy"]["modules"]
     except (KeyError, TypeError) as exc:
-        raise ValueError(
-            "missing [tool.runops.coverage-policy.modules] table"
-        ) from exc
+        raise ValueError("missing [tool.runops.coverage-policy.modules] table") from exc
     module_table = _mapping(
         modules,
         context="[tool.runops.coverage-policy.modules]",

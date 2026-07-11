@@ -41,10 +41,13 @@ def test_coverage_policy_passes_when_every_module_meets_floor(tmp_path: Path) ->
     report = tmp_path / "coverage.json"
     _write_report(report, {"src/runops/core/state.py": 92.5})
 
-    assert evaluate_coverage_policy(
-        report,
-        {"src/runops/core/state.py": 90.0},
-    ) == ()
+    assert (
+        evaluate_coverage_policy(
+            report,
+            {"src/runops/core/state.py": 90.0},
+        )
+        == ()
+    )
 
 
 def test_coverage_policy_reports_below_floor(tmp_path: Path) -> None:
@@ -89,7 +92,7 @@ def test_load_coverage_policy_rejects_invalid_thresholds(
     config = tmp_path / "pyproject.toml"
     _write_policy(config, threshold)
 
-    with pytest.raises(ValueError, match="src/runops/core/state.py"):
+    with pytest.raises(ValueError, match=r"src/runops/core/state\.py"):
         load_coverage_policy(config)
 
 
@@ -97,7 +100,7 @@ def test_load_coverage_policy_requires_modules_table(tmp_path: Path) -> None:
     config = tmp_path / "pyproject.toml"
     config.write_text("[tool.runops]\n", encoding="utf-8")
 
-    with pytest.raises(ValueError, match="coverage-policy.modules"):
+    with pytest.raises(ValueError, match=r"coverage-policy\.modules"):
         load_coverage_policy(config)
 
 

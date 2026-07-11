@@ -216,9 +216,7 @@ def test_quality_gates_enforce_critical_module_coverage(relative_path: str) -> N
     text = _read(relative_path)
 
     assert "--cov-report=json:coverage.json" in text
-    assert (
-        "python -m runops.application.operator.coverage_policy coverage.json" in text
-    )
+    assert "python -m runops.application.operator.coverage_policy coverage.json" in text
 
 
 def test_v0_migration_note_records_surface_and_internal_moves() -> None:

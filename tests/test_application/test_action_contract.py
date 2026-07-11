@@ -161,16 +161,17 @@ def test_cli_operation_bindings_round_trip_action_specs() -> None:
 
 def test_cli_operation_validator_reports_unknown_actions() -> None:
     """Unknown action names should be reported with their CLI path."""
-    altered = tuple(
+    altered = [
         binding
         for binding in CLI_OPERATION_BINDINGS
         if binding.command_path != ("runs", "create")
-    ) + (
+    ]
+    altered.append(
         CliOperationBinding(
             command_path=("runs", "create"),
             action_names=("missing_action",),
             effect="write",
-        ),
+        )
     )
 
     assert cli_operation_issues(altered) == (
@@ -195,16 +196,17 @@ def test_cli_operation_validator_reports_missing_and_extra_pairs() -> None:
         for binding in CLI_OPERATION_BINDINGS
         if binding.command_path == ("runs", "create")
     )
-    altered = tuple(
+    altered = [
         binding
         for binding in CLI_OPERATION_BINDINGS
         if binding.command_path != create_binding.command_path
-    ) + (
+    ]
+    altered.append(
         CliOperationBinding(
             command_path=create_binding.command_path,
             action_names=("show_log",),
             effect=create_binding.effect,
-        ),
+        )
     )
 
     issues = cli_operation_issues(altered)

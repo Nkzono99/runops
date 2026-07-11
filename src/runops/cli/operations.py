@@ -62,9 +62,7 @@ def cli_operation_issues(
     path_counts = Counter(binding.command_path for binding in bindings)
     for command_path, count in path_counts.items():
         if count > 1:
-            issues.append(
-                f"Duplicate CLI binding path: '{' '.join(command_path)}'."
-            )
+            issues.append(f"Duplicate CLI binding path: '{' '.join(command_path)}'.")
 
     expected_pairs = {
         (command_path, action_name)
