@@ -2,12 +2,27 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 ExperimentStage = Literal["pilot", "full"]
 ExperimentDecision = Literal["WAIT", "EXPAND", "REVISE", "STOP"]
+IssueSeverity = Literal["error", "warning"]
+ExperimentPhase = Literal[
+    "blocked",
+    "proposed",
+    "pilot-planned",
+    "pilot-ready",
+    "pilot-active",
+    "review-pending",
+    "full-authorized",
+    "full-active",
+    "revising",
+    "stopped",
+    "completed",
+]
 
 
 @dataclass(frozen=True)
@@ -79,3 +94,66 @@ class ExperimentCreateSpec:
     selected_candidate: str
     cost_ceiling_core_hours: float
     candidates: tuple[ExperimentCandidate, ...]
+
+
+@dataclass(frozen=True)
+class ExperimentIssue:
+    """One deterministic integrity finding."""
+
+    severity: IssueSeverity
+    code: str
+    message: str
+    path: Path | None = None
+
+    def to_dict(self, project_root: Path) -> dict[str, str]:
+        data = {
+            "severity": self.severity,
+            "code": self.code,
+            "message": self.message,
+        }
+        if self.path is not None:
+            data["path"] = (
+                self.path.resolve().relative_to(project_root.resolve()).as_posix()
+            )
+        return data
+
+
+@dataclass(frozen=True)
+class ExperimentProjection:
+    """Read-only operational view derived from canonical project state."""
+
+    experiment: ExperimentRecord
+    phase: ExperimentPhase
+    surveys: tuple[Path, ...]
+    run_counts: Mapping[str, int]
+    required_artifacts: int
+    present_artifacts: int
+    blockers: tuple[ExperimentIssue, ...]
+    warnings: tuple[ExperimentIssue, ...]
+    next_actions: tuple[str, ...]
+    next_commands: tuple[str, ...]
+
+    def to_dict(self, project_root: Path) -> dict[str, Any]:
+        def display(path: Path) -> str:
+            return path.resolve().relative_to(project_root.resolve()).as_posix()
+
+        return {
+            "experiment": {
+                "id": self.experiment.id,
+                "title": self.experiment.title,
+                "question": self.experiment.question,
+                "decision": self.experiment.decision,
+                "selected_candidate": self.experiment.selected_candidate,
+            },
+            "phase": self.phase,
+            "surveys": [display(path) for path in self.surveys],
+            "run_counts": dict(self.run_counts),
+            "artifact_readiness": {
+                "required": self.required_artifacts,
+                "present": self.present_artifacts,
+            },
+            "blockers": [item.to_dict(project_root) for item in self.blockers],
+            "warnings": [item.to_dict(project_root) for item in self.warnings],
+            "next_actions": list(self.next_actions),
+            "next_commands": list(self.next_commands),
+        }
