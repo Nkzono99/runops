@@ -34,7 +34,7 @@ def load_experiment_ledger(project_root: Path) -> ExperimentLedger:
     version = payload.get("schema_version")
     if isinstance(version, bool) or version not in {1, 2}:
         raise SimctlError("research/experiments.toml schema_version must be 1 or 2")
-    raw_experiments = payload.get("experiments")
+    raw_experiments = payload.get("experiments", [])
     if not isinstance(raw_experiments, list):
         raise SimctlError("research/experiments.toml must define [[experiments]]")
     records = tuple(

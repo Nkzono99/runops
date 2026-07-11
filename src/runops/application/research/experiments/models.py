@@ -157,3 +157,36 @@ class ExperimentProjection:
             "next_actions": list(self.next_actions),
             "next_commands": list(self.next_commands),
         }
+
+
+@dataclass(frozen=True)
+class ExperimentCreateRequest:
+    """Inputs required to plan a workspace mutation."""
+
+    project_root: Path
+    experiment_id: str
+    spec: ExperimentCreateSpec
+
+
+@dataclass(frozen=True)
+class ExperimentCreatePlan:
+    """Immutable, non-mutating description of an experiment creation."""
+
+    project_root: Path
+    experiment_id: str
+    ledger_path: Path
+    ledger_identity: tuple[int, int, int]
+    ledger_after: ExperimentLedger
+    proposal_path: Path
+    proposal_text: str
+    original_ledger_bytes: bytes
+    ledger_bytes_after: bytes
+
+
+@dataclass(frozen=True)
+class ExperimentCreateResult:
+    """Paths and record committed by an applied creation plan."""
+
+    experiment: ExperimentRecord
+    ledger_path: Path
+    proposal_path: Path
