@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import tomli_w
 
@@ -18,15 +18,16 @@ from runops.core.discovery import discover_runs
 from runops.core.exceptions import ProjectNotFoundError, SimctlError
 from runops.core.project import find_project_root
 
+from .models import SourceKind, StorySource, StorySpec, StoryStep
+from .schema import read_story_spec, story_spec_payload, validate_story_id
+
 if sys.version_info >= (3, 11):
     import tomllib
 else:
     import tomli as tomllib
 
 _STORIES_ROOT = Path("analysis") / "stories"
-_ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 _DEFAULT_MATURITY = ("main", "accepted", "draft")
-_SOURCE_KINDS = frozenset({"run", "survey", "comparison", "path"})
 
 
 @dataclass(frozen=True)
@@ -104,7 +105,7 @@ def create_story_workspace(
     if not generated_id:
         digest = hashlib.sha256(normalized_name.encode("utf-8")).hexdigest()[:10]
         generated_id = f"story-{digest}"
-    resolved_id = _validate_story_id(story_id or generated_id)
+    resolved_id = validate_story_id(story_id or generated_id)
     story_title = title.strip() or normalized_name
     story_dir = root / _STORIES_ROOT / resolved_id
     if story_dir.exists():
@@ -112,25 +113,30 @@ def create_story_workspace(
 
     story_dir.mkdir(parents=True)
     story_path = story_dir / "story.toml"
-    payload: dict[str, Any] = {
-        "schema_version": 1,
-        "id": resolved_id,
-        "title": story_title,
-        "status": "draft",
-        "sources": [_source_record(root, source) for source in sources],
-        "steps": [
-            {
-                "id": "first-step",
-                "title": "First story step",
-                "required_artifacts": ["figure:replace_with_artifact_name"],
-                "acceptable_status": list(_DEFAULT_MATURITY),
-                "claim_ceiling": "",
-                "notes": "",
-            }
-        ],
-    }
+    source_records = [_source_record(root, source) for source in sources]
+    spec = StorySpec(
+        schema_version=1,
+        id=resolved_id,
+        title=story_title,
+        status="draft",
+        sources=tuple(
+            StorySource(
+                kind=cast(SourceKind, record["kind"]),
+                path=record["path"],
+            )
+            for record in source_records
+        ),
+        steps=(
+            StoryStep(
+                id="first-step",
+                title="First story step",
+                required_artifacts=("figure:replace_with_artifact_name",),
+                acceptable_status=_DEFAULT_MATURITY,
+            ),
+        ),
+    )
     with open(story_path, "wb") as f:
-        tomli_w.dump(payload, f)
+        tomli_w.dump(story_spec_payload(spec), f)
 
     return StoryWorkspaceResult(
         story_id=resolved_id,
@@ -159,16 +165,11 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
         raise SimctlError(f"story.toml not found: {story_path}")
 
     project_root = _find_project_root_for_story(story_root)
-    story = _read_story(story_path)
-    schema_version = story.get("schema_version")
-    if type(schema_version) is not int or schema_version != 1:
-        raise SimctlError("story schema_version must be 1")
-    story_id = _validate_story_id(
-        _required_string(story, "id", default=story_root.name)
-    )
-    title = _required_string(story, "title", default=story_id)
-    steps = _read_steps(story)
-    source_records = _read_sources(story)
+    spec = read_story_spec(story_path, default_id=story_root.name)
+    steps = [_legacy_step(step) for step in spec.steps]
+    source_records = [
+        {"kind": source.kind, "path": source.path} for source in spec.sources
+    ]
 
     artifacts: list[dict[str, Any]] = []
     warnings: list[str] = []
@@ -192,9 +193,9 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
         "schema_version": 1,
         "generated_at": generated_at,
         "story": {
-            "id": story_id,
-            "title": title,
-            "status": str(story.get("status", "draft") or "draft"),
+            "id": spec.id,
+            "title": spec.title,
+            "status": spec.status,
             "path": _display_path(story_path, base=project_root),
         },
         "sources": source_records,
@@ -211,7 +212,7 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
     )
     audit_md_path.write_text(
         _render_audit_markdown(
-            title=title,
+            title=spec.title,
             overall_status=overall_status,
             generated_at=generated_at,
             steps=step_results,
@@ -221,8 +222,8 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
     )
 
     return StoryAuditResult(
-        story_id=story_id,
-        title=title,
+        story_id=spec.id,
+        title=spec.title,
         story_dir=story_root,
         audit_json_path=audit_json_path,
         audit_md_path=audit_md_path,
@@ -232,18 +233,15 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
     )
 
 
-def _validate_story_id(value: str) -> str:
-    story_id = value
-    if not story_id:
-        raise SimctlError("story id must be non-empty")
-    if story_id != story_id.strip():
-        raise SimctlError("story id must not contain leading or trailing whitespace")
-    if not _ID_PATTERN.match(story_id):
-        raise SimctlError(
-            "story id must start with a lowercase letter or digit and contain "
-            "only lowercase letters, digits, '.', '_' or '-'"
-        )
-    return story_id
+def _legacy_step(step: StoryStep) -> dict[str, Any]:
+    return {
+        "id": step.id,
+        "title": step.title,
+        "required_artifacts": list(step.required_artifacts),
+        "acceptable_status": list(step.acceptable_status),
+        "claim_ceiling": step.claim_ceiling,
+        "notes": step.notes,
+    }
 
 
 def _source_record(project_root: Path, source_path: Path) -> dict[str, str]:
@@ -255,81 +253,6 @@ def _source_record(project_root: Path, source_path: Path) -> dict[str, str]:
     path = _display_path(resolved, base=project_root)
     kind = _detect_source_kind(resolved) if resolved.exists() else "path"
     return {"kind": kind, "path": path}
-
-
-def _read_story(story_path: Path) -> dict[str, Any]:
-    try:
-        with open(story_path, "rb") as f:
-            raw = tomllib.load(f)
-    except OSError as e:
-        raise SimctlError(f"Failed to read {story_path}: {e}") from e
-    except tomllib.TOMLDecodeError as e:
-        raise SimctlError(f"Invalid TOML in {story_path}: {e}") from e
-    if not isinstance(raw, dict):
-        raise SimctlError(f"Invalid story spec in {story_path}")
-    return raw
-
-
-def _read_sources(story: dict[str, Any]) -> list[dict[str, str]]:
-    raw_sources = story.get("sources", [])
-    if raw_sources is None:
-        return []
-    if not isinstance(raw_sources, list):
-        raise SimctlError("story sources must be a list")
-
-    sources: list[dict[str, str]] = []
-    for index, item in enumerate(raw_sources, start=1):
-        if not isinstance(item, dict):
-            raise SimctlError(f"story source #{index} must be a table")
-        raw_path = item.get("path", "")
-        if not isinstance(raw_path, str):
-            raise SimctlError(f"story source #{index} path must be a string")
-        path = raw_path.strip()
-        if not path:
-            raise SimctlError(f"story source #{index} is missing path")
-        raw_kind = item.get("kind", "path")
-        if not isinstance(raw_kind, str) or raw_kind not in _SOURCE_KINDS:
-            valid = ", ".join(sorted(_SOURCE_KINDS))
-            raise SimctlError(f"story source #{index} kind must be one of: {valid}")
-        sources.append({"kind": raw_kind, "path": path})
-    return sources
-
-
-def _read_steps(story: dict[str, Any]) -> list[dict[str, Any]]:
-    raw_steps = story.get("steps", [])
-    if not isinstance(raw_steps, list) or not raw_steps:
-        raise SimctlError("story must define at least one [[steps]] table")
-
-    steps: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    for index, item in enumerate(raw_steps, start=1):
-        if not isinstance(item, dict):
-            raise SimctlError(f"story step #{index} must be a table")
-        step_id = str(item.get("id", "")).strip()
-        if not step_id:
-            raise SimctlError(f"story step #{index} is missing id")
-        if step_id in seen:
-            raise SimctlError(f"Duplicate story step id: {step_id}")
-        seen.add(step_id)
-        required = _required_string_array(
-            item.get("required_artifacts"),
-            field=f"story step #{index} required_artifacts",
-        )
-        acceptable = _required_string_array(
-            item.get("acceptable_status"),
-            field=f"story step #{index} acceptable_status",
-        )
-        steps.append(
-            {
-                "id": step_id,
-                "title": str(item.get("title", step_id) or step_id),
-                "required_artifacts": required,
-                "acceptable_status": acceptable,
-                "claim_ceiling": str(item.get("claim_ceiling", "") or ""),
-                "notes": str(item.get("notes", "") or ""),
-            }
-        )
-    return steps
 
 
 def _collect_source_artifacts(
@@ -718,36 +641,12 @@ def _display_path(path: Path, *, base: Path) -> str:
         return path.as_posix()
 
 
-def _required_string(
-    payload: dict[str, Any],
-    key: str,
-    *,
-    default: str = "",
-) -> str:
-    value = str(payload.get(key, default) or default).strip()
-    if not value:
-        raise SimctlError(f"story {key} must be non-empty")
-    return value
-
-
 def _string_list(value: Any) -> list[str]:
     if isinstance(value, str):
         return [value] if value else []
     if isinstance(value, list):
         return [str(item) for item in value if str(item)]
     return []
-
-
-def _required_string_array(value: Any, *, field: str) -> list[str]:
-    """Validate a non-empty TOML array containing only non-empty strings."""
-    if not isinstance(value, list) or not value:
-        raise SimctlError(f"{field} must be a non-empty string array")
-    result: list[str] = []
-    for item in value:
-        if not isinstance(item, str) or not item.strip():
-            raise SimctlError(f"{field} must contain only non-empty strings")
-        result.append(item.strip())
-    return result
 
 
 def _normalize_token(value: str) -> str:
