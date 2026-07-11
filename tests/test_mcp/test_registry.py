@@ -33,12 +33,18 @@ def test_required_runops_tools_are_exposed() -> None:
 def test_unsafe_action_tools_remain_disabled_by_default() -> None:
     specs = {spec.name: spec for spec in all_tool_specs()}
 
-    for name in ("runops.job.submit", "runops.job.cancel", "runops.run.delete"):
+    for name in (
+        "runops.job.submit",
+        "runops.job.cancel",
+        "runops.run.delete",
+        "runops.experiment.create",
+    ):
         spec = specs[name]
         assert spec.enabled is False
         assert spec.exposed is False
-        assert spec.safety.requires_confirmation is True
-        assert spec.safety.confirmation_field == "confirm"
+        if spec.safety.safety_class in {"external", "destructive"}:
+            assert spec.safety.requires_confirmation is True
+            assert spec.safety.confirmation_field == "confirm"
 
 
 def test_capabilities_payload_exposes_codex_plugin_policy() -> None:

@@ -12,7 +12,7 @@ from runops import __version__
 from runops.cli.config import config_app
 from runops.cli.context import context
 from runops.cli.demo import demo_app
-from runops.cli.groups import analyze_app, case_app, notes_app, runs_app
+from runops.cli.groups import analyze_app, case_app, experiment_app, notes_app, runs_app
 from runops.cli.init import doctor, init
 from runops.cli.knowledge import knowledge_app
 from runops.cli.lint import lint
@@ -109,6 +109,7 @@ def _build_app(name: str) -> typer.Typer:
     cli_app.command("plugins")(plugins)
     cli_app.command("lint")(lint)
     cli_app.add_typer(case_app, name="case")
+    cli_app.add_typer(experiment_app, name="experiment")
     cli_app.add_typer(runs_app, name="runs")
     cli_app.add_typer(analyze_app, name="analyze")
     cli_app.add_typer(demo_app, name="demo")

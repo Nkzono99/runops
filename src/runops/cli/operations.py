@@ -22,6 +22,7 @@ class CliOperationBinding:
 
 
 CLI_OPERATION_BINDINGS: tuple[CliOperationBinding, ...] = (
+    CliOperationBinding(("experiment", "new"), ("create_experiment",), "write"),
     CliOperationBinding(("runs", "create"), ("create_run",), "write"),
     CliOperationBinding(("runs", "sweep"), ("create_survey",), "write"),
     CliOperationBinding(("runs", "submit"), ("submit_run",), "external"),

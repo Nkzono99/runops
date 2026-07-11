@@ -44,6 +44,12 @@ class SafetyMetadata:
 READ = SafetyMetadata(level=0, safety_class="read")
 INSPECT = SafetyMetadata(level=1, safety_class="inspect")
 PLAN = SafetyMetadata(level=2, safety_class="plan")
+WRITE_DISABLED = SafetyMetadata(
+    level=3,
+    safety_class="write",
+    side_effects=True,
+    writes_files=True,
+)
 EXTERNAL_DISABLED = SafetyMetadata(
     level=4,
     safety_class="external",

@@ -238,6 +238,7 @@ def test_mcp_tool_bindings_round_trip_action_specs() -> None:
         "runops.job.cancel": "cancel_run",
         "runops.run.delete": "delete_run",
         "runops.run.logs": "show_log",
+        "runops.experiment.create": "create_experiment",
     }
 
     assert {

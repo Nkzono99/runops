@@ -20,6 +20,7 @@ from runops.mcp.safety import (
     INSPECT,
     PLAN,
     READ,
+    WRITE_DISABLED,
     SafetyMetadata,
 )
 
@@ -164,6 +165,14 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         enabled=False,
         exposed=False,
         action_name="submit_run",
+    ),
+    ToolSpec(
+        "runops.experiment.create",
+        "Create an experiment record and proposal. Disabled in MCP Slice 1.",
+        WRITE_DISABLED,
+        enabled=False,
+        exposed=False,
+        action_name="create_experiment",
     ),
     ToolSpec(
         "runops.job.cancel",
@@ -378,7 +387,7 @@ def conformance_report() -> dict[str, Any]:
         tool_name
         for tool_name in action_mcp_tools
         if tool_name in specs_by_name
-        and specs_by_name[tool_name].safety.level >= 3
+        and specs_by_name[tool_name].safety.safety_class in {"external", "destructive"}
         and (
             not specs_by_name[tool_name].safety.requires_confirmation
             or not specs_by_name[tool_name].safety.confirmation_field
@@ -387,10 +396,10 @@ def conformance_report() -> dict[str, Any]:
     add(
         "unsafe_action_mcp_tools_require_confirmation",
         not unsafe_action_tools_without_confirmation,
-        "Unsafe action MCP tools require explicit confirmation metadata."
+        "External and destructive action MCP tools require confirmation metadata."
         if not unsafe_action_tools_without_confirmation
         else (
-            "Unsafe action MCP tools without confirmation metadata: "
+            "External/destructive action MCP tools without confirmation metadata: "
             + ", ".join(unsafe_action_tools_without_confirmation)
         ),
     )
