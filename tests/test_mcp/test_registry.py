@@ -14,9 +14,12 @@ from runops.mcp.registry import (
 
 def test_registry_conformance_passes() -> None:
     report = conformance_report()
+    checks = {check["name"]: check for check in report["checks"]}
 
     assert report["ok"] is True
     assert all(check["ok"] for check in report["checks"])
+    assert checks["cli_action_bindings_conform"]["ok"] is True
+    assert checks["mcp_action_bindings_conform"]["ok"] is True
 
 
 def test_required_runops_tools_are_exposed() -> None:
@@ -60,3 +63,11 @@ def test_capabilities_payload_exposes_codex_plugin_policy() -> None:
         payload["codex_plugin_policy"]["delegated_capabilities_field"]
         == "delegated_capabilities"
     )
+
+
+def test_capabilities_payload_exposes_only_nonempty_action_bindings() -> None:
+    tools = {tool["name"]: tool for tool in capabilities_payload()["tools"]}
+
+    assert tools["runops.job.submit"]["action_name"] == "submit_run"
+    assert tools["runops.run.logs"]["action_name"] == "show_log"
+    assert "action_name" not in tools["runops.health"]

@@ -227,6 +227,39 @@ def test_action_specs_advertise_existing_mcp_tools() -> None:
     assert missing_tools == {}
 
 
+def test_mcp_tool_bindings_round_trip_action_specs() -> None:
+    """ActionSpec and ToolSpec metadata should agree in both directions."""
+    specs = {spec.name: spec for spec in all_tool_specs()}
+    expected = {
+        "runops.job.plan_submit": "submit_run",
+        "runops.job.submit": "submit_run",
+        "runops.job.cancel": "cancel_run",
+        "runops.run.delete": "delete_run",
+        "runops.run.logs": "show_log",
+    }
+
+    assert {
+        name: spec.action_name for name, spec in specs.items() if spec.action_name
+    } == expected
+    for tool_name, action_name in expected.items():
+        assert tool_name in actions.ACTION_SPECS[action_name].mcp_tools
+
+
+def test_external_and_destructive_mcp_tools_have_action_bindings() -> None:
+    """Unsafe tools need an action relation and explicit confirmation metadata."""
+    unsafe = {
+        spec.name: spec
+        for spec in all_tool_specs()
+        if spec.safety.safety_class in {"external", "destructive"}
+    }
+
+    assert unsafe
+    for spec in unsafe.values():
+        assert spec.action_name
+        assert spec.safety.requires_confirmation is True
+        assert spec.safety.confirmation_field
+
+
 def test_action_spec_dict_includes_interface_metadata() -> None:
     """Serialized ActionSpecs should expose CLI and MCP surface metadata."""
     data = actions.ACTION_SPECS["submit_run"].to_dict()

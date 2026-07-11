@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from runops.application.actions.specs import ACTION_SPECS
+from runops.cli.operations import cli_operation_issues
 from runops.core.codex_plugin import (
     CODEX_PLUGIN_ACTIVATION_SCOPE,
     CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,
@@ -36,6 +37,7 @@ class ToolSpec:
     exposed: bool = True
     deprecated: bool = False
     replacement: str = ""
+    action_name: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         """Return JSON-serializable tool metadata."""
@@ -49,6 +51,8 @@ class ToolSpec:
         data.update(self.safety.to_dict())
         if self.replacement:
             data["replacement"] = self.replacement
+        if self.action_name:
+            data["action_name"] = self.action_name
         return data
 
 
@@ -131,7 +135,12 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
     ),
     ToolSpec("runops.run.list", "List run directories and manifest states.", READ),
     ToolSpec("runops.run.inspect", "Inspect one run manifest and readiness.", INSPECT),
-    ToolSpec("runops.run.logs", "Return tail lines from the latest run log.", INSPECT),
+    ToolSpec(
+        "runops.run.logs",
+        "Return tail lines from the latest run log.",
+        INSPECT,
+        action_name="show_log",
+    ),
     ToolSpec(
         "runops.slurm.queue",
         "List Slurm job records known to the project manifests.",
@@ -146,6 +155,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         "runops.job.plan_submit",
         "Plan an sbatch submission command without submitting it.",
         PLAN,
+        action_name="submit_run",
     ),
     ToolSpec(
         "runops.job.submit",
@@ -153,6 +163,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         EXTERNAL_DISABLED,
         enabled=False,
         exposed=False,
+        action_name="submit_run",
     ),
     ToolSpec(
         "runops.job.cancel",
@@ -160,6 +171,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         DESTRUCTIVE_DISABLED,
         enabled=False,
         exposed=False,
+        action_name="cancel_run",
     ),
     ToolSpec(
         "runops.run.delete",
@@ -167,6 +179,7 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         DESTRUCTIVE_DISABLED,
         enabled=False,
         exposed=False,
+        action_name="delete_run",
     ),
 )
 
@@ -340,6 +353,14 @@ def conformance_report() -> dict[str, Any]:
         not safety_missing,
         "Every tool has valid safety metadata.",
     )
+    cli_issues = cli_operation_issues()
+    add(
+        "cli_action_bindings_conform",
+        not cli_issues,
+        "CLI operation bindings match every advertised ActionSpec path."
+        if not cli_issues
+        else "CLI action binding issues: " + " ".join(cli_issues),
+    )
     action_mcp_tools = {
         tool_name
         for action_spec in ACTION_SPECS.values()
@@ -372,6 +393,42 @@ def conformance_report() -> dict[str, Any]:
             "Unsafe action MCP tools without confirmation metadata: "
             + ", ".join(unsafe_action_tools_without_confirmation)
         ),
+    )
+    expected_mcp_pairs = {
+        (tool_name, action_name)
+        for action_name, action_spec in ACTION_SPECS.items()
+        for tool_name in action_spec.mcp_tools
+    }
+    actual_mcp_pairs = {
+        (spec.name, spec.action_name) for spec in TOOL_SPECS if spec.action_name
+    }
+    mcp_issues = [
+        f"Tool {spec.name} references unknown action {spec.action_name}."
+        for spec in TOOL_SPECS
+        if spec.action_name and spec.action_name not in ACTION_SPECS
+    ]
+    mcp_issues.extend(
+        f"Missing ToolSpec binding: {tool_name} -> {action_name}."
+        for tool_name, action_name in expected_mcp_pairs - actual_mcp_pairs
+    )
+    mcp_issues.extend(
+        f"Unexpected ToolSpec binding: {tool_name} -> {action_name}."
+        for tool_name, action_name in actual_mcp_pairs - expected_mcp_pairs
+        if action_name in ACTION_SPECS
+    )
+    mcp_issues.extend(
+        f"Unsafe tool has no action binding: {spec.name}."
+        for spec in TOOL_SPECS
+        if spec.safety.safety_class in {"external", "destructive"}
+        and not spec.action_name
+    )
+    mcp_issues.sort()
+    add(
+        "mcp_action_bindings_conform",
+        not mcp_issues,
+        "MCP ToolSpec bindings match ActionSpec metadata in both directions."
+        if not mcp_issues
+        else "MCP action binding issues: " + " ".join(mcp_issues),
     )
 
     ok = all(bool(check["ok"]) for check in checks)
