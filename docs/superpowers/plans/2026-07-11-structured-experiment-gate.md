@@ -8,28 +8,30 @@
 
 **Tech Stack:** Python 3.10+, TOML, frozen dataclasses, Typer, pytest.
 
-**Status:** active
+**Status:** completed
+
+**Outcome:** Added a structured candidate-comparison ledger and a fail-closed pilot/full gate for survey-backed bulk submissions, including scaffold, migration, and agent workflow updates.
 
 ### Task 1: Contract and parser
 
-- [ ] Add failing unit tests for pilot/full, candidates, paths, and decisions.
-- [ ] Implement `application/research/experiments.py` typed parser and validator.
-- [ ] Run focused tests and commit `feat: add structured experiment gate`.
+- [x] Add failing unit tests for pilot/full, candidates, paths, and decisions.
+- [x] Implement `application/research/experiments.py` typed parser and validator.
+- [x] Run focused tests and commit `feat: add structured experiment gate`.
 
 ### Task 2: Bulk submission integration
 
-- [ ] Add failing CLI tests for fail-closed survey bulk, dry-run, `--yes`, and generic compatibility.
-- [ ] Invoke the validator before run discovery/plan construction.
-- [ ] Run submit tests and commit `feat: gate survey bulk submission`.
+- [x] Add failing CLI tests for fail-closed survey bulk, dry-run, `--yes`, and generic compatibility.
+- [x] Invoke the validator before run discovery/plan construction.
+- [x] Run submit tests and commit `feat: gate survey bulk submission`.
 
 ### Task 3: Generated harness and migration
 
-- [ ] Add failing scaffold/harness assertions.
-- [ ] Add `research/experiments.toml`, update Research Director/review-pilot/run-all guidance, builder/update expectations, SPEC, commands, and v0 migration note.
-- [ ] Run harness/init/update tests and commit `docs: structure experiment gate workflow`.
+- [x] Add failing scaffold/harness assertions.
+- [x] Add `research/experiments.toml`, update Research Director/review-pilot/run-all guidance, builder/update expectations, SPEC, commands, and v0 migration note.
+- [x] Run harness/init/update tests and commit `docs: structure experiment gate workflow`.
 
 ### Task 4: Verification
 
-- [ ] Run Ruff format/check, mypy, full pytest and branch coverage policy.
-- [ ] Run CLI smoke checks.
-- [ ] Mark this plan completed with an Outcome and commit closeout changes.
+- [x] Run Ruff format/check, mypy, full pytest and branch coverage policy.
+- [x] Run CLI smoke checks.
+- [x] Mark this plan completed with an Outcome and commit closeout changes.
