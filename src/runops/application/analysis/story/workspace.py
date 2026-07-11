@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import tomli_w
 
@@ -18,8 +18,9 @@ from runops.core.discovery import discover_runs
 from runops.core.exceptions import ProjectNotFoundError, SimctlError
 from runops.core.project import find_project_root
 
-from .models import SourceKind, StorySource, StorySpec, StoryStep
+from .models import ArtifactRecord, StorySpec, StoryStep
 from .schema import read_story_spec, story_spec_payload, validate_story_id
+from .sources import collect_source_artifacts, display_path, source_from_path
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -113,19 +114,12 @@ def create_story_workspace(
 
     story_dir.mkdir(parents=True)
     story_path = story_dir / "story.toml"
-    source_records = [_source_record(root, source) for source in sources]
     spec = StorySpec(
         schema_version=1,
         id=resolved_id,
         title=story_title,
         status="draft",
-        sources=tuple(
-            StorySource(
-                kind=cast(SourceKind, record["kind"]),
-                path=record["path"],
-            )
-            for record in source_records
-        ),
+        sources=tuple(source_from_path(root, source) for source in sources),
         steps=(
             StoryStep(
                 id="first-step",
@@ -173,13 +167,10 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
 
     artifacts: list[dict[str, Any]] = []
     warnings: list[str] = []
-    for source in source_records:
-        source_artifacts, source_warnings = _collect_source_artifacts(
-            project_root,
-            source,
-        )
-        artifacts.extend(source_artifacts)
-        warnings.extend(source_warnings)
+    for source in spec.sources:
+        collection = collect_source_artifacts(project_root, source)
+        artifacts.extend(_legacy_artifact(item) for item in collection.artifacts)
+        warnings.extend(collection.warnings)
 
     source_blocked = any(
         warning.startswith("Story source not found:") for warning in warnings
@@ -196,7 +187,7 @@ def audit_story_workspace(story_dir: Path) -> StoryAuditResult:
             "id": spec.id,
             "title": spec.title,
             "status": spec.status,
-            "path": _display_path(story_path, base=project_root),
+            "path": display_path(story_path, base=project_root),
         },
         "sources": source_records,
         "overall_status": overall_status,
@@ -242,6 +233,29 @@ def _legacy_step(step: StoryStep) -> dict[str, Any]:
         "claim_ceiling": step.claim_ceiling,
         "notes": step.notes,
     }
+
+
+def _legacy_artifact(artifact: ArtifactRecord) -> dict[str, Any]:
+    attributes = {
+        "kind": artifact.kind,
+        "path": artifact.path,
+        "title": artifact.title,
+        "description": artifact.description,
+        "status": artifact.status,
+        "source_scope": artifact.source_scope,
+        "source_index": artifact.source_index,
+        "run_id": artifact.run_id,
+        "quantity": artifact.quantity,
+    }
+    data = {
+        key: value
+        for key, value in attributes.items()
+        if key in artifact.present_fields
+    }
+    data["name"] = artifact.name
+    data["id"] = artifact.artifact_id
+    data["tags"] = list(artifact.tags)
+    return data
 
 
 def _source_record(project_root: Path, source_path: Path) -> dict[str, str]:
