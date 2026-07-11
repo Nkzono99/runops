@@ -9,6 +9,8 @@ from typing import Any
 
 import pytest
 import tomli_w
+from runops.application import analysis
+from runops.application.analysis import story
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -51,6 +53,19 @@ def _write_manifest(run_dir: Path, run_id: str) -> None:
             },
             f,
         )
+
+
+def test_story_module_exports_public_analysis_symbols() -> None:
+    public_names = (
+        "StoryAuditResult",
+        "StoryWorkspaceResult",
+        "audit_story_workspace",
+        "create_story_workspace",
+        "slugify_story_id",
+    )
+
+    for name in public_names:
+        assert getattr(story, name) is getattr(analysis, name)
 
 
 def test_create_story_workspace_writes_story_toml(tmp_path: Path) -> None:
