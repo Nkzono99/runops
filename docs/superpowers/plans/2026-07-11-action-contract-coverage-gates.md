@@ -40,7 +40,7 @@ Import the new catalog and add tests which assert that every advertised CLI path
 Run:
 
 ```bash
-tssrun -p gr20001b -- uv run pytest tests/test_application/test_action_contract.py -q
+tssrun -p gr20001b uv run pytest tests/test_application/test_action_contract.py -q
 ```
 
 Expected: collection fails because `runops.cli.operations` does not exist.
@@ -95,7 +95,7 @@ Assert these exact bindings: logs to `show_log`; plan-submit and submit to `subm
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-tssrun -p gr20001b -- uv run pytest tests/test_application/test_action_contract.py tests/test_mcp/test_registry.py -q
+tssrun -p gr20001b uv run pytest tests/test_application/test_action_contract.py tests/test_mcp/test_registry.py -q
 ```
 
 Expected: failures because `ToolSpec` has no `action_name` and the conformance checks are absent.
@@ -134,7 +134,7 @@ Use `tmp_path` fixtures to cover a passing report, a below-floor violation with 
 - [ ] **Step 2: Run the unit test and verify RED**
 
 ```bash
-tssrun -p gr20001b -- uv run pytest tests/test_application/test_coverage_policy.py -q
+tssrun -p gr20001b uv run pytest tests/test_application/test_coverage_policy.py -q
 ```
 
 Expected: collection fails because the module does not exist.
@@ -173,7 +173,7 @@ Extend `tests/test_harness/test_development_guidance.py` with a parameterized te
 - [ ] **Step 2: Run the focused test and verify RED**
 
 ```bash
-tssrun -p gr20001b -- uv run pytest tests/test_harness/test_development_guidance.py -q
+tssrun -p gr20001b uv run pytest tests/test_harness/test_development_guidance.py -q
 ```
 
 Expected: the new assertions fail because the JSON report and checker command are absent.
@@ -191,9 +191,9 @@ immediately afterward in CI, publish verification, `$check`, and the development
 - [ ] **Step 4: Run focused tests and a real coverage report**
 
 ```bash
-tssrun -p gr20001b -- uv run pytest tests/test_harness/test_development_guidance.py -q
-tssrun -p gr20001b -- uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
-tssrun -p gr20001b -- uv run python -m runops.application.operator.coverage_policy coverage.json
+tssrun -p gr20001b uv run pytest tests/test_harness/test_development_guidance.py -q
+tssrun -p gr20001b uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
+tssrun -p gr20001b uv run python -m runops.application.operator.coverage_policy coverage.json
 ```
 
 Expected: harness test passes, global coverage is at least 80%, and every critical module meets its floor.
@@ -217,9 +217,9 @@ git commit -m "ci: enforce critical module coverage policy"
 - [ ] **Step 1: Run formatting and static analysis**
 
 ```bash
-tssrun -p gr20001b -- uv run ruff format --check src/ tests/
-tssrun -p gr20001b -- uv run ruff check src/ tests/
-tssrun -p gr20001b -- uv run mypy src/
+tssrun -p gr20001b uv run ruff format --check src/ tests/
+tssrun -p gr20001b uv run ruff check src/ tests/
+tssrun -p gr20001b uv run mypy src/
 ```
 
 Expected: all commands exit 0.
@@ -227,9 +227,9 @@ Expected: all commands exit 0.
 - [ ] **Step 2: Run the complete test and coverage gates**
 
 ```bash
-tssrun -p gr20001b -- uv run pytest tests/ -x -q
-tssrun -p gr20001b -- uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
-tssrun -p gr20001b -- uv run python -m runops.application.operator.coverage_policy coverage.json
+tssrun -p gr20001b uv run pytest tests/ -x -q
+tssrun -p gr20001b uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
+tssrun -p gr20001b uv run python -m runops.application.operator.coverage_policy coverage.json
 ```
 
 Expected: all tests pass, global coverage is at least 80%, and no critical-module violation is printed.
@@ -237,8 +237,8 @@ Expected: all tests pass, global coverage is at least 80%, and no critical-modul
 - [ ] **Step 3: Run interface smoke checks**
 
 ```bash
-tssrun -p gr20001b -- uv run runo mcp check
-tssrun -p gr20001b -- uv run runo --help
+tssrun -p gr20001b uv run runo mcp check
+tssrun -p gr20001b uv run runo --help
 ```
 
 Expected: both commands exit 0 and public command names are unchanged.
