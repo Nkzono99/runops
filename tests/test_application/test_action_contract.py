@@ -11,6 +11,11 @@ import pytest
 from runops.application import actions
 from runops.application.actions import ActionStatus
 from runops.cli.main import app as cli_app
+from runops.cli.operations import (
+    CLI_OPERATION_BINDINGS,
+    CliOperationBinding,
+    cli_operation_issues,
+)
 from runops.mcp.registry import all_tool_specs
 
 
@@ -128,6 +133,84 @@ def test_action_specs_advertise_existing_cli_commands() -> None:
 
     assert unmapped_actions == []
     assert missing_commands == {}
+
+
+def test_cli_operation_bindings_round_trip_action_specs() -> None:
+    """The explicit CLI catalog should exactly match ActionSpec metadata."""
+    advertised = {
+        command_path: tuple(
+            sorted(
+                name
+                for name, spec in actions.ACTION_SPECS.items()
+                if command_path in spec.cli_commands
+            )
+        )
+        for spec in actions.ACTION_SPECS.values()
+        for command_path in spec.cli_commands
+    }
+    bound = {
+        binding.command_path: tuple(sorted(binding.action_names))
+        for binding in CLI_OPERATION_BINDINGS
+    }
+
+    assert cli_operation_issues() == ()
+    assert bound == advertised
+    assert set(bound) <= _collect_cli_commands(cli_app)
+    assert bound[("runs", "retry")] == ("plan_retry", "retry_run")
+
+
+def test_cli_operation_validator_reports_unknown_actions() -> None:
+    """Unknown action names should be reported with their CLI path."""
+    altered = tuple(
+        binding
+        for binding in CLI_OPERATION_BINDINGS
+        if binding.command_path != ("runs", "create")
+    ) + (
+        CliOperationBinding(
+            command_path=("runs", "create"),
+            action_names=("missing_action",),
+            effect="write",
+        ),
+    )
+
+    assert cli_operation_issues(altered) == (
+        "CLI path 'runs create' references unknown action 'missing_action'.",
+        "Missing CLI binding for action 'create_run' at 'runs create'.",
+    )
+
+
+def test_cli_operation_validator_reports_duplicate_paths() -> None:
+    """Duplicate paths should fail instead of collapsing into one mapping."""
+    binding = CLI_OPERATION_BINDINGS[0]
+
+    issues = cli_operation_issues((*CLI_OPERATION_BINDINGS, binding))
+
+    assert f"Duplicate CLI binding path: '{' '.join(binding.command_path)}'." in issues
+
+
+def test_cli_operation_validator_reports_missing_and_extra_pairs() -> None:
+    """Bindings must not omit or invent an ActionSpec path relation."""
+    create_binding = next(
+        binding
+        for binding in CLI_OPERATION_BINDINGS
+        if binding.command_path == ("runs", "create")
+    )
+    altered = tuple(
+        binding
+        for binding in CLI_OPERATION_BINDINGS
+        if binding.command_path != create_binding.command_path
+    ) + (
+        CliOperationBinding(
+            command_path=create_binding.command_path,
+            action_names=("show_log",),
+            effect=create_binding.effect,
+        ),
+    )
+
+    issues = cli_operation_issues(altered)
+
+    assert "Missing CLI binding for action 'create_run' at 'runs create'." in issues
+    assert "Unexpected CLI binding for action 'show_log' at 'runs create'." in issues
 
 
 def test_action_specs_advertise_existing_mcp_tools() -> None:
