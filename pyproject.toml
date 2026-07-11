@@ -90,3 +90,12 @@ exclude = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.runops.coverage-policy.modules]
+"src/runops/core/manifest.py" = 95
+"src/runops/application/execution/submission.py" = 90
+"src/runops/core/state.py" = 90
+"src/runops/core/event_log.py" = 80
+"src/runops/slurm/submit.py" = 90
+"src/runops/adapters/contrib/beach/adapter.py" = 80
+"src/runops/application/analysis/story.py" = 80
