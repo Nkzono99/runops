@@ -308,7 +308,11 @@ def test_update_yes_replaces_editable_install(tmp_path: Path) -> None:
 
 
 def test_update_help_hides_force_compatibility_alias() -> None:
-    result = runner.invoke(app, ["update", "--help"])
+    result = runner.invoke(
+        app,
+        ["update", "--help"],
+        env={"COLUMNS": "160", "TERM": "dumb", "NO_COLOR": "1"},
+    )
 
     assert result.exit_code == 0, result.output
     assert "--yes" in result.output
