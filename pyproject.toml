@@ -93,11 +93,14 @@ testpaths = ["tests"]
 
 [tool.runops.coverage-policy.modules]
 "src/runops/core/manifest.py" = 95
-"src/runops/application/execution/submission.py" = 90
+"src/runops/application/execution/submission/apply.py" = 90
+"src/runops/application/execution/submission/claim.py" = 90
+"src/runops/application/execution/submission/planning.py" = 90
 "src/runops/core/state.py" = 90
 "src/runops/core/event_log.py" = 80
 "src/runops/slurm/submit.py" = 90
 "src/runops/adapters/contrib/beach/adapter.py" = 80
+"src/runops/adapters/contrib/beach/diagnostics.py" = 80
 "src/runops/application/analysis/story/models.py" = 95
 "src/runops/application/analysis/story/schema.py" = 90
 "src/runops/application/analysis/story/audit.py" = 95

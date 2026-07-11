@@ -36,6 +36,12 @@ contract の明示的な legacy exception とし、新しい依存を増やさ�
   `mpiexec` を直接実行する。
 - 外部実行や filesystem mutation は plan/apply に分け、apply 前に stale 条件を確認する。
 
+責務が大きい use case は公開 facade と capability module に分ける。submission は
+planning / claim / apply、notebook は access / archive、plugin gateway は discovery /
+validation / inventory を境界とする。Simulator Adapter の registry class は
+`adapter.py` に維持し、宣言情報は `metadata.py`、出力・状態判定は
+`diagnostics.py` に置く。
+
 ## `manifest.toml` が正本
 
 run の identity、state、origin、provenance、job 情報は `manifest.toml` に記録する。

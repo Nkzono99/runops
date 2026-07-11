@@ -2,9 +2,9 @@
 
 ## Circular imports
 
-`harness/builder.py` が `cli/init/command.py` を import するとループする。
-harness は templates と adapters.registry にだけ依存する。
-`cli/init/command.py` が harness/builder を import する方向は OK。
+`cli/init/workflow.py` は harness の plugin recommendation helper を使う。
+harness 側から `cli/init/command.py` や `workflow.py` を import するとループするため、
+harness は templates と adapters.registry を依存の入口にする。
 
 ## `_write_if_missing` のセマンティクス
 

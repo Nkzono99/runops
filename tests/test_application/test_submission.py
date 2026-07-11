@@ -794,6 +794,25 @@ def test_plan_submit_rejects_fifo_claim_without_blocking(tmp_path: Path) -> None
     assert "regular single-link file" in plan.claim_before
 
 
+def test_plan_submit_reports_claim_read_failure_as_blocking_precondition(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(run_dir)
+    (run_dir / ".runops-submit.lock").write_text("", encoding="utf-8")
+
+    with patch(
+        "runops.application.execution.submission.os.read",
+        side_effect=OSError("claim read failed"),
+    ):
+        plan = plan_submit(SubmitRequest(run_dir=run_dir))
+
+    claim_check = _checks(plan)["submission_claim_empty"]
+    assert claim_check.passed is False
+    assert "SubmissionClaimError" in plan.claim_before
+    assert "claim read failed" in plan.claim_before
+
+
 def test_apply_submit_new_lock_directory_fsync_failure_calls_no_scheduler(
     tmp_path: Path,
 ) -> None:

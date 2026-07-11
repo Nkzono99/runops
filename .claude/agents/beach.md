@@ -24,8 +24,9 @@ case/survey 展開、manifest、adapter contract、job.sh 生成、lint/test/doc
 
 ## runops 側で担当すること
 
-- `src/runops/adapters/contrib/beach/adapter.py` の adapter contract、runtime
-  resolution、required outputs、summary parsing を保つ。
+- `src/runops/adapters/contrib/beach/adapter.py` の adapter contract と runtime、
+  `metadata.py` の宣言情報、`diagnostics.py` の attempt-aware status / summary
+  判定を保つ。
 - `runo runs create`, `runo runs submit`, `runo runs status`,
   `runo analyze summarize`, `runo analyze collect`
   から見た runops workflow を壊さない。

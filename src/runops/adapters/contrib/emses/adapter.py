@@ -38,6 +38,8 @@ from runops.adapters._runtime import (
 from runops.adapters._utils.toml_utils import apply_dotted_overrides
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.contrib._paths import relative_to_run
+from runops.adapters.contrib.emses import diagnostics as _diagnostics
+from runops.adapters.contrib.emses import metadata as _metadata
 from runops.adapters.contrib.emses.constants import (
     INPUT_DIR,
     LATEST_OUTPUT_DIR,
@@ -81,319 +83,52 @@ class EmseAdapter(SimulatorAdapter):
     @classmethod
     def default_config(cls) -> dict[str, Any]:
         """Return default simulators.toml entry for EMSES."""
-        return {
-            "adapter": "emses",
-            "resolver_mode": "package",
-            "executable": "mpiemses3D",
-        }
+        return _metadata.default_config()
 
     @classmethod
     def required_outputs(cls) -> dict[str, str]:
         """Return EMSES outputs required for analysis readiness."""
-        return {"hdf5_fields": "EMSES HDF5 field output files"}
+        return _metadata.required_outputs()
 
     @classmethod
     def interactive_config(cls) -> dict[str, Any]:
         """Interactively prompt for EMSES configuration."""
-        import typer
-
-        typer.echo("\n  Configuring 'emses' simulator (EMSES PIC):")
-
-        resolver_mode = typer.prompt(
-            "    Resolver mode (package / local_executable / local_source)",
-            default="package",
-        )
-        executable = typer.prompt(
-            "    Executable path or name",
-            default="mpiemses3D",
-        )
-
-        config: dict[str, Any] = {
-            "adapter": "emses",
-            "resolver_mode": resolver_mode,
-            "executable": executable,
-        }
-
-        if resolver_mode == "local_source":
-            config["source_repo"] = typer.prompt(
-                "    EMSES source repository path", default=""
-            )
-            config["build_command"] = typer.prompt(
-                "    Build command", default="make -j"
-            )
-
-        return config
+        return _metadata.interactive_config()
 
     @classmethod
     def case_template(cls) -> dict[str, str]:
         """Return template files for a new EMSES case."""
-        from runops.templates import load_static
-
-        return {
-            "case.toml": load_static("adapters/emses/case.toml"),
-            "plasma.toml": load_static("adapters/emses/plasma.toml"),
-            "summarize.py": load_static("adapters/emses/summarize.py"),
-        }
+        return _metadata.case_template()
 
     @classmethod
     def pip_packages(cls) -> list[str]:
         """Return pip packages for EMSES (simulator + analysis tools)."""
-        return [
-            "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git",
-            "emout",
-            "h5py",
-            "matplotlib",
-            "numpy",
-        ]
+        return _metadata.pip_packages()
 
     @classmethod
     def doc_repos(cls) -> list[tuple[str, str]]:
         """Return documentation repos for EMSES."""
-        return [
-            (
-                "https://github.com/CS12-Laboratory/MPIEMSES3D.git",
-                "MPIEMSES3D",
-            ),
-            (
-                "https://github.com/Nkzono99/emout.git",
-                "emout",
-            ),
-        ]
+        return _metadata.doc_repos()
 
     @classmethod
     def knowledge_sources(cls) -> dict[str, list[str]]:
         """Return knowledge-relevant file patterns for EMSES repos."""
-        return {
-            "MPIEMSES3D": [
-                "README.md",
-                "docs/**/*.md",
-                "schemas/*.json",
-                "examples/**/*.toml",
-                "cookbook/COOKBOOK.md",
-                "cookbook/index.toml",
-                "cookbook/**/*.toml",
-                "cookbook/**/*.md",
-            ],
-            "emout": [
-                "README.md",
-                "docs/agent-user-guide.md",
-            ],
-        }
+        return _metadata.knowledge_sources()
 
     @classmethod
     def codex_plugins(cls) -> list[CodexPluginRecommendation]:
         """Return Codex plugins recommended for EMSES projects."""
-        return [
-            CodexPluginRecommendation(
-                name="mpiemses3d-context",
-                display_name="MPIEMSES3D Context",
-                reason=(
-                    "MPIEMSES3D input review, parameter design, run diagnosis, "
-                    "output analysis, and simulator learning guides."
-                ),
-                install_hint=(
-                    "pip install mpiemses3d-tools\nmpiemses-codex-plugin install"
-                ),
-                activation_hint=(
-                    "Open Codex /plugins, install `MPIEMSES3D Context`, then "
-                    "start a new Codex thread."
-                ),
-                visibility="private-or-gated",
-                source="simulator:emses",
-                capabilities=(
-                    "input-review",
-                    "parameter-design",
-                    "run-diagnose",
-                    "output-analysis",
-                    "method-summary",
-                    "simulator-guide",
-                    "cookbook",
-                    "issue-report",
-                ),
-            ),
-            CodexPluginRecommendation(
-                name="emout-context",
-                display_name="emout Context",
-                reason=(
-                    "EMSES output loading, visualization script generation, "
-                    "unit conversion, remote_figure workflows, and emout "
-                    "troubleshooting."
-                ),
-                install_hint=(
-                    "codex plugin marketplace add Nkzono99/emout "
-                    "--ref main "
-                    "--sparse .agents/plugins "
-                    "--sparse plugins/emout-context\n"
-                    "codex plugin add emout-context@emout"
-                ),
-                activation_hint=(
-                    "Restart Codex or start a new Codex thread after installing."
-                ),
-                visibility="public",
-                source="simulator:emses",
-                capabilities=(
-                    "output-analysis",
-                    "visualization-script",
-                    "visualization-workflow",
-                    "script-review",
-                    "output-diagnose",
-                    "issue-report",
-                    "feedback-report",
-                ),
-            ),
-        ]
+        return _metadata.codex_plugins()
 
     @classmethod
     def parameter_schema(cls) -> dict[str, dict[str, Any]]:
         """Return EMSES parameter schema."""
-        return {
-            "jobcon.nstep": {
-                "type": "int",
-                "unit": "",
-                "description": "Total simulation time steps",
-                "range": [1, None],
-                "default": 10000,
-                "constraints": [],
-                "interdependencies": [],
-            },
-            "tmgrid.dt": {
-                "type": "float",
-                "unit": "1/omega_pe",
-                "description": "Time step in normalized units",
-                "range": [0.0, None],
-                "default": 1.0,
-                "constraints": ["cfl_condition"],
-                "derived_from": "Must satisfy dt < dx / cv",
-                "interdependencies": [
-                    "tmgrid.nx",
-                    "plasma.cv",
-                ],
-            },
-            "tmgrid.nx": {
-                "type": "int",
-                "unit": "cells",
-                "description": "Grid cells in X direction",
-                "range": [1, None],
-                "default": 64,
-                "constraints": ["debye_resolution", "grid_divisibility"],
-                "interdependencies": ["mpi.nodes"],
-            },
-            "tmgrid.ny": {
-                "type": "int",
-                "unit": "cells",
-                "description": "Grid cells in Y direction",
-                "range": [1, None],
-                "default": 64,
-                "constraints": ["debye_resolution", "grid_divisibility"],
-                "interdependencies": ["mpi.nodes"],
-            },
-            "tmgrid.nz": {
-                "type": "int",
-                "unit": "cells",
-                "description": "Grid cells in Z direction",
-                "range": [1, None],
-                "default": 64,
-                "constraints": ["debye_resolution", "grid_divisibility"],
-                "interdependencies": ["mpi.nodes"],
-            },
-            "plasma.cv": {
-                "type": "float",
-                "unit": "dx/dt_norm",
-                "description": "Speed of light in normalized units",
-                "range": [0.0, None],
-                "default": 1.0,
-                "constraints": ["cfl_condition"],
-                "interdependencies": ["tmgrid.dt"],
-            },
-            "mpi.nodes": {
-                "type": "list[int]",
-                "unit": "",
-                "description": (
-                    "Domain decomposition [nxdiv, nydiv, nzdiv]. "
-                    "Product must equal ntasks."
-                ),
-                "range": [1, None],
-                "constraints": [
-                    "domain_decomp_consistency",
-                    "grid_divisibility",
-                ],
-                "interdependencies": [
-                    "tmgrid.nx",
-                    "tmgrid.ny",
-                    "tmgrid.nz",
-                ],
-            },
-            "species.N.wp": {
-                "type": "float",
-                "unit": "omega_pe",
-                "description": "Plasma frequency of species N",
-                "range": [0.0, None],
-                "derived_from": "sqrt(n * q^2 / (m * eps0))",
-                "constraints": ["debye_resolution"],
-                "interdependencies": ["species.N.qm", "tmgrid.nx"],
-            },
-            "species.N.qm": {
-                "type": "float",
-                "unit": "e/m_e",
-                "description": "Charge-to-mass ratio of species N",
-                "interdependencies": ["species.N.wp"],
-            },
-            "species.N.npin": {
-                "type": "int",
-                "unit": "",
-                "description": "Number of macro-particles for species N",
-                "range": [0, None],
-            },
-            "emfield.ex0": {
-                "type": "float",
-                "unit": "normalized",
-                "description": "External electric field (X)",
-                "default": 0.0,
-            },
-            "emfield.bx0": {
-                "type": "float",
-                "unit": "normalized",
-                "description": "External magnetic field (X)",
-                "default": 0.0,
-            },
-        }
+        return _metadata.parameter_schema()
 
     @classmethod
     def default_plot_recipes(cls) -> dict[str, dict[str, Any]]:
         """Return default survey plot recipes for EMSES studies."""
-        return {
-            "completion-vs-dt": {
-                "description": (
-                    "Check how far each run advanced as the EMSES timestep changes."
-                ),
-                "x": ["param.tmgrid.dt", "dt"],
-                "y": ["last_step"],
-                "kind": "line",
-                "group_by": ["origin.case"],
-                "title": "EMSES completion vs dt",
-            },
-            "progress-vs-target": {
-                "description": (
-                    "Compare achieved steps against requested nstep across runs."
-                ),
-                "x": ["nstep"],
-                "y": ["last_step"],
-                "kind": "scatter",
-                "group_by": ["origin.case"],
-                "title": "EMSES progress vs target steps",
-            },
-            "field-output-vs-nx": {
-                "description": (
-                    "Track how many HDF5 field outputs were produced at each "
-                    "x-grid size."
-                ),
-                "x": ["param.tmgrid.nx", "nx"],
-                "y": ["output_counts.hdf5_fields"],
-                "kind": "line",
-                "group_by": ["origin.case"],
-                "title": "EMSES field outputs vs nx",
-            },
-        }
+        return _metadata.default_plot_recipes()
 
     def validate_params(
         self,
@@ -410,9 +145,7 @@ class EmseAdapter(SimulatorAdapter):
     @classmethod
     def agent_guide(cls) -> str:
         """Return AI agent guide for EMSES."""
-        from runops.templates import load_static
-
-        return load_static("adapters/emses/agent_guide.md")
+        return _metadata.agent_guide()
 
     @property
     def name(self) -> str:
@@ -569,51 +302,7 @@ class EmseAdapter(SimulatorAdapter):
         Returns:
             Dictionary of output categories to file lists.
         """
-        work_dir = run_dir / WORK_DIR
-        if not work_dir.is_dir():
-            return {}
-
-        outputs: dict[str, Any] = {}
-
-        log_patterns = {"*.out", "*.err", "*.log"}
-        for output_dir in (work_dir / "latest", work_dir):
-            if not output_dir.is_dir():
-                continue
-
-            h5_files = sorted(output_dir.glob("*.h5"))
-            if h5_files:
-                outputs["hdf5_fields"] = [relative_to_run(f, run_dir) for f in h5_files]
-
-            diag_files: list[str] = []
-            for f in sorted(output_dir.iterdir()):
-                if not f.is_file() or f.suffix == ".h5":
-                    continue
-                if any(f.match(p) for p in log_patterns):
-                    continue
-                diag_files.append(relative_to_run(f, run_dir))
-            if diag_files:
-                outputs["diagnostics"] = diag_files
-
-            snapshot_dir = output_dir / "SNAPSHOT1"
-            if snapshot_dir.is_dir():
-                snap_files = sorted(snapshot_dir.glob("esdat*.h5"))
-                if snap_files:
-                    outputs["snapshots"] = [
-                        relative_to_run(f, run_dir) for f in snap_files
-                    ]
-
-            if outputs:
-                break
-
-        # Log files
-        logs: list[str] = []
-        for pattern in ("stdout.*.log", "stderr.*.log", "*.out", "*.err"):
-            for f in sorted(work_dir.glob(pattern)):
-                logs.append(relative_to_run(f, run_dir))
-        if logs:
-            outputs["logs"] = logs
-
-        return outputs
+        return _diagnostics.detect_outputs(self, run_dir)
 
     def detect_status(self, run_dir: Path) -> str:
         """Infer EMSES simulation status from output files.
@@ -631,53 +320,7 @@ class EmseAdapter(SimulatorAdapter):
         Returns:
             A status string.
         """
-        work_dir = run_dir / WORK_DIR
-        if not work_dir.is_dir():
-            return "unknown"
-
-        # Check for errors in log files
-        for pattern in ("stderr.*.log", "*.err"):
-            for log in work_dir.glob(pattern):
-                try:
-                    content = log.read_text(errors="replace")
-                    if any(
-                        kw in content.lower()
-                        for kw in ("error", "segmentation fault", "killed", "oom")
-                    ):
-                        return "failed"
-                except OSError:
-                    pass
-
-        # Check energy file for simulation progress
-        for output_dir in (work_dir / "latest", work_dir):
-            energy_file = output_dir / "energy"
-            if not energy_file.is_file():
-                continue
-            try:
-                nstep = self._get_expected_nstep(run_dir)
-                lines = [
-                    line
-                    for line in energy_file.read_text(encoding="utf-8")
-                    .strip()
-                    .split("\n")
-                    if line.strip()
-                ]
-                if lines and nstep:
-                    last_parts = lines[-1].strip().split()
-                    if last_parts:
-                        last_step = int(float(last_parts[0]))
-                        if last_step >= nstep:
-                            return "completed"
-                        return "running"
-            except (ValueError, IndexError, OSError):
-                pass
-
-        # Fallback: check for any output files
-        for output_dir in (work_dir / "latest", work_dir):
-            if list(output_dir.glob("*.h5")):
-                return "running"
-
-        return "unknown"
+        return _diagnostics.detect_status(self, run_dir)
 
     def summarize(self, run_dir: Path) -> dict[str, Any]:
         """Extract key metrics from EMSES outputs.
@@ -689,51 +332,7 @@ class EmseAdapter(SimulatorAdapter):
             Summary dictionary with status, output counts, energy data,
             and simulation parameters.
         """
-        summary: dict[str, Any] = {}
-        work_dir = run_dir / WORK_DIR
-
-        summary["status"] = self.detect_status(run_dir)
-
-        # Count outputs by category
-        outputs = self.detect_outputs(run_dir)
-        summary["output_counts"] = {
-            k: len(v) if isinstance(v, list) else 1 for k, v in outputs.items()
-        }
-
-        # Energy diagnostics
-        for output_dir in (work_dir / "latest", work_dir):
-            energy_file = output_dir / "energy"
-            if not energy_file.is_file():
-                continue
-            try:
-                lines = [
-                    line
-                    for line in energy_file.read_text(encoding="utf-8")
-                    .strip()
-                    .split("\n")
-                    if line.strip()
-                ]
-                if lines:
-                    summary["total_energy_lines"] = len(lines)
-                    last_parts = lines[-1].strip().split()
-                    if last_parts:
-                        summary["last_step"] = int(float(last_parts[0]))
-            except (ValueError, OSError):
-                pass
-            break
-
-        # Simulation parameters from plasma.toml
-        config = self._load_input_config(run_dir)
-        if config:
-            tmgrid = config.get("tmgrid", {})
-            for key in ("nx", "ny", "nz", "dt"):
-                if key in tmgrid:
-                    summary[key] = tmgrid[key]
-            jobcon = config.get("jobcon", {})
-            if "nstep" in jobcon:
-                summary["nstep"] = jobcon["nstep"]
-
-        return summary
+        return _diagnostics.summarize(self, run_dir)
 
     def collect_provenance(
         self,

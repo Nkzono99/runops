@@ -38,10 +38,11 @@ from runops.adapters._runtime import (
 from runops.adapters._utils.toml_utils import apply_dotted_overrides
 from runops.adapters.base import SimulatorAdapter
 from runops.adapters.contrib._paths import relative_to_run
+from runops.adapters.contrib.beach import diagnostics as _diagnostics
+from runops.adapters.contrib.beach import metadata as _metadata
 from runops.adapters.contrib.beach.constants import (
     INPUT_DIR,
     LATEST_OUTPUT_DIR,
-    OUTPUT_FILES,
     WORK_DIR,
 )
 from runops.adapters.contrib.beach.validation import (
@@ -103,244 +104,52 @@ class BeachAdapter(SimulatorAdapter):
     @classmethod
     def default_config(cls) -> dict[str, Any]:
         """Return default simulators.toml entry for BEACH."""
-        return {
-            "adapter": "beach",
-            "resolver_mode": "package",
-            "executable": "beach",
-        }
+        return _metadata.default_config()
 
     @classmethod
     def required_outputs(cls) -> dict[str, str]:
         """Return BEACH outputs required for analysis readiness."""
-        return {"summary": "BEACH summary.txt completion summary"}
+        return _metadata.required_outputs()
 
     @classmethod
     def interactive_config(cls) -> dict[str, Any]:
         """Interactively prompt for BEACH configuration."""
-        import typer
-
-        typer.echo("\n  Configuring 'beach' simulator (BEACH BEM):")
-
-        resolver_mode = typer.prompt(
-            "    Resolver mode (package / local_executable / local_source)",
-            default="package",
-        )
-        executable = typer.prompt(
-            "    Executable path or name",
-            default="beach",
-        )
-
-        default_modules = ["intel/2023.2", "intelmpi/2023.2"]
-        config: dict[str, Any] = {
-            "adapter": "beach",
-            "resolver_mode": resolver_mode,
-            "executable": executable,
-            "modules": default_modules,
-        }
-
-        if resolver_mode == "local_source":
-            config["source_repo"] = typer.prompt(
-                "    BEACH source repository path", default=""
-            )
-            config["build_command"] = typer.prompt(
-                "    Build command", default="make build"
-            )
-
-        if typer.confirm("    Customize module list?", default=False):
-            modules_str = typer.prompt(
-                "    Modules (comma-separated)",
-                default=", ".join(default_modules),
-            )
-            config["modules"] = [m.strip() for m in modules_str.split(",") if m.strip()]
-
-        return config
+        return _metadata.interactive_config()
 
     @classmethod
     def case_template(cls) -> dict[str, str]:
         """Return template files for a new BEACH case."""
-        from runops.templates import load_static
-
-        return {
-            "case.toml": load_static("adapters/beach/case.toml"),
-            "beach.toml": load_static("adapters/beach/beach.toml"),
-            "summarize.py": load_static("adapters/beach/summarize.py"),
-        }
+        return _metadata.case_template()
 
     @classmethod
     def pip_packages(cls) -> list[str]:
         """Return pip packages for BEACH (simulator + analysis tools)."""
-        return [
-            "beach-bem",
-            "matplotlib",
-            "numpy",
-            "pandas",
-        ]
+        return _metadata.pip_packages()
 
     @classmethod
     def doc_repos(cls) -> list[tuple[str, str]]:
         """Return documentation repos for BEACH."""
-        return [
-            (
-                "https://github.com/Nkzono99/beach.git",
-                "beach",
-            ),
-        ]
+        return _metadata.doc_repos()
 
     @classmethod
     def knowledge_sources(cls) -> dict[str, list[str]]:
         """Return knowledge-relevant file patterns for BEACH repos."""
-        return {
-            "beach": [
-                "README.md",
-                "docs/**/*.md",
-                "schemas/*.json",
-                "examples/**/*.toml",
-                "cookbook/COOKBOOK.md",
-                "cookbook/index.toml",
-                "cookbook/**/*.toml",
-                "cookbook/**/*.md",
-            ],
-        }
+        return _metadata.knowledge_sources()
 
     @classmethod
     def codex_plugins(cls) -> list[CodexPluginRecommendation]:
         """Return Codex plugins recommended for BEACH projects."""
-        return [
-            CodexPluginRecommendation(
-                name="beach-context",
-                display_name="BEACH Context",
-                reason=(
-                    "BEACH configuration review, run diagnosis, case design, "
-                    "output analysis, simulator learning, method summaries, "
-                    "and issue report drafting."
-                ),
-                install_hint=(
-                    "codex plugin marketplace add Nkzono99/BEACH "
-                    "--ref main "
-                    "--sparse .agents/plugins "
-                    "--sparse plugins/beach-context"
-                ),
-                activation_hint=(
-                    "Open Codex /plugins, install `BEACH Context`, then "
-                    "restart Codex or start a new Codex thread."
-                ),
-                visibility="public",
-                source="simulator:beach",
-                capabilities=(
-                    "config-review",
-                    "case-design",
-                    "run-diagnose",
-                    "output-analysis",
-                    "method-summary",
-                    "simulator-guide",
-                    "cookbook",
-                    "issue-report",
-                ),
-            )
-        ]
+        return _metadata.codex_plugins()
 
     @classmethod
     def parameter_schema(cls) -> dict[str, dict[str, Any]]:
         """Return BEACH parameter schema."""
-        return {
-            "sim.dt": {
-                "type": "float",
-                "unit": "s",
-                "description": "Time step",
-                "range": [0.0, None],
-                "default": 1.0e-6,
-                "constraints": ["timestep_stability"],
-                "interdependencies": [
-                    "environment.electron_density",
-                ],
-            },
-            "sim.max_step": {
-                "type": "int",
-                "unit": "",
-                "description": "Maximum simulation steps",
-                "range": [1, None],
-                "default": 1000,
-            },
-            "sim.batch_count": {
-                "type": "int",
-                "unit": "",
-                "description": "Number of batches",
-                "range": [1, None],
-                "default": 100,
-            },
-            "sim.field_solver": {
-                "type": "str",
-                "description": "Field solver type (fmm, direct, etc.)",
-                "default": "fmm",
-            },
-            "environment.electron_density": {
-                "type": "float",
-                "unit": "m^-3",
-                "description": "Background electron number density",
-                "range": [0.0, None],
-                "default": 1.0e12,
-                "constraints": ["charge_neutrality"],
-                "interdependencies": [
-                    "environment.ion_density",
-                ],
-            },
-            "environment.electron_temperature": {
-                "type": "float",
-                "unit": "eV",
-                "description": "Electron temperature",
-                "range": [0.0, None],
-                "default": 1.0,
-            },
-            "environment.ion_density": {
-                "type": "float",
-                "unit": "m^-3",
-                "description": "Background ion number density",
-                "range": [0.0, None],
-                "default": 1.0e12,
-                "constraints": ["charge_neutrality"],
-                "interdependencies": [
-                    "environment.electron_density",
-                ],
-            },
-            "environment.ion_temperature": {
-                "type": "float",
-                "unit": "eV",
-                "description": "Ion temperature",
-                "range": [0.0, None],
-                "default": 1.0,
-            },
-            "mesh.obj_path": {
-                "type": "str",
-                "description": "Path to OBJ mesh file",
-                "constraints": ["mesh_file_exists"],
-            },
-        }
+        return _metadata.parameter_schema()
 
     @classmethod
     def default_plot_recipes(cls) -> dict[str, dict[str, Any]]:
         """Return default survey plot recipes for BEACH studies."""
-        return {
-            "charge-history-vs-dt": {
-                "description": (
-                    "Check charge-history coverage as the BEACH timestep changes."
-                ),
-                "x": ["param.sim.dt", "sim_dt"],
-                "y": ["output_counts.charge_history"],
-                "kind": "line",
-                "group_by": ["param.sim.field_solver", "sim_field_solver"],
-                "title": "BEACH charge-history coverage vs dt",
-            },
-            "potential-history-vs-steps": {
-                "description": (
-                    "Compare potential-history output availability against max_step."
-                ),
-                "x": ["param.sim.max_step", "sim_max_step"],
-                "y": ["output_counts.potential_history"],
-                "kind": "line",
-                "group_by": ["param.sim.field_solver", "sim_field_solver"],
-                "title": "BEACH potential-history coverage vs max_step",
-            },
-        }
+        return _metadata.default_plot_recipes()
 
     def validate_params(
         self,
@@ -357,9 +166,7 @@ class BeachAdapter(SimulatorAdapter):
     @classmethod
     def agent_guide(cls) -> str:
         """Return AI agent guide for BEACH."""
-        from runops.templates import load_static
-
-        return load_static("adapters/beach/agent_guide.md")
+        return _metadata.agent_guide()
 
     @property
     def name(self) -> str:
@@ -517,34 +324,7 @@ class BeachAdapter(SimulatorAdapter):
         Returns:
             Dictionary of detected output labels to relative paths.
         """
-        outputs: dict[str, Any] = {}
-        work_dir = run_dir / WORK_DIR
-
-        # Search candidate output directories
-        for output_dir in (
-            work_dir / "latest",
-            work_dir / "outputs" / "latest",
-            work_dir / "outputs",
-            work_dir,
-        ):
-            if not output_dir.is_dir():
-                continue
-            for label, filename in OUTPUT_FILES.items():
-                f = output_dir / filename
-                if f.is_file():
-                    outputs[label] = relative_to_run(f, run_dir)
-            if outputs:
-                break
-
-        # Log files
-        logs: list[str] = []
-        for pattern in ("stdout.*.log", "stderr.*.log", "*.out", "*.err"):
-            for f in sorted(work_dir.glob(pattern)):
-                logs.append(relative_to_run(f, run_dir))
-        if logs:
-            outputs["logs"] = logs
-
-        return outputs
+        return _diagnostics.detect_outputs(self, run_dir)
 
     def detect_status(self, run_dir: Path) -> str:
         """Infer BEACH simulation status from output files.
@@ -564,7 +344,7 @@ class BeachAdapter(SimulatorAdapter):
         Returns:
             A status string.
         """
-        return self._status_snapshot(run_dir).status
+        return _diagnostics.detect_status(self, run_dir)
 
     def _status_snapshot(self, run_dir: Path) -> _BeachStatusSnapshot:
         """Collect one internally consistent current-attempt status snapshot."""
@@ -625,83 +405,21 @@ class BeachAdapter(SimulatorAdapter):
         Returns:
             Summary dictionary.
         """
-        summary: dict[str, Any] = {}
-        snapshot = self._status_snapshot(run_dir)
-
-        summary["status"] = snapshot.status
-
-        # Parse summary.txt
-        if snapshot.summary_file is not None:
-            try:
-                for line in snapshot.summary_file.read_text(encoding="utf-8").split(
-                    "\n"
-                ):
-                    line = line.strip()
-                    if "=" not in line:
-                        continue
-                    key, value = line.split("=", 1)
-                    key, value = key.strip(), value.strip()
-                    try:
-                        summary[key] = int(value)
-                    except ValueError:
-                        try:
-                            summary[key] = float(value)
-                        except ValueError:
-                            summary[key] = value
-            except OSError:
-                pass
-
-        # Output counts
-        outputs = self.detect_outputs(run_dir)
-        summary["output_counts"] = {
-            k: len(v) if isinstance(v, list) else 1 for k, v in outputs.items()
-        }
-
-        # Config parameters
-        beach_toml = run_dir / INPUT_DIR / "beach.toml"
-        if beach_toml.is_file():
-            try:
-                with open(beach_toml, "rb") as f:
-                    config = tomllib.load(f)
-                sim = config.get("sim", {})
-                for key in ("dt", "batch_count", "max_step", "field_solver"):
-                    if key in sim:
-                        summary[f"sim_{key}"] = sim[key]
-            except (tomllib.TOMLDecodeError, OSError):
-                pass
-
-        progress = snapshot.progress
-        if progress is not None:
-            last_batch, batch_count, _log_file = progress
-            summary["last_step"] = last_batch
-            summary["nstep"] = batch_count
-
-        return summary
+        return _diagnostics.summarize(self, run_dir)
 
     @staticmethod
     def _output_dirs(work_dir: Path) -> tuple[Path, ...]:
         """Return BEACH output directory candidates in lookup order."""
-        return (
-            work_dir / "latest",
-            work_dir / "outputs" / "latest",
-            work_dir / "outputs",
-            work_dir,
-        )
+        return _diagnostics._output_dirs(work_dir)
 
     @staticmethod
     def _mtime(path: Path) -> float | None:
         """Return file mtime, or ``None`` when it cannot be read."""
-        try:
-            return path.stat().st_mtime
-        except OSError:
-            return None
+        return _diagnostics._mtime(path)
 
     def _newest_summary_file(self, work_dir: Path) -> Path | None:
         """Return the newest readable ``summary.txt`` across output candidates."""
-        candidates = self._sort_logs(
-            output_dir / "summary.txt" for output_dir in self._output_dirs(work_dir)
-        )
-        return candidates[0] if candidates else None
+        return _diagnostics._newest_summary_file(self, work_dir)
 
     def _latest_stdout_batch_progress(
         self,
@@ -710,69 +428,27 @@ class BeachAdapter(SimulatorAdapter):
         job_id: str = "",
     ) -> tuple[int, int, Path] | None:
         """Return progress from the selected attempt stdout log, if present."""
-        logs = self._stdout_logs(work_dir, job_id=job_id)
-        if not logs:
-            return None
-        log_file = logs[0]
-        progress = self._parse_batch_progress(self._read_text_tail(log_file))
-        if progress is None:
-            return None
-        last_batch, batch_count = progress
-        return last_batch, batch_count, log_file
+        return _diagnostics._latest_stdout_batch_progress(self, work_dir, job_id=job_id)
 
     def _stdout_logs(self, work_dir: Path, *, job_id: str = "") -> list[Path]:
         """Return stdout candidates, scoped to ``job_id`` when available."""
-        if job_id:
-            return self._existing_logs(
-                work_dir,
-                (f"stdout.{job_id}.log", f"{job_id}.out"),
-            )
-        return self._newest_logs(work_dir, ("stdout.*.log", "*.out"))
+        return _diagnostics._stdout_logs(self, work_dir, job_id=job_id)
 
     def _has_error_log(self, work_dir: Path, *, job_id: str) -> bool:
         """Return whether the selected attempt stderr contains an error marker."""
-        if job_id:
-            logs = self._existing_logs(
-                work_dir,
-                (f"stderr.{job_id}.log", f"{job_id}.err"),
-            )
-        else:
-            logs = self._newest_logs(work_dir, ("stderr.*.log", "*.err"))
-        return any(
-            content.strip()
-            and any(
-                keyword in content for keyword in ("error", "fatal", "killed", "oom")
-            )
-            for content in (self._read_text_tail(log_file).lower() for log_file in logs)
-        )
+        return _diagnostics._has_error_log(self, work_dir, job_id=job_id)
 
     def _existing_logs(self, work_dir: Path, names: tuple[str, ...]) -> list[Path]:
         """Return exact-name log candidates newest first."""
-        paths = [work_dir / name for name in names]
-        return self._sort_logs(path for path in paths if path.is_file())
+        return _diagnostics._existing_logs(self, work_dir, names)
 
     def _newest_logs(self, work_dir: Path, patterns: tuple[str, ...]) -> list[Path]:
         """Return at most the newest matching legacy log candidate."""
-        paths: list[Path] = []
-        for pattern in patterns:
-            paths.extend(work_dir.glob(pattern))
-        sorted_paths = self._sort_logs(paths)
-        return sorted_paths[:1]
+        return _diagnostics._newest_logs(self, work_dir, patterns)
 
     def _sort_logs(self, paths: Iterable[Path]) -> list[Path]:
         """Deduplicate and sort readable log paths by mtime then name."""
-        candidates: list[tuple[float, str, Path]] = []
-        seen: set[Path] = set()
-        for log_file in paths:
-            if log_file in seen or not log_file.is_file():
-                continue
-            mtime = self._mtime(log_file)
-            if mtime is None:
-                continue
-            candidates.append((mtime, log_file.name, log_file))
-            seen.add(log_file)
-        candidates.sort(reverse=True)
-        return [path for _mtime, _name, path in candidates]
+        return _diagnostics._sort_logs(self, paths)
 
     @staticmethod
     def _attempt_context(run_dir: Path) -> _AttemptContext:
@@ -801,22 +477,12 @@ class BeachAdapter(SimulatorAdapter):
     @staticmethod
     def _read_text_tail(path: Path) -> str:
         """Read the tail of a potentially large text log."""
-        try:
-            with path.open("rb") as f:
-                f.seek(0, 2)
-                size = f.tell()
-                f.seek(max(0, size - _STDOUT_TAIL_BYTES))
-                return f.read().decode("utf-8", errors="replace")
-        except OSError:
-            return ""
+        return _diagnostics._read_text_tail(path)
 
     @staticmethod
     def _parse_batch_progress(text: str) -> tuple[int, int] | None:
         """Parse the last ``batch N/M`` progress marker from text."""
-        latest: tuple[int, int] | None = None
-        for match in _BATCH_PROGRESS_RE.finditer(text):
-            latest = (int(match.group(1)), int(match.group(2)))
-        return latest
+        return _diagnostics._parse_batch_progress(text)
 
     def collect_provenance(
         self,
