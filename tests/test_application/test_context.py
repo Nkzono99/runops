@@ -12,9 +12,8 @@ from runops.application.context import (
     _collect_codex_plugins,
     _collect_facts_summary,
     _collect_knowledge_paths,
-    _collect_notes_summary,
     _collect_recent_failures,
-    _collect_research_agenda,
+    _collect_research_workspace,
     _collect_run_stats,
     _load_campaign_info,
     _load_launcher_names,
@@ -323,34 +322,23 @@ def test_collect_codex_plugins_reports_warning_on_broken_project(
     assert diagnostics[0]["section"] == "codex_plugins"
 
 
-def test_context_includes_research_agenda_and_latest_note(tmp_path: Path) -> None:
-    _write_toml(tmp_path / "runops.toml", {"project": {"name": "agenda-project"}})
-    agenda_path = tmp_path / "research" / "agenda.md"
-    agenda_path.parent.mkdir(parents=True)
-    agenda_path.write_text(
-        "# Research Agenda\n\n"
-        "## Current Decision / 現在の判断\n\n"
-        "- 判断 (Decision): smoke run の完了確認を優先する。\n\n"
-        "## Next Actions / 次の行動\n\n"
-        "1. 行動 (Action): `runo runs sync` で状態を確認する。\n",
-        encoding="utf-8",
+def test_context_includes_bounded_research_workspace(tmp_path: Path) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "research-project"}})
+    (tmp_path / "research/journal/archive").mkdir(parents=True)
+    (tmp_path / "research/results").mkdir()
+    (tmp_path / "research/archive/results").mkdir(parents=True)
+    (tmp_path / "research/CURRENT.md").write_text("# Current\n", encoding="utf-8")
+    (tmp_path / "research/journal/active.md").write_text(
+        "# Research Journal\n\n", encoding="utf-8"
     )
-    notes_dir = tmp_path / "notes"
-    notes_dir.mkdir()
-    (notes_dir / "2026-05-07.md").write_text("# 2026-05-07\n", encoding="utf-8")
-    (notes_dir / "2026-05-08.md").write_text("# 2026-05-08\n", encoding="utf-8")
-    (notes_dir / "README.md").write_text("# Notes\n", encoding="utf-8")
 
     ctx = build_project_context(tmp_path)
 
-    assert ctx["research_agenda"]["exists"] is True
-    assert (
-        ctx["research_agenda"]["current_decision"] == "smoke run の完了確認を優先する。"
-    )
-    assert ctx["research_agenda"]["next_actions_count"] == 1
-    assert ctx["notes"]["latest_path"] == "notes/2026-05-08.md"
-    assert ctx["section_status"]["research_agenda"] == "ok"
-    assert ctx["section_status"]["notes"] == "ok"
+    assert ctx["research"]["exists"] is True
+    assert ctx["research"]["current_chars"] == len("# Current\n")
+    assert ctx["research"]["journal_chars"] == len("# Research Journal\n\n")
+    assert ctx["research"]["active_result_count"] == 0
+    assert ctx["section_status"]["research"] == "ok"
 
 
 def test_context_reports_diagnostics_for_broken_sections(tmp_path: Path) -> None:
@@ -372,17 +360,18 @@ def test_context_reports_diagnostics_for_broken_sections(tmp_path: Path) -> None
     assert any(diagnostic["section"] == "facts" for diagnostic in ctx["diagnostics"])
 
 
-def test_context_agenda_and_notes_helpers_report_missing_state(
+def test_context_research_helper_reports_missing_state(
     tmp_path: Path,
 ) -> None:
     diagnostics: list[dict[str, str]] = []
     section_status: dict[str, str] = {}
 
-    agenda = _collect_research_agenda(tmp_path, diagnostics, section_status)
-    notes = _collect_notes_summary(tmp_path, diagnostics, section_status)
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "empty"}})
+    research = _collect_research_workspace(tmp_path, diagnostics, section_status)
 
-    assert agenda == {"exists": False, "path": "research/agenda.md"}
-    assert notes == {"exists": False}
+    assert research["exists"] is False
+    assert research["current_chars"] == 0
+    assert research["journal_chars"] == 0
     assert diagnostics == []
     assert section_status == {}
 

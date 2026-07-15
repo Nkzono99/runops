@@ -44,9 +44,6 @@ from runops.application.actions.knowledge import (
 )
 from runops.application.actions.registry import _DISPATCH as _DISPATCH
 from runops.application.actions.registry import execute_action as execute_action
-from runops.application.actions.research import (
-    create_experiment as create_experiment,
-)
 from runops.application.actions.result import (
     ActionResult as ActionResult,
 )
@@ -96,7 +93,6 @@ __all__ = [
     "archive_run",
     "cancel_run",
     "collect_survey",
-    "create_experiment",
     "create_run",
     "create_survey",
     "default_archive_destination",

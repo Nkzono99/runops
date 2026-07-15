@@ -3,27 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 from unittest.mock import patch
 
-import pytest
 from typer.testing import CliRunner
 
 from runops.cli.main import app
-from runops.harness.harnessops import HarnessOpsResult
 
 runner = CliRunner()
-
-
-@pytest.fixture(autouse=True)
-def _mock_harnessops(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep setup tests independent from the local hops installation."""
-    monkeypatch.setattr(
-        "runops.harness.harnessops.initialize_project_harnessops",
-        lambda *_args, **_kwargs: HarnessOpsResult(
-            "skipped",
-            "HarnessOps skipped (test)",
-        ),
-    )
 
 
 def _make_existing_project(project_dir: Path, simulator: str | None = None) -> None:
@@ -45,7 +32,7 @@ def _make_existing_project(project_dir: Path, simulator: str | None = None) -> N
 
 def test_setup_renders_imports_for_builtin_agent_guide(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: Any,
 ) -> None:
     project_dir = tmp_path / "setup-project"
     _make_existing_project(project_dir)
@@ -72,45 +59,9 @@ def test_setup_renders_imports_for_builtin_agent_guide(
     assert "@.runops/knowledge/runops/agent-user-guide.md" in imports
 
 
-def test_setup_invokes_harnessops(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Setup delegates HarnessOps project overlay initialization to hops."""
-    project_dir = tmp_path / "setup-project"
-    _make_existing_project(project_dir)
-    calls: list[Path] = []
-
-    def _fake_bootstrap(
-        _root: Path,
-        _sim_names: list[str],
-        _runops_package: str,
-        _created: list[str],
-        _skipped: list[str],
-        **_kwargs: object,
-    ) -> None:
-        return None
-
-    def _fake_harnessops(root: Path) -> HarnessOpsResult:
-        calls.append(root)
-        return HarnessOpsResult("created", "HarnessOps initialized")
-
-    monkeypatch.setattr("runops.cli.init._bootstrap_environment", _fake_bootstrap)
-    monkeypatch.setattr(
-        "runops.harness.harnessops.initialize_project_harnessops",
-        _fake_harnessops,
-    )
-
-    result = runner.invoke(app, ["setup", "--path", str(project_dir)])
-
-    assert result.exit_code == 0
-    assert calls == [project_dir.resolve()]
-    assert "HarnessOps initialized" in result.output
-
-
 def test_setup_runs_auth_for_simulator_packages_without_refs(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: Any,
 ) -> None:
     """Setup preflights private package installs but leaves refs opt-in."""
     project_dir = tmp_path / "setup-project"
@@ -157,7 +108,7 @@ def test_setup_runs_auth_for_simulator_packages_without_refs(
 
 def test_setup_outputs_project_config_plugin_recommendations(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: Any,
 ) -> None:
     """Setup shows project-wide plugin recommendations from runops.toml."""
     project_dir = tmp_path / "setup-project"
@@ -187,7 +138,7 @@ def test_setup_outputs_project_config_plugin_recommendations(
 
 def test_setup_with_refs_clones_reference_mirrors(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: Any,
 ) -> None:
     """--with-refs opts setup into adapter-declared refs mirrors."""
     project_dir = tmp_path / "setup-project"
@@ -236,7 +187,7 @@ def test_setup_with_refs_clones_reference_mirrors(
 
 def test_setup_smoke_with_knowledge_attach_render_and_doctor(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: Any,
 ) -> None:
     project_dir = tmp_path / "smoke-project"
 
@@ -300,7 +251,7 @@ def test_setup_smoke_with_knowledge_attach_render_and_doctor(
 
 def test_setup_warns_on_invalid_project_config_and_continues(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: Any,
 ) -> None:
     project_dir = tmp_path / "broken-project"
     project_dir.mkdir()

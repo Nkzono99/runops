@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -15,12 +14,6 @@ from runops.cli.main import app
 from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.environment import EnvironmentInfo
 from runops.harness.builder import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
-from runops.harness.harnessops import HarnessOpsResult
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 runner = CliRunner()
 
@@ -35,13 +28,6 @@ def _mock_bootstrap(
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(
-        "runops.harness.harnessops.initialize_project_harnessops",
-        lambda *_args, **_kwargs: HarnessOpsResult(
-            "skipped",
-            "HarnessOps skipped (test)",
-        ),
     )
     monkeypatch.setattr(
         "runops.core.environment.detect_environment",
@@ -68,113 +54,20 @@ class TestInit:
         assert (tmp_path / "runs").is_dir()
         assert (tmp_path / ".gitignore").exists()
 
-    def test_new_project_scaffolds_empty_schema_v2_ledger(self, tmp_path: Path) -> None:
+    def test_new_project_scaffolds_bounded_research_workspace(
+        self, tmp_path: Path
+    ) -> None:
         result = runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
 
         assert result.exit_code == 0
-        with open(tmp_path / "research" / "experiments.toml", "rb") as stream:
-            assert tomllib.load(stream) == {"schema_version": 2}
-
-    def test_init_invokes_harnessops(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Init delegates project overlay creation to hops when enabled."""
-        calls: list[Path] = []
-
-        def _fake_harnessops(project_dir: Path) -> HarnessOpsResult:
-            calls.append(project_dir)
-            return HarnessOpsResult("created", "HarnessOps initialized")
-
-        monkeypatch.setattr(
-            "runops.harness.harnessops.initialize_project_harnessops",
-            _fake_harnessops,
-        )
-        result = runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
-
-        assert result.exit_code == 0
-        assert calls == [tmp_path.resolve()]
-        assert "HarnessOps initialized" in result.output
-
-    def test_init_can_skip_harnessops(
-        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """--no-harnessops disables the hops lifecycle hook."""
-
-        def _fail_harnessops(_project_dir: Path) -> HarnessOpsResult:
-            raise AssertionError("should not be called")
-
-        monkeypatch.setattr(
-            "runops.harness.harnessops.initialize_project_harnessops",
-            _fail_harnessops,
-        )
-        result = runner.invoke(
-            app,
-            ["init", "-y", "--no-harnessops", "--path", str(tmp_path)],
-        )
-
-        assert result.exit_code == 0
-        assert "HarnessOps (disabled)" in result.output
-        assert (tmp_path / ".git").is_dir()
-        assert (tmp_path / "CLAUDE.md").exists()
-        assert (tmp_path / "AGENTS.md").exists()
-        assert (tmp_path / ".runops" / "knowledge" / "candidates" / "facts").is_dir()
-        assert (tmp_path / ".claude" / "skills").is_dir()
-        assert (tmp_path / ".agents" / "skills").is_dir()
-        assert (tmp_path / ".codex" / "config.toml").exists()
-        assert (tmp_path / ".codex" / "rules" / "runops.rules").exists()
-        assert (tmp_path / ".vscode" / "settings.json").exists()
-        # Lab notebook scaffolding
-        assert (tmp_path / "notes").is_dir()
-        assert (tmp_path / "notes" / "reports").is_dir()
-        assert (tmp_path / "notes" / "reports" / "README.md").is_file()
-        assert (tmp_path / "notes" / "reports" / "archive").is_dir()
-        assert (tmp_path / "notes" / "reports" / "figures").is_dir()
-        assert (tmp_path / "notes" / "history").is_dir()
-        assert (tmp_path / "notes" / "README.md").is_file()
-        # Source material scaffolding
-        assert (tmp_path / "materials").is_dir()
-        assert (tmp_path / "materials" / "papers").is_dir()
-        assert (tmp_path / "materials" / "manuals").is_dir()
-        assert (tmp_path / "materials" / "figures").is_dir()
-        assert (tmp_path / "materials" / "snippets").is_dir()
-        assert (tmp_path / "materials" / "README.md").is_file()
-        assert (tmp_path / "materials" / "index.toml").is_file()
-        # Research decision-layer scaffolding
-        assert (tmp_path / "research").is_dir()
-        assert (tmp_path / "research" / "README.md").is_file()
-        assert (tmp_path / "research" / "agenda.md").is_file()
-        assert (tmp_path / "research" / "proposals").is_dir()
-        assert (tmp_path / "research" / "reviews").is_dir()
-
-    def test_init_notes_readme_content(self, tmp_path: Path) -> None:
-        """notes/README.md describes the lab-notebook convention."""
-        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
-        readme = (tmp_path / "notes" / "README.md").read_text(encoding="utf-8")
-        assert "lab notebook" in readme
-        assert "runo notes append" in readme
-        assert "runo notes archive" in readme
-        assert "notes/YYYY-MM-DD.md" in readme
-        assert "notes/history/YYYY/YYYY-MM-DD.md" in readme
-        assert "notes/reports/README.md" in readme
-        assert "Markdown だけで図を確認できる" in readme
-        assert "再開できるログ" in readme
-        assert "Context:" in readme
-        assert "Evidence:" in readme
-        assert "Observation:" in readme
-        assert "Interpretation:" in readme
-
-    def test_init_reports_readme_content(self, tmp_path: Path) -> None:
-        """notes/reports/README.md describes report-index conventions."""
-        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
-        readme = (tmp_path / "notes" / "reports" / "README.md").read_text(
-            encoding="utf-8"
-        )
-
-        assert "Recommended Reading Order" in readme
-        assert "Machine-Readable Entry Points" in readme
-        assert "Heavy / Recovery-Only Material" in readme
-        assert "Markdown image" in readme
-        assert "analysis/cross_run/<comparison_id>/" in readme
+        assert (tmp_path / "research/CURRENT.md").is_file()
+        assert (tmp_path / "research/journal/active.md").is_file()
+        assert (tmp_path / "research/journal/archive").is_dir()
+        assert (tmp_path / "research/results").is_dir()
+        assert (tmp_path / "research/archive/results").is_dir()
+        assert (tmp_path / ".runops/work").is_dir()
+        assert not (tmp_path / "notes").exists()
+        assert not (tmp_path / ".harnessops").exists()
 
     def test_init_materials_readme_content(self, tmp_path: Path) -> None:
         """materials/README.md describes visible source material storage."""
@@ -189,71 +82,25 @@ class TestInit:
         assert "materials = []" in index
 
     def test_init_research_scaffold_content(self, tmp_path: Path) -> None:
-        """research/ documents the mutable decision-ledger convention."""
+        """research/ documents the bounded current and journal conventions."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
-        readme = (tmp_path / "research" / "README.md").read_text(encoding="utf-8")
-        agenda = (tmp_path / "research" / "agenda.md").read_text(encoding="utf-8")
-        assert "Active Experiment Portfolio" in agenda
-        assert "Expand criterion" in agenda
-        assert "Stop criterion" in agenda
+        current = (tmp_path / "research/CURRENT.md").read_text(encoding="utf-8")
+        journal = (tmp_path / "research/journal/active.md").read_text(encoding="utf-8")
+        assert "Current Question" in current
+        assert "Current Decision" in current
+        assert journal == "# Research Journal\n\n"
 
-        assert "研究判断の台帳" in readme
-        assert "TODO リストではなく" in readme
-        assert "agenda.md is not an artifact ledger" in readme
-        assert "Do not put chronological notes or artifact inventories" in readme
-        assert "本文は日本語" in readme
-        assert "mutable な現在の研究判断の台帳" in agenda
-        assert "agenda.md is not an artifact ledger" in agenda
-        assert "What Would Change Our Mind" in agenda
-        assert "Human gate: yes/no" in agenda
-
-    def test_init_creates_note_skill(self, tmp_path: Path) -> None:
-        """The note skill is scaffolded next to the other skills."""
+    def test_init_creates_research_workspace_skill(self, tmp_path: Path) -> None:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
-        skill_md = tmp_path / ".claude" / "skills" / "note" / "SKILL.md"
-        codex_skill_md = tmp_path / ".agents" / "skills" / "note" / "SKILL.md"
+        skill_md = tmp_path / ".claude/skills/research-workspace/SKILL.md"
+        codex_skill_md = tmp_path / ".agents/skills/research-workspace/SKILL.md"
         assert skill_md.is_file()
         assert codex_skill_md.is_file()
         content = skill_md.read_text(encoding="utf-8")
         codex_content = codex_skill_md.read_text(encoding="utf-8")
-        assert "name: note" in content
-        assert "runo notes append" in content
-        assert "name: note" in codex_content
-        assert "runo notes append" in codex_content
-        assert "`/note`" in content
-        assert "`$note`" in codex_content
-        assert "`/note`" not in codex_content
-        assert "Model name must not stand alone" in codex_content
-        assert "Figures are first-class note content" in codex_content
-        assert "Do not replace image embeds with plain Markdown links" in codex_content
-        assert "notes/reports/README.md" in codex_content
-        assert "Quality gate before append" in codex_content
-
-    def test_init_creates_research_agenda_skill(self, tmp_path: Path) -> None:
-        """The research-agenda skill is rendered for Claude and Codex."""
-        runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
-        skill_md = tmp_path / ".claude" / "skills" / "research-agenda" / "SKILL.md"
-        codex_skill_md = (
-            tmp_path / ".agents" / "skills" / "research-agenda" / "SKILL.md"
-        )
-
-        assert skill_md.is_file()
-        assert codex_skill_md.is_file()
-        content = skill_md.read_text(encoding="utf-8")
-        codex_content = codex_skill_md.read_text(encoding="utf-8")
-        assert "name: research-agenda" in content
-        assert "research/agenda.md" in content
-        assert "本文は日本語" in content
-        assert "判断の台帳" in codex_content
-        assert "agenda.md is not an artifact ledger" in codex_content
-        assert (
-            "Do not put chronological notes or artifact inventories back into agenda.md"
-            in codex_content
-        )
-        assert "notes/reports/README.md" in codex_content
-        assert "analysis/cross_run/<comparison_id>/" in codex_content
-        assert (tmp_path / "research" / "paper_requests.toml").is_file()
-        assert (tmp_path / "research" / "experiments.toml").is_file()
+        assert "name: research-workspace" in content
+        assert "runo research append" in content
+        assert "artifacts/` に Markdown を作らない" in codex_content
 
     def test_init_creates_migrate_runops_skill(self, tmp_path: Path) -> None:
         """The migrate-runops skill is rendered for Claude and Codex."""
@@ -546,8 +393,8 @@ class TestInit:
         assert "役割分担" in content
         assert "$new-case" in content
         assert "/new-case" not in content
-        assert "Codex 補助ルール" in content
-        assert "runops へのフィードバック" in content
+        assert "Codex 補助ルール" not in content
+        assert "HarnessOps" not in content
         assert "Simulator Cookbook ルール" not in content
         assert "globs: refs/**/cookbook/**" not in content
 
@@ -601,7 +448,7 @@ class TestInit:
         )
         assert "--list-recipes" in analyze_content
         assert "analysis/scratch/" in analyze_content
-        assert "analysis/cross_run/" in analyze_content
+        assert "research/results/" in analyze_content
         summarize_content = (skills_dir / "summarize-script" / "SKILL.md").read_text(
             encoding="utf-8"
         )

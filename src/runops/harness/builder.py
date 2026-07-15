@@ -19,7 +19,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -30,11 +29,6 @@ from runops.core.codex_plugin import CodexPluginRecommendation
 from runops.core.project_files import GITIGNORE_MANAGED_END, GITIGNORE_MANAGED_START
 from runops.harness._adapters import collect_doc_repos as _collect_doc_repos
 from runops.harness._skills import render_skill_files as _render_skill_files
-
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    import tomli as tomllib
 
 HARNESS_LOCK_PATH = ".runops/harness.lock"
 
@@ -50,7 +44,6 @@ RUNS_AGENTS_MD = "runs/AGENTS.md"
 RULE_WORKFLOW = ".claude/rules/runops-workflow.md"
 RULE_PLAN_BEFORE_ACT = ".claude/rules/plan-before-act.md"
 RULE_COOKBOOK = ".claude/rules/cookbook.md"
-RULE_UPSTREAM_FEEDBACK = ".claude/rules/upstream-feedback.md"
 GITIGNORE_PATH = ".gitignore"
 
 # Codex-side outputs (see runops.harness.codex for rationale).
@@ -66,7 +59,6 @@ _RUNS_DOC_TEMPLATE = "harness/shared/runs.md"
 _RULE_WORKFLOW_TEMPLATE = "harness/claude/rules/runops-workflow.md"
 _RULE_PLAN_BEFORE_ACT_TEMPLATE = "harness/claude/rules/plan-before-act.md"
 _RULE_COOKBOOK_TEMPLATE = "harness/claude/rules/cookbook.md.j2"
-_RULE_UPSTREAM_FEEDBACK_TEMPLATE = "harness/claude/rules/upstream-feedback.md.j2"
 _VSCODE_SETTINGS_TEMPLATE = "scaffold/vscode_settings.json"
 _GITIGNORE_TEMPLATE = "scaffold/gitignore.txt"
 
@@ -104,7 +96,6 @@ class HarnessBundle:
     """Rendered harness file contents keyed by project-relative path."""
 
     files: dict[str, str] = field(default_factory=dict)
-    upstream_feedback: bool = True
 
     def hashes(self) -> dict[str, str]:
         """Return ``{relative_path: sha256}`` for every file in the bundle."""
@@ -221,7 +212,6 @@ def _render_agent_md(
     supports_import: bool,
     skills_dir: str,
     include_cookbook_rule: bool,
-    include_upstream_feedback: bool,
 ) -> str:
     """Render a CLAUDE.md / AGENTS.md Jinja template.
 
@@ -242,7 +232,6 @@ def _render_agent_md(
         doc_repos=doc_repos,
         codex_plugin_recommendations=codex_plugin_recommendations,
         include_cookbook_rule=include_cookbook_rule,
-        include_upstream_feedback=include_upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
         supports_import=supports_import,
         skills_dir=skills_dir,
@@ -261,7 +250,6 @@ def build_harness_bundle(
     simulator_names: list[str],
     *,
     simulator_configs: dict[str, dict[str, Any]] | None = None,
-    upstream_feedback: bool = True,
     knowledge_imports_path: str = "",
     include_reference_repos: bool = False,
     codex_plugin_recommendations: list[CodexPluginRecommendation] | None = None,
@@ -274,8 +262,6 @@ def build_harness_bundle(
         simulator_configs: Optional project simulator config keyed by simulator
             name.  When present, ``adapter = "..."`` aliases are used for
             adapter-declared fallback recommendations.
-        upstream_feedback: Include the ``.claude/rules/upstream-feedback.md``
-            rule.  ``runops init --no-upstream-feedback`` sets this to False.
         knowledge_imports_path: Relative path to the rendered imports file,
             or empty string if knowledge imports are not configured.
         include_reference_repos: Include adapter-declared ``refs/`` repository
@@ -323,7 +309,6 @@ def build_harness_bundle(
         supports_import=True,
         skills_dir=".claude/skills/",
         include_cookbook_rule=include_cookbook_rule,
-        include_upstream_feedback=upstream_feedback,
     )
     files[AGENTS_MD] = _render_agent_md(
         _AGENTS_MD_TEMPLATE,
@@ -335,7 +320,6 @@ def build_harness_bundle(
         supports_import=False,
         skills_dir=AGENTS_SKILLS_PREFIX,
         include_cookbook_rule=include_cookbook_rule,
-        include_upstream_feedback=upstream_feedback,
     )
 
     files[CLAUDE_SETTINGS] = build_claude_settings()
@@ -355,8 +339,6 @@ def build_harness_bundle(
     files[RULE_PLAN_BEFORE_ACT] = load_static(_RULE_PLAN_BEFORE_ACT_TEMPLATE)
     if include_cookbook_rule:
         files[RULE_COOKBOOK] = render(_RULE_COOKBOOK_TEMPLATE)
-    if upstream_feedback:
-        files[RULE_UPSTREAM_FEEDBACK] = render(_RULE_UPSTREAM_FEEDBACK_TEMPLATE)
 
     files[CASES_CLAUDE_MD] = load_static(_CASES_DOC_TEMPLATE)
     files[RUNS_CLAUDE_MD] = load_static(_RUNS_DOC_TEMPLATE)
@@ -383,7 +365,7 @@ def build_harness_bundle(
     for rel_path, content in rendered_codex_skills.items():
         files[f"{AGENTS_SKILLS_PREFIX}{rel_path}"] = content
 
-    return HarnessBundle(files=files, upstream_feedback=upstream_feedback)
+    return HarnessBundle(files=files)
 
 
 # ---------------------------------------------------------------------------
@@ -476,30 +458,3 @@ def save_harness_lock(
         json.dumps(payload, indent=2, ensure_ascii=False) + "\n",
         encoding="utf-8",
     )
-
-
-# ---------------------------------------------------------------------------
-# runops.toml [harness] helpers
-# ---------------------------------------------------------------------------
-
-
-def read_upstream_feedback_setting(project_dir: Path) -> bool:
-    """Return ``[harness].upstream_feedback`` from runops.toml.
-
-    Defaults to True when the key, table, or file is absent so that projects
-    predating this feature get upstream-feedback guidance by default once they
-    run ``runops update-harness``.
-    """
-    project_file = project_dir / "runops.toml"
-    if not project_file.is_file():
-        return True
-    try:
-        with open(project_file, "rb") as f:
-            data = tomllib.load(f)
-    except (tomllib.TOMLDecodeError, OSError):
-        return True
-    harness = data.get("harness")
-    if not isinstance(harness, dict):
-        return True
-    value = harness.get("upstream_feedback", True)
-    return bool(value)

@@ -34,12 +34,12 @@ cases/<simulator>/<case>/summarize.py
 複数 case で完全に同じ処理を共有する場合だけ `scripts/summarize.py` を使う。
 survey 全体の contact sheet、複数 run を並べる比較図、論文図は
 `summarize.py` に入れず、`runo analyze collect` 後に `<survey>/summary/plots/`
-または `analysis/cross_run/<comparison_id>/` で作る。
+または `research/results/RNNNN-<comparison_id>/artifacts/scripts/` で作る。
 
 cross-run comparison や paper material bundle は
-`analysis/cross_run/<comparison_id>/` に置く。人間が読む interpretation や
-analysis story は `notes/reports/<topic>.md`、現在の研究判断だけは
-`research/agenda.md` に分ける。
+cross-run data / figure / script は result の `artifacts/` に置く。人間が読む
+interpretation はその result の `README.md`、現在の研究判断だけは
+`research/CURRENT.md` に分ける。
 
 ## 必須インタフェース
 
@@ -103,7 +103,7 @@ summary["figures"].append(
 8. survey がある場合は `runo analyze collect <survey>` を実行し、
    `summary/survey_summary.csv`, `summary/survey_summary.json`, `summary/artifacts.toml` を確認する。
 9. 必要なら `runo analyze plot <survey> --list-columns` で plot 可能な列を確認する。
-10. 結果と evidence path を `{{ skill_prefix }}note` に残す。
+10. 結果と evidence path を `{{ skill_prefix }}research-workspace` で残す。
 11. 研究判断が変わる場合だけ `{{ skill_prefix }}research-agenda` も更新する。
 
 ## 最小テンプレート

@@ -6,7 +6,7 @@ runops は、HPC / Slurm 上のシミュレーション研究を **AI エージ�
 人間が多数の CLI コマンドを覚えて日々叩くための道具ではありません。CLI は
 存在しますが、それは Agent が project state を安全に読み書きするための
 execution kernel です。人間は研究意図、制約、判断、確認を与え、Agent が
-`campaign.toml`、case、survey、run、manifest、notes、analysis を整えます。
+`campaign.toml`、case、survey、run、manifest、analysis、bounded research memory を整えます。
 
 最初に読むべき入口は [AI エージェントではじめる](docs/get-started-with-agent.md) です。
 
@@ -32,8 +32,8 @@ runops はこの問題を、単なる CLI ではなく **Agent が扱える研�
 3. runops が run directory と `manifest.toml` を生成する
 4. Agent が投入前 plan、対象 run、queue、資源量を提示する
 5. 人間が高コスト操作や破壊的操作だけ確認する
-6. Agent が状態同期、log 読解、解析、notebook、report、知見整理を進める
-7. 判断が変わったら `research/agenda.md` と次の survey に戻す
+6. Agent が状態同期、log 読解、解析、research journal、知見整理を進める
+7. 判断が変わったら `research/CURRENT.md` と次の survey に戻す
 
 このループの具体的な始め方は
 [docs/get-started-with-agent.md](docs/get-started-with-agent.md) を見てください。
@@ -50,11 +50,11 @@ project state の全体像は [docs/layers/README.md](docs/layers/README.md) に
 
 Agent が主に行うこと:
 
-- project context、推奨 plugin、既存 notes、materials、environment を読む
+- project context、推奨 plugin、`research/CURRENT.md`、materials、environment を読む
 - 必要な場合だけ、明示的 knowledge source や任意の `refs/` fallback mirror を参照する
 - `campaign.toml`、case、survey の草案を作る
 - run 生成、submit、sync、status、log、analysis を runops 経由で進める
-- `notes/YYYY-MM-DD.md`、`notes/reports/`、`research/agenda.md` を更新する
+- 作業経緯を `research/journal/`、残す解析を `research/results/` に整理する
 - runops 本体への改善要望や local patch 候補を整理する
 
 CLI を手で直接使う場面は、bootstrap、debug、CI、Agent 実装確認、緊急時の
@@ -70,7 +70,7 @@ runops の中心にある思想は、以下の分離です。
 
 - **`manifest.toml` が run の正本**
   run id、状態、由来、job id、Slurm 状態、provenance、parameter snapshot を
-  manifest に記録する。notes や会話ログは補助情報であり、正本ではない。
+  manifest に記録する。journal や会話ログは補助情報であり、正本ではない。
 
 - **不変と可変を分ける**
   `run.id` は不変。path は分類・整理のために変わりうる。run の由来と
@@ -102,10 +102,12 @@ project/
   campaign.toml          # 研究意図、仮説、変数、観測量
   cases/                 # reusable case definitions
   runs/                  # survey と run directory
-  notes/                 # append-only lab notebook と refined reports
-  research/agenda.md     # 現在の研究判断
+  research/CURRENT.md    # 現在の研究判断だけを置く bounded entry point
+  research/journal/      # 文字数で原文 rotation する時系列ログ
+  research/results/      # 人が残すと判断した解析結果
   materials/             # papers, manuals, figures, snippets
   refs/                  # optional fallback mirrors / external knowledge mounts
+  .runops/work/          # Git 管理しない goal 単位の provisional output
   .runops/               # environment, generated Agent context, facts
   .claude/ .agents/ .codex/
                          # Agent harness, skills, rules, permissions
@@ -175,8 +177,8 @@ uv run mypy src/
 - [実験層](docs/layers/experiment.md) — campaign / case / survey の設計正本
 - [Execution Kernel](docs/layers/execution-kernel.md) — run / submit / sync / manifest
 - [解析層](docs/layers/analysis.md) — 解析・可視化成果物の運用
-- [研究判断層](docs/layers/research.md) — `research/agenda.md`
-- [知識層](docs/layers/knowledge.md) — plugin / notes / materials / knowledge / refs fallback
+- [研究判断層](docs/layers/research.md) — `CURRENT.md` / journal / retained results
+- [知識層](docs/layers/knowledge.md) — plugin / materials / knowledge / refs fallback
 - [ハーネス層](docs/layers/harness.md) — Agent instructions / skills / rules
 - [Upstream 連携層](docs/layers/upstream.md) — local patch / feedback / PR
 - [Project health check](docs/project-health.md) — `runo lint` による検査

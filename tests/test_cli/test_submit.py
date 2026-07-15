@@ -245,7 +245,7 @@ def test_submit_all(tmp_path: Path) -> None:
         assert check.message in result.output
 
 
-def test_submit_all_gates_survey_before_planning_even_with_dry_run_and_yes(
+def test_submit_all_does_not_require_legacy_research_ledger(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
@@ -262,9 +262,9 @@ def test_submit_all_gates_survey_before_planning_even_with_dry_run_and_yes(
             ["runs", "submit", "--all", "--dry-run", "--yes", str(survey_dir)],
         )
 
-    assert result.exit_code == 1
-    assert "requires [research]" in result.output
-    build_plan.assert_not_called()
+    assert result.exit_code == 0
+    assert "requires [research]" not in result.output
+    build_plan.assert_called_once()
 
 
 def test_submit_all_confirmation_decline(tmp_path: Path) -> None:

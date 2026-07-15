@@ -36,14 +36,13 @@ def test_context_no_json_outputs_human_summary(tmp_path: Path) -> None:
     context_data = {
         "project": {"name": "demo-project", "root": str(tmp_path)},
         "campaign": {"hypothesis": "density controls stability"},
-        "research_agenda": {
+        "research": {
             "exists": True,
-            "path": "research/agenda.md",
-            "is_template": False,
-            "current_decision": "sync smoke run before rerun",
-            "next_actions_count": 2,
+            "current_chars": 1234,
+            "journal_chars": 5678,
+            "active_result_count": 2,
+            "ok": True,
         },
-        "notes": {"latest_path": "notes/2026-05-08.md"},
         "simulators": ["emses", "beach"],
         "runs": {"total": 3, "running": 1, "failed": 2},
         "recent_failures": [
@@ -66,10 +65,9 @@ def test_context_no_json_outputs_human_summary(tmp_path: Path) -> None:
     assert f"Root: {tmp_path}" in result.output
     assert "Hypothesis: density controls stability" in result.output
     assert (
-        "Research agenda: research/agenda.md (ready, next_actions=2)" in result.output
+        "Research: current=1234 chars, journal=5678 chars, "
+        "active_results=2, status=ok" in result.output
     )
-    assert "Current decision: sync smoke run before rerun" in result.output
-    assert "Latest note: notes/2026-05-08.md" in result.output
     assert "Simulators: emses, beach" in result.output
     assert "Runs: total=3, running=1, failed=2" in result.output
     assert "Recent failures (2):" in result.output

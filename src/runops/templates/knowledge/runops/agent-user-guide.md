@@ -20,15 +20,16 @@ project-local skill を参照する。
 1. `uvx --from runops runo context --json`
 2. `uvx --from runops runo plugins --check` と `uvx --from runops runo plugins --json`
 3. `campaign.toml`
-4. `research/agenda.md`
+4. `research/CURRENT.md` と `runo research status`
 5. 関連する `cases/**/case.toml` と `runs/**/survey.toml`
 6. `.runops/facts.toml` と `.runops/knowledge/candidates/facts/`
 7. 必要なら `runo runs status` / `runo runs log -e`
 
 ## 知識と記録
 
-- 時系列の作業ログは `runo notes append` で `notes/YYYY-MM-DD.md` に残す
-- 現在の高レベルな研究判断は `research/agenda.md` に残す
+- 時系列の作業ログは `runo research append` で bounded journal に残す
+- 現在の高レベルな研究判断は `research/CURRENT.md` に残す
+- 残す解析は `research/results/` に明示昇格し、説明を README 1 枚に集約する
 - 整理済み知見は `runo knowledge save` / `runo knowledge add-fact` を使う
 - `.runops/knowledge/` は生成済み Agent context であり、手で整形しない
 - simulator cookbook や長文 workflow は推奨 Codex plugin / explicit knowledge
@@ -54,6 +55,6 @@ Agent 向けの参照情報はこの `.runops/knowledge/runops/` 配下に生成
 ## runops へのフィードバック
 
 runops の bug、分かりにくい error、足りない workflow を見つけたら、まず
-project の note や HarnessOps feedback に記録し、ユーザーに相談してから issue
+project の journal に記録し、ユーザーに相談してから issue
 または PR に進める。runops 本体を修正したい場合は、別途 source checkout を用意し、
 project の研究作業と混ぜない。

@@ -1,61 +1,13 @@
-# Paper Request Contract
+# Paper 由来の追加依頼
 
-paper draft から runops project へ戻す追加解析・図表・追加実験の要望は、
-`research/paper_requests.toml` に structured queue として置く。
-これは実行キューではなく、`research/agenda.md` や `research/proposals/` へ
-判断を戻すための handoff である。
+paper draft から戻る追加解析や図表依頼のために、専用の永続 queue は作りません。
+依頼の扱いは通常の Research Workspace と同じです。
 
-## File
+- 作業中のメモ、候補、未検証の解析は `.runops/work/<goal-id>/` に置く
+- 残すと人が判断した解析だけ `runo research new-result <topic>` で
+  `research/results/RNNN-topic/` に昇格する
+- 現在の判断や次の一手だけを `research/CURRENT.md` に反映する
+- 時系列上残す必要がある経緯は `runo research append` で journal に追記する
 
-```toml
-#:schema https://runops.dev/schemas/paper_requests.json
-schema_version = 1
-
-[[requests]]
-id = "PAPER-REQ-0001"
-type = "analysis_request"
-title = "Add sheath width comparison for Figure 2"
-paper_id = "draft-a"
-paper_context = "Results / Figure 2"
-desired_artifact = "table or figure comparing sheath width across angle_scan"
-source_link = "refs/links.toml#paper.draft-a"
-related_runs = ["R20260412-0003"]
-related_surveys = ["runs/sheath/angle_scan"]
-priority = "medium"
-status = "open"
-human_gate = true
-```
-
-空の queue では `[[requests]]` を省略し、`schema_version = 1` だけを置ける。
-
-`type` は `analysis_request`, `figure_request`, `experiment_request`,
-`evidence_gap`, `export_request` のいずれかにする。
-
-## Routing
-
-- 軽い解析・図表・export 要望は `research/agenda.md` の current decision /
-  next action に要約して追う。
-- 高コスト rerun、新しい survey、paper-level claim に関わる要望は
-  `research/proposals/` に proposal を作ってから進める。
-- `experiment_request` は case / survey design までを計画し、MCP 経由で勝手に
-  submit しない。
-
-## MCP
-
-- `runops.paper.requests.list` は request queue を read-only に列挙する。
-- `runops.paper.request.draft` は candidate request を検証し、正規化済み
-  object、追記用 TOML snippet、target path、既存 queue 状態、duplicate id や
-  enum mismatch の診断を返す。file mutation は行わない。
-- `runops.paper.request.plan` は 1 件の request を agenda / proposal へ戻す
-  plan を返す。file mutation、run creation、job submit は行わない。
-- 図表候補や export 候補の確認は `runops.analysis.artifacts`,
-  `runops.survey.summary`, `runops.publication.exports.list` を使う。
-
-paperops から handoff するときは、paperops 側で runops schema や enum を複製せず、
-まず `runops.paper.request.draft` に `request_type`, `title`, `paper_context`,
-`desired_artifact`, `source_link`, `priority`, `related_runs`,
-`related_surveys`, `human_gate` を渡して preview / validation する。返された
-`toml_snippet` は人間の確認後に `research/paper_requests.toml` へ追記する。
-既存 queue と `request_id` が重複した場合、`draft` は `valid=false`、
-`toml_snippet=""`、append next action なしを返し、代替候補を
-`suggested_request_id` に入れる。
+paper 側との対応関係は result の `manifest.toml` と `README.md` に source path として
+記録します。追加実験や HPC job の投入は、この依頼経路から自動実行しません。

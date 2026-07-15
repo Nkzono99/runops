@@ -47,12 +47,11 @@ uvx --from runops runo update-harness --apply-chain
 - 未編集のファイルは自動で上書きされる
 - ユーザーが編集済みのファイルは `<path>.new` として出力されるので diff を確認してマージする
 - `.vscode/settings.json` もこの更新対象に含まれる
-- `notes/`, `materials/`, `research/` は不足している scaffold だけ補完される
+- `materials/`, `research/` は不足している scaffold だけ補完される
 - `.runops/knowledge/runops/agent-user-guide.md` と `imports.md` も実行中の runops package から再生成される
 - `.runops/harness.lock` に最後に適用した runops version が記録される
 - `.runops/harness.lock` の `upgrade_chain` に exact-version step の履歴が記録される
 - `--dry-run` で事前確認、`--force` で全上書き
-- HarnessOps overlay がある場合は HarnessOps CLI 経由の `update-harness` も連鎖し、repo-local HarnessOps skills と overlay metadata を更新する。直接呼ぶ場合は `uvx --from harnessops hops update-harness` を使う
 
 ## 3. migration guide を確認
 
@@ -78,9 +77,9 @@ release note または migration guide に migration item として書かれて�
 - `manual-edit` / `breaking-manual` / `destructive-human-gate` は
   `{{ skill_prefix }}migrate-runops` に渡す
 - guide にない破壊的変更や schema rewrite は推測で実行しない。
-  足りない場合は `{{ skill_prefix }}feedback-runops` の HarnessOps feedback 候補にする
+  足りない場合は project 固有情報を除いて issue 下書きにする
 
-Migration を適用 / skip / defer した場合は、`notes/YYYY-MM-DD.md` に記録する。
+Migration を適用 / skip / defer した場合は、`runo research append` で記録する。
 
 ## 4. シミュレータパッケージを更新
 

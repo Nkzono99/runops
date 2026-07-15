@@ -60,7 +60,7 @@ drift を早期に検出します。
 
 - **正本は Interface Layer ではなく各 Layer に置く**  
   CLI output や会話ログを正本にしない。run 状態は `manifest.toml`、
-  研究判断は `research/agenda.md`、実験設計は case / survey に戻す。
+  研究判断は `research/CURRENT.md`、実験設計は case / survey に戻す。
 
 - **生成物を直接編集しない**  
   `manifest.toml`、run `input/`、`submit/job.sh`、`work/` は interface 経由で
@@ -153,9 +153,9 @@ MCP provider は Agent / host 向けの edge interface です。read / inspect /
 
 `runo runs submit --all` は HPC 資源・queue・quota に影響する高コスト操作です。
 Agent との会話上で対象 run、queue、資源量を確認済みの場合だけ `--yes` を使います。
-production / large survey では、`--yes` は proposal / pilot / review の scientific gate を
-省略しません。`research/reviews/` の `Decision: EXPAND` 後だけ remaining run を
-full submit します。
+production / large survey では、`--yes` は研究上の確認を省略しません。対象、概算資源量、
+根拠となる pilot result を人が確認し、その判断を `research/CURRENT.md` に反映してから
+remaining run を full submit します。
 
 ### Monitoring
 
@@ -197,10 +197,12 @@ completed / archived run には `delete` を使わず、`archive` → `purge-wor
 
 | コマンド | 説明 |
 |---------|------|
-| `runo notes append TITLE [BODY]` | 今日の `notes/YYYY-MM-DD.md` に timestamped entry を追記 |
-| `runo notes list [-n N]` | 最近の lab notebook 日付一覧 |
-| `runo notes show [DATE\|today\|latest]` | 指定日の lab notebook を表示 |
-| `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
+| `runo research status/check` | active research の量と layout を検査 |
+| `runo research append TITLE BODY` | bounded journal に timestamped entry を追記 |
+| `runo research rotate [--force]` | journal を原文のまま numbered archive へ移動 |
+| `runo research new-result NAME` | durable result workspace を作成 |
+| `runo research archive/restore ID` | result を可逆移動 |
+| `runo research migrate-legacy` | 旧 workspace を preview 付きで可逆移行 |
 | `runo knowledge save NAME` | 知見を `.runops/insights/` に保存 |
 | `runo knowledge list` | 知見一覧表示 |
 | `runo knowledge show NAME` | 知見の詳細表示 |

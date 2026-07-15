@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
-from .agenda import summarize_research_agenda
+from .workspace import ResearchBudget, research_budget_from_raw
 
-__all__ = ["summarize_research_agenda"]
+__all__ = [
+    "ResearchBudget",
+    "research_budget_from_raw",
+]

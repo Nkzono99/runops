@@ -33,7 +33,8 @@ runo analyze plot $ARGUMENTS --x param.some_axis --y some_metric
 ## cross-run 比較 workspace
 
 複数 run / survey をまたぐ比較では、図・中間表・比較専用 script を
-`analysis/cross_run/<comparison_id>/` にまとめる。
+`runo analyze new-comparison` で `research/results/RNNNN-<comparison_id>/` にまとめる。
+説明は `README.md` 1 枚、data / figure / script は `artifacts/` 以下に置く。
 
 ```bash
 runo analyze new-comparison "landau model comparison" --source runs/series_a

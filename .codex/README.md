@@ -44,8 +44,7 @@ trust_level = "trusted"
 ## 設定の責務分離
 
 `.codex/config.toml` は、runops 開発リポジトリで共有する repo-local default
-を置きます。この repository では HarnessOps daily automation が `git pull`,
-GitHub issue 確認、web search、修正、test、commit、push まで unattended に
+を置きます。この repository では local maintenance が unattended に
 実行できることを優先し、`sandbox_mode = "danger-full-access"`,
 `approval_policy = "never"`, `web_search = "live"` を共有設定にします。
 AGENTS.md は短い入口に保ち、詳細は `.codex/rules/*.md` と `.agents/skills/`
@@ -122,9 +121,8 @@ submit 系は `allow`、`rm -rf` は `forbidden` になっていることを確�
 
 ## Automation prompts
 
-Issue triage / unattended daily loop は repo-local prompt ではなく、
-HarnessOps 側の `$hops-daily-steward` と `$hops-issue-triage` に統一します。
-runops 固有の repo-local prompt / skill は残しません。
+Issue triage / unattended daily loop は、この repository に必要なものだけを
+repo-local Automation prompt として明示的に管理します。
 
 将来 repo-local Automation prompt を追加する場合は、登録本文を短く保ち、
 詳細な実行手順を `.codex/automation-prompts/` に置きます。これにより prompt の

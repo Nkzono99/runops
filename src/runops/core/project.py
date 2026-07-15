@@ -18,6 +18,7 @@ else:
 
 from runops.core.exceptions import ProjectConfigError, ProjectNotFoundError
 from runops.core.knowledge_source import KnowledgeConfig, load_knowledge_config
+from runops.core.research import ResearchBudget, research_budget_from_raw
 
 _PROJECT_FILE = "runops.toml"
 _SIMULATORS_FILE = "simulators.toml"
@@ -43,6 +44,7 @@ class ProjectConfig:
     simulators: dict[str, dict[str, Any]] = field(default_factory=dict)
     launchers: dict[str, dict[str, Any]] = field(default_factory=dict)
     knowledge: KnowledgeConfig | None = None
+    research_budget: ResearchBudget = field(default_factory=ResearchBudget)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -134,6 +136,7 @@ def load_project(project_dir: Path) -> ProjectConfig:
         simulators=simulators,
         launchers=launchers,
         knowledge=knowledge,
+        research_budget=research_budget_from_raw(raw),
         raw=raw,
     )
 

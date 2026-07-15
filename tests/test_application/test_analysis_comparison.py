@@ -58,9 +58,10 @@ def test_create_comparison_workspace_records_sources(tmp_path: Path) -> None:
 
     assert result.comparison_id == "landau-a"
     assert result.source_count == 1
-    assert (result.comparison_dir / "scripts" / ".gitkeep").is_file()
-    assert (result.comparison_dir / "data" / ".gitkeep").is_file()
-    assert (result.comparison_dir / "figures" / ".gitkeep").is_file()
+    assert result.comparison_dir.name == "R0001-landau-a"
+    assert (result.comparison_dir / "artifacts/scripts").is_dir()
+    assert (result.comparison_dir / "artifacts/data").is_dir()
+    assert (result.comparison_dir / "artifacts/figures").is_dir()
     with open(result.manifest_path, "rb") as f:
         manifest = tomllib.load(f)
 
@@ -70,9 +71,9 @@ def test_create_comparison_workspace_records_sources(tmp_path: Path) -> None:
     assert manifest["sources"][0]["path"] == "runs/survey-a"
     assert manifest["sources"][0]["run_ids"] == ["R20260501-0001"]
     assert manifest["paths"] == {
-        "scripts": "scripts",
-        "data": "data",
-        "figures": "figures",
+        "scripts": "artifacts/scripts",
+        "data": "artifacts/data",
+        "figures": "artifacts/figures",
     }
 
 

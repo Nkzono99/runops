@@ -19,7 +19,6 @@ from runops.application.actions.analysis import (
     summarize_run,
 )
 from runops.application.actions.knowledge import add_fact, promote_fact, save_insight
-from runops.application.actions.research import create_experiment
 from runops.application.actions.result import ActionResult, ActionStatus
 from runops.application.actions.run_lifecycle import (
     create_run,
@@ -35,7 +34,6 @@ logger = logging.getLogger(__name__)
 
 #: Map action name -> callable.
 _DISPATCH: dict[str, Callable[..., ActionResult]] = {
-    "create_experiment": create_experiment,
     "create_run": create_run,
     "create_survey": create_survey,
     "submit_run": submit_run,

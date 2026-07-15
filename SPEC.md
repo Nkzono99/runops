@@ -229,15 +229,14 @@ sim-manager/
           R20260328-0001/
             ...
 
-  notes/                 # project-wide lab notebook (chronological)
-    YYYY-MM-DD.md        # 日次の append-only ノート (`runo notes append`)
-    reports/             # 長文 refined レポート
-    README.md            # 二層 (curated vs lab notebook) 規約
-  research/              # current high-level research decision ledger
-    README.md
-    agenda.md            # mutable current decision state
-    proposals/           # optional pre-execution decisions
-    reviews/             # optional checkpoint snapshots
+  research/              # quantity-bounded research memory
+    CURRENT.md           # mutable current state (default 20,000 chars)
+    journal/
+      active.md          # append-only active segment
+      archive/           # intact JNNNN.md segments
+    results/             # explicitly promoted durable results
+    archive/results/     # reversible inactive results
+  .runops/work/          # provisional goal output (gitignored)
 ```
 
 ---
@@ -1132,70 +1131,33 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 ---
 
-## 18.9 Lab notebook (実験ノート)
+## 18.9 Quantity-bounded research workspace
 
-curated knowledge (`.runops/insights/`, `.runops/facts.toml`) と並列に運用する
-**append-only な時系列ノート**。1 ファイル = 1 日 (`notes/YYYY-MM-DD.md`)、
-各エントリは `## HH:MM <title>` で始まる。
+研究記憶は日数ではなく Unicode 文字数、件数、bytes で上限を持つ。既定値は
+`runops.toml [research.workspace]` に置く。
 
-* `runo notes append TITLE [BODY]` — 今日 (JST) の lab notebook に追記。
-  本文は引数 (inline) または `-` / 引数省略で stdin から読む。
-* `runo notes list [-n N]` — 最近の lab notebook 日付一覧 (新しい順, デフォルト 14 日)
-* `runo notes show [DATE|today|latest]` — 指定日の内容を表示
-* `runo notes archive [--older-than 7d]` — 古い active note を year 別 history へ no-clobber で移動
+* `CURRENT.md`: mutable な現在判断。既定 20,000 文字
+* `journal/active.md`: append-only。既定 64,000 文字を越える前に原文のまま
+  `journal/archive/JNNNN.md` へ rotation
+* `results/RNNNN-topic/README.md`: result ごとの唯一の narrative。既定 30,000 文字
+* `results/RNNNN-topic/artifacts/`: Markdown 禁止。既定 50 files / 200 MiB
+* active result は既定 8 件。archive/restore は rename による可逆操作
+* `.runops/work/<goal-id>/` は provisional output で Git 管理しない
 
-書き込みポリシー:
-
-* **append-only**: 既存 entry は触らない。新しい entry を末尾に追加する
-* 1 ファイル = 1 日。日付は ISO 形式 (`2026-04-08.md`)
-* 既存ファイルが無ければ `# YYYY-MM-DD — lab notebook` ヘッダ付きで新規作成
-* 各 entry は `## HH:MM <title>` 直下に本文 (markdown 自由)
-
-curated layer との関係:
+AI は重要度を推測して既存 evidence を削除・要約置換しない。journal rotation は
+原文を保持し、durable result への昇格は明示的に行う。
 
 ```text
-raw notes/materials
-  -> research/agenda.md (current decision) OR notes/reports/<topic>.md
-  -> analysis/publication artifact
-  -> .runops/insights/<name>.md / .runops/facts.toml
+research/journal + materials + .runops/work
+  -> research/CURRENT.md OR research/results/RNNNN-topic
+  -> .runops/insights / .runops/facts.toml (必要な場合だけ)
 ```
 
-raw evidence、現在判断/refined narrative、解析・出版 artifact、再利用可能知識を
-同じ正本として混ぜない。
+旧 `notes/`, `analysis/cross_run/`, `analysis/**/*.md`, HarnessOps metadata 等は
+`runo research migrate-legacy` が `MIGRATION.json` 付き recovery archive へ移し、
+`--restore` で復元できる。自動 purge は提供しない。
 
-### 18.9.1 Research layer
-
-`research/` は現在の高レベルな研究判断を隔離する project workspace。
-`research/agenda.md` は TODO リストではなく、mutable な decision ledger とする。
-
-* 本文は日本語で書く。コード・コマンド・ファイルパス・run_id は実際の表記のまま残す
-* `notes/YYYY-MM-DD.md` は append-only な時系列ログ、`research/agenda.md` は現在判断の正本
-* `research/proposals/` は高コスト・方向転換・新 model などの実行前判断を必要時に残す
-* `research/reviews/` は主要 result / failed run / pause / kill / pivot などの checkpoint snapshot を残す
-* production / large survey は proposal で bounded pilot と stop / expand criterion を
-  先に定義し、pilot review の `Decision: EXPAND` 後だけ full submit する
-* `--yes` は CLI confirmation の省略であり、proposal / pilot / review の research gate
-  を省略しない
-
-### 18.9.2 Structured experiment gate
-
-survey-backed `runo runs submit --all` は `survey.toml [research]` の
-`experiment_id` と `stage = "pilot" | "full"` を必須とする。
-`research/experiments.toml` schema 2 は candidate comparison と expansion decision の
-機械正本で、各 experiment は不変 ID、title、question、最低 2 候補、選択候補、
-proposal path、cost ceiling を持つ。候補は
-`information_gain`, `falsification`, `estimated_core_hours`, `operational_risk` を持つ。
-`stage = "full"` は decision `EXPAND`、存在する review path、対象 survey、stage、
-最大 core-hours を含む authorization scope が一致する場合だけ許可する。
-この gate は dry-run にも適用し、`--yes` では省略できない。
-
-experiment phase は永続化 field ではない。ledger、`survey.toml`、run manifest、
-analysis artifact index から決定的に導出し、保存済み `phase` は schema error とする。
-schema 1 は bulk gate の互換 read に限り受理し、schema 2 への明示 migration は
-`runo migrate apply M0-0004 --yes` で行う。migrated record の不足情報は
-`migration_blockers` として fail closed にする。
-
-### 18.9.3 Story acceptance audit (experimental)
+### 18.9.2 Story acceptance audit (experimental)
 
 `analysis/stories/<story-id>/story.toml` は `schema_version = 1` を持ち、各 step の
 `required_artifacts` と `acceptable_status` は 1 件以上の非空文字列からなる TOML array
@@ -1293,13 +1255,15 @@ source が 1 件でも欠落した audit は、別 source に十分な artifact 
 
 ---
 
-## 19.5 `notes append`
+## 19.5 `research`
 
-* `notes/<JST today>.md` を解決 (project root 直下を優先、なければ cwd/notes)
-* ファイルが無ければ `# YYYY-MM-DD — lab notebook` ヘッダを付けて新規作成
-* 末尾に `## HH:MM <title>` 見出しと本文を append (既存 entry には触らない)
-* 本文ソース: 引数 inline / `-` または引数省略時は stdin
-* 空タイトル・空本文はエラー (exit 2)
+* `status/check`: configured budget に対する文字数、件数、bytes、layout issue を返す
+* `append TITLE BODY`: JST timestamp の entry を active journal に append し、必要なら先に rotation
+* `rotate [--force]`: active journal 全文を次の `JNNNN.md` へ no-clobber で保存
+* `new-result NAME`: `RNNNN-slug/{README.md,manifest.toml,artifacts/}` を作る
+* `archive/restore RESULT_ID`: result directory を内容変更せず移動する
+* `migrate-legacy [--dry-run|--restore]`: 旧 workspace を決定的・可逆に移行する
+* 空タイトル/本文、symlink、hardlink、不正 UTF-8、overwrite は fail closed
 
 ---
 
@@ -1315,19 +1279,6 @@ source が 1 件でも欠落した audit は、別 source に十分な artifact 
 
 * 指定 survey 配下の各 run の summary を収集
 * `survey_summary.csv` などを生成
-
----
-
-## 19.8 `experiment new/show/check`
-
-* `experiment new NAME --from SPEC` は TOML/JSON spec を検証し、schema 2 ledger record と
-  `research/proposals/NAME.md` を同じ plan から原子的に作成する
-* `--dry-run` は常に無変更。`--json` は `--yes` を同時指定しない限り plan のみ返す
-* JSON 出力は `schema_version`, `status`, `data`, `warnings`, `blockers`,
-  `next_actions` を持つ versioned envelope とする
-* `experiment show` は phase、blocker、warning、次の command を導出して表示する
-* `experiment check` は error-level issue が 1 件以上あれば exit 1 とする
-* これらの command は科学的候補の選択や WAIT/EXPAND/REVISE/STOP decision を自動化しない
 
 ---
 

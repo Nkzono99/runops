@@ -989,10 +989,10 @@ runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group pa
 
 ---
 
-## cross-run comparison workspace
+## retained comparison result
 
 複数 run / survey をまたぐ比較・可視化では、比較単位の成果物を
-`analysis/cross_run/<comparison_id>/` にまとめる。
+`research/results/RNNN-<comparison_id>/` にまとめる。
 置き場所と運用ルールは [Analysis Layer](layers/analysis.md) を正本とする。
 
 ```bash
@@ -1006,11 +1006,11 @@ runo analyze new-comparison "no_plate vs flat_plate" \
 
 | File | Description |
 |------|-------------|
-| `analysis/cross_run/<id>/manifest.toml` | 比較の正本。source run/survey/path、scripts/data/figures の置き場、artifact index を記録 |
-| `analysis/cross_run/<id>/README.md` | 人間/Agent 向けの短い workspace 説明 |
-| `analysis/cross_run/<id>/scripts/` | 比較専用 script。project-wide reusable script は project root の `scripts/` に置き、manifest から参照してよい |
-| `analysis/cross_run/<id>/data/` | 比較用 CSV/JSON/中間表 |
-| `analysis/cross_run/<id>/figures/` | 比較図・contact sheet |
+| `research/results/RNNN-<id>/manifest.toml` | source run/survey/path と artifact index を記録 |
+| `research/results/RNNN-<id>/README.md` | 結論、根拠、限界を集約する唯一の narrative |
+| `research/results/RNNN-<id>/artifacts/scripts/` | 比較専用 script |
+| `research/results/RNNN-<id>/artifacts/data/` | 比較用 CSV/JSON/中間表。Markdown は置かない |
+| `research/results/RNNN-<id>/artifacts/figures/` | 比較図・contact sheet |
 
 ### manifest.toml の概要
 
@@ -1141,87 +1141,6 @@ runo analyze export R20260412-0003 --paper draft-a --name fig2-baseline
 runo analyze export R20260412-0003 --paper draft-a --paper-status placeholder
 runo analyze export runs/sheath/angle_scan --paper draft-a --mode symlink
 ```
-
-## research/paper_requests.toml
-
-paper draft から runops project へ戻す追加解析・図表・追加実験・export 要望の
-structured queue。schema は `schemas/paper_requests.json`。
-これは実行キューではなく、`research/agenda.md` や `research/proposals/` へ
-判断を戻すための handoff である。
-
-```toml
-#:schema https://runops.dev/schemas/paper_requests.json
-schema_version = 1
-
-[[requests]]
-id = "PAPER-REQ-0001"
-type = "analysis_request"
-title = "Add sheath width comparison for Figure 2"
-paper_id = "draft-a"
-paper_context = "Results / Figure 2"
-desired_artifact = "table or figure comparing sheath width across angle_scan"
-source_link = "refs/links.toml#paper.draft-a"
-related_runs = ["R20260412-0003"]
-related_surveys = ["runs/sheath/angle_scan"]
-priority = "medium"
-status = "open"
-human_gate = true
-```
-
-空の queue では `[[requests]]` を省略し、`schema_version = 1` だけを置ける。
-
-`type` は `analysis_request`, `figure_request`, `experiment_request`,
-`evidence_gap`, `export_request` のいずれか。
-`priority` は `low | medium | high | urgent`、`status` は
-`open | planned | in_progress | blocked | done | rejected`。
-追加実験の実行は明示操作に残し、MCP 経由で自動 submit しない。
-
-## research/experiments.toml
-
-scientific experiment の候補比較、選択、human decision、full-stage authorization の
-機械正本。schema 2 の phase は保存せず、`runo experiment show` が project state から
-導出する。空 ledger は `schema_version = 2` だけでよい。
-
-```toml
-schema_version = 2
-
-[[experiments]]
-id = "E1"
-title = "Ion depletion pilot"
-question = "Does vti widen the depletion cone?"
-decision = "EXPAND"
-proposal = "research/proposals/E1.md"
-review = "research/reviews/E1.md"
-selected_candidate = "C1"
-cost_ceiling_core_hours = 128.0
-
-[experiments.authorization]
-stage = "full"
-survey = "runs/full-scan"
-review = "research/reviews/E1.md"
-max_core_hours = 128.0
-
-[[experiments.candidates]]
-id = "C1"
-information_gain = "Separates thermal and drift scaling"
-falsification = "No monotonic cone-angle response"
-estimated_core_hours = 32.0
-operational_risk = "low"
-
-[[experiments.candidates]]
-id = "C2"
-information_gain = "Tests resolution sensitivity first"
-falsification = "Resolution changes the inferred trend"
-estimated_core_hours = 64.0
-operational_risk = "medium"
-```
-
-`decision` は `WAIT | EXPAND | REVISE | STOP`、authorization `stage` は
-`pilot | full`。path は project-relative で project 外へ出てはならない。
-schema 1 からは `runo migrate apply M0-0004 --yes` で移行し、復元不能な
-`title`, `question`, `cost_ceiling_core_hours` は `migration_blockers` に残す。
-
----
 
 ## JSON Schema
 

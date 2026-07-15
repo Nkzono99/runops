@@ -20,7 +20,6 @@ runops の開発ハーネスは `.claude/` だけではなく、`.codex/` と
 
 - Claude 固有設定は `.claude/`、Codex 固有設定は `.codex/` に置く
 - 共通ワークフローや運用知識は、tool 固有の文法差を除いて意図的な差分だけを残す
-- HarnessOps upstream lab overlay は repo 外の `../runops-harness-lab` に置き、repo 内 `harness-lab/` は再作成・Git 管理しない
 - shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
   `.claude/skills/improve-harness/SKILL.md`, `.agents/skills/improve-harness/SKILL.md`,
   `.claude/skills/release/SKILL.md`, `.agents/skills/release/SKILL.md`,
@@ -95,7 +94,7 @@ uv run runo --help                         # 開発 checkout の CLI 実行
 
 - **run ディレクトリが主単位**: すべての操作は run_id / run dir を基点とする
 - **manifest.toml が正本**: run の状態・由来・provenance はすべて manifest.toml に記録
-- **研究判断の隔離**: 生成 project の `research/agenda.md` は mutable な現在判断の台帳。本文は日本語
+- **研究記憶の上限**: `research/CURRENT.md`、量でローテーションする journal、明示昇格した result だけを active に保つ
 - **Simulator Adapter パターン**: simulator 固有処理は Adapter に閉じ込める
 - **Launcher Profile パターン**: MPI 起動方式は Launcher に閉じ込める
 - **MPI に介入しない**: Python ツールは rank ごとのラッパにならない

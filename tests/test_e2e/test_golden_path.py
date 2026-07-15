@@ -46,7 +46,6 @@ def _init_project(
             "init",
             *simulators,
             "-y",
-            "--no-harnessops",
             "--path",
             str(project_dir),
         ],

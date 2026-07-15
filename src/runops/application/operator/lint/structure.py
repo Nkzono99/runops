@@ -25,35 +25,33 @@ def check_structure(context: LintContext) -> list[LintIssue]:
             )
         )
 
-    notes_readme = root / "notes" / "README.md"
-    if not notes_readme.is_file():
+    current = root / "research" / "CURRENT.md"
+    if not current.is_file():
         issues.append(
             LintIssue(
                 severity="warning",
-                issue_id="structure.notes_readme_missing",
-                path=notes_readme,
-                message="notes/README.md is missing.",
+                issue_id="structure.research_current_missing",
+                path=current,
+                message="research/CURRENT.md is missing.",
                 recommendation=(
-                    "Run `runo migrate apply M0-0002` or restore the scaffolded "
-                    "notes guide."
+                    "Run `runo update-harness --only research` to restore the "
+                    "minimal research scaffold."
                 ),
-                migration="M0-0002",
             )
         )
 
-    agenda_path = root / "research" / "agenda.md"
-    if not agenda_path.is_file():
+    journal = root / "research" / "journal" / "active.md"
+    if not journal.is_file():
         issues.append(
             LintIssue(
                 severity="warning",
-                issue_id="structure.research_agenda_missing",
-                path=agenda_path,
-                message="research/agenda.md is missing.",
+                issue_id="structure.research_journal_missing",
+                path=journal,
+                message="research/journal/active.md is missing.",
                 recommendation=(
-                    "Run `runo migrate apply M0-0002` to add the research decision "
-                    "ledger scaffold."
+                    "Run `runo update-harness --only research` to restore the "
+                    "minimal research scaffold."
                 ),
-                migration="M0-0002",
             )
         )
 

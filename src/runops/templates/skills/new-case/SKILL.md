@@ -88,9 +88,9 @@ case.toml の `[params]` で dot 記法で指定したパラメータは、入�
 - description には実験の意図を書く (後から振り返れるように)
 - ケース作成後は `runo runs create` で run を生成する
 
-## `{{ skill_prefix }}note` で残すべきこと
+## `{{ skill_prefix }}research-workspace` で残すべきこと
 
-case を作る時の意思決定は `notes/YYYY-MM-DD.md` に残す:
+case を作る時の意思決定は bounded journal に残す:
 
 - どのパラメータをデフォルトから変えたか・なぜか
 - `sensitive` パラメータを動かした理由 (cookbook の警告を承知の上で)
@@ -98,10 +98,11 @@ case を作る時の意思決定は `notes/YYYY-MM-DD.md` に残す:
 - 一度試して没にしたパラメータ値とその理由
 
 ```bash
-runo notes append "case 'flat_plate' を作成" - <<'EOF'
+runo research append "case 'flat_plate' を作成" "$(cat <<'EOF'
 EMSES emses-mini fragment ベース。違い:
 - nx=4000, nz=800 に拡張 (depletion 観察に必要な x 範囲)
 - vti は survey で振るので case 側はプレースホルダ 5 eV
 - plate を z=200 に固定。地電位 -34 V (4σ 上限)
 EOF
+)"
 ```

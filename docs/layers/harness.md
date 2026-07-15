@@ -36,7 +36,7 @@ project 側 harness の source of truth は runops repo 内の template です�
 | `src/runops/templates/harness/claude/` | `.claude/`, `CLAUDE.md` |
 | `src/runops/templates/harness/codex/` | `.codex/`, `AGENTS.md` |
 | `src/runops/templates/harness/shared/` | Claude / Codex 共通本文・rules |
-| `src/runops/templates/scaffold/` | `notes/`, `research/`, `materials/` などの scaffold |
+| `src/runops/templates/scaffold/` | minimal `research/`, `materials/` などの scaffold |
 
 汎用 harness 改善は project 側ファイルに直接固定せず、template に戻します。
 
@@ -54,12 +54,12 @@ Harness Layer に置くもの:
 
 置かないもの:
 
-- 研究判断の正本。これは `research/agenda.md`。
+- 研究判断の正本。これは `research/CURRENT.md`。
 - run の状態、job 履歴、provenance。これは Execution Kernel の `manifest.toml`。
-- 実験ログ。これは `notes/YYYY-MM-DD.md`。
+- 時系列の研究ログ。これは量で rotation する `research/journal/active.md`。
 - simulator output。これは `runs/**/work/`。
-- 解析成果物。これは `runs/**/analysis/`, `<survey>/summary/`, `analysis/cross_run/`。
-- upstream issue の本文そのもの。これは GitHub issue と note の evidence path。
+- 解析成果物。run-local は `runs/**/analysis/`、残す横断結果は `research/results/`。
+- upstream issue の本文そのもの。これは GitHub issue と evidence path。
 
 ## 更新ルール
 

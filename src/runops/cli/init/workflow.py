@@ -16,7 +16,6 @@ from runops.cli.init.knowledge import _prepare_knowledge_imports
 from runops.cli.init.prompting import _BundledSiteProfile
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
-    _create_notes_skeleton,
     _create_research_skeleton,
     _create_runops_skeleton,
     _mkdir_if_missing,
@@ -87,20 +86,6 @@ def init(
         bool,
         typer.Option("--yes", "-y", help="Skip interactive prompts, use defaults."),
     ] = False,
-    no_upstream_feedback: Annotated[
-        bool,
-        typer.Option(
-            "--no-upstream-feedback",
-            help="Do not include the upstream-feedback rule for the AI agent.",
-        ),
-    ] = False,
-    no_harnessops: Annotated[
-        bool,
-        typer.Option(
-            "--no-harnessops",
-            help="Do not initialize the project-side HarnessOps overlay.",
-        ),
-    ] = False,
     gh_auth_login: Annotated[
         bool,
         typer.Option(
@@ -155,10 +140,6 @@ def init(
 ) -> None:
     """Initialize a new runops project (runops.toml etc.).
 
-    When the external ``hops`` CLI is available, ``runo init`` also delegates
-    project-side HarnessOps overlay creation to ``hops init --profile
-    runops-project``. Use ``--no-harnessops`` to skip that hook.
-
     By default, runs in interactive mode with guided prompts.
     Use --yes / -y to skip prompts and use defaults.
 
@@ -176,8 +157,6 @@ def init(
         project_name = typer.prompt("Project name", default=project_dir.name)
     else:
         project_name = name or project_dir.name
-
-    upstream_feedback = not no_upstream_feedback
 
     # Resolve interactive choices before writing files so failed preflights do
     # not leave a half-created project behind.
@@ -230,12 +209,16 @@ def init(
     skipped: list[str] = []
 
     # runops.toml
-    harness_line = (
-        f"\n[harness]\nupstream_feedback = {'true' if upstream_feedback else 'false'}\n"
-    )
     simproject_content = (
         f"#:schema {_SCHEMA_BASE_URL}/runops.json\n"
-        f'[project]\nname = "{project_name}"\ndescription = ""\n' + harness_line
+        f'[project]\nname = "{project_name}"\ndescription = ""\n\n'
+        "[research.workspace]\n"
+        "current_chars = 20000\n"
+        "journal_segment_chars = 64000\n"
+        "result_readme_chars = 30000\n"
+        "active_results = 8\n"
+        "result_artifact_files = 50\n"
+        "result_artifact_bytes = 209715200\n"
     )
     if _write_if_missing(project_dir / _SIMPROJECT_FILE, simproject_content):
         created.append(_SIMPROJECT_FILE)
@@ -338,16 +321,13 @@ def init(
     else:
         skipped.append("runs/")
 
-    # .runops/ skeleton (insights, facts, generated knowledge)
+    # .runops/ skeleton (provisional goal work + generated knowledge)
     _create_runops_skeleton(project_dir, created)
-
-    # notes/ skeleton (chronological lab notebook + reports)
-    _create_notes_skeleton(project_dir, created)
 
     # materials/ skeleton (human-provided source material for agents)
     _create_materials_skeleton(project_dir, created)
 
-    # research/ skeleton (mutable decision ledger + optional snapshots)
+    # research/ skeleton (bounded current state, journal, results, archive)
     _create_research_skeleton(project_dir, created)
 
     # refs/ — optional legacy/local mirror of simulator doc repos.  The normal
@@ -414,7 +394,6 @@ def init(
     harness = build_harness_bundle(
         project_name,
         sim_names,
-        upstream_feedback=upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
         include_reference_repos=with_refs,
         codex_plugin_recommendations=codex_plugin_recommendations,
@@ -431,21 +410,6 @@ def init(
     lock_hashes = harness.hashes()
     lock_hashes[GITIGNORE_PATH] = hash_text(build_managed_gitignore_block())
     save_harness_lock(project_dir, lock_hashes)
-
-    # HarnessOps project overlay.  runops delegates all state changes to the
-    # external hops CLI and keeps init usable when HarnessOps is unavailable.
-    if no_harnessops:
-        skipped.append("HarnessOps (disabled)")
-    else:
-        from runops.harness.harnessops import initialize_project_harnessops
-
-        harnessops_result = initialize_project_harnessops(project_dir)
-        if harnessops_result.status == "created":
-            created.append(harnessops_result.message)
-        else:
-            skipped.append(harnessops_result.message)
-            if harnessops_result.status == "failed":
-                typer.echo(f"  Warning: {harnessops_result.message}", err=True)
 
     # git init
     fresh_git = False

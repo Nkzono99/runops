@@ -397,7 +397,7 @@ AI: uvx 経由の runops で update-harness を実行します...
 \begin{itemize}[nosep]
   \item \textbf{uvx 経由の runops} で最新 package を実行
   \item \textbf{runo update-harness} でハーネスファイル (CLAUDE.md, skills, rules, editor settings 等) を再生成
-  \item \textbf{不足している visible workspace} として \texttt{notes/}, \texttt{materials/}, \texttt{research/} を補完
+  \item \textbf{不足している visible workspace} として \texttt{materials/} と最小 \texttt{research/} を補完
   \item \textbf{runo update} でシミュレータパッケージを更新
   \item 編集済みファイルとの競合は \texttt{.new} ファイルとして出力され、diff 確認後にマージ
 \end{itemize}
@@ -434,9 +434,9 @@ Claude Code は CLAUDE.md を自動的に読み込むため、runops プロジ�
 
 runops のハーネスには「意味のある作業単位ごとに Git コミットする」というルールが組み込まれており、AI Agent は case 作成後・run 生成後・解析完了後・知見保存後などのタイミングで自動的にコミットを作成します。もしコミットされていないと感じたら、「コミットして」と指示すれば即座に対応します。
 
-\subsection*{\color{accent} Lab notebook は自然言語で指示する}
+\subsection*{\color{accent} Research journal は量で区切る}
 
-AI Agent に「今の議論をノートに残して」「サーベイの設計理由を記録して」と伝えれば、lab notebook (\texttt{notes/YYYY-MM-DD.md}) に自動記録します。「なぜこのパラメータ範囲にしたか」「なぜこの case を保留したか」といった情報は再現性に直結するので、積極的にメモを指示してください。\texttt{/note} スキルを直接呼ぶこともできますが、自然言語での指示のほうが柔軟です。
+AI Agent に残すべき作業経緯は \texttt{research/journal/active.md} へ追記します。日付ごとのファイルは増やさず、設定文字数に達したときだけ原文のまま \texttt{journal/archive/JNNNN.md} へ rotation します。現在有効な判断は \texttt{research/CURRENT.md}、残す解析は \texttt{research/results/} に分けます。
 
 \subsection*{\color{accent} Smoke test を活用する}
 

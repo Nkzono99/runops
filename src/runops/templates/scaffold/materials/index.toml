@@ -7,6 +7,6 @@
 # title = "Example paper"
 # kind = "paper"
 # tags = ["background"]
-# notes = "Summarized in notes/readings/example.md"
+# notes = "Summarized in research/results/R0001-example/README.md"
 
 materials = []

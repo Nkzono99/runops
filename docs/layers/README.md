@@ -42,7 +42,7 @@ project 側の正本を詳しく見るための view です。対応は次のと
 | Experiment Layer | [experiment.md](experiment.md) | `campaign.toml` → `case.toml` → `survey.toml` の実験設計正本 |
 | Execution Kernel | [execution-kernel.md](execution-kernel.md) | run / submit / sync / manifest / provenance の実行状態正本 |
 | Analysis Layer | [analysis.md](analysis.md) | 解析・可視化成果物、summary、survey 集計、cross-run 比較 |
-| Research Layer | [research.md](research.md) | `research/agenda.md` による現在判断の台帳 |
+| Research Layer | [research.md](research.md) | 量で bounded な current / journal / durable results |
 | Knowledge Layer | [knowledge.md](knowledge.md) | Agent が再利用する plugin 導線、notes、materials、`.runops/insights/`、refs fallback |
 | Harness Layer | [harness.md](harness.md) | Agent の手順、権限、skills、rules、project-local harness |
 | Upstream Integration Layer | [upstream.md](upstream.md) | runops local patch、feedback issue、PR、update / migration の境界 |

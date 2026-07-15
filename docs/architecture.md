@@ -698,44 +698,44 @@ insights のインポート       ← プロジェクト横断の知識共有
 知見の種類: `constraint` (制約), `result` (結果サマリー),
 `analysis` (物理的考察), `dependency` (パラメータ依存性)
 
-### Lab notebook (chronological)
+### Quantity-bounded research memory
 
 Research Workspace 全体の maturity flow は次です。
 
 ```text
-raw notes/materials
-  -> research/agenda.md OR notes/reports/<topic>.md
-  -> analysis/publication artifact
+research/journal + materials + .runops/work
+  -> research/CURRENT.md OR research/results/RNNNN-topic
   -> .runops/insights/ / .runops/facts.toml
 ```
 
 ```
-notes/YYYY-MM-DD.md        ← runo notes append (append-only)
-notes/history/YYYY/YYYY-MM-DD.md
-                             ← 古い日次 notebook (runo notes archive)
-notes/reports/<topic>.md   ← refined long-form (改稿可)
+research/journal/active.md ← runo research append (append-only)
+research/journal/archive/JNNNN.md
+                             ← 文字数で原文 rotation
+research/results/RNNNN-topic/README.md
+                             ← 明示昇格した durable result
     ↓ /learn で素材として読む
 .runops/insights/, facts.toml ← curated 化
 ```
 
-curated knowledge と lab notebook は **二層構造**:
+curated knowledge と research workspace は役割を分ける:
 
 - 整理済の永続知見 (上書き可・名前付き) は `.runops/insights/` / `facts.toml`
-- 時系列の意思決定・観察ログ (準備フェーズの意思決定・観察・仮説・TODO) は `notes/YYYY-MM-DD.md`
-- `runo notes append` は今日の日次ファイルに `## HH:MM <title>` 形式で追記
-- `runo notes archive` は古い日次ファイルだけを `notes/history/YYYY/` に移し、`notes list/show` は active と history を透過検索する
-- agenda / report で判断を整理し、analysis/publication artifact の evidence を経て
+- 時系列の意思決定・観察ログは `research/journal/active.md`
+- `runo research append` は `## HH:MM <title>` 形式で追記し、文字数上限前に rotation する
+- durable result は `research/results/` へ明示昇格し、README 1 枚に narrative を集約する
+- CURRENT / result で判断を整理し、artifact evidence を経て
   insight / fact へ昇格
 
-### Research layer (decision ledger)
+### Research layer
 
 ```
-research/agenda.md          ← 現在の高レベルな研究判断 (mutable)
-research/proposals/         ← 高コスト・方向転換前の任意 proposal
-research/reviews/           ← agenda checkpoint の snapshot
+research/CURRENT.md         ← 現在の高レベルな研究判断 (mutable, bounded)
+research/results/           ← 人が残すと決めた解析結果
+research/archive/results/   ← 可逆 archive
 ```
 
-`research/agenda.md` は TODO リストではなく、現在の見立て、active question、
+`research/CURRENT.md` は TODO リストではなく、現在の見立て、active question、
 paused/killed、次に何をなぜ行うかを残す判断の台帳。本文は日本語で書き、
 コード・コマンド・ファイルパス・run_id は実際の表記のまま残す。
 

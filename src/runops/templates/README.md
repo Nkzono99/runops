@@ -15,7 +15,7 @@ Current layout:
   syntax injected by the harness builder. Support resources such as
   `scripts/`, `references/`, and `examples/` are copied beside `SKILL.md`.
 - `scaffold/` — generic project scaffold files that are not primarily agent
-  harness files, such as `.gitignore`, `campaign.toml`, `notes/`,
+  harness files, such as `.gitignore`, `campaign.toml`, `research/`,
   `materials/`, `research/`, and editor settings.
 - `adapters/` — simulator-specific case/input templates and minimal
   plugin-first adapter fallback guides.

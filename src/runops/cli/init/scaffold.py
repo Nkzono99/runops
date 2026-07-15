@@ -48,12 +48,8 @@ def _create_runops_skeleton(project_dir: Path, created: list[str]) -> None:
     runops_dir = project_dir / ".runops"
     if _mkdir_if_missing(runops_dir):
         created.append(".runops/")
-    if _mkdir_if_missing(runops_dir / "insights"):
-        created.append(".runops/insights/")
-    from runops.templates import load_static
-
-    if _write_if_missing(runops_dir / "facts.toml", load_static("scaffold/facts.toml")):
-        created.append(".runops/facts.toml")
+    if _mkdir_if_missing(runops_dir / "work"):
+        created.append(".runops/work/")
     # Knowledge integration directories
     if _mkdir_if_missing(runops_dir / "knowledge"):
         created.append(".runops/knowledge/")
@@ -63,43 +59,6 @@ def _create_runops_skeleton(project_dir: Path, created: list[str]) -> None:
         created.append(".runops/knowledge/candidates/")
     if _mkdir_if_missing(runops_dir / "knowledge" / "candidates" / "facts"):
         created.append(".runops/knowledge/candidates/facts/")
-
-
-def _create_notes_skeleton(project_dir: Path, created: list[str]) -> None:
-    """Create the lab-notebook skeleton.
-
-    The lab notebook is a visible human/agent workspace for chronological
-    append-only entries, edited via
-    ``runo notes append`` or the ``/note`` skill.
-
-    Args:
-        project_dir: Project root directory.
-        created: Mutable list to append created items.
-    """
-    notes_dir = project_dir / "notes"
-    if _mkdir_if_missing(notes_dir):
-        created.append("notes/")
-    reports_dir = notes_dir / "reports"
-    if _mkdir_if_missing(reports_dir):
-        created.append("notes/reports/")
-    if _mkdir_if_missing(reports_dir / "archive"):
-        created.append("notes/reports/archive/")
-    if _mkdir_if_missing(reports_dir / "figures"):
-        created.append("notes/reports/figures/")
-    if _mkdir_if_missing(notes_dir / "history"):
-        created.append("notes/history/")
-
-    from runops.templates import load_static
-
-    readme_path = notes_dir / "README.md"
-    if _write_if_missing(readme_path, load_static("scaffold/notes/README.md")):
-        created.append("notes/README.md")
-    reports_readme_path = reports_dir / "README.md"
-    if _write_if_missing(
-        reports_readme_path,
-        load_static("scaffold/notes/reports/README.md"),
-    ):
-        created.append("notes/reports/README.md")
 
 
 def _create_materials_skeleton(project_dir: Path, created: list[str]) -> None:
@@ -122,39 +81,34 @@ def _create_materials_skeleton(project_dir: Path, created: list[str]) -> None:
 
 
 def _create_research_skeleton(project_dir: Path, created: list[str]) -> None:
-    """Create the high-level research decision skeleton."""
+    """Create the minimal quantity-bounded research workspace."""
     research_dir = project_dir / "research"
     if _mkdir_if_missing(research_dir):
         created.append("research/")
-    for dirname in ("proposals", "reviews"):
+    for dirname in (
+        "journal",
+        "journal/archive",
+        "results",
+        "archive",
+        "archive/results",
+    ):
         if _mkdir_if_missing(research_dir / dirname):
             created.append(f"research/{dirname}/")
 
     from runops.templates import load_static
 
-    readme_path = research_dir / "README.md"
-    if _write_if_missing(readme_path, load_static("scaffold/research/README.md")):
-        created.append("research/README.md")
-    agenda_path = research_dir / "agenda.md"
-    if _write_if_missing(agenda_path, load_static("scaffold/research/agenda.md")):
-        created.append("research/agenda.md")
-    paper_requests_path = research_dir / "paper_requests.toml"
+    current_path = research_dir / "CURRENT.md"
     if _write_if_missing(
-        paper_requests_path,
-        load_static("scaffold/research/paper_requests.toml"),
+        current_path,
+        load_static("scaffold/research/CURRENT.md"),
     ):
-        created.append("research/paper_requests.toml")
-    experiments_path = research_dir / "experiments.toml"
+        created.append("research/CURRENT.md")
+    journal_path = research_dir / "journal" / "active.md"
     if _write_if_missing(
-        experiments_path,
-        load_static("scaffold/research/experiments.toml"),
+        journal_path,
+        load_static("scaffold/research/journal/active.md"),
     ):
-        created.append("research/experiments.toml")
-    for dirname in ("proposals", "reviews"):
-        keep_path = research_dir / dirname / ".gitkeep"
-        template_path = f"scaffold/research/{dirname}/.gitkeep"
-        if _write_if_missing(keep_path, load_static(template_path)):
-            created.append(f"research/{dirname}/.gitkeep")
+        created.append("research/journal/active.md")
 
 
 def _get_data_path() -> Path:

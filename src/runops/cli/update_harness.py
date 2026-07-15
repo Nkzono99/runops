@@ -4,7 +4,7 @@
 AGENTS.md, .claude/skills/, .claude/rules/, .claude/settings.json,
 .vscode/settings.json, the managed block inside ``.gitignore``, etc.) from
 the current version of runops and writes them into the project. It also
-backfills the visible ``notes/``, ``materials/``, and ``research/`` workspace
+backfills the visible ``materials/`` and ``research/`` workspace
 scaffold when those paths are missing.
 
 Collision detection:  If the on-disk file matches the hash recorded in
@@ -34,7 +34,6 @@ from runops.application.operator.harness_upgrade import (
 from runops.cli.init.knowledge import _prepare_knowledge_imports
 from runops.cli.init.scaffold import (
     _create_materials_skeleton,
-    _create_notes_skeleton,
     _create_research_skeleton,
 )
 from runops.core.exceptions import SimctlError
@@ -50,8 +49,8 @@ from runops.harness.builder import (
     hash_file,
     hash_managed_gitignore_block,
     hash_text,
+    is_harness_path,
     load_harness_lock,
-    read_upstream_feedback_setting,
     replace_managed_gitignore_block,
     save_harness_lock,
 )
@@ -95,21 +94,11 @@ def _has_reference_repos(project_dir: Path, simulator_names: list[str]) -> bool:
 def _missing_workspace_scaffold(
     project_dir: Path,
     *,
-    include_notes: bool,
     include_materials: bool,
     include_research: bool,
 ) -> list[str]:
     """Return missing visible workspace scaffold paths."""
     expected: list[str] = []
-    if include_notes:
-        expected.extend(
-            [
-                "notes/",
-                "notes/reports/",
-                "notes/history/",
-                "notes/README.md",
-            ]
-        )
     if include_materials:
         expected.extend(
             [
@@ -126,14 +115,13 @@ def _missing_workspace_scaffold(
         expected.extend(
             [
                 "research/",
-                "research/README.md",
-                "research/agenda.md",
-                "research/experiments.toml",
-                "research/paper_requests.toml",
-                "research/proposals/",
-                "research/proposals/.gitkeep",
-                "research/reviews/",
-                "research/reviews/.gitkeep",
+                "research/CURRENT.md",
+                "research/journal/",
+                "research/journal/active.md",
+                "research/journal/archive/",
+                "research/results/",
+                "research/archive/",
+                "research/archive/results/",
             ]
         )
 
@@ -202,18 +190,11 @@ def update_harness(
             "--only",
             help=(
                 "Comma-separated list of files to update"
-                " (e.g. 'CLAUDE.md,.claude/rules,.vscode,notes,materials,"
+                " (e.g. 'CLAUDE.md,.claude/rules,.vscode,materials,"
                 "research')."
             ),
         ),
     ] = None,
-    no_harnessops: Annotated[
-        bool,
-        typer.Option(
-            "--no-harnessops",
-            help="Do not initialize or update the project-side HarnessOps overlay.",
-        ),
-    ] = False,
     plan: Annotated[
         bool,
         typer.Option(
@@ -264,9 +245,6 @@ def update_harness(
     Files that have not been manually edited since the last init/update
     are silently overwritten.  Files with user edits are written as
     ``<path>.new`` — review the diff and merge manually.
-    When the external ``hops`` CLI is available, this command also delegates
-    HarnessOps overlay/agent-bridge refresh to ``hops update-harness``.
-
     Use ``--force`` to overwrite all files regardless of user edits.
     Use ``--adopt`` to accept the current on-disk state into the lock
     (useful for first-time migration of an existing project).
@@ -277,7 +255,6 @@ def update_harness(
       runo update-harness --force           # force-overwrite everything
       runo update-harness --adopt           # lock current state
       runo update-harness --only CLAUDE.md  # update a single file
-      runo update-harness --no-harnessops   # skip the hops lifecycle hook
       runo update-harness --plan            # show versioned upgrade chain
       runo update-harness --apply-chain     # run chain via uvx exact versions
     """
@@ -322,7 +299,6 @@ def update_harness(
                     target=target,
                     allow_major=allow_major,
                     force=force,
-                    no_harnessops=no_harnessops,
                 ),
                 applied_version_source=applied_harness_runops_version,
             )
@@ -390,9 +366,6 @@ def update_harness(
         build_project_codex_plugin_inventory(project).recommendations
     )
 
-    # Read [harness] settings
-    upstream_feedback = read_upstream_feedback_setting(project_dir)
-
     if dry_run:
         imports_file = project_dir / ".runops" / "knowledge" / "enabled" / "imports.md"
         knowledge_imports_path = (
@@ -408,7 +381,6 @@ def update_harness(
     harness = build_harness_bundle(
         project_name,
         simulator_names,
-        upstream_feedback=upstream_feedback,
         knowledge_imports_path=knowledge_imports_path,
         include_reference_repos=_has_reference_repos(project_dir, simulator_names),
         codex_plugin_recommendations=codex_plugin_recommendations,
@@ -427,6 +399,8 @@ def update_harness(
     written_new: list[str] = []
     unchanged: list[str] = []
     adopted: list[str] = []
+    retired: list[str] = []
+    preserved_retired: list[str] = []
     backfilled_workspace: list[str] = []
     updated_lock = dict(lock)
 
@@ -485,6 +459,26 @@ def update_harness(
                 new_path.write_text(content, encoding="utf-8")
             written_new.append(rel_path)
 
+    # Retire files that an older runops version managed but the current
+    # template set no longer emits.  Unedited files can be removed safely;
+    # edited files are preserved and reported for human review.
+    if only_prefixes is None:
+        for rel_path in sorted(set(lock) - set(harness.files) - {GITIGNORE_PATH}):
+            if not is_harness_path(rel_path):
+                continue
+            full_path = project_dir / rel_path
+            disk_hash = hash_file(full_path)
+            if disk_hash is None:
+                updated_lock.pop(rel_path, None)
+                continue
+            if disk_hash == lock[rel_path]:
+                if not dry_run:
+                    full_path.unlink()
+                    updated_lock.pop(rel_path, None)
+                retired.append(rel_path)
+            else:
+                preserved_retired.append(rel_path)
+
     if _harness_path_requested(only_prefixes, GITIGNORE_PATH):
         gitignore_path = project_dir / GITIGNORE_PATH
         managed_block = build_managed_gitignore_block()
@@ -541,21 +535,17 @@ def update_harness(
                 updated_lock[GITIGNORE_PATH] = managed_hash
             overwritten.append(GITIGNORE_PATH)
 
-    include_notes = _workspace_target_requested(only_prefixes, "notes")
     include_materials = _workspace_target_requested(only_prefixes, "materials")
     include_research = _workspace_target_requested(only_prefixes, "research")
     if dry_run:
         backfilled_workspace.extend(
             _missing_workspace_scaffold(
                 project_dir,
-                include_notes=include_notes,
                 include_materials=include_materials,
                 include_research=include_research,
             )
         )
     else:
-        if include_notes:
-            _create_notes_skeleton(project_dir, backfilled_workspace)
         if include_materials:
             _create_materials_skeleton(project_dir, backfilled_workspace)
         if include_research:
@@ -582,19 +572,6 @@ def update_harness(
             updated_lock,
             upgrade_event=upgrade_event,
         )
-
-    harnessops_message: str | None = None
-    harnessops_failed = False
-    if no_harnessops:
-        harnessops_message = "HarnessOps skipped (disabled)"
-    elif only_prefixes is not None:
-        harnessops_message = "HarnessOps skipped (--only was used)"
-    else:
-        from runops.harness.harnessops import update_project_harnessops
-
-        harnessops_result = update_project_harnessops(project_dir, dry_run=dry_run)
-        harnessops_message = harnessops_result.message
-        harnessops_failed = harnessops_result.status == "failed"
 
     # Report
     prefix = "[dry-run] " if dry_run else ""
@@ -636,16 +613,23 @@ def update_harness(
         typer.echo(f"{prefix}Backfilled {len(backfilled_workspace)} workspace item(s):")
         for p in backfilled_workspace:
             typer.echo(f"  {p}")
-    if harnessops_message is not None:
-        if harnessops_failed:
-            typer.echo(f"{prefix}Warning: {harnessops_message}", err=True)
-        else:
-            typer.echo(f"{prefix}{harnessops_message}.")
+    if retired:
+        typer.echo(f"{prefix}Retired {len(retired)} obsolete managed file(s):")
+        for p in retired:
+            typer.echo(f"  {p}")
+    if preserved_retired:
+        typer.echo(
+            f"{prefix}Preserved {len(preserved_retired)} edited obsolete file(s):",
+            err=True,
+        )
+        for p in preserved_retired:
+            typer.echo(f"  {p}", err=True)
     if (
         not overwritten
         and not written_new
         and not adopted
         and not backfilled_workspace
-        and not harnessops_failed
+        and not retired
+        and not preserved_retired
     ):
         typer.echo(f"{prefix}All harness files are up to date.")

@@ -42,7 +42,7 @@ git tag --list 'v*' --sort=-v:refname | head -5
 以下を確認する:
 - 全ての run が terminal 状態 (completed / failed / cancelled) か
 - 未コミットの変更がないか
-- 解析結果が notes/ や analysis/ に記録されているか
+- 主要解析結果が `research/results/` に昇格されているか
 
 ### 2. リリースノートを作成する
 
@@ -55,7 +55,7 @@ git log $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~30)..HEAD --on
 リリースノートに含める情報:
 - **目的**: このマイルストーンで何を達成したか
 - **実行した run**: case / survey の概要と結果
-- **主要な知見**: `.runops/insights/` や `notes/` から
+- **主要な知見**: `research/results/` や `.runops/insights/` から
 - **データの場所**: 重要な出力ファイルのパス
 - **次のステップ**: 残タスクや次のキャンペーン
 
@@ -80,7 +80,7 @@ git tag -a vX.Y -m "<リリースノート概要>"
 ### 5. lab notebook に記録する
 
 ```bash
-runo notes append "release vX.Y" "<リリースノート概要>"
+runo research append "release vX.Y" "<リリースノート概要>"
 ```
 
 ### 6. push する (ユーザー確認後)

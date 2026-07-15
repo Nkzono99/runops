@@ -11,6 +11,9 @@ refs/
 .runops/knowledge/
 .runops/environment.toml
 
+# Provisional Goal/agent work. Durable results must be promoted explicitly.
+.runops/work/
+
 # Run work directory (simulator outputs, restart, logs, status snapshots)
 # Everything under work/ is regenerable from input/, so we exclude it whole
 # rather than trying to enumerate per-simulator output filenames.

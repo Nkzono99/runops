@@ -30,7 +30,7 @@ release note / migration guide の手順へ合わせるための skill です。
 - `uvx --from runops runo migrate list`
 - release note または migration guide
 - migration item が指定する project file
-- 最近の `notes/YYYY-MM-DD.md` と relevant `research/agenda.md`
+- `research/CURRENT.md`、最近の journal segment、relevant result README
 
 ## 手順
 
@@ -95,8 +95,8 @@ guide を読みながら扱う。
 ### 4. 適用する
 
 guide の `Migration` に書かれた command / file edit だけを実行する。
-guide にない補完が必要なら、migration を止めて `{{ skill_prefix }}feedback-runops`
-候補として HarnessOps record / docs gap 下書きを残す。
+guide にない補完が必要なら migration を止め、project 固有情報を除いた docs gap の
+issue 下書きを残す。
 
 ### 5. 検証する
 
@@ -111,12 +111,12 @@ uvx --from runops runo lint
 加えて item の `Validation` に書かれた command / file check を実行する。
 解析成果物の migration では、対象の `artifacts.toml` が実在成果物を指しているか確認する。
 
-### 6. note に記録する
+### 6. journal に記録する
 
 適用 / skip / defer を lab notebook に残す:
 
 ```bash
-runo notes append "runops migration" - <<'EOF'
+runo research append "runops migration" "$(cat <<'EOF'
 Context: runops target version=<version>.
 Applied:
 - M0-0001: <what changed>
@@ -127,17 +127,18 @@ Validation:
 - runo context --json: pass/fail
 - runo lint: pass/fail/warnings
 Follow-up:
-- <feedback-runops HarnessOps feedback candidate or none>
+- <upstream issue candidate or none>
 EOF
+)"
 ```
 
-研究判断が変わった場合だけ `{{ skill_prefix }}research-agenda` も使う。
+研究判断が変わった場合だけ `research/CURRENT.md` も更新する。
 通常の runops migration は research agenda の対象ではない。
 
 ## 重要ルール
 
 - migration guide にない破壊的変更を実行しない。
-- project 固有の `notes/`, `research/`, `campaign.toml`, `cases/`, `runs/` を
+- project 固有の `research/`, `campaign.toml`, `cases/`, `runs/` を
   runops upstream の source と混ぜない。
 - runops 本体に local patch がある場合は、先に `{{ skill_prefix }}patch-runops`
   で別 checkout の branch / commit / upstream disposition を整理する。

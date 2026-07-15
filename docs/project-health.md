@@ -29,11 +29,11 @@ Research / Knowledge / Harness / Upstream の各 layer を横断して見る hea
 
 | Scope | 見るもの |
 |-------|----------|
-| `structure` | `campaign.toml`, `notes/README.md`, `research/agenda.md`, `.gitignore` managed block |
+| `structure` | `campaign.toml`, `research/CURRENT.md`, journal scaffold, `.gitignore` managed block |
 | `runs` | `manifest.toml` の読み取り、`run_id` の存在と一意性、manifest status と last Slurm state の矛盾 |
 | `provenance` | completed run の `git_commit`, executable hash, simulator version |
 | `analysis` | completed run の `analysis/summary.json`, artifact index, legacy `figures_index.json` |
-| `knowledge` | `research/agenda.md` の template 状態、Next Actions の evidence path、`.runops/facts.toml` の source |
+| `knowledge` | research budget/layout、artifact 規則、`.runops/facts.toml` の source |
 | `plugins` | project / simulator / site 由来の推奨 Codex plugin metadata と委譲 role index。install 済み状態は見ない |
 
 `--scope` は comma-separated です。
@@ -63,8 +63,8 @@ runo migrate apply M0-0001 --dry-run
 runo migrate apply M0-0001
 ```
 
-CLI で修復できない finding は、手作業で直すか、汎用化できそうなら `feedback-runops`
-で HarnessOps record / upstream 下書きにします。
+CLI で修復できない finding は手作業で直すか、project 固有情報を除いて upstream
+issue の下書きにします。
 
 ## Agent Workflow
 
@@ -73,4 +73,4 @@ Agent が project に入ったときの標準動線:
 1. `runo context --json` で現在地を把握する。
 2. 必要なら `runo lint --scope structure,analysis,knowledge,plugins` で読む入口、成果物索引、推奨 plugin metadata を確認する。
 3. migration finding があれば `runo migrate apply <id> --dry-run` で確認する。
-4. 直したこと、skip したこと、保留したことを `notes/YYYY-MM-DD.md` に残す。
+4. 直したこと、skip したこと、保留したことを `runo research append` で残す。

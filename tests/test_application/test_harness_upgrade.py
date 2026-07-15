@@ -24,7 +24,6 @@ def _request(
     target: str | None = "0.9.0",
     allow_major: bool = False,
     force: bool = False,
-    no_harnessops: bool = False,
 ) -> HarnessUpgradeRequest:
     return HarnessUpgradeRequest(
         project_dir=tmp_path,
@@ -32,7 +31,6 @@ def _request(
         target=target,
         allow_major=allow_major,
         force=force,
-        no_harnessops=no_harnessops,
     )
 
 
@@ -42,7 +40,6 @@ def test_plan_resolves_latest_and_builds_exact_uvx_commands(tmp_path: Path) -> N
             tmp_path,
             target="latest",
             force=True,
-            no_harnessops=True,
         ),
         version_source=lambda: ("0.8.2", "0.9.0", "0.10.1", "0.11.0rc1"),
         applied_version_source=lambda _path: "0.8.0",
@@ -67,7 +64,6 @@ def test_plan_resolves_latest_and_builds_exact_uvx_commands(tmp_path: Path) -> N
         "--from-version",
         "0.8.0",
         "--force",
-        "--no-harnessops",
     )
     assert plan.steps[-1].command[2] == "runops==0.10.1"
 

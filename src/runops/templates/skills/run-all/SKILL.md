@@ -3,19 +3,18 @@ name: run-all
 description: Generate and submit all runs from a survey. Use when ready to launch a parameter sweep.
 ---
 
-# Pilot gate 付きでサーベイを生成・投入する
+# Pilot 確認付きでサーベイを生成・投入する
 
 ## 手順
 
-1. Active Experiment Portfolio と proposal path、pilot matrix、cost ceiling を確認
+1. `research/CURRENT.md`、対応する result README、pilot matrix、cost ceiling を確認
 2. `runo runs sweep` で run 生成し、`runo runs list` で exact pilot run_id を確認
-3. 対応する review に `Decision: EXPAND` がなければ、明示承認後に pilot run だけを
+3. pilot result の人による確認がなければ、明示承認後に pilot run だけを
    `runo runs submit <RUN>` で投入して停止する
-4. pilot 完了後は `{{ skill_prefix }}review-pilot` で
-   `research/reviews/<date>-<topic>.md` を作る
-5. review の proposal / run_id / criteria、文字列 `Decision: EXPAND`、portfolio の
-   review path と decision が一致する場合だけ full submit plan を作る
-   - `survey.toml [research]` と `research/experiments.toml` の machine gate も一致必須
+4. pilot 完了後は `{{ skill_prefix }}research-workspace` で、対応する result README に
+   evidence と解釈を、`research/CURRENT.md` に現在判断を残す
+5. pilot run_id、判定基準、result evidence、CURRENT の判断が一致する場合だけ
+   full submit plan を作る
 6. `runo runs submit --dry-run --all` で投入対象と skip を確認する
 7. remaining run 数、queue、資源量、cost ceiling、実行 command を報告して明示確認を取る
 8. `runo runs submit --all` で full submit する
@@ -24,10 +23,10 @@ description: Generate and submit all runs from a survey. Use when ready to launc
 runo runs sweep $ARGUMENTS
 runo runs list $ARGUMENTS
 cd $ARGUMENTS
-# review がない場合: proposal に列挙した pilot だけを投入して停止
+# human-reviewed pilot result がない場合は pilot だけを投入して停止
 runo runs submit <pilot-run-id> -qn <queue>
 
-# review に Decision: EXPAND がある場合だけ full submit plan へ進む
+# CURRENT に full survey の明示判断がある場合だけ plan へ進む
 runo runs submit --dry-run --all -qn <queue>
 # → run 数、skip、queue、資源量を報告してから投入
 runo runs submit --all -qn <queue>
@@ -38,14 +37,14 @@ runo runs submit --all --yes -qn <queue>
 ## 注意
 
 - `runs submit --all` は破壊的操作ではないが、HPC 資源・queue・quota に影響する高コスト操作
-- `--yes` は CLI prompt を省略するだけで、pilot review gate を省略しない
-- `--dry-run` も machine gate を通す。gate failure を個別 submit 分解で迂回しない
-- review が `REVISE`, `STOP`, `WAIT`、または欠落なら full submit を行わない
+- `--yes` は CLI prompt を省略するだけで、pilot の人による確認を省略しない
+- pilot evidence や判断が不足する場合は個別 submit 分解で迂回しない
+- CURRENT の判断が `REVISE`, `STOP`, `WAIT`、または欠落なら full submit を行わない
 - 初回の大規模 survey と EXPAND 後の full submit は承認を取る
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。
   止まった理由と予定していた command をユーザーへ返す
 
-## `{{ skill_prefix }}note` で残すべきこと
+## `{{ skill_prefix }}research-workspace` で残すべきこと
 
 投入直前と直後に lab notebook に記録する (後でジョブが化けたとき・物理が
 おかしかったとき、何を投入したか辿れるようにする):
@@ -56,10 +55,11 @@ runo runs submit --all --yes -qn <queue>
 - 投入前のスナップショット commit hash
 
 ```bash
-runo notes append "Series A 全投入" - <<'EOF'
+runo research append "Series A 全投入" "$(cat <<'EOF'
 runs/series_A_flat_plate/ から 10 run, gr20001a へ投入.
 job_id: 4567890..4567899. snapshot commit: 53a7e62.
 smoke は R20260330-0001/-0010/-0019 (両端と中央).
 完走見込み: 約 8 h × 10 run / 4 並列 = 20 h.
 EOF
+)"
 ```

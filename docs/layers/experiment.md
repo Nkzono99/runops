@@ -35,7 +35,7 @@ campaign.toml
 - run ごとの実行事実、provenance、state は [Execution Kernel](execution-kernel.md) の
   `manifest.toml` に置く。
 - run の結果から作る summary / figure は [Analysis Layer](analysis.md) に置く。
-- 現在の高レベルな判断は [Research Layer](research.md) の `research/agenda.md` に置く。
+- 現在の高レベルな判断は [Research Layer](research.md) の `research/CURRENT.md` に置く。
 
 ## 標準フロー
 
@@ -65,7 +65,7 @@ submit、rerun、delete、purge などの実行ライフサイクル操作の ga
 - `input/`, `submit/job.sh`, `status/` を直接作らない。これらは Execution Kernel の生成物。
 - run-local な場当たり修正を正本にしない。再利用価値があれば `case.toml` または
   `survey.toml` に戻す。
-- raw output を `notes/`, `materials/`, `research/` にコピーして正本化しない。
+- raw output を `materials/` や `research/` にコピーして正本化しない。
 
 ## 他レイヤとの関係
 

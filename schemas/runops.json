@@ -105,14 +105,21 @@
         }
       }
     },
-    "harness": {
+    "research": {
       "type": "object",
-      "description": "AI harness generation options",
+      "description": "Quantity-bounded research workspace options",
       "properties": {
-        "upstream_feedback": {
-          "type": "boolean",
-          "default": true,
-          "description": "Whether generated agent docs include upstream feedback guidance"
+        "workspace": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "current_chars": {"type": "integer", "minimum": 1, "default": 20000},
+            "journal_segment_chars": {"type": "integer", "minimum": 1, "default": 64000},
+            "result_readme_chars": {"type": "integer", "minimum": 1, "default": 30000},
+            "active_results": {"type": "integer", "minimum": 1, "default": 8},
+            "result_artifact_files": {"type": "integer", "minimum": 1, "default": 50},
+            "result_artifact_bytes": {"type": "integer", "minimum": 1, "default": 209715200}
+          }
         }
       },
       "additionalProperties": true

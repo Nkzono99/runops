@@ -79,11 +79,11 @@ class TestNewComparison:
             )
 
         assert result.exit_code == 0, result.output
-        comparison_dir = tmp_path / "analysis" / "cross_run" / "landau-model-comparison"
+        comparison_dir = tmp_path / "research/results/R0001-landau-model-comparison"
         assert comparison_dir.is_dir()
-        assert (comparison_dir / "scripts" / ".gitkeep").is_file()
-        assert (comparison_dir / "data" / ".gitkeep").is_file()
-        assert (comparison_dir / "figures" / ".gitkeep").is_file()
+        assert (comparison_dir / "artifacts/scripts").is_dir()
+        assert (comparison_dir / "artifacts/data").is_dir()
+        assert (comparison_dir / "artifacts/figures").is_dir()
         with open(comparison_dir / "manifest.toml", "rb") as f:
             manifest = tomllib.load(f)
         assert manifest["comparison"]["id"] == "landau-model-comparison"
@@ -93,8 +93,11 @@ class TestNewComparison:
 
     def test_new_comparison_reports_duplicate_workspace(self, tmp_path: Path) -> None:
         _write_project_file(tmp_path)
-        comparison_dir = tmp_path / "analysis" / "cross_run" / "existing"
+        comparison_dir = tmp_path / "research/results/R0001-existing"
         comparison_dir.mkdir(parents=True)
+        (comparison_dir / "manifest.toml").write_text(
+            '[comparison]\nid = "existing"\n', encoding="utf-8"
+        )
 
         with patch("runops.cli.analyze.Path.cwd", return_value=tmp_path):
             result = runner.invoke(

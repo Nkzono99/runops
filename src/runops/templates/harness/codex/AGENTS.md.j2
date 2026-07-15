@@ -7,7 +7,7 @@ Codex は `AGENTS.md`、ディレクトリ別 `AGENTS.md`、`.agents/skills/`、
 
 {% include "harness/shared/partials/agent-body.md.j2" %}
 
-{% if include_cookbook_rule or include_upstream_feedback -%}
+{% if include_cookbook_rule -%}
 ## Codex 補助ルール
 
 Claude Code では一部の補助ルールを `.claude/rules/` に分けている。
@@ -17,9 +17,5 @@ Codex はそのディレクトリを自動読み込みしないため、Codex �
 {% if include_cookbook_rule -%}
 {% set rule_heading = "###" -%}
 {% include "harness/shared/rules/cookbook.md.j2" %}
-{% endif -%}
-{% if include_upstream_feedback -%}
-{% set rule_heading = "###" -%}
-{% include "harness/shared/rules/upstream-feedback.md.j2" %}
 {% endif -%}
 {% endif -%}

@@ -57,9 +57,6 @@ _TOOL_ATTRS = {
     "runops.analysis.artifacts": "analysis_artifacts",
     "runops.survey.summary": "survey_summary",
     "runops.analysis.plot_columns": "analysis_plot_columns",
-    "runops.paper.requests.list": "paper_requests_list",
-    "runops.paper.request.draft": "paper_request_draft",
-    "runops.paper.request.plan": "paper_request_plan",
     "runops.run.list": "run_list",
     "runops.run.inspect": "run_inspect",
     "runops.run.logs": "run_logs",
@@ -111,7 +108,6 @@ def test_tools_facade_contains_only_explicit_reexports() -> None:
 def test_capability_modules_own_facade_callables() -> None:
     from runops.mcp._tools import (
         analysis,
-        paper_requests,
         project,
         provider,
         publication,
@@ -130,11 +126,6 @@ def test_capability_modules_own_facade_callables() -> None:
         ),
         publication: ("publication_exports_list", "publication_export_inspect"),
         analysis: ("analysis_artifacts", "survey_summary", "analysis_plot_columns"),
-        paper_requests: (
-            "paper_requests_list",
-            "paper_request_draft",
-            "paper_request_plan",
-        ),
         runs: ("run_list", "run_inspect", "run_logs"),
         scheduler: ("slurm_queue", "slurm_job_inspect", "job_plan_submit"),
     }
@@ -243,59 +234,6 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         "stub": "runops.analysis.plot_columns",
         "kwargs": {"survey": "runs/survey-a", "project_root": "root"},
     }
-    assert fake.tools["runops.paper.requests.list"]["callback"](
-        project_root="root",
-        paper_id="draft-a",
-        status_filter="open",
-        limit=2,
-    ) == {
-        "stub": "runops.paper.requests.list",
-        "kwargs": {
-            "project_root": "root",
-            "paper_id": "draft-a",
-            "status_filter": "open",
-            "limit": 2,
-        },
-    }
-    assert fake.tools["runops.paper.request.draft"]["callback"](
-        project_root="root",
-        request_id="REQ-001",
-        request_type="analysis_request",
-        title="Add comparison",
-        paper_context="Results",
-        desired_artifact="table",
-        source_link="refs/links.toml#paper.draft-a",
-        paper_id="draft-a",
-        priority="high",
-        status="open",
-        related_runs=["R20260512-0001"],
-        related_surveys=["runs/angle_scan"],
-        human_gate=False,
-    ) == {
-        "stub": "runops.paper.request.draft",
-        "kwargs": {
-            "project_root": "root",
-            "request_id": "REQ-001",
-            "request_type": "analysis_request",
-            "title": "Add comparison",
-            "paper_context": "Results",
-            "desired_artifact": "table",
-            "source_link": "refs/links.toml#paper.draft-a",
-            "paper_id": "draft-a",
-            "priority": "high",
-            "status": "open",
-            "related_runs": ["R20260512-0001"],
-            "related_surveys": ["runs/angle_scan"],
-            "human_gate": False,
-        },
-    }
-    assert fake.tools["runops.paper.request.plan"]["callback"](
-        "REQ-001",
-        project_root="root",
-    ) == {
-        "stub": "runops.paper.request.plan",
-        "kwargs": {"request_id": "REQ-001", "project_root": "root"},
-    }
     assert fake.tools["runops.run.list"]["callback"](
         project_root="root",
         status_filter="created",
@@ -364,9 +302,6 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         "runops.health",
         "runops.analysis.artifacts",
         "runops.analysis.plot_columns",
-        "runops.paper.request.draft",
-        "runops.paper.request.plan",
-        "runops.paper.requests.list",
         "runops.project.list",
         "runops.project.plugins",
         "runops.publication.export.inspect",

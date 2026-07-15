@@ -10,10 +10,6 @@ from runops.harness import (
 )
 
 
-def _bare_hops_command_lines(content: str) -> list[str]:
-    return [line for line in content.splitlines() if line.lstrip().startswith("hops ")]
-
-
 def test_build_codex_config_keeps_repo_stable_defaults() -> None:
     """Config echoes the project name and avoids runtime-sensitive policy."""
     content = build_codex_config("demo")
@@ -102,9 +98,9 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".agents/skills/new-case/SKILL.md" in bundle.files
     assert ".agents/skills/setup-runops/SKILL.md" in bundle.files
     assert ".agents/skills/setup-plugins/SKILL.md" in bundle.files
-    assert ".agents/skills/research-agenda/SKILL.md" in bundle.files
-    assert ".agents/skills/research-director/SKILL.md" in bundle.files
-    assert ".agents/skills/review-pilot/SKILL.md" in bundle.files
+    assert ".agents/skills/research-workspace/SKILL.md" in bundle.files
+    assert ".agents/skills/research-agenda/SKILL.md" not in bundle.files
+    assert ".agents/skills/feedback-runops/SKILL.md" not in bundle.files
     assert ".agents/skills/summarize-script/SKILL.md" in bundle.files
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
     assert ".agents/skills/update-runops/SKILL.md" in bundle.files
@@ -128,9 +124,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "MPIEMSES3D Context" in agents
     assert "emout Context" in agents
     assert "委譲役割: input-review, parameter-design" in agents
-    assert "$research-agenda" in agents
-    assert "$research-director" in agents
-    assert "$review-pilot" in agents
+    assert "$research-workspace" in agents
     assert "$summarize-script" in agents
     assert "$patch-runops" in agents
     assert "$update-runops" in agents
@@ -138,36 +132,15 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "$python-package-refactor" in agents
     assert "$setup-runops" in agents
     assert "$setup-plugins" in agents
-    assert "active question、current decision、paused/killed" in agents
-    # Skills share the same frontmatter, but use each agent's native
-    # invocation syntax in the body.
-    claude_note = bundle.files[".claude/skills/note/SKILL.md"]
-    codex_note = bundle.files[".agents/skills/note/SKILL.md"]
-    assert "name: note" in claude_note
-    assert "name: note" in codex_note
-    assert "`/note`" in claude_note
-    assert "`/learn`" in claude_note
-    assert "`$note`" in codex_note
-    assert "`$learn`" in codex_note
-    assert "`/note`" not in codex_note
-    assert "{{ skill_prefix }}" not in codex_note
-    assert "Model name must not stand alone" in codex_note
-    assert "Figures are first-class note content" in codex_note
-    assert "Do not replace image embeds with plain Markdown links" in codex_note
-    assert "notes/reports/README.md" in codex_note
-    assert "Quality gate before append" in codex_note
-    codex_research = bundle.files[".agents/skills/research-agenda/SKILL.md"]
-    assert "agenda.md is not an artifact ledger" in codex_research
-    assert (
-        "Do not put chronological notes or artifact inventories back into agenda.md"
-        in codex_research
-    )
-    assert "notes/reports/README.md" in codex_research
-    assert "analysis/cross_run/<comparison_id>/" in codex_research
+    codex_research = bundle.files[".agents/skills/research-workspace/SKILL.md"]
+    assert "runo research status" in codex_research
+    assert "runo research append" in codex_research
+    assert "artifacts/` に Markdown を作らない" in codex_research
     codex_run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
     assert "runo runs submit --dry-run --all" in codex_run_all
     assert "runo runs submit --all --dry-run" not in codex_run_all
-    assert "Decision: EXPAND" in codex_run_all
+    assert "research/CURRENT.md" in codex_run_all
+    assert "pilot result" in codex_run_all
     assert "full submit" in codex_run_all
     assert "pilot" in codex_run_all
     codex_create_run = bundle.files[".agents/skills/create-run/SKILL.md"]
@@ -175,36 +148,18 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "runo runs submit --all -qn" not in codex_create_run
     codex_reference = bundle.files[".agents/skills/runops-reference/SKILL.md"]
     assert "直接実行せず `$run-all`" in codex_reference
-    codex_director = bundle.files[".agents/skills/research-director/SKILL.md"]
-    assert "research/proposals/<date>-<topic>.md" in codex_director
-    assert "Active Experiment Portfolio" in codex_director
-    assert "falsification" in codex_director
-    codex_review_pilot = bundle.files[".agents/skills/review-pilot/SKILL.md"]
-    assert "EXPAND" in codex_review_pilot
-    assert "REVISE" in codex_review_pilot
-    assert "STOP" in codex_review_pilot
-    assert "WAIT" in codex_review_pilot
-    assert "research/reviews/<date>-<topic>.md" in codex_review_pilot
     codex_refactor = bundle.files[".agents/skills/python-package-refactor/SKILL.md"]
     claude_refactor = bundle.files[".claude/skills/python-package-refactor/SKILL.md"]
     assert ".agents/skills/python-package-refactor/scripts/" in codex_refactor
     assert ".claude/skills/python-package-refactor/scripts/" in claude_refactor
     assert "{{ skills_dir }}" not in codex_refactor
     codex_summarize = bundle.files[".agents/skills/summarize-script/SKILL.md"]
-    assert "`$note`" in codex_summarize
     assert "cases/<simulator>/<case>/summarize.py" in codex_summarize
-    assert "analysis/cross_run/<comparison_id>/" in codex_summarize
-    assert "notes/reports/<topic>.md" in codex_summarize
-    assert "research/agenda.md" in codex_summarize
     assert "{{ skill_prefix }}" not in codex_summarize
     codex_migrate = bundle.files[".agents/skills/migrate-runops/SKILL.md"]
     assert "`$update-runops`" in codex_migrate
-    assert "`$feedback-runops`" in codex_migrate
     assert "runo migrate list" in codex_migrate
     assert "{{ skill_prefix }}" not in codex_migrate
-    codex_feedback = bundle.files[".agents/skills/feedback-runops/SKILL.md"]
-    assert "hops add-failure" in codex_feedback
-    assert "hops feedback export --target runops --sanitize" in codex_feedback
     codex_setup = bundle.files[".agents/skills/setup-runops/SKILL.md"]
     codex_setup_plugins = bundle.files[".agents/skills/setup-plugins/SKILL.md"]
     claude_setup = bundle.files[".claude/skills/setup-runops/SKILL.md"]
@@ -227,39 +182,6 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert 'git commit -m "chore: scaffold runops project"' in claude_setup
     assert "{{ skill_prefix }}" not in codex_setup
     assert "{{ skill_prefix }}" not in codex_setup_plugins
-
-
-def test_generated_feedback_guidance_uses_portable_hops_invocation() -> None:
-    """Generated feedback guidance must not assume hops is on PATH."""
-    bundle = build_harness_bundle(
-        "demo",
-        ["emses"],
-        knowledge_imports_path=".runops/knowledge/enabled/imports.md",
-    )
-
-    codex_feedback = bundle.files[".agents/skills/feedback-runops/SKILL.md"]
-    assert "uvx --from harnessops hops doctor --check-overlay" in codex_feedback
-    assert (
-        "uvx --from harnessops hops feedback export --target runops --sanitize"
-        in codex_feedback
-    )
-    assert _bare_hops_command_lines(codex_feedback) == []
-
-    agents = bundle.files["AGENTS.md"]
-    assert "uvx --from harnessops hops doctor --check-overlay" in agents
-    assert (
-        "uvx --from harnessops hops feedback export --target runops --sanitize"
-        in agents
-    )
-    assert _bare_hops_command_lines(agents) == []
-
-    claude_rule = bundle.files[".claude/rules/upstream-feedback.md"]
-    assert "uvx --from harnessops hops doctor --check-overlay" in claude_rule
-    assert (
-        "uvx --from harnessops hops feedback export --target runops --sanitize"
-        in claude_rule
-    )
-    assert _bare_hops_command_lines(claude_rule) == []
 
 
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:
@@ -311,33 +233,16 @@ def test_agents_md_does_not_use_import_syntax() -> None:
     assert "/new-case" not in agents
 
 
-def test_agents_md_inlines_default_shared_codex_rules() -> None:
-    """Codex gets upstream guidance through AGENTS.md by default."""
-    bundle = build_harness_bundle(
-        "demo",
-        ["emses"],
-        upstream_feedback=True,
-    )
-    agents = bundle.files["AGENTS.md"]
-    assert "## Codex 補助ルール" in agents
-    assert "### runops へのフィードバック" in agents
-    assert "### Simulator Cookbook ルール" not in agents
-    # The Claude rule frontmatter must not be embedded into AGENTS.md.
-    assert "globs: refs/**/cookbook/**" not in agents
-
-
 def test_agents_md_inlines_reference_cookbook_when_enabled() -> None:
     """Codex gets cookbook guidance when local refs mirrors are enabled."""
     bundle = build_harness_bundle(
         "demo",
         ["emses"],
-        upstream_feedback=True,
         include_reference_repos=True,
     )
     agents = bundle.files["AGENTS.md"]
     assert "## Codex 補助ルール" in agents
     assert "### Simulator Cookbook ルール" in agents
-    assert "### runops へのフィードバック" in agents
     # The Claude rule frontmatter must not be embedded into AGENTS.md.
     assert "globs: refs/**/cookbook/**" not in agents
 
@@ -347,7 +252,6 @@ def test_agents_md_omits_empty_codex_rules_section() -> None:
     bundle = build_harness_bundle(
         "demo",
         [],
-        upstream_feedback=False,
     )
     agents = bundle.files["AGENTS.md"]
     assert "## Codex 補助ルール" not in agents

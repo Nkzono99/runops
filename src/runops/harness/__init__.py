@@ -14,7 +14,6 @@ from runops.harness.builder import (
     is_harness_path,
     load_harness_lock,
     load_harness_upgrade_chain,
-    read_upstream_feedback_setting,
     replace_managed_gitignore_block,
     save_harness_lock,
 )
@@ -43,7 +42,6 @@ __all__ = [
     "is_harness_path",
     "load_harness_lock",
     "load_harness_upgrade_chain",
-    "read_upstream_feedback_setting",
     "replace_managed_gitignore_block",
     "save_harness_lock",
 ]

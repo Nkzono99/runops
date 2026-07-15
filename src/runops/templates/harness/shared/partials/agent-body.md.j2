@@ -16,7 +16,7 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 1. `uvx --from runops runo context --json` で project の現在地を把握する
 2. 必要なら `uvx --from runops runo lint --scope structure,analysis,knowledge,plugins` で読み入口、成果物索引、推奨 plugin metadata を確認する
 3. `campaign.toml` を読む
-4. `research/agenda.md` があれば読む
+4. `research/CURRENT.md` と `runo research status` で現在地と量を確認する
 5. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
 6. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
 7. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
@@ -41,12 +41,8 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 | `{{ skill_prefix }}debug-failed` | 失敗 run を診断する |
 | `{{ skill_prefix }}cleanup` | run のアーカイブ・整理 |
 | `{{ skill_prefix }}learn` | 知見を記録する (curated, 名前付き) |
-| `{{ skill_prefix }}note` | lab notebook に時系列エントリを追記する |
-| `{{ skill_prefix }}research-agenda` | `research/agenda.md` の現在判断を更新する |
-| `{{ skill_prefix }}research-director` | 次の bounded experiment と pilot proposal を決める |
-| `{{ skill_prefix }}review-pilot` | pilot 結果を review し EXPAND / REVISE / STOP / WAIT を決める |
-| `{{ skill_prefix }}feedback-runops` | runops 本体へのバグ報告・機能要望を HarnessOps 経由で記録し、issue 下書きを作る |
-| `{{ skill_prefix }}patch-runops` | 必要時に別 checkout で runops 本体を修正し、HarnessOps feedback/PR/local-only を判定 |
+| `{{ skill_prefix }}research-workspace` | bounded journal、current state、result を整理する |
+| `{{ skill_prefix }}patch-runops` | 必要時に別 checkout で runops 本体を修正し、PR/local-only を判定する |
 | `{{ skill_prefix }}update-runops` | uvx で runops tool と project harness を更新し、migration guide を確認する |
 | `{{ skill_prefix }}migrate-runops` | `docs/migrations/` に従って project 側状態を移行する |
 | `{{ skill_prefix }}python-package-refactor` | Python package の構造リファクタリングを API 保持と検証付きで進める |
@@ -69,9 +65,8 @@ campaign 設計、case / survey 編集、run 生成、投入、監視、解析�
 - `runo runs purge-work` / `runo runs delete` (実ファイル削除)
 - 実行バイナリ、モジュール、launcher の変更
 
-production / large survey の full submit は、proposal に定義した pilot と
-`research/reviews/` の `Decision: EXPAND` を確認してから行う。`--yes` はこの research
-gate を省略しない。
+production / large survey の full submit は、対応する result README に記録した pilot と
+`Decision: EXPAND` を確認してから行う。`--yes` はこの research gate を省略しない。
 
 ### 報告してから進めるもの
 - `runo runs cancel` (実行中の job を停止するが、追加確認プロンプトは不要)
@@ -108,16 +103,17 @@ gate を省略しない。
 
 | 種類 | 性質 | 書き先 | スキル |
 |---|---|---|---|
-| 再開可能な時系列の実験ノート (準備の意思決定, 試したこと, 観察, 仮説, TODO) | append-only, chronological | `notes/YYYY-MM-DD.md`, `notes/history/YYYY/YYYY-MM-DD.md` | `{{ skill_prefix }}note`, `runo notes archive` |
-| 現在の高レベルな研究判断 | mutable decision ledger | `research/agenda.md` | `{{ skill_prefix }}research-agenda` |
+| 再開可能な時系列の実験 journal | append-only, size-bounded | `research/journal/active.md`, `research/journal/archive/JNNNN.md` | `runo research append`, `runo research rotate` |
+| 現在の高レベルな研究判断 | mutable, size-bounded | `research/CURRENT.md` | 直接編集 |
+| 残す価値のある解析結果 | one narrative per result | `research/results/RNNNN-*/README.md` と `artifacts/` | `runo research new-result` |
 | 論文・manual・図・snippet | visible source material | `materials/` | 直接編集 |
 | 機械的に再利用する知見 | advanced, structured | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |
 
-- 「結果をまとめて」「知見を記録して」等の整理済情報はまず **`notes/reports/` に**
+- 「結果をまとめて」「知見を記録して」等の整理済情報は **`research/results/` に**
 - 「今、どの問いを active にしているか」「何を pause / kill したか」
-  「次に何をなぜ行うか」は **`research/agenda.md` に**
+  「次に何をなぜ行うか」は **`research/CURRENT.md` に**
 - 機械的に再利用したい atomic な知見だけ **`{{ skill_prefix }}learn` で advanced knowledge レイヤに**
-- 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`{{ skill_prefix }}note` で lab notebook に**。
+- 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`runo research append` で journal に**。
   短くてよいが、`Context:` と `Evidence:` を残し、model 名だけ・figure path だけで
   前提を推測させない。
 - 参照 PDF / manual / snippet は **`materials/` に**
@@ -125,9 +121,9 @@ gate を省略しない。
 - 共有 source 由来の candidate fact を採用するときは
   `runo knowledge promote-fact` で local fact に昇格する
 
-### `{{ skill_prefix }}note` は準備フェーズから使う
+### journal は準備フェーズから使う
 
-`{{ skill_prefix }}note` は解析時だけでなく **準備フェーズ (campaign 設計, case / survey 設計,
+`runo research append` は解析時だけでなく **準備フェーズ (campaign 設計, case / survey 設計,
 パラメータ選定, 投入計画) の意思決定もここに残す**。
 意思決定の理由・トレードオフ・却下した代替案・不安要素を後から読み返せる
 形にしておくと、再現性と方針修正の根拠が手に入る。具体例:
@@ -142,29 +138,26 @@ gate を省略しない。
 `Artifacts:` (figure / script / data path) を添える。大量の図は contact sheet
 または代表図だけを埋め込み、全 figure path は `Artifacts:` に列挙する。
 
-設計フェーズの skill (`{{ skill_prefix }}setup-runops`, `{{ skill_prefix }}setup-campaign`,
-`{{ skill_prefix }}new-case`, `{{ skill_prefix }}create-run`, `{{ skill_prefix }}survey-design`,
-`{{ skill_prefix }}run-all`) は **完了時に `{{ skill_prefix }}note` で経緯を残してから次に進む**。
+設計フェーズの skill は **完了時に `runo research append` で経緯を残してから次に進む**。
 その作業によって active question、current decision、paused/killed、次の行動が
-変わった場合は、続けて `{{ skill_prefix }}research-agenda` で `research/agenda.md`
-も更新する。
+変わった場合は、続けて `research/CURRENT.md` も更新する。
 
-### `{{ skill_prefix }}learn` は `{{ skill_prefix }}note` を素材として使う
+### `{{ skill_prefix }}learn` は research workspace を素材として使う
 
-`{{ skill_prefix }}note` と `materials/` は raw な原料、`{{ skill_prefix }}learn`
+`research/journal/` と `materials/` は raw な原料、`{{ skill_prefix }}learn`
 は advanced / structured な最終産物。つまり **`{{ skill_prefix }}learn` を呼ぶときは、
-まず `notes/`, `materials/`, `research/` を読んで素材を集める**:
+まず `research/`, `materials/` を読んで素材を集める**:
 
-1. `runo notes list` で active / history の lab notebook の日付を確認
-2. 当該テーマに関連する日次 notebook を `runo notes show` で読む
-3. `research/agenda.md` で現在の見立てと active question を確認する
+1. `runo research status` で workspace の量と active result を確認
+2. 当該テーマに関連する journal segment と result README を読む
+3. `research/CURRENT.md` で現在の見立てと active question を確認する
 4. 関連する `materials/index.toml` / `materials/` の資料を確認する
 5. 散らばっている観察・仮説・反例を一つの insight にまとめる
 6. 必要な場合だけ `runo knowledge save` / `add-fact` で永続化する
 7. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
 
-lab notebook の entry が積み上がってストーリーになったら、
-`notes/reports/<topic>.md` に refined version を書き起こし、必要なら
+journal の entry が積み上がってストーリーになったら、
+`runo research new-result <topic>` で result を作り README に書き起こし、必要なら
 `{{ skill_prefix }}learn` で `.runops/insights/` / `facts.toml` に昇格する。
 
 ## サイト固有情報

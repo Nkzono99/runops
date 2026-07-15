@@ -7,11 +7,6 @@ from runops.mcp._tools.analysis import (
     analysis_plot_columns,
     survey_summary,
 )
-from runops.mcp._tools.paper_requests import (
-    paper_request_draft,
-    paper_request_plan,
-    paper_requests_list,
-)
 from runops.mcp._tools.project import (
     project_doctor,
     project_inspect,
@@ -37,9 +32,6 @@ __all__ = [
     "capabilities",
     "health",
     "job_plan_submit",
-    "paper_request_draft",
-    "paper_request_plan",
-    "paper_requests_list",
     "project_doctor",
     "project_inspect",
     "project_list",

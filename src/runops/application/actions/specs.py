@@ -71,22 +71,6 @@ class ActionSpec:
 
 
 ACTION_SPECS: dict[str, ActionSpec] = {
-    "create_experiment": ActionSpec(
-        name="create_experiment",
-        description="Create a typed experiment record and proposal attachment.",
-        required_params=("project_root", "experiment_id", "spec_path"),
-        optional_params=("dry_run",),
-        preconditions=(
-            "project loaded",
-            "experiment ledger schema == 2",
-            "experiment id unused",
-        ),
-        state_change="-> experiment proposed",
-        risk_level="low",
-        cost_class="low",
-        cli_commands=(("experiment", "new"),),
-        mcp_tools=("runops.experiment.create",),
-    ),
     "create_run": ActionSpec(
         name="create_run",
         description="Create a new run directory from a case.",

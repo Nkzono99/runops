@@ -54,9 +54,6 @@ def test_command_tree_is_stable_for_primary_and_alias_apps() -> None:
         "demo import-codex-session",
         "demo render-replay",
         "doctor",
-        "experiment check",
-        "experiment new",
-        "experiment show",
         "init",
         "knowledge add-fact",
         "knowledge facts",
@@ -81,11 +78,15 @@ def test_command_tree_is_stable_for_primary_and_alias_apps() -> None:
         "migrate apply",
         "migrate list",
         "migrate show",
-        "notes append",
-        "notes archive",
-        "notes list",
-        "notes show",
         "plugins",
+        "research append",
+        "research archive",
+        "research check",
+        "research migrate-legacy",
+        "research new-result",
+        "research restore",
+        "research rotate",
+        "research status",
         "runs archive",
         "runs cancel",
         "runs clone",
@@ -132,6 +133,7 @@ def test_help_shows_primary_commands() -> None:
         "context",
         "config",
         "knowledge",
+        "research",
         "mcp",
         "case",
         "runs",
@@ -199,6 +201,15 @@ def test_analyze_help_shows_grouped_analysis_commands() -> None:
     assert result.exit_code == 0
     for cmd in ["summarize", "collect", "plot", "export", "new-comparison"]:
         assert cmd in result.output
+
+
+def test_research_help_replaces_notes_group() -> None:
+    result = runner.invoke(app, ["research", "--help"])
+    assert result.exit_code == 0
+
+    removed = runner.invoke(app, ["notes", "--help"])
+    assert removed.exit_code != 0
+    assert "No such command" in removed.output
 
 
 def test_runs_submit_help_is_available() -> None:

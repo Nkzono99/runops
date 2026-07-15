@@ -278,7 +278,7 @@ def new_comparison(
         "",
         "--id",
         help=(
-            "Stable comparison id under analysis/cross_run/. "
+            "Stable comparison id recorded in a research result. "
             "Defaults to a slugified name."
         ),
     ),
@@ -289,7 +289,7 @@ def new_comparison(
         help="Run, survey, or path source to record in manifest.toml.",
     ),
 ) -> None:
-    """Create a cross-run comparison workspace under analysis/cross_run/."""
+    """Create a durable cross-run result under research/results/."""
     try:
         project_root = find_project_root(Path.cwd())
         result = create_comparison_workspace(

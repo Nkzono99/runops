@@ -104,8 +104,8 @@ runo runs submit -qn <partition>
 ```
 
 survey 全体の投入はここから直接行わず、必ず `{{ skill_prefix }}run-all` へ委譲する。
-production / large survey は proposal の pilot と review の `Decision: EXPAND` が揃うまで
-full submit しない。`--yes` はこの gate を省略しない。
+production / large survey は pilot result と `research/CURRENT.md` の明示判断が揃うまで
+full submit しない。`--yes` はこの確認を省略しない。
 
 ## 注意
 
@@ -115,9 +115,9 @@ full submit しない。`--yes` はこの gate を省略しない。
 - survey の run 数にかかわらず bulk submit は `{{ skill_prefix }}run-all` を使う
 - `runo runs submit --dry-run --all` で投入前に確認できる
 
-## `{{ skill_prefix }}note` で残すべきこと
+## `{{ skill_prefix }}research-workspace` で残すべきこと
 
-run / survey 生成の前後で lab notebook に記録する:
+run / survey 生成の前後で bounded journal に記録する:
 
 - 何 run 生成したか (件数, 内訳, 命名規則)
 - 想定総コスト (core-h, walltime)
@@ -126,10 +126,11 @@ run / survey 生成の前後で lab notebook に記録する:
 - 投入前の commit hash (`git rev-parse HEAD`)
 
 ```bash
-runo notes append "Series A sweep 生成" - <<'EOF'
+runo research append "Series A sweep 生成" "$(cat <<'EOF'
 runs/series_A_flat_plate/ に 10 run.
 base case: cases/emses/flat_plate, sweep 軸: ions[0].vti = 1..19 eV.
 display_name: vti{vti}.
 total core-h ≈ 64k. snapshot commit: 53a7e62.
 EOF
+)"
 ```

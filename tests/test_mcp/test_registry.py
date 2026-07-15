@@ -37,7 +37,6 @@ def test_unsafe_action_tools_remain_disabled_by_default() -> None:
         "runops.job.submit",
         "runops.job.cancel",
         "runops.run.delete",
-        "runops.experiment.create",
     ):
         spec = specs[name]
         assert spec.enabled is False

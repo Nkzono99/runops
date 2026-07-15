@@ -165,9 +165,7 @@ bootstrap が終わったら、この skill の主経路に戻り、project の�
 5. base input があるなら `{{ skill_prefix }}new-case` で case を作る
 6. independent variables が見えているなら `{{ skill_prefix }}survey-design` で survey を作る
 7. run 生成や submit は、対象・資源・確認条件を示してから進める
-8. runops 自体の不満点や改善案が出たら、`{{ skill_prefix }}feedback-runops`
-   で候補一覧、`{{ skill_prefix }}feedback-runops 不満点・改善案` で
-   HarnessOps record と issue 下書きを作る
+8. runops 自体の不満点や改善案が出たら、project 固有情報を除いて issue 下書きにする
 
 baseline commit は、生成直後の project scaffold とその後の研究作業を diff で分けるための
 目印として使う。`git status --short` で生成物が未 commit なら、次のような commit を提案する。
@@ -187,13 +185,12 @@ git commit -m "chore: scaffold runops project"
 - {{ skill_prefix }}setup-plugins 推奨 plugin と plugin-provided hooks の導入状態を整えて。
 - この入力ファイルをベースに case を作って。
 - 照射角を振る survey.toml を作って。submit はまだしない。
-- {{ skill_prefix }}feedback-runops setup 中に気になった改善点
+- setup 中に気になった runops 改善点を issue 下書きにして。
 ```
 
 ## note に残すこと
 
-project で `runo notes append` が使えるなら、準備段階の判断を
-`{{ skill_prefix }}note` で残す。
+準備段階の判断を `runo research append` で残す。
 
 - project を新規作成 / setup した理由
 - 採用 simulator / site / launcher

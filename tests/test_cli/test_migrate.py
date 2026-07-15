@@ -58,8 +58,10 @@ def test_migrate_applies_research_scaffold(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "M0-0002" in result.output
     assert "Status: applied" in result.output
-    assert (tmp_path / "research" / "agenda.md").is_file()
-    assert (tmp_path / "research" / "paper_requests.toml").is_file()
+    assert (tmp_path / "research" / "CURRENT.md").is_file()
+    assert (tmp_path / "research" / "journal" / "active.md").is_file()
+    assert (tmp_path / "research" / "results").is_dir()
+    assert not (tmp_path / "research" / "agenda.md").exists()
 
 
 def test_migrate_dry_run_does_not_write(tmp_path: Path) -> None:
@@ -72,7 +74,7 @@ def test_migrate_dry_run_does_not_write(tmp_path: Path) -> None:
 
     assert result.exit_code == 0
     assert "Status: planned" in result.output
-    assert "research/agenda.md" in result.output
-    assert "research/paper_requests.toml" in result.output
-    assert not (tmp_path / "research" / "agenda.md").exists()
-    assert not (tmp_path / "research" / "paper_requests.toml").exists()
+    assert "research/CURRENT.md" in result.output
+    assert "research/journal/active.md" in result.output
+    assert not (tmp_path / "research" / "CURRENT.md").exists()
+    assert not (tmp_path / "research" / "journal").exists()

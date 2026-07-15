@@ -142,7 +142,7 @@ Agent との聞き取りを短くしたい場合は、研究目的と制約を�
 | 投入前にレビューする | `submit 前に plan と対象 run を確認して。初回 bulk submit なので確認を挟んで。` |
 | 失敗 run を診断する | `failed run を確認して。log を読んで failure_reason を整理し、retry 方針を提案して。` |
 | 解析・知見を整理する | `completed run を summarize / collect して、insight と fact の候補を分けてまとめて。` |
-| runops にフィードバックする | `$feedback-runops` (`/feedback-runops`) で候補一覧、`$feedback-runops 不満点・改善案` で HarnessOps record と issue 下書きを作成 |
+| runops にフィードバックする | project 固有情報を除いた再現手順と issue 下書きを作るよう依頼する |
 
 ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
 
@@ -168,53 +168,11 @@ campaign 設計用の SKILL を使って campaign.toml を整理して。
 
 それ以外はエージェントに任せて大丈夫です。
 
-## runops へのフィードバックを HarnessOps 経由で issue 下書きにする
+## runops へのフィードバック
 
-プロジェクトを運用していて runops 本体への不満点・改善点・バグらしき挙動に
-気づいたら、その場でエージェントに feedback 記録を頼んでください。runops が生成する
-プロジェクト側ハーネスには `feedback-runops` SKILL が含まれており、現在の研究タスクを
-止めずに HarnessOps の `harness-feedback/` へ記録し、サニタイズ済み bundle から
-upstream issue 下書きへ進められます。
-
-候補を見たいだけなら、引数なしで呼びます。Codex では:
-
-```text
-$feedback-runops
-```
-
-Claude Code では:
-
-```text
-/feedback-runops
-```
-
-具体的な不満点や改善案がある場合は、続けて本文を書きます。Codex では:
-
-```text
-$feedback-runops runo runs submit の挙動がわかりにくかったので、改善してほしい
-```
-
-Claude Code では:
-
-```text
-/feedback-runops runo runs submit の挙動がわかりにくかったので、改善してほしい
-```
-
-引数なしなら、そのセッション中に見つかった候補を一覧します。具体的な内容を
-渡すと、`uvx --from harnessops hops add-failure` / `route` / `add-feedback` /
-`feedback export --sanitize --format github-issue` で record と下書きを作り、重複
-issue を確認し、環境情報を集め、issue のタイトルと本文案を作ります。
-
-この SKILL は安全のため、ユーザー確認なしに GitHub issue を作りません。
-起票前に必ず内容を表示させ、private なデータパス・クラスタ固有の秘密・未公開の
-研究情報が本文に入っていないことを確認してください。作成後は issue URL を
-`notes/YYYY-MM-DD.md` に記録しておくと、後で「あのときの改善要望」を辿りやすくなります。
-
-HarnessOps が利用できる環境では、`runo init` / `runo setup` が project 側
-overlay 初期化を連鎖し、`runo update-harness` が overlay 更新を連鎖して呼びます。
-生成 guidance で HarnessOps CLI を直接呼ぶ場合は、PATH 上の `hops` に依存せず
-`uvx --from harnessops hops ...` を使います。HarnessOps を使わない環境では
-`--no-harnessops` でこの連携を無効化できます。
+不満点や bug 候補は `runo research append` で project 内に短く記録できます。
+upstream issue を作る場合は、再現手順、期待/実際の挙動、workaround を下書きし、
+private path、クラスタ固有情報、未公開 result を除いたことを人が確認してから起票します。
 
 ## 次に読む
 

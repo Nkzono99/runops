@@ -54,13 +54,12 @@ run_id は `RYYYYMMDD-NNNN` 形式で不変、path は整理のため可変で�
 成熟経路は次とする。
 
 ```text
-raw notes/materials
-  -> research/agenda.md OR notes/reports
-  -> analysis/publication artifact
+research/journal + materials + .runops/work
+  -> research/CURRENT.md OR research/results/RNNNN-topic
   -> insights/facts
 ```
 
-`research/agenda.md` は現在判断、`notes/reports` は改稿可能な refined report/narrative、
+`research/CURRENT.md` は現在判断、`research/results` は人が昇格した refined result、
 `.runops/insights/` / `.runops/facts.toml` は再利用する整理済み知見を担う。
 生成済み context や会話ログを正本にしない。story は experimental surface として
 candidate-stable kernel から分ける。

@@ -74,14 +74,14 @@ unit = "V (normalized)"
 
 1. `campaign.toml` を更新する
 2. 記入内容のサマリーを表示する
-3. **`{{ skill_prefix }}note` で経緯を残す** (下記参照)
+3. **`{{ skill_prefix }}research-workspace` で経緯を残す** (下記参照)
 4. 次のステップを提案する:
    - ケースが未作成なら `runo case new <case_name> -s <simulator>` を提案 (cases/<sim>/ に自動生成)
    - ケースが既存なら survey 設計を提案
 
-## `{{ skill_prefix }}note` で残すべきこと
+## `{{ skill_prefix }}research-workspace` で残すべきこと
 
-campaign 設計の意思決定は raw な状態で `notes/YYYY-MM-DD.md` に残しておく
+campaign 設計の意思決定は bounded journal に残しておく
 (後の `{{ skill_prefix }}learn` の素材になる):
 
 - どのテーマ・仮説を採用したか、なぜか
@@ -93,7 +93,7 @@ campaign 設計の意思決定は raw な状態で `notes/YYYY-MM-DD.md` に残�
 例:
 
 ```bash
-uvx --from runops runo notes append "campaign セットアップ" - <<'EOF'
+uvx --from runops runo research append "campaign セットアップ" "$(cat <<'EOF'
 Theme: thermal-motion-induced ion depletion (2D PIC).
 Hypothesis: vti が大きいほど plate 下流の枯渇角 alpha が広がる。
 
@@ -101,6 +101,7 @@ independent: vti (1-19 eV, CFL 4σ で 19 eV が上限).
 fixed: vflow=400 km/s, dx=0.5 m, box 4000x800.
 没案: vflow も振る → 2 軸スキャンは 30 run × 2 で資源が足りない。
 EOF
+)"
 ```
 
 ## 注意

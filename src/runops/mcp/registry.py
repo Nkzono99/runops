@@ -20,7 +20,6 @@ from runops.mcp.safety import (
     INSPECT,
     PLAN,
     READ,
-    WRITE_DISABLED,
     SafetyMetadata,
 )
 
@@ -119,21 +118,6 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         "List survey plot columns from an existing summary aggregate.",
         INSPECT,
     ),
-    ToolSpec(
-        "runops.paper.requests.list",
-        "List paper-facing requests from the project research layer.",
-        READ,
-    ),
-    ToolSpec(
-        "runops.paper.request.draft",
-        "Draft and validate a paper-facing request without mutating files.",
-        PLAN,
-    ),
-    ToolSpec(
-        "runops.paper.request.plan",
-        "Plan how to route a paper-facing request without mutating files.",
-        PLAN,
-    ),
     ToolSpec("runops.run.list", "List run directories and manifest states.", READ),
     ToolSpec("runops.run.inspect", "Inspect one run manifest and readiness.", INSPECT),
     ToolSpec(
@@ -165,14 +149,6 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         enabled=False,
         exposed=False,
         action_name="submit_run",
-    ),
-    ToolSpec(
-        "runops.experiment.create",
-        "Create an experiment record and proposal. Disabled in MCP Slice 1.",
-        WRITE_DISABLED,
-        enabled=False,
-        exposed=False,
-        action_name="create_experiment",
     ),
     ToolSpec(
         "runops.job.cancel",
@@ -254,9 +230,6 @@ REQUIRED_COMMON_TOOLS = {
 REQUIRED_RUNOPS_TOOLS = REQUIRED_COMMON_TOOLS | {
     "runops.analysis.artifacts",
     "runops.analysis.plot_columns",
-    "runops.paper.request.draft",
-    "runops.paper.request.plan",
-    "runops.paper.requests.list",
     "runops.project.plugins",
     "runops.publication.export.inspect",
     "runops.publication.exports.list",

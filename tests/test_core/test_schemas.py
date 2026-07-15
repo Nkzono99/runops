@@ -27,8 +27,10 @@ def test_runops_schema_is_the_project_schema() -> None:
     assert "codex_plugins" in project_props
     plugin_schema = project_props["codex_plugins"]["additionalProperties"]
     assert plugin_schema["$ref"] == "codex-plugin-recommendation.json"
-    assert "harness" in schema["properties"]
-    assert "upstream_feedback" in schema["properties"]["harness"]["properties"]
+    assert "research" in schema["properties"]
+    workspace = schema["properties"]["research"]["properties"]["workspace"]
+    assert workspace["properties"]["current_chars"]["default"] == 20000
+    assert workspace["properties"]["active_results"]["default"] == 8
 
 
 def test_codex_plugin_recommendation_schema_defines_shared_contract() -> None:
@@ -172,28 +174,3 @@ def test_launcher_schema_accepts_current_and_legacy_type_keys() -> None:
     assert {"required": ["type"]} in launcher_schema["anyOf"]
     assert {"required": ["kind"]} in launcher_schema["anyOf"]
     assert "kind" in launcher_schema["properties"]
-
-
-def test_paper_requests_schema_defines_request_contract() -> None:
-    """paper_requests.toml schema should describe paper-facing request rows."""
-    schema = _load_schema("paper_requests.json")
-    request_schema = schema["properties"]["requests"]["items"]
-
-    assert schema["properties"]["schema_version"]["const"] == 1
-    assert "requests" in schema["properties"]
-    assert schema["required"] == ["schema_version"]
-    assert request_schema["properties"]["type"]["enum"] == [
-        "analysis_request",
-        "figure_request",
-        "experiment_request",
-        "evidence_gap",
-        "export_request",
-    ]
-    assert request_schema["properties"]["status"]["enum"] == [
-        "open",
-        "planned",
-        "in_progress",
-        "blocked",
-        "done",
-        "rejected",
-    ]

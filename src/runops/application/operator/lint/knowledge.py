@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import re
 import sys
 from typing import Any
 
@@ -12,56 +11,33 @@ else:
     import tomli as tomllib
 
 from runops.application.operator.lint.models import LintContext, LintIssue
-from runops.core.research import summarize_research_agenda
+from runops.application.research.workspace import inspect_workspace
+from runops.core.project import load_project
 
 
 def check_knowledge(context: LintContext) -> list[LintIssue]:
-    """Check curated knowledge and the mutable research agenda."""
+    """Check curated knowledge and the bounded research workspace."""
     issues: list[LintIssue] = []
-    issues.extend(_check_agenda(context))
+    issues.extend(_check_research_workspace(context))
     issues.extend(_check_facts(context))
     return issues
 
 
-def _check_agenda(context: LintContext) -> list[LintIssue]:
-    issues: list[LintIssue] = []
-    agenda_path = context.project_root / "research" / "agenda.md"
-    if not agenda_path.is_file():
-        return issues
-
-    summary = summarize_research_agenda(context.project_root)
-    if bool(summary.get("is_template", False)):
-        issues.append(
-            LintIssue(
-                severity="warning",
-                issue_id="knowledge.research_agenda_template",
-                path=agenda_path,
-                message="research/agenda.md still looks like the scaffold template.",
-                recommendation=(
-                    "Fill in current beliefs, active questions, current decision, "
-                    "and next actions before relying on agent automation."
-                ),
-            )
+def _check_research_workspace(context: LintContext) -> list[LintIssue]:
+    status = inspect_workspace(
+        context.project_root,
+        budget=load_project(context.project_root).research_budget,
+    )
+    return [
+        LintIssue(
+            severity=issue.severity,
+            issue_id=f"knowledge.{issue.code}",
+            path=context.project_root / issue.path,
+            message=issue.message,
+            recommendation="Run `runo research status` and archive or rotate intact.",
         )
-        return issues
-
-    text = agenda_path.read_text(encoding="utf-8", errors="replace")
-    next_actions = _section_text(text, "next actions", "次の行動")
-    if _has_action(next_actions) and not _has_evidence_path(next_actions):
-        issues.append(
-            LintIssue(
-                severity="warning",
-                issue_id="knowledge.next_actions_evidence_missing",
-                path=agenda_path,
-                message="Next Actions lacks an evidence path field.",
-                recommendation=(
-                    "For each next action, record the evidence path to produce or "
-                    "cite so the action can update notes/reports/research cleanly."
-                ),
-            )
-        )
-
-    return issues
+        for issue in status.issues
+    ]
 
 
 def _check_facts(context: LintContext) -> list[LintIssue]:
@@ -102,50 +78,6 @@ def _check_facts(context: LintContext) -> list[LintIssue]:
             )
         )
     return issues
-
-
-def _section_text(text: str, *tokens: str) -> str:
-    current_matches = False
-    collected: list[str] = []
-    normalized_tokens = tuple(token.casefold() for token in tokens)
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("## "):
-            heading = stripped.removeprefix("## ").casefold()
-            current_matches = any(token in heading for token in normalized_tokens)
-            continue
-        if current_matches:
-            collected.append(line)
-    return "\n".join(collected)
-
-
-def _has_action(section: str) -> bool:
-    for line in section.splitlines():
-        stripped = _strip_item(line)
-        if not stripped or "..." in stripped:
-            continue
-        if re.search(r"\baction\b", stripped, flags=re.IGNORECASE):
-            return True
-        if re.match(r"^\d+\.\s+", line.strip()):
-            return True
-    return False
-
-
-def _has_evidence_path(section: str) -> bool:
-    for line in section.splitlines():
-        stripped = _strip_item(line).casefold()
-        if "evidence path" in stripped or "evidence:" in stripped:
-            value = stripped.split(":", 1)[-1].strip() if ":" in stripped else stripped
-            if value and value not in {"tbd", "todo", "未定"}:
-                return True
-    return False
-
-
-def _strip_item(line: str) -> str:
-    stripped = line.strip()
-    if stripped.startswith("- "):
-        return stripped[2:].strip()
-    return stripped
 
 
 def _iter_fact_like_tables(value: Any) -> list[dict[str, Any]]:

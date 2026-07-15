@@ -59,15 +59,6 @@ shared な運用変更を入れたら `AGENTS.md`, `CLAUDE.md`,
 - CLI 名は `runo` を優先する。`runops` は互換 alias として残す。
 - 技術スタックは Python 3.10+ / uv / Typer / TOML / pytest / ruff / mypy strict。
 
-## HarnessOps 導線
-
-HarnessOps CLI (`hops`) は `.venv` に常駐 install せず、`uvx --from harnessops hops ...` で実行する。
-診断は `$hops-diagnose` または `uvx --from harnessops hops doctor --check-overlay --check-records`。
-ハーネス摩擦や上流改善候補は `$harnessops-bridge` / `$hops-add-failure` で記録し、lab 評価は `$hops-run-lab`、更新は `$hops-update-harness` を使う。
-この checkout の upstream lab overlay は repo 外の `../runops-harness-lab` に置く。
-repo 内 `harness-lab/` は再作成・Git 管理しない。
-`.harnessops/`, `harness-feedback/`, HarnessOps overlay は手で組み替えず、更新は `uvx --refresh-package harnessops --from harnessops hops update-harness ...` に委譲する。
-
 ## 主要ディレクトリ
 
 ```text
@@ -144,5 +135,5 @@ release は `$release` を使い、`pyproject.toml` と `src/runops/__init__.py`
 ## 知識層
 
 AI エージェント向けの知識管理は `.codex/rules/knowledge-layer.md` と
-`docs/layers/knowledge.md` を参照する。`research/agenda.md` は mutable な現在判断の
-台帳であり、TODO 置き場ではない。
+`docs/layers/knowledge.md` を参照する。現在判断は `research/CURRENT.md`、時系列ログは
+量でローテーションする `research/journal/`、残す解析は `research/results/` に置く。

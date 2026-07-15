@@ -1,47 +1,31 @@
 # 知識層 (Knowledge Layer)
 
-AI エージェントがシミュレーションを自律的に行うための知識管理。
-詳細は `docs/layers/knowledge.md` を参照。
+研究作業の active memory は、日数ではなく量で上限を持つ。
 
-## 知識の種類
+| 種類 | 保存先 | 規則 |
+|---|---|---|
+| 現在判断 | `research/CURRENT.md` | mutable。既定 20,000 Unicode 文字以内 |
+| 時系列ログ | `research/journal/active.md` | append-only。既定 64,000 文字で原文のまま `archive/JNNNN.md` へ rotation |
+| 残す解析 | `research/results/RNNNN-topic/` | narrative は `README.md` 1 枚、実体は `artifacts/` |
+| 一時作業 | `.runops/work/<goal-id>/` | provisional、Git 管理しない |
+| 人間提供資料 | `materials/` | source material。解析結果の置き場にしない |
+| 機械的再利用知識 | `.runops/insights/`, `.runops/facts.toml` | advanced curated store |
 
-| 種類 | 保存先 | 更新方法 |
-|------|--------|----------|
-| シミュレータ知識 | simulator/environment plugin + `.runops/knowledge/` + 任意の `refs/` fallback mirror | plugin install/update, `runo knowledge source sync`, `runo update-refs` |
-| 外部共有知識 | `runops.toml` の `[knowledge]` | `knowledge source attach/sync` |
-| 実行環境 | `.runops/environment.toml` | `runo doctor` |
-| 研究意図 | `campaign.toml` | ユーザーが記述 |
-| 実験知見 (curated) | `.runops/insights/` | `knowledge save` / `knowledge source sync` |
-| 構造化知識 (curated) | `.runops/facts.toml` | `knowledge add-fact` / `knowledge facts` |
-| lab notebook | `notes/YYYY-MM-DD.md`, `notes/history/YYYY/YYYY-MM-DD.md` | `runo notes append`, `runo notes archive` |
-| 長文レポート | `notes/reports/<topic>.md` | 直接編集 (改稿可) |
-| 研究判断の台帳 | `research/agenda.md` | 直接編集 (現在判断の更新) |
-
-## 二層構造
-
-- `.runops/insights/` / `.runops/facts.toml` は整理済の永続知見 (上書き可・名前付き・atomic)
-- `notes/YYYY-MM-DD.md` は append-only な時系列ログ。古い日次 notebook は `notes/history/YYYY/` に archive する
-- `research/agenda.md` は mutable な現在判断の正本。TODO ではなく active question / current decision / paused-killed / 判断が変わる条件を置く
-- 価値が出てきたら `notes/reports/` → `.runops/insights/` / `facts.toml` に昇格
-
-## 外部知識ソース
-
-複数プロジェクト間で共有する知識を外部リポジトリとして管理し、project に接続できる。
-
-Simulator / site が外部 Codex plugin を推薦する場合、`runo init` / `runo setup`
-と生成 harness に導線を出す。plugin install / enable はユーザー local な Codex
-環境の操作であり、runops project state には含めない。
-開発ハーネス内の `.agents/skills/emses`, `.agents/skills/beach`,
-`.codex/agents/emses.toml`, `.codex/agents/beach.toml` は runops 側の薄い
-橋渡しに保ち、シミュレータ固有の長文 context は MPIEMSES3D / emout / BEACH
-などの外部 plugin へ委譲する。
+`artifacts/` 以下に Markdown を置かない。同じ論理データを CSV/JSON/Markdown の
+複数形式で重複保存しない。AI は重要度を推測して evidence を削除・要約置換せず、
+人が選んだ結果だけ `runo research new-result` で昇格する。
 
 ```bash
-runo knowledge source attach git shared-kb git@github.com:lab/hpc-shared-knowledge.git
-runo knowledge source attach path local-kb ../hpc-knowledge
-runo knowledge source sync
-runo knowledge source render
+runo research status
+runo research append "<title>" "<body>"
+runo research rotate --force
+runo research new-result <topic>
+runo research archive R0001-topic
+runo research restore R0001-topic
+runo research migrate-legacy --dry-run
+runo research check
 ```
 
-- `runo init` の対話時は GitHub の `*shared_knowledge*` リポジトリを候補表示し、選択されたものだけ接続
-- `runo setup` 時は `runops.toml` に設定された知識ソースを自動同期
+旧 `notes/`、`analysis/cross_run/`、分散 Markdown、HarnessOps metadata は
+`runo research migrate-legacy` で内容を変更せず recovery archive へ移す。移行は
+`--restore` で戻せる。削除・purge はこの workflow に含めない。

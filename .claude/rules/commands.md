@@ -63,13 +63,16 @@
 | `runo analyze collect [DIR]` | survey 集計 |
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 |
 | `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
-| `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace (`analysis/cross_run/`) を作成 |
 | `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | story acceptance audit workspace (`analysis/stories/`) を作成。relative source は project root 基準 |
 | `runo analyze audit-story [STORY_DIR]` | story の要求 step と artifact index を照合し `audit.json` / `audit.md` を生成 |
-| `runo notes append TITLE [BODY]` | lab notebook に追記 |
-| `runo notes list` | active/history の lab notebook 日付一覧 |
-| `runo notes show [DATE]` | active/history から指定日の lab notebook を表示 |
-| `runo notes archive [--older-than 7d]` | 古い日次 notebook を `notes/history/YYYY/` に移動 |
+| `runo research status [PATH]` | active research の文字数・件数・bytes を表示 |
+| `runo research check [PATH]` | budget と配置規則を検査 |
+| `runo research append TITLE BODY` | bounded journal に追記し必要なら自動 rotation |
+| `runo research rotate [PATH] [--force]` | journal を原文のまま numbered archive へ移す |
+| `runo research new-result NAME` | README 1 枚と artifacts/ を持つ result を作成 |
+| `runo research archive RESULT_ID` | active result を可逆 archive |
+| `runo research restore RESULT_ID` | archived result を復元 |
+| `runo research migrate-legacy [--dry-run|--restore]` | 旧 research/notes/analysis/HarnessOps 構成を可逆移行 |
 | `runo knowledge save NAME` | 知見を `.runops/insights/` に保存 |
 | `runo knowledge list` | 知見一覧 |
 | `runo knowledge show NAME` | 指定知見を表示 |
@@ -84,14 +87,6 @@
 | `runo knowledge source status` | 外部知識ソース状態表示 |
 | `runo knowledge profile enable SOURCE_NAME PROFILE_NAMES...` | source profile を有効化 |
 | `runo knowledge profile disable SOURCE_NAME PROFILE_NAMES...` | source profile を無効化 |
-
-## Experiment workflow
-
-| コマンド | 説明 |
-|---------|------|
-| `runo experiment new NAME [--from SPEC] [--dry-run] [--yes] [--json]` | schema 2 ledger と proposal を原子的に作成。`--json` は `--yes` がない限り plan のみ返す |
-| `runo experiment show [EXPERIMENT] [--json]` | ledger、survey、run、artifact から導出した phase と次の操作を表示 |
-| `runo experiment check [EXPERIMENT] [--json]` | experiment の参照整合性を検査。error があれば exit 1 |
 
 ## Demo replay
 

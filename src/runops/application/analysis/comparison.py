@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,7 +15,12 @@ from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
 
-_COMPARISON_ROOT = Path("analysis") / "cross_run"
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
+_COMPARISON_ROOT = Path("research") / "results"
 _ID_PATTERN = re.compile(r"^[a-z0-9][a-z0-9_.-]*$")
 
 
@@ -108,9 +114,9 @@ def _write_comparison_readme(
         "",
         f"- Comparison ID: `{comparison_id}`",
         "- Manifest: `manifest.toml`",
-        "- Scripts: `scripts/`",
-        "- Data/tables: `data/`",
-        "- Figures: `figures/`",
+        "- Scripts: `artifacts/scripts/`",
+        "- Data/tables: `artifacts/data/`",
+        "- Figures: `artifacts/figures/`",
         "",
         "Keep comparison-specific scripts and generated cross-run artifacts here.",
         "Reusable project-wide scripts can still live under the project `scripts/`",
@@ -130,7 +136,7 @@ def create_comparison_workspace(
     comparison_id: str = "",
     sources: tuple[Path, ...] = (),
 ) -> ComparisonWorkspaceResult:
-    """Create ``analysis/cross_run/<comparison_id>/``.
+    """Create one durable comparison under ``research/results/``.
 
     Args:
         project_root: runops project root.
@@ -153,16 +159,36 @@ def create_comparison_workspace(
     resolved_id = _validate_comparison_id(resolved_id)
 
     root = project_root.resolve()
-    comparison_dir = root / _COMPARISON_ROOT / resolved_id
-    if comparison_dir.exists():
-        raise SimctlError(f"comparison workspace already exists: {comparison_dir}")
+    results_root = root / _COMPARISON_ROOT
+    results_root.mkdir(parents=True, exist_ok=True)
+    for existing_manifest in results_root.glob("R[0-9][0-9][0-9][0-9]-*/manifest.toml"):
+        try:
+            with open(existing_manifest, "rb") as stream:
+                existing = tomllib.load(stream)
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+        comparison = existing.get("comparison")
+        if isinstance(comparison, dict) and comparison.get("id") == resolved_id:
+            raise SimctlError(
+                f"comparison workspace already exists: {existing_manifest.parent}"
+            )
+
+    numbers = []
+    for child in results_root.glob("R[0-9][0-9][0-9][0-9]-*"):
+        try:
+            numbers.append(int(child.name[1:5]))
+        except ValueError:
+            continue
+    result_id = f"R{max(numbers, default=0) + 1:04d}-{resolved_id}"
+    comparison_dir = results_root / result_id
 
     source_records = [_source_record(root, source) for source in sources]
     comparison_dir.mkdir(parents=True)
-    for child in ("scripts", "data", "figures"):
-        child_dir = comparison_dir / child
+    artifacts_dir = comparison_dir / "artifacts"
+    artifacts_dir.mkdir()
+    for artifact_kind in ("scripts", "data", "figures"):
+        child_dir = artifacts_dir / artifact_kind
         child_dir.mkdir()
-        (child_dir / ".gitkeep").write_text("", encoding="utf-8")
 
     manifest_path = comparison_dir / "manifest.toml"
     readme_path = comparison_dir / "README.md"
@@ -178,9 +204,9 @@ def create_comparison_workspace(
         },
         "sources": source_records,
         "paths": {
-            "scripts": "scripts",
-            "data": "data",
-            "figures": "figures",
+            "scripts": "artifacts/scripts",
+            "data": "artifacts/data",
+            "figures": "artifacts/figures",
         },
         "artifacts": {
             "scripts": [],

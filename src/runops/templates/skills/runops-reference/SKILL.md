@@ -96,7 +96,7 @@ runo runs submit -qn compute       # queue 指定
 runo runs submit --dry-run          # 確認のみ
 
 # survey 全体の CLI syntax。直接実行せず `{{ skill_prefix }}run-all` を使い、
-# proposal → pilot → review の Decision: EXPAND gate を確認する
+# pilot result と research/CURRENT.md の明示判断を確認する
 cd runs/sheath/angle_scan
 runo runs submit --all
 runo runs submit --all -qn compute

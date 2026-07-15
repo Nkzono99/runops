@@ -51,7 +51,6 @@ class HarnessUpgradeRequest:
     target: str | None = None
     allow_major: bool = False
     force: bool = False
-    no_harnessops: bool = False
 
 
 @dataclass(frozen=True)
@@ -133,7 +132,6 @@ def plan_harness_upgrade(
                 to_version=step.to_version,
                 from_version=step.from_version,
                 force=request.force,
-                no_harnessops=request.no_harnessops,
             ),
         )
         for step in core_plan.steps
@@ -218,7 +216,6 @@ def _uvx_update_harness_command(
     to_version: str,
     from_version: str,
     force: bool,
-    no_harnessops: bool,
 ) -> tuple[str, ...]:
     command = [
         uvx,
@@ -233,8 +230,6 @@ def _uvx_update_harness_command(
     ]
     if force:
         command.append("--force")
-    if no_harnessops:
-        command.append("--no-harnessops")
     return tuple(command)
 
 

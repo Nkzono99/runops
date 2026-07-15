@@ -1,6 +1,6 @@
 ---
 name: patch-runops
-description: Patch runops itself in a separate source checkout, verify the fix, then decide whether it stays local, becomes HarnessOps feedback, draft PR, or ready PR.
+description: Patch runops itself in a separate source checkout, verify the fix, then decide whether it stays local, becomes an issue, draft PR, or ready PR.
 ---
 
 # runops 本体を別 checkout で patch する
@@ -14,11 +14,11 @@ source checkout を用意して作業する。
 
 ## 基本方針
 
-- project 側の `campaign.toml`, `cases/`, `runs/`, `notes/` と runops 本体の変更を混ぜない。
+- project 側の `campaign.toml`, `cases/`, `runs/`, `research/` と runops 本体の変更を混ぜない。
 - local patch の正本は別 checkout 内の Git branch / commit とする。
 - current project で確認したいときだけ、一時的に `.venv` へ package install する。
-- 作業メモや handoff は `notes/YYYY-MM-DD.md` に残す。
-- 研究判断が変わる場合だけ `research/agenda.md` も更新する。
+- 作業メモや handoff は `runo research append` で残す。
+- 研究判断が変わる場合だけ `research/CURRENT.md` も更新する。
 
 ## まず分類する
 
@@ -30,7 +30,7 @@ source checkout を用意して作業する。
 | project 固有 harness override | project 側に残す |
 | 汎用 CLI / core / adapter / launcher 修正 | runops source checkout |
 | 汎用 scaffold / skill / harness 改善 | runops source checkout の `src/runops/templates/` |
-| 一部だけ汎用、または設計が必要 | local patch + `{{ skill_prefix }}feedback-runops` HarnessOps record / issue 下書き |
+| 一部だけ汎用、または設計が必要 | local patch + project 固有情報を除いた issue 下書き |
 
 project 側の生成物をそのまま upstream に入れない:
 
@@ -39,7 +39,6 @@ project 側の生成物をそのまま upstream に入れない:
 - `AGENTS.md`
 - `CLAUDE.md`
 - `research/*`
-- `notes/*`
 - `campaign.toml`
 - `cases/*`
 - `runs/*`
@@ -105,12 +104,13 @@ git commit -m "fix: <summary>"
 project 側の note に branch / commit / current project での確認結果を残す:
 
 ```bash
-runo notes append "runops local patch" - <<'EOF'
+runo research append "runops local patch" "$(cat <<'EOF'
 Context: runops source checkout branch=fix/<short-name>, commit=<sha>.
 Patch: <何を直したか>
 Current project check: <どの command/run で確認したか>
 Upstream disposition: local-only / feedback-issue / draft-pr / ready-pr
 EOF
+)"
 ```
 
 ## Upstream disposition
@@ -120,7 +120,7 @@ local patch 後、必ず次のどれかに分類する。
 | 判定 | 意味 | 次の動き |
 |------|------|----------|
 | `local-only` | project 固有 | project 側に残し、runops 本体には戻さない |
-| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | `{{ skill_prefix }}feedback-runops` で HarnessOps record + issue 下書き |
+| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | project 固有情報を除いて issue 下書きを作る |
 | `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
 | `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
 

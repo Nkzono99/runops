@@ -79,6 +79,10 @@ def test_runs_create_writes_event_log_from_global_options(
 ) -> None:
     _create_project_with_case(tmp_path)
     log_path = tmp_path / "events.jsonl"
+    (tmp_path / "research" / "journal").mkdir(parents=True)
+    (tmp_path / "research" / "journal" / "active.md").write_text(
+        "# Research Journal\n\n", encoding="utf-8"
+    )
     monkeypatch.chdir(tmp_path)
 
     result = runner.invoke(
@@ -123,7 +127,7 @@ def test_cli_invocation_never_persists_raw_argv_values(
         [
             "--event-log",
             str(log_path),
-            "notes",
+            "research",
             "append",
             "Secret note",
             "top-secret-value",

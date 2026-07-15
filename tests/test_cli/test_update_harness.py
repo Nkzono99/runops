@@ -20,7 +20,6 @@ from runops.harness.builder import (
     load_harness_upgrade_chain,
     save_harness_lock,
 )
-from runops.harness.harnessops import HarnessOpsResult
 
 runner = CliRunner()
 
@@ -35,20 +34,6 @@ def _mock_bootstrap(
     monkeypatch.setattr(
         "runops.cli.init._bootstrap_environment",
         lambda *_args, **_kwargs: None,
-    )
-    monkeypatch.setattr(
-        "runops.harness.harnessops.initialize_project_harnessops",
-        lambda *_args, **_kwargs: HarnessOpsResult(
-            "skipped",
-            "HarnessOps skipped (test)",
-        ),
-    )
-    monkeypatch.setattr(
-        "runops.harness.harnessops.update_project_harnessops",
-        lambda *_args, **_kwargs: HarnessOpsResult(
-            "skipped",
-            "HarnessOps skipped (test)",
-        ),
     )
 
 
@@ -68,63 +53,6 @@ class TestUpdateHarnessBasic:
         assert result.exit_code == 0
         assert "up to date" in result.output
 
-    def test_update_harness_invokes_harnessops(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """update-harness delegates HarnessOps overlay refresh to hops."""
-        _init_project(tmp_path)
-        calls: list[tuple[Path, bool]] = []
-
-        def _fake_harnessops(root: Path, *, dry_run: bool = False) -> HarnessOpsResult:
-            calls.append((root, dry_run))
-            return HarnessOpsResult("updated", "HarnessOps updated")
-
-        monkeypatch.setattr(
-            "runops.harness.harnessops.update_project_harnessops",
-            _fake_harnessops,
-        )
-
-        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
-
-        assert result.exit_code == 0
-        assert calls == [(tmp_path.resolve(), False)]
-        assert "HarnessOps updated" in result.output
-
-    def test_update_harness_can_skip_harnessops(
-        self,
-        tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch,
-    ) -> None:
-        """--no-harnessops disables the hops update hook."""
-        _init_project(tmp_path)
-
-        def _fail_harnessops(
-            _root: Path,
-            *,
-            dry_run: bool = False,
-        ) -> HarnessOpsResult:
-            raise AssertionError("should not be called")
-
-        monkeypatch.setattr(
-            "runops.harness.harnessops.update_project_harnessops",
-            _fail_harnessops,
-        )
-
-        result = runner.invoke(
-            app,
-            [
-                "update-harness",
-                str(tmp_path),
-                "--skip-pull",
-                "--no-harnessops",
-            ],
-        )
-
-        assert result.exit_code == 0
-        assert "HarnessOps skipped (disabled)" in result.output
-
     def test_update_harness_includes_project_config_plugin_recommendations(
         self,
         tmp_path: Path,
@@ -137,8 +65,7 @@ class TestUpdateHarnessBasic:
             'display_name = "Analysis Context"\n'
             'reason = "Team analysis workflow guidance."\n'
             'install_hint = "codex plugin add analysis-context@project"\n'
-            'capabilities = ["analysis-workflow", "handoff"]\n'
-            "\n[harness]\nupstream_feedback = true\n",
+            'capabilities = ["analysis-workflow", "handoff"]\n',
             encoding="utf-8",
         )
 
@@ -169,7 +96,7 @@ class TestUpdateHarnessBasic:
         assert ".claude/settings.json" in lock
         assert ".vscode/settings.json" in lock
         assert ".claude/rules/runops-workflow.md" in lock
-        assert ".claude/rules/upstream-feedback.md" in lock
+        assert ".claude/rules/upstream-feedback.md" not in lock
         assert ".codex/config.toml" in lock
         assert ".codex/rules/runops.rules" in lock
         assert ".agents/skills/new-case/SKILL.md" in lock
@@ -180,10 +107,28 @@ class TestUpdateHarnessBasic:
             ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
             in lock
         )
-        assert ".agents/skills/research-agenda/SKILL.md" in lock
+        assert ".agents/skills/research-workspace/SKILL.md" in lock
         assert "cases/AGENTS.md" in lock
         assert "runs/AGENTS.md" in lock
         assert GITIGNORE_PATH in lock
+
+    def test_retires_unedited_obsolete_managed_files(self, tmp_path: Path) -> None:
+        """Removed HarnessOps-era templates disappear without touching edits."""
+        _init_project(tmp_path)
+        obsolete = tmp_path / ".claude/rules/upstream-feedback.md"
+        obsolete.write_text("obsolete managed content\n", encoding="utf-8")
+        lock = load_harness_lock(tmp_path)
+        lock[".claude/rules/upstream-feedback.md"] = hash_text(
+            "obsolete managed content\n"
+        )
+        save_harness_lock(tmp_path, lock)
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert "Retired 1 obsolete managed file" in result.output
+        assert not obsolete.exists()
+        assert ".claude/rules/upstream-feedback.md" not in load_harness_lock(tmp_path)
 
     def test_overwrites_unedited_files(self, tmp_path: Path) -> None:
         """Files matching their lock hash are silently overwritten."""
@@ -334,7 +279,6 @@ class TestUpdateHarnessBasic:
                 "--apply-chain",
                 "--target",
                 "0.9.0",
-                "--no-harnessops",
             ],
         )
 
@@ -350,7 +294,6 @@ class TestUpdateHarnessBasic:
                 "--upgrade-step",
                 "--from-version",
                 "0.8.0",
-                "--no-harnessops",
             ],
             [
                 "uvx",
@@ -362,7 +305,6 @@ class TestUpdateHarnessBasic:
                 "--upgrade-step",
                 "--from-version",
                 "0.8.2",
-                "--no-harnessops",
             ],
         ]
 
@@ -402,37 +344,28 @@ class TestUpdateHarnessBasic:
     def test_backfills_visible_workspace_when_missing(self, tmp_path: Path) -> None:
         """update-harness recreates missing visible workspace scaffold."""
         _init_project(tmp_path)
-        (tmp_path / "notes" / "README.md").unlink()
-        (tmp_path / "notes" / "history").rmdir()
         (tmp_path / "materials" / "README.md").unlink()
         (tmp_path / "materials" / "papers").rmdir()
-        (tmp_path / "research" / "agenda.md").unlink()
-        (tmp_path / "research" / "paper_requests.toml").unlink()
-        (tmp_path / "research" / "reviews" / ".gitkeep").unlink()
+        (tmp_path / "research" / "CURRENT.md").unlink()
+        (tmp_path / "research" / "journal" / "active.md").unlink()
 
         result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
 
         assert result.exit_code == 0
         assert "Backfilled" in result.output
-        assert (tmp_path / "notes" / "README.md").is_file()
-        assert (tmp_path / "notes" / "history").is_dir()
         assert (tmp_path / "materials" / "README.md").is_file()
         assert (tmp_path / "materials" / "papers").is_dir()
-        assert (tmp_path / "research" / "agenda.md").is_file()
-        assert (tmp_path / "research" / "paper_requests.toml").is_file()
-        assert (tmp_path / "research" / "reviews" / ".gitkeep").is_file()
+        assert (tmp_path / "research" / "CURRENT.md").is_file()
+        assert (tmp_path / "research" / "journal" / "active.md").is_file()
         lock = load_harness_lock(tmp_path)
-        assert "notes/README.md" not in lock
         assert "materials/README.md" not in lock
-        assert "research/agenda.md" not in lock
-        assert "research/paper_requests.toml" not in lock
+        assert "research/CURRENT.md" not in lock
 
     def test_only_can_limit_workspace_backfill(self, tmp_path: Path) -> None:
         """--only respects visible workspace backfill targets."""
         _init_project(tmp_path)
-        (tmp_path / "notes" / "README.md").unlink()
         (tmp_path / "materials" / "README.md").unlink()
-        (tmp_path / "research" / "agenda.md").unlink()
+        (tmp_path / "research" / "CURRENT.md").unlink()
 
         result = runner.invoke(
             app,
@@ -446,9 +379,8 @@ class TestUpdateHarnessBasic:
         )
 
         assert result.exit_code == 0
-        assert not (tmp_path / "notes" / "README.md").exists()
         assert (tmp_path / "materials" / "README.md").is_file()
-        assert not (tmp_path / "research" / "agenda.md").exists()
+        assert not (tmp_path / "research" / "CURRENT.md").exists()
 
     def test_dry_run_no_writes(self, tmp_path: Path) -> None:
         """--dry-run reports but does not actually write files."""
@@ -579,59 +511,6 @@ class TestUpdateHarnessBasic:
         assert "project の状態はこちらで確認します" in content
         assert "doctor で未解決の項目はありますか" not in content
         assert 'git commit -m "chore: scaffold runops project"' in content
-
-
-class TestInitUpstreamFeedback:
-    """Tests for --no-upstream-feedback in runops init."""
-
-    def test_default_includes_feedback_rule(self, tmp_path: Path) -> None:
-        """By default, upstream-feedback.md rule is created."""
-        _init_project(tmp_path)
-        rule = tmp_path / ".claude" / "rules" / "upstream-feedback.md"
-        assert rule.exists()
-        content = rule.read_text(encoding="utf-8")
-        assert "Nkzono99/runops" in content
-        assert "gh issue create" in content
-
-    def test_no_upstream_feedback_flag(self, tmp_path: Path) -> None:
-        """--no-upstream-feedback omits the rule file."""
-        result = runner.invoke(
-            app, ["init", "-y", "--no-upstream-feedback", "--path", str(tmp_path)]
-        )
-        assert result.exit_code == 0
-        rule = tmp_path / ".claude" / "rules" / "upstream-feedback.md"
-        assert not rule.exists()
-        agents = (tmp_path / "AGENTS.md").read_text(encoding="utf-8")
-        assert "runops へのフィードバック" not in agents
-
-    def test_simproject_records_upstream_feedback(self, tmp_path: Path) -> None:
-        """runops.toml includes [harness] upstream_feedback = true."""
-        _init_project(tmp_path)
-        content = (tmp_path / "runops.toml").read_text(encoding="utf-8")
-        assert "[harness]" in content
-        assert "upstream_feedback = true" in content
-
-    def test_simproject_records_no_upstream_feedback(self, tmp_path: Path) -> None:
-        """--no-upstream-feedback sets upstream_feedback = false."""
-        runner.invoke(
-            app, ["init", "-y", "--no-upstream-feedback", "--path", str(tmp_path)]
-        )
-        content = (tmp_path / "runops.toml").read_text(encoding="utf-8")
-        assert "upstream_feedback = false" in content
-
-    def test_update_harness_respects_setting(self, tmp_path: Path) -> None:
-        """update-harness reads upstream_feedback from runops.toml."""
-        # Init without feedback
-        runner.invoke(
-            app, ["init", "-y", "--no-upstream-feedback", "--path", str(tmp_path)]
-        )
-        rule = tmp_path / ".claude" / "rules" / "upstream-feedback.md"
-        assert not rule.exists()
-
-        # update-harness should NOT create it
-        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
-        assert result.exit_code == 0
-        assert not rule.exists()
 
 
 class TestHarnessLock:

@@ -43,25 +43,16 @@ name = "demo"
         encoding="utf-8",
     )
     (path / "campaign.toml").write_text('[campaign]\ngoal = "demo"\n')
-    notes_dir = path / "notes"
-    notes_dir.mkdir(parents=True)
-    (notes_dir / "README.md").write_text("# Notes\n", encoding="utf-8")
     research_dir = path / "research"
-    research_dir.mkdir(parents=True)
-    (research_dir / "agenda.md").write_text(
-        """
-# Research Agenda
-
-## Current Decision
-
-- Decision: Keep the current plan.
-
-## Next Actions
-
-1. Action: inspect latest run.
-   - Evidence path to produce: notes/2026-05-08.md
-""".lstrip(),
+    (research_dir / "journal" / "archive").mkdir(parents=True)
+    (research_dir / "results").mkdir()
+    (research_dir / "archive" / "results").mkdir(parents=True)
+    (research_dir / "CURRENT.md").write_text(
+        "# Current Research State\n",
         encoding="utf-8",
+    )
+    (research_dir / "journal" / "active.md").write_text(
+        "# Research Journal\n\n", encoding="utf-8"
     )
     (path / ".gitignore").write_text(
         f"{GITIGNORE_MANAGED_START}\nwork/\n{GITIGNORE_MANAGED_END}\n",
@@ -149,7 +140,8 @@ def test_project_lint_reports_missing_structure(tmp_path: Path) -> None:
 
     ids = {issue.issue_id for issue in report.issues}
     assert "structure.campaign_missing" in ids
-    assert "structure.research_agenda_missing" in ids
+    assert "structure.research_current_missing" in ids
+    assert "structure.research_journal_missing" in ids
     assert report.error_count == 1
 
 
@@ -349,28 +341,17 @@ def test_project_lint_reports_legacy_figures_index(tmp_path: Path) -> None:
     assert issue.migration == "M0-0003"
 
 
-def test_project_lint_reports_agenda_without_evidence_path(tmp_path: Path) -> None:
+def test_project_lint_reports_oversized_current_state(tmp_path: Path) -> None:
     _write_project(tmp_path)
-    (tmp_path / "research" / "agenda.md").write_text(
-        """
-# Research Agenda
-
-## Current Decision
-
-- Decision: Keep the current plan.
-
-## Next Actions
-
-1. Action: run a new comparison.
-""".lstrip(),
+    (tmp_path / "research" / "CURRENT.md").write_text(
+        "x" * 20_001,
         encoding="utf-8",
     )
 
     report = run_project_lint(tmp_path, scopes=("knowledge",))
 
     assert any(
-        issue.issue_id == "knowledge.next_actions_evidence_missing"
-        for issue in report.issues
+        issue.issue_id == "knowledge.current.too_large" for issue in report.issues
     )
 
 

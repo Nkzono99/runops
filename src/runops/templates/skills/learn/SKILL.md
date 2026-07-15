@@ -1,61 +1,21 @@
 ---
 name: learn
-description: Save advanced knowledge insights and structured facts from experiment results. Use only after notes/ or reports/ contain stable findings worth machine reuse.
+description: Promote a stable, reusable claim from explicit research results into advanced insights or structured facts without copying the whole journal.
 ---
 
-# 実験結果から知見を記録する
+# 再利用知識へ昇格する
 
-`{{ skill_prefix }}learn` は advanced / structured knowledge
-(`.runops/insights/`, `.runops/facts.toml`) への永続化スキル。これに対して
-`{{ skill_prefix }}note` は raw な lab notebook (`notes/`) への時系列追記で、
-`{{ skill_prefix }}research-agenda` は現在の研究判断 (`research/agenda.md`) の更新、
-論文・manual・図・snippet などの source material は `materials/` に置く。
+日常の研究記憶は `research/` に置く。この skill は、複数 project から機械的に
+再利用する価値が確定した小さな知見だけを `.runops/insights/` または
+`.runops/facts.toml` へ昇格する。
 
-日常の知識共有はまず `notes/`, `materials/`, `research/` に寄せる。`{{ skill_prefix }}learn`
-は **機械的に再利用したい、安定した知見だけを抽出する** ときに使う。
+1. `runo research status` を確認する。
+2. 関連する `research/results/RNNNN-*/README.md` と artifact を読む。
+3. journal 全体を複製せず、claim、適用範囲、反例、evidence path を抽出する。
+4. narrative insight は `runo knowledge save`、atomic claim は
+   `runo knowledge add-fact` を使う。
+5. source result ID と artifact path を必ず残す。
+6. `research/CURRENT.md` は現在判断が変わった場合だけ更新する。
 
-## 手順
-
-1. **`notes/`, `materials/`, `research/` を素材として集める** (structured knowledge を作る前段)
-   - `runo notes list` で最近の lab notebook 日付を確認
-   - 関連するテーマの `runo notes show <YYYY-MM-DD>` で読む
-   - `research/agenda.md` で現在の見立てと active question を確認する
-   - `materials/index.toml` や `materials/README.md` で関連資料を確認
-   - 散らばった観察・仮説・反例・却下案を集める
-2. 完了した run の結果 (`runo analyze summarize`, ログ, 出力) を読む
-3. 新たに分かったこと・期待と異なる結果を特定する
-4. 知見の種類を判断する (constraint / result / analysis / dependency)
-5. 出処になった `notes/<date>.md` の日付を insight 本文に書き残す
-   (後から検証可能・raw material trail として)
-
-## 人向け知見の保存
-
-```bash
-runo knowledge save <name> -t <type> -s <simulator> -m "<内容>"
-```
-
-タイプ: `constraint`, `result`, `analysis`, `dependency`
-
-例:
-
-```bash
-runo knowledge save mag_scan_summary -t result -s emses \
-  -m "磁場角度 0-90 度のサーベイ。45度で最もイオン加速が効率的。"
-```
-
-## 機械可読な fact の追加
-
-```bash
-runo knowledge add-fact "<claim>" \
-  -t <type> -s <simulator> \
-  --param-name <param> --scope-text "<scope>" \
-  --evidence-kind <kind> --evidence-ref <ref> \
-  -c <confidence> --tags "<tags>"
-```
-
-タイプ: `observation`, `constraint`, `dependency`, `policy`, `hypothesis`
-
-- `high` confidence は複数 run の再現か deterministic 確認がある場合だけ使う
-- 既存 fact を修正するときは `--supersedes fNNN` を使う
-- 外部 source から同期された candidate fact は `runo knowledge facts` で確認できる
-- 採用する candidate fact は `runo knowledge promote-fact <source>:<fact_id>` で local fact に昇格する
+AI が journal から重要度を推測して一括昇格してはいけない。result への明示昇格が
+済んでいない観察は、まず人に候補と理由を示す。
