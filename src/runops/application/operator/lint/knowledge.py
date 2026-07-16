@@ -34,10 +34,24 @@ def _check_research_workspace(context: LintContext) -> list[LintIssue]:
             issue_id=f"knowledge.{issue.code}",
             path=context.project_root / issue.path,
             message=issue.message,
-            recommendation="Run `runo research status` and archive or rotate intact.",
+            recommendation=_research_recommendation(issue.code),
         )
         for issue in status.issues
     ]
+
+
+def _research_recommendation(code: str) -> str:
+    if code in {
+        "current.too_many_lines",
+        "current.too_many_paths",
+        "current.looks_chronological",
+    }:
+        return (
+            "Keep research/CURRENT.md as the current decision ledger; move "
+            "chronology to `runo research append`, refined detail to "
+            "research/results/, and exhaustive provenance to export/source indexes."
+        )
+    return "Run `runo research status` and archive or rotate intact."
 
 
 def _check_facts(context: LintContext) -> list[LintIssue]:

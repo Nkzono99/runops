@@ -23,7 +23,7 @@ research/
 .runops/work/<goal-id>/
 ```
 
-- `CURRENT.md`: active question、現在判断、次の一手だけを置く mutable な入口。
+- `CURRENT.md`: active question、現在判断、次の一手だけを置く mutable な入口。既定 50 行を目安に保つ。
 - `journal/active.md`: append-only。文字数上限に達したら原文のまま numbered segment へ移す。
 - `results/`: 人が残すと決めた解析だけ。説明は result ごとに `README.md` 1 枚。
 - `artifacts/`: CSV、JSON、画像、script 等の実体。Markdown は禁止。
@@ -34,6 +34,9 @@ research/
 ```toml
 [research.workspace]
 current_chars = 20000
+current_lines = 50
+current_path_references = 10
+current_chronological_headings = 3
 journal_segment_chars = 64000
 result_readme_chars = 30000
 active_results = 8
@@ -41,9 +44,13 @@ result_artifact_files = 50
 result_artifact_bytes = 209715200
 ```
 
-`runo research status` は Unicode 文字数、active result 数、artifact の件数と bytes を
-機械的に測ります。`runo research check` は budget 超過、artifact 内 Markdown、symlink、
-論理名が同じ複数形式を検査します。
+`current_chars` は hard limit です。行数、path 参照数、日付・時刻で始まる見出し数は
+compact guidance で、超過しても warning に留まります。時系列は journal、残す詳細解析は
+`results/`、網羅的な artifact provenance は export/source index に分けます。
+
+`runo research status` は Unicode 文字数、行数、path 参照、時系列見出し、active result 数、
+artifact の件数と bytes を機械的に測ります。`runo research check` は hard budget 超過、
+artifact 内 Markdown、symlink、論理名が同じ複数形式を検査します。
 
 ```bash
 runo research append "observation" "..."

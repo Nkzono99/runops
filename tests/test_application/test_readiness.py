@@ -6,7 +6,15 @@ from pathlib import Path
 
 import tomli_w
 
-from runops.application.execution.readiness import evaluate_run_readiness
+from runops.application.execution.readiness import (
+    evaluate_run_readiness,
+    probe_run_readiness,
+    read_cached_run_readiness,
+    readiness_for_bulk_view,
+    resolve_run_readiness,
+    write_readiness_cache,
+)
+from runops.core.manifest import read_manifest, update_manifest
 from tests.factories import create_run_manifest
 
 
@@ -92,3 +100,82 @@ def test_unknown_adapter_reports_unknown_readiness(tmp_path: Path) -> None:
     assert readiness.analysis_ready is False
     assert readiness.analysis_status == "unknown"
     assert readiness.warnings == ("Unknown simulator adapter: not_registered.",)
+
+
+def test_bounded_probe_returns_machine_actionable_incomplete_result(
+    tmp_path: Path,
+) -> None:
+    run_dir = _create_emses_run(tmp_path, hdf5=False)
+
+    readiness = probe_run_readiness(run_dir)
+
+    assert readiness.analysis_status == "incomplete"
+    assert readiness.reason_codes == ("missing_required_output:hdf5_fields",)
+    assert readiness.recommended_action == "review_outputs"
+    assert readiness.recommended_command == "runo runs log R20260507-0001"
+    assert readiness.requires_human is False
+    assert readiness.evaluation_mode == "bounded"
+    assert readiness.to_dict()["partial_outputs"] == {"hdf5_fields": 0}
+
+
+def test_readiness_cache_is_attempt_aware(tmp_path: Path) -> None:
+    run_dir = _create_emses_run(tmp_path, hdf5=True)
+    update_manifest(
+        run_dir,
+        {
+            "job": {
+                "job_id": "12345",
+                "submitted_at": "2026-07-16T12:00:00+09:00",
+                "attempt": 1,
+            }
+        },
+    )
+    manifest = read_manifest(run_dir)
+    readiness = probe_run_readiness(run_dir, manifest=manifest)
+
+    cache_path = write_readiness_cache(run_dir, readiness, manifest=manifest)
+
+    assert cache_path == run_dir / "status" / "readiness.json"
+    assert read_cached_run_readiness(run_dir, manifest=manifest) == readiness
+
+    update_manifest(run_dir, {"job": {"job_id": "67890", "attempt": 2}})
+    assert read_cached_run_readiness(run_dir) is None
+
+
+def test_resolve_replaces_bounded_unknown_with_reusable_deep_cache(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "runs" / "R20260507-0003"
+    create_run_manifest(run_dir, status="completed", adapter="not_registered")
+    bounded = probe_run_readiness(run_dir)
+    write_readiness_cache(run_dir, bounded)
+
+    resolved = resolve_run_readiness(run_dir)
+
+    assert bounded.evaluation_mode == "bounded"
+    assert resolved.analysis_status == "unknown"
+    assert resolved.evaluation_mode == "deep"
+    assert read_cached_run_readiness(run_dir) == resolved
+    assert resolve_run_readiness(run_dir) == resolved
+
+
+def test_bulk_view_reports_cache_miss_without_running_or_writing_probe(
+    tmp_path: Path,
+) -> None:
+    run_dir = _create_emses_run(tmp_path, hdf5=True)
+
+    readiness = readiness_for_bulk_view(run_dir)
+
+    assert readiness is not None
+    assert readiness.analysis_status == "unknown"
+    assert readiness.reason_codes == ("readiness_not_cached",)
+    assert readiness.recommended_action == "deep_validate"
+    assert readiness.recommended_command == "runo runs status R20260507-0001"
+    assert readiness.evaluation_mode == "not_evaluated"
+    assert not (run_dir / "status" / "readiness.json").exists()
+
+
+def test_bulk_view_omits_readiness_for_non_completed_run(tmp_path: Path) -> None:
+    run_dir = _create_emses_run(tmp_path, status="running")
+
+    assert readiness_for_bulk_view(run_dir) is None

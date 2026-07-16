@@ -230,7 +230,7 @@ sim-manager/
             ...
 
   research/              # quantity-bounded research memory
-    CURRENT.md           # mutable current state (default 20,000 chars)
+    CURRENT.md           # mutable current state (20,000 chars hard; compact warnings)
     journal/
       active.md          # append-only active segment
       archive/           # intact JNNNN.md segments
@@ -804,7 +804,9 @@ run ディレクトリ・manifest・入力・job script が生成済み
 
 ### `completed`
 
-正常終了
+scheduler / execution process が正常終了した状態。simulator 固有の完了条件や
+analysis-required artifact の充足は別の readiness 軸で扱い、`completed` だけを
+scientific evidence の受理条件にしない。
 
 ### `failed`
 
@@ -884,6 +886,9 @@ class SimulatorAdapter:
     def detect_status(run_dir) -> str:
         ...
 
+    def probe_readiness(run_dir) -> dict:
+        ...
+
     def summarize(run_dir) -> dict:
         ...
 
@@ -897,6 +902,10 @@ class SimulatorAdapter:
 
 Adapter は **実行準備と後処理のみ** を担当する。
 MPI 実行中の rank ごとのホットパスには介入しない。
+
+`probe_readiness()` は scheduler terminal transition に付随する bounded probe とし、
+full output enumeration や巨大 log の全読みを行わない。`simulator_status`, `outputs`,
+`warnings` を返し、未対応 Adapter は `unknown` と explicit deep validation 導線を返す。
 
 ## 14.4 Attempt-aware output detection
 
@@ -1117,6 +1126,9 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 * `runo analyze summarize [<run_dir or run_id>]`
 * `runo analyze collect [<survey_dir>]`
+* `runo analyze export [<run_dir or run_id>] --paper <paper-id>` — incomplete run を
+  `--paper-status accepted` にする場合は `--accept-incomplete-reason <WHY>` を同じ
+  command で必須とする
 
 ---
 
@@ -1125,7 +1137,9 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 * `runo runs archive <run_dir or run_id>` — completed → archived。既定では `runs/_archive/<元の runs/ 相対パス>` へ移動する
 * `runo runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
 * `runo runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
-* `runo runs purge-work [<run_dir or run_id>]` — archived → purged
+* `runo runs purge-work [<run_dir or run_id>]` — archived → purged。cached readiness が
+  incomplete / unknown の場合は `--discard-incomplete --reason <WHY>` を同じ command に指定して
+  review provenance を残す
 * `runo runs cancel [<run_dir or run_id>]` — submitted/running → cancelled (`scancel` と `sync` をまとめて実行する安全経路)
 * `runo runs delete [<run_dir or run_id>]` — created / cancelled / failed の run ディレクトリをハード削除 (ライフサイクル外、completed/archived には不可)
 
@@ -1136,7 +1150,9 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 研究記憶は日数ではなく Unicode 文字数、件数、bytes で上限を持つ。既定値は
 `runops.toml [research.workspace]` に置く。
 
-* `CURRENT.md`: mutable な現在判断。既定 20,000 文字
+* `CURRENT.md`: mutable な現在判断。既定 20,000 文字を hard limit とし、50 行、
+  path 参照 10 件、日付・時刻で始まる時系列見出し 3 件を compact guidance の warning
+  threshold とする
 * `journal/active.md`: append-only。既定 64,000 文字を越える前に原文のまま
   `journal/archive/JNNNN.md` へ rotation
 * `results/RNNNN-topic/README.md`: result ごとの唯一の narrative。既定 30,000 文字
@@ -1146,6 +1162,10 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 AI は重要度を推測して既存 evidence を削除・要約置換しない。journal rotation は
 原文を保持し、durable result への昇格は明示的に行う。
+compact guidance の超過は通常 lint/check を失敗させない。`runo lint --strict` を
+明示した場合だけ warning を gate として扱う。`CURRENT.md` に作業日誌や artifact inventory
+を再展開せず、時系列は journal、残す詳細解析は result、網羅的な artifact provenance は
+export/source index に置く。
 
 ```text
 research/journal + materials + .runops/work
@@ -1244,12 +1264,24 @@ source が 1 件でも欠落した audit は、別 source に十分な artifact 
 * `job_id` がある場合は `squeue` / `sacct` で live Slurm state を best-effort 表示する
 * manifest と `status/state.json` は更新しない
 * `--short` / `--summary` では live Slurm query を行わず、manifest のみを読む
+* completed run では current attempt の `status/readiness.json` があれば再利用し、
+  analysis status、reason code、recommended action / exact command を表示する
+* bounded cache が `unknown` の場合だけ deep evaluation を 1 回行い、その結果で
+  cache を置き換える。deep evaluation が `unknown` でも以後は再利用する
+* `runs list`、`runs dashboard --all`、MCP `runops.run.list` は bulk latency を
+  bounded に保つため cache だけを読み、completed run の cache miss は
+  `unknown` / `readiness_not_cached` / `deep_validate` と exact status command を返す。
+  bulk view 自体は deep evaluation を起動しない
 
 ### `sync`
 
 * `squeue` / `sacct` により Slurm 状態を RunState に変換する
 * `status/state.json` を更新する
 * manifest の `run.status` と `run.last_slurm_state` を同期する
+* completed へ遷移した run では Adapter の bounded `probe_readiness()` を同じ action
+  内で 1 回実行し、attempt-aware な `status/readiness.json` を保存する
+* action result は execution / simulator / analysis status、reason code、partial output、
+  recommended action / exact command をまとめて返し、通常の診断に別 status call を要求しない
 * bulk モード (survey dir または複数 RUNS) では `job_id` 未記録 / terminal
   state な run を silent skip し、残りのみを処理する
 

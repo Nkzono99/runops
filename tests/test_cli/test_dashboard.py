@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 from typer.testing import CliRunner
 
+from runops.application.execution.readiness import RunReadiness, write_readiness_cache
 from runops.cli.main import app
 from tests.factories import create_minimal_project, create_run_manifest
 
@@ -14,6 +15,25 @@ if TYPE_CHECKING:
     import pytest
 
 runner = CliRunner()
+
+
+def _cache_incomplete_readiness(run_dir: Path, run_id: str) -> None:
+    write_readiness_cache(
+        run_dir,
+        RunReadiness(
+            run_id=run_id,
+            execution_status="completed",
+            adapter="fake_sim",
+            simulator_status="completed",
+            analysis_status="incomplete",
+            analysis_ready=False,
+            checks=(),
+            warnings=("Missing required output.",),
+            reason_codes=("missing_required_output:result",),
+            recommended_action="review_outputs",
+            evaluation_mode="bounded",
+        ),
+    )
 
 
 def _create_dashboard_run(
@@ -77,6 +97,26 @@ class TestDashboard:
         assert result.exit_code == 0
         assert "R20260327-0001" in result.output
         assert "completed" in result.output
+
+    def test_dashboard_all_surfaces_cached_readiness(self, tmp_path: Path) -> None:
+        project_dir = create_minimal_project(tmp_path)
+        survey = project_dir / "runs" / "series_x"
+        run_id = "R20260327-0003"
+        run_dir = _create_dashboard_run(
+            survey,
+            run_id,
+            status="completed",
+            job_id="11111",
+        )
+        _cache_incomplete_readiness(run_dir, run_id)
+
+        result = runner.invoke(app, ["runs", "dashboard", "--all", str(survey)])
+
+        assert result.exit_code == 0, result.output
+        assert "ANALYSIS" in result.output
+        assert "NEXT" in result.output
+        assert "incomplete" in result.output
+        assert "review_outputs" in result.output
 
     def test_dashboard_no_active_runs(self, tmp_path: Path) -> None:
         project_dir = create_minimal_project(tmp_path)

@@ -180,13 +180,58 @@ def _validate_archive_destination(source: Path, destination: Path) -> str | None
 
 
 @logged_action("purge_work")
-def purge_work(run_dir: Path) -> ActionResult:
+def purge_work(
+    run_dir: Path,
+    *,
+    discard_incomplete: bool = False,
+    review_reason: str = "",
+) -> ActionResult:
     """Delete purgeable work outputs from an archived run."""
+    from runops.application.execution.readiness import read_cached_run_readiness
+    from runops.core.manifest import read_manifest, update_manifest
     from runops.core.state import update_state
 
     state_str, err = _require_state(run_dir, RunState.ARCHIVED)
     if err:
         return _precondition_fail("purge_work", err)
+
+    manifest = read_manifest(run_dir)
+    readiness = read_cached_run_readiness(run_dir, manifest=manifest)
+    if readiness is not None and not readiness.analysis_ready:
+        gate_data = {
+            "readiness": readiness.to_dict(),
+            "recommended_action": readiness.recommended_action,
+            "requires_human": True,
+        }
+        if not discard_incomplete:
+            return ActionResult(
+                action="purge_work",
+                status=ActionStatus.PRECONDITION_FAILED,
+                message=(
+                    "Cached readiness is not ready; inspect outputs or rerun with "
+                    "--discard-incomplete --reason <WHY>."
+                ),
+                data=gate_data,
+                state_before=state_str,
+            )
+        if not review_reason.strip():
+            return ActionResult(
+                action="purge_work",
+                status=ActionStatus.PRECONDITION_FAILED,
+                message="--discard-incomplete requires a non-empty review reason.",
+                data=gate_data,
+                state_before=state_str,
+            )
+        update_manifest(
+            run_dir,
+            {
+                "run": {
+                    "readiness_disposition": "discarded_incomplete",
+                    "readiness_review_reason": review_reason.strip(),
+                    "readiness_reviewed_at": datetime.now(tz=timezone.utc).isoformat(),
+                }
+            },
+        )
 
     work_dir = run_dir / "work"
     targets = ["outputs", "restart", "tmp"]
@@ -216,6 +261,9 @@ def purge_work(run_dir: Path) -> ActionResult:
         data={
             "removed_dirs": removed_dirs,
             "bytes_removed": total_removed,
+            "discarded_incomplete": bool(
+                readiness is not None and not readiness.analysis_ready
+            ),
         },
         state_before=state_str,
         state_after=RunState.PURGED.value,

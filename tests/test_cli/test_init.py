@@ -88,7 +88,15 @@ class TestInit:
         journal = (tmp_path / "research/journal/active.md").read_text(encoding="utf-8")
         assert "Current Question" in current
         assert "Current Decision" in current
+        assert "50 行" in current
+        assert "artifact 一覧" in current
+        assert "research/results/" in current
         assert journal == "# Research Journal\n\n"
+
+        config = (tmp_path / "runops.toml").read_text(encoding="utf-8")
+        assert "current_lines = 50" in config
+        assert "current_path_references = 10" in config
+        assert "current_chronological_headings = 3" in config
 
     def test_init_creates_research_workspace_skill(self, tmp_path: Path) -> None:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
@@ -100,6 +108,8 @@ class TestInit:
         codex_content = codex_skill_md.read_text(encoding="utf-8")
         assert "name: research-workspace" in content
         assert "runo research append" in content
+        assert "50 行" in content
+        assert "artifact 一覧" in content
         assert "artifacts/` に Markdown を作らない" in codex_content
 
     def test_init_creates_migrate_runops_skill(self, tmp_path: Path) -> None:

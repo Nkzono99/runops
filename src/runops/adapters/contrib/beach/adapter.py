@@ -326,6 +326,18 @@ class BeachAdapter(SimulatorAdapter):
         """
         return _diagnostics.detect_outputs(self, run_dir)
 
+    def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
+        """Return a bounded BEACH readiness observation."""
+        snapshot = self._status_snapshot(run_dir)
+        outputs: dict[str, Any] = {}
+        if snapshot.summary_file is not None:
+            outputs["summary"] = relative_to_run(snapshot.summary_file, run_dir)
+        return {
+            "simulator_status": snapshot.status,
+            "outputs": outputs,
+            "warnings": [],
+        }
+
     def detect_status(self, run_dir: Path) -> str:
         """Infer BEACH simulation status from output files.
 

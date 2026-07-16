@@ -70,6 +70,9 @@ class MySolverAdapter(SimulatorAdapter):
     def detect_status(self, run_dir: Path) -> str:
         ...
 
+    def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
+        ...
+
     def summarize(self, run_dir: Path) -> dict[str, Any]:
         ...
 
@@ -237,6 +240,23 @@ adapter は、`detect_outputs()` の top-level key に合わせて宣言する�
 def required_outputs(cls) -> dict[str, str]:
     return {"fields": "field HDF5 output files"}
 ```
+
+terminal `runo runs sync` では full `detect_outputs()` の代わりに
+`probe_readiness()` が呼ばれる。これは同じ top-level output label を返すが、required
+artifact は最初の 1 件を見つけた時点で止め、log は bounded tail のみを読む。
+
+```python
+def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
+    field = next((run_dir / "work").glob("*.h5"), None)
+    return {
+        "simulator_status": self.detect_status_bounded(run_dir),
+        "outputs": {"fields": str(field)} if field is not None else {},
+        "warnings": [],
+    }
+```
+
+bounded probe を安全に実装できない場合は base implementation を維持する。その場合、
+sync result は `analysis_status = unknown` と exact deep-validation command を返す。
 
 #### 5. `detect_status(run_dir) -> str`
 

@@ -8,9 +8,29 @@ from typing import Any
 import tomli_w
 from typer.testing import CliRunner
 
+from runops.application.execution.readiness import RunReadiness, write_readiness_cache
 from runops.cli.main import app
 
 runner = CliRunner()
+
+
+def _cache_incomplete_readiness(run_dir: Path, run_id: str) -> None:
+    write_readiness_cache(
+        run_dir,
+        RunReadiness(
+            run_id=run_id,
+            execution_status="completed",
+            adapter="fake_sim",
+            simulator_status="completed",
+            analysis_status="incomplete",
+            analysis_ready=False,
+            checks=(),
+            warnings=("Missing required output.",),
+            reason_codes=("missing_required_output:result",),
+            recommended_action="review_outputs",
+            evaluation_mode="bounded",
+        ),
+    )
 
 
 def _create_run(
@@ -58,6 +78,20 @@ def test_list_discovers_runs(tmp_path: Path) -> None:
     assert "R20260327-0002" in result.output
     assert "run_a" in result.output
     assert "run_b" in result.output
+
+
+def test_list_surfaces_cached_readiness_without_deep_evaluation(tmp_path: Path) -> None:
+    run_id = "R20260327-0004"
+    run_dir = _create_run(tmp_path, run_id, status="completed")
+    _cache_incomplete_readiness(run_dir, run_id)
+
+    result = runner.invoke(app, ["runs", "list", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    assert "ANALYSIS" in result.output
+    assert "NEXT" in result.output
+    assert "incomplete" in result.output
+    assert "review_outputs" in result.output
 
 
 def test_list_filter_by_status(tmp_path: Path) -> None:

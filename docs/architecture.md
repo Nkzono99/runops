@@ -258,6 +258,8 @@ class SimulatorAdapter(ABC):
     @abstractmethod
     def detect_status(self, run_dir) -> str: ...
 
+    def probe_readiness(self, run_dir) -> dict: ...
+
     @abstractmethod
     def summarize(self, run_dir) -> dict: ...
 
@@ -268,6 +270,8 @@ class SimulatorAdapter(ABC):
 `required_outputs()` は任意メソッドで、`detect_outputs()` の top-level key のうち
 analysis-ready 判定に必須のカテゴリを宣言します。`runo runs status` と
 `runo context` は、scheduler の `completed` と required artifact の充足を分けて表示します。
+`probe_readiness()` は terminal `sync` 用の bounded observation であり、全 output の列挙や
+巨大 log の全読みを避けて `simulator_status`, `outputs`, `warnings` を返します。
 
 ### GenericAdapter
 
@@ -649,6 +653,7 @@ refs/{repo}/docs/          ← ローカル mirror fallback
 adapter.parameter_schema() ← 構造化メタデータ
 adapter.validate_params()  ← 物理的バリデーション
 adapter.required_outputs() ← analysis-ready に必要な成果物
+adapter.probe_readiness()  ← terminal sync で 1 回だけ行う bounded observation
 ```
 
 - simulator/environment plugin: 長文の Agent context、環境スキル、解析ライブラリ利用法
@@ -661,6 +666,7 @@ adapter.required_outputs() ← analysis-ready に必要な成果物
 - `parameter_schema()`: 型・単位・範囲・制約・導出公式
 - `validate_params()`: CFL 条件、Debye 長解像度など
 - `required_outputs()`: completed run を analysis-ready とみなす前に必要な出力カテゴリ
+- `probe_readiness()`: scheduler terminal transition で使う bounded status/output probe
 
 シミュレータ固有の Agent 向け長文コンテキストは、runops adapter ではなく各
 シミュレータや解析ライブラリの Codex plugin に置く。runops adapter は実行管理に
@@ -738,6 +744,9 @@ research/archive/results/   ← 可逆 archive
 `research/CURRENT.md` は TODO リストではなく、現在の見立て、active question、
 paused/killed、次に何をなぜ行うかを残す判断の台帳。本文は日本語で書き、
 コード・コマンド・ファイルパス・run_id は実際の表記のまま残す。
+既定 50 行、path 参照 10 件、時系列見出し 3 件は compact guidance の warning であり、
+20,000 文字の hard limit と分離する。時系列は journal、詳細解析は result、網羅的な
+artifact provenance は export/source index に置く。
 
 project 運用レイヤーの詳細は [Layer Docs](layers/README.md) を参照。
 

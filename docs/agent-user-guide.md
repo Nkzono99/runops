@@ -26,12 +26,13 @@ research/archive/results/
 .runops/work/<goal-id>/
 ```
 
-- 現在判断は `CURRENT.md`。
+- 現在判断は `CURRENT.md`。既定 50 行を目安にし、作業日誌や artifact inventory に戻さない。
 - 時系列ログは `runo research append`。日数ではなく文字数で原文 rotation。
 - goal の大量な途中出力は `.runops/work/<goal-id>/`。
 - 人が残すと決めた解析だけ `runo research new-result` で昇格。
 - narrative は result ごとに README 1 枚。`artifacts/` に Markdown を作らない。
 - AI は evidence を自動削除・要約置換しない。
+- 網羅的な artifact provenance は export/source index に置く。
 
 ```bash
 runo research append "Series A design" "Context: ... Evidence: ..."

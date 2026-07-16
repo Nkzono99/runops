@@ -114,6 +114,9 @@
           "additionalProperties": false,
           "properties": {
             "current_chars": {"type": "integer", "minimum": 1, "default": 20000},
+            "current_lines": {"type": "integer", "minimum": 1, "default": 50},
+            "current_path_references": {"type": "integer", "minimum": 1, "default": 10},
+            "current_chronological_headings": {"type": "integer", "minimum": 1, "default": 3},
             "journal_segment_chars": {"type": "integer", "minimum": 1, "default": 64000},
             "result_readme_chars": {"type": "integer", "minimum": 1, "default": 30000},
             "active_results": {"type": "integer", "minimum": 1, "default": 8},

@@ -17,6 +17,11 @@ research/
 で、日数ではなく文字数により原文のまま rotation します。結果は人が残すと決めた
 ものだけ `results/` に昇格し、説明を README 1 枚へ集約します。
 
+`CURRENT.md` は既定 50 行を目安にし、path 参照 10 件、日付・時刻で始まる見出し 3 件を
+越えると warning を出します。これは通常作業を止める hard gate ではありません。
+時系列は `runo research append`、残す詳細解析は `results/`、網羅的な artifact provenance は
+export/source index に置き、`CURRENT.md` を日誌や inventory に戻さないでください。
+
 ```bash
 runo research status
 runo research append "<title>" "<body>"

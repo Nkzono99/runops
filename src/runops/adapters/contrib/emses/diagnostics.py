@@ -19,6 +19,87 @@ class _EmsesDiagnostics(Protocol):
     def detect_status(self, run_dir: Path) -> str: ...
 
 
+_PROBE_TAIL_BYTES = 64 * 1024
+
+
+def probe_readiness(self: _EmsesDiagnostics, run_dir: Path) -> dict[str, Any]:
+    """Return a bounded readiness observation without enumerating outputs."""
+    work_dir = run_dir / WORK_DIR
+    simulator_status = _probe_status(self, run_dir)
+    hdf5_path: Path | None = None
+    for output_dir in (work_dir / "latest", work_dir):
+        if not output_dir.is_dir():
+            continue
+        hdf5_path = next(output_dir.glob("*.h5"), None)
+        if hdf5_path is not None:
+            break
+    outputs: dict[str, Any] = {}
+    if hdf5_path is not None:
+        outputs["hdf5_fields"] = relative_to_run(hdf5_path, run_dir)
+    return {
+        "simulator_status": simulator_status,
+        "outputs": outputs,
+        "warnings": [],
+    }
+
+
+def _probe_status(self: _EmsesDiagnostics, run_dir: Path) -> str:
+    """Infer EMSES status using only bounded tails and existence checks."""
+    work_dir = run_dir / WORK_DIR
+    if not work_dir.is_dir():
+        return "unknown"
+
+    error_logs: list[Path] = []
+    for pattern in ("stderr.*.log", "*.err"):
+        error_logs.extend(work_dir.glob(pattern))
+    if error_logs:
+        latest_error = max(error_logs, key=_safe_mtime)
+        content = _read_tail(latest_error).lower()
+        if any(
+            keyword in content
+            for keyword in ("error", "segmentation fault", "killed", "oom")
+        ):
+            return "failed"
+
+    for output_dir in (work_dir / "latest", work_dir):
+        energy_file = output_dir / "energy"
+        if not energy_file.is_file():
+            continue
+        try:
+            nstep = self._get_expected_nstep(run_dir)
+            lines = [
+                line for line in _read_tail(energy_file).splitlines() if line.strip()
+            ]
+            if lines and nstep:
+                last_step = int(float(lines[-1].split()[0]))
+                return "completed" if last_step >= nstep else "running"
+        except (ValueError, IndexError, OSError):
+            pass
+
+    for output_dir in (work_dir / "latest", work_dir):
+        if output_dir.is_dir() and next(output_dir.glob("*.h5"), None) is not None:
+            return "running"
+    return "unknown"
+
+
+def _read_tail(path: Path) -> str:
+    try:
+        with path.open("rb") as stream:
+            stream.seek(0, 2)
+            size = stream.tell()
+            stream.seek(max(0, size - _PROBE_TAIL_BYTES))
+            return stream.read().decode("utf-8", errors="replace")
+    except OSError:
+        return ""
+
+
+def _safe_mtime(path: Path) -> float:
+    try:
+        return path.stat().st_mtime
+    except OSError:
+        return 0.0
+
+
 def detect_outputs(self: _EmsesDiagnostics, run_dir: Path) -> dict[str, Any]:
     """Detect EMSES output files in ``work/``.
 

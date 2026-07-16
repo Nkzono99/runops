@@ -7,7 +7,8 @@ description: Keep project research memory bounded by character and artifact budg
 
 研究記憶の正本は `research/` の次の 3 層だけにする。
 
-- `CURRENT.md`: 現在の問い、判断、次の一手。過程の全文は置かない
+- `CURRENT.md`: 現在の問い、判断、次の一手。既定 50 行目安で、過程の全文や
+  artifact 一覧を置かない
 - `journal/`: append-only な作業記録。量の上限で segment を無要約ローテーションする
 - `results/RNNNN-topic/`: 残す解析結果。説明は `README.md` 1 枚、実体は `artifacts/`
 
@@ -23,6 +24,11 @@ description: Keep project research memory bounded by character and artifact budg
 6. `artifacts/` に Markdown を作らない。同じ論理データの CSV/JSON/Markdown 重複を避ける。
 7. active result が増えたら `runo research archive RNNNN` で可逆 archive する。削除しない。
 8. 最後に `runo research check` を通す。
+
+`CURRENT.md` に時系列見出しや path が増えた場合、古い詳細を再展開せず、時系列は
+`runo research append`、精製した報告は `research/results/`、網羅的 provenance は
+export/source index へ移す。`runo lint --scope knowledge` の guidance warning は hard
+failure ではないが、次の handoff 前に解消する。
 
 AI が重要度を推測して既存 evidence を削除・要約置換してはいけない。重要性の判断が
 必要なら、原文を保ったまま result 候補と理由を人に示す。

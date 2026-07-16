@@ -269,6 +269,62 @@ class TestPurgeWork:
         assert result.exit_code == 0
         assert "Freed: 0.0 B" in result.output
 
+    def test_purge_incomplete_uses_inline_disposition(self, tmp_path: Path) -> None:
+        from runops.application.execution.readiness import (
+            probe_run_readiness,
+            write_readiness_cache,
+        )
+        from runops.core.manifest import read_manifest, update_manifest
+
+        run_dir = _create_run(tmp_path, "R20260327-0002", status="completed")
+        update_manifest(
+            run_dir,
+            {
+                "job": {"job_id": "12345", "attempt": 1},
+                "simulator": {"name": "emses", "adapter": "emses"},
+            },
+        )
+        with (run_dir / "input" / "plasma.toml").open("wb") as stream:
+            tomli_w.dump({"jobcon": {"nstep": 100}}, stream)
+        (run_dir / "work" / "energy").write_text(
+            "100 1.0 2.0\n",
+            encoding="utf-8",
+        )
+        manifest = read_manifest(run_dir)
+        write_readiness_cache(
+            run_dir,
+            probe_run_readiness(run_dir, manifest=manifest),
+            manifest=manifest,
+        )
+        update_manifest(run_dir, {"run": {"status": "archived"}})
+        (run_dir / "work" / "outputs").mkdir()
+
+        blocked = runner.invoke(
+            app,
+            ["runs", "purge-work", "--yes", str(run_dir)],
+        )
+
+        assert blocked.exit_code == 1
+        assert "--discard-incomplete --reason" in blocked.output
+
+        accepted = runner.invoke(
+            app,
+            [
+                "runs",
+                "purge-work",
+                "--yes",
+                "--discard-incomplete",
+                "--reason",
+                "outputs are unusable",
+                str(run_dir),
+            ],
+        )
+
+        assert accepted.exit_code == 0, accepted.output
+        assert read_manifest(run_dir).run["readiness_disposition"] == (
+            "discarded_incomplete"
+        )
+
 
 class TestDelete:
     """Tests for `runops runs delete`."""

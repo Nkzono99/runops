@@ -8,6 +8,7 @@ from typing import Annotated, Optional
 
 import typer
 
+from runops.application.execution.readiness import readiness_for_bulk_view
 from runops.cli.run_lookup import resolve_run_targets
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
@@ -84,7 +85,7 @@ def _print_dashboard(run_dirs: list[Path], *, all_states: bool) -> None:
         typer.echo("No runs found.")
         return
 
-    rows: list[tuple[str, str, str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str, str, str, str, str]] = []
 
     for run_dir in run_dirs:
         try:
@@ -105,8 +106,22 @@ def _print_dashboard(run_dirs: list[Path], *, all_states: bool) -> None:
             status,
             str(manifest.run.get("last_slurm_state", "")),
         )
+        readiness = readiness_for_bulk_view(run_dir, manifest=manifest)
+        analysis_status = readiness.analysis_status if readiness is not None else "-"
+        next_action = readiness.recommended_action if readiness is not None else "-"
 
-        rows.append((run_id, display_name, status, step_str, pct_str, last_slurm))
+        rows.append(
+            (
+                run_id,
+                display_name,
+                status,
+                analysis_status,
+                next_action,
+                step_str,
+                pct_str,
+                last_slurm,
+            )
+        )
 
     if not rows:
         typer.echo("No active runs found.")
@@ -115,7 +130,16 @@ def _print_dashboard(run_dirs: list[Path], *, all_states: bool) -> None:
     # Sort by run_id for stable output.
     rows.sort(key=lambda r: r[0])
 
-    headers = ("RUN_ID", "NAME", "STATE", "STEP", "%", "SLURM")
+    headers = (
+        "RUN_ID",
+        "NAME",
+        "STATE",
+        "ANALYSIS",
+        "NEXT",
+        "STEP",
+        "%",
+        "SLURM",
+    )
     widths = [len(h) for h in headers]
     for row in rows:
         for i, cell in enumerate(row):

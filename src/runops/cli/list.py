@@ -7,6 +7,7 @@ from typing import Optional
 
 import typer
 
+from runops.application.execution.readiness import readiness_for_bulk_view
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
@@ -52,7 +53,7 @@ def list_runs(
         raise typer.Exit(code=0)
 
     # Collect manifest data for each run
-    rows: list[tuple[str, str, str, str]] = []
+    rows: list[tuple[str, str, str, str, str, str]] = []
     for run_dir in run_dirs:
         try:
             manifest = read_manifest(run_dir)
@@ -70,7 +71,19 @@ def list_runs(
         if tag and tag not in tags:
             continue
 
-        rows.append((run_id, display_name, run_status, str(run_dir)))
+        readiness = readiness_for_bulk_view(run_dir, manifest=manifest)
+        analysis_status = readiness.analysis_status if readiness is not None else "-"
+        next_action = readiness.recommended_action if readiness is not None else "-"
+        rows.append(
+            (
+                str(run_id),
+                str(display_name),
+                str(run_status),
+                analysis_status,
+                next_action,
+                str(run_dir),
+            )
+        )
 
     # Sort by run_id
     rows.sort(key=lambda r: r[0])
@@ -82,13 +95,13 @@ def list_runs(
     _print_table(rows)
 
 
-def _print_table(rows: list[tuple[str, str, str, str]]) -> None:
+def _print_table(rows: list[tuple[str, str, str, str, str, str]]) -> None:
     """Print a formatted table of run entries.
 
     Args:
-        rows: List of (run_id, display_name, status, path) tuples.
+        rows: List of run identity, execution/readiness state, action, and path.
     """
-    headers = ("RUN_ID", "NAME", "STATUS", "PATH")
+    headers = ("RUN_ID", "NAME", "STATUS", "ANALYSIS", "NEXT", "PATH")
     # Calculate column widths
     widths = [len(h) for h in headers]
     for row in rows:

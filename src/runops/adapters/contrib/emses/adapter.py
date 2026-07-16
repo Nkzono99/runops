@@ -304,6 +304,10 @@ class EmseAdapter(SimulatorAdapter):
         """
         return _diagnostics.detect_outputs(self, run_dir)
 
+    def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
+        """Return a bounded EMSES readiness observation."""
+        return _diagnostics.probe_readiness(self, run_dir)
+
     def detect_status(self, run_dir: Path) -> str:
         """Infer EMSES simulation status from output files.
 

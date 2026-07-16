@@ -973,6 +973,66 @@ class TestExport:
         assert manifest["source"]["run"]["paper_status"] == "placeholder"
         assert manifest["files"][0]["sha256"].startswith("sha256:")
 
+    def test_export_accepts_incomplete_only_with_inline_reason(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        _write_project_file(tmp_path)
+        run_dir = _create_run(tmp_path / "runs", "R20260327-0009")
+        (run_dir / "analysis" / "summary.json").write_text(
+            json.dumps({"status": "partial", "partial": True}),
+            encoding="utf-8",
+        )
+
+        blocked = runner.invoke(
+            app,
+            [
+                "analyze",
+                "export",
+                str(run_dir),
+                "--paper",
+                "draft-a",
+                "--name",
+                "blocked",
+                "--paper-status",
+                "accepted",
+            ],
+        )
+
+        assert blocked.exit_code == 1
+        assert "--accept-incomplete-reason" in blocked.output
+
+        accepted = runner.invoke(
+            app,
+            [
+                "analyze",
+                "export",
+                str(run_dir),
+                "--paper",
+                "draft-a",
+                "--name",
+                "accepted-with-caveat",
+                "--paper-status",
+                "accepted",
+                "--accept-incomplete-reason",
+                "qualitative comparison only",
+            ],
+        )
+
+        assert accepted.exit_code == 0, accepted.output
+        manifest_path = (
+            tmp_path
+            / "exports"
+            / "papers"
+            / "draft-a"
+            / "accepted-with-caveat"
+            / "manifest.json"
+        )
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        assert manifest["source"]["run"]["readiness_acceptance_reason"] == (
+            "qualitative comparison only"
+        )
+
     def test_export_survey_collects_summary_outputs(self, tmp_path: Path) -> None:
         _write_project_file(tmp_path)
         survey_dir = tmp_path / "runs" / "angle_scan"

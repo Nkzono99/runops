@@ -4,7 +4,7 @@
 
 | 種類 | 保存先 | 規則 |
 |---|---|---|
-| 現在判断 | `research/CURRENT.md` | mutable。既定 20,000 Unicode 文字以内 |
+| 現在判断 | `research/CURRENT.md` | mutable。20,000 Unicode 文字が hard limit。既定 50 行・path 参照 10 件・時系列見出し 3 件で warning |
 | 時系列ログ | `research/journal/active.md` | append-only。既定 64,000 文字で原文のまま `archive/JNNNN.md` へ rotation |
 | 残す解析 | `research/results/RNNNN-topic/` | narrative は `README.md` 1 枚、実体は `artifacts/` |
 | 一時作業 | `.runops/work/<goal-id>/` | provisional、Git 管理しない |
@@ -14,6 +14,11 @@
 `artifacts/` 以下に Markdown を置かない。同じ論理データを CSV/JSON/Markdown の
 複数形式で重複保存しない。AI は重要度を推測して evidence を削除・要約置換せず、
 人が選んだ結果だけ `runo research new-result` で昇格する。
+
+`CURRENT.md` は artifact inventory や作業日誌へ戻さない。時系列は
+`runo research append`、残す詳細解析は `research/results/`、網羅的な artifact provenance は
+export/source index に置く。compact 指標の超過は普段の作業を止めない warning であり、
+`runo lint --strict` を選んだ場合だけ gate になる。
 
 旧構成は `runo research migrate-legacy` で内容を変更せず recovery archive へ移す。
 移行は `--restore` で戻せる。削除・purge はこの workflow に含めない。

@@ -18,6 +18,9 @@ class ResearchBudget:
     """
 
     current_chars: int = 20_000
+    current_lines: int = 50
+    current_path_references: int = 10
+    current_chronological_headings: int = 3
     journal_segment_chars: int = 64_000
     result_readme_chars: int = 30_000
     active_results: int = 8
@@ -57,6 +60,9 @@ class ResearchBudget:
         """Return the public JSON-serializable budget shape."""
         return {
             "current_chars": self.current_chars,
+            "current_lines": self.current_lines,
+            "current_path_references": self.current_path_references,
+            "current_chronological_headings": self.current_chronological_headings,
             "journal_segment_chars": self.journal_segment_chars,
             "result_readme_chars": self.result_readme_chars,
             "active_results": self.active_results,

@@ -222,7 +222,9 @@ def _render_status(payload: dict[str, object]) -> None:
     typer.echo(f"Research workspace: {payload['root']}")
     typer.echo(
         "Quantities: "
-        f"current={payload['current_chars']} chars, "
+        f"current={payload['current_chars']} chars/{payload['current_lines']} lines, "
+        f"current_paths={payload['current_path_references']}, "
+        f"current_chronology={payload['current_chronological_headings']}, "
         f"journal={payload['journal_chars']} chars, "
         f"active_results={payload['active_result_count']}, "
         f"artifacts={payload['artifact_files']} files/{payload['artifact_bytes']} bytes"

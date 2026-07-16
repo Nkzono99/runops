@@ -9,7 +9,7 @@ import typer
 
 from runops.application.actions import ActionStatus
 from runops.application.actions import sync_run as sync_run_action
-from runops.application.execution.readiness import RunReadiness, evaluate_run_readiness
+from runops.application.execution.readiness import RunReadiness, resolve_run_readiness
 from runops.cli.run_lookup import resolve_run_targets
 from runops.core.exceptions import (
     ManifestNotFoundError,
@@ -179,6 +179,14 @@ def _print_status_one(run_dir: Path) -> None:
             )
         for warning in readiness.warnings:
             typer.echo(f"Readiness warning: {warning}")
+        if readiness.reason_codes:
+            typer.echo("Readiness codes: " + ", ".join(readiness.reason_codes))
+        if readiness.recommended_action:
+            typer.echo(f"Next action: {readiness.recommended_action}")
+        if readiness.recommended_command:
+            typer.echo(f"Next command: {readiness.recommended_command}")
+        if readiness.requires_human:
+            typer.echo("Human decision: required")
     retry_status = str(manifest.run.get("retry_status", "")).strip()
     if retry_status:
         typer.echo(f"Retry:  {retry_status}")
@@ -216,7 +224,7 @@ def _readiness_for_display(
     """Return readiness details for completed runs."""
     if manifest.run.get("status") != RunState.COMPLETED.value:
         return None
-    return evaluate_run_readiness(run_dir, manifest=manifest)
+    return resolve_run_readiness(run_dir, manifest=manifest)
 
 
 def sync(
@@ -329,6 +337,16 @@ def sync(
             failure_reason = str(result.data.get("failure_reason", ""))
             if failure_reason:
                 msg += f" (reason: {failure_reason})"
+            readiness = result.data.get("readiness")
+            if isinstance(readiness, dict):
+                analysis_status = str(readiness.get("analysis_status", "unknown"))
+                recommended_action = str(result.data.get("recommended_action", ""))
+                msg += f"; analysis={analysis_status}"
+                if recommended_action:
+                    msg += f"; next={recommended_action}"
+                recommended_command = str(result.data.get("recommended_command", ""))
+                if recommended_command:
+                    msg += f"; command={recommended_command}"
             typer.echo(msg)
 
     # Print summary when multiple targets are involved

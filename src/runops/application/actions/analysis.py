@@ -152,6 +152,7 @@ def export_publication(
     include_figures: bool = True,
     include_plots: bool = True,
     paper_status: str = "",
+    accept_incomplete_reason: str = "",
     force: bool = False,
 ) -> ActionResult:
     """Create a project-side publication export bundle."""
@@ -166,6 +167,7 @@ def export_publication(
             include_figures=include_figures,
             include_plots=include_plots,
             paper_status=paper_status,
+            accept_incomplete_reason=accept_incomplete_reason,
             force=force,
         )
     except SimctlError as e:

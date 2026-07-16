@@ -76,6 +76,50 @@ def test_status_shows_completed_run_readiness_warning(tmp_path: Path) -> None:
     assert "State:  completed" in result.output
     assert "Analysis: incomplete" in result.output
     assert "Missing artifacts: hdf5_fields" in result.output
+    assert "Readiness codes: missing_required_output:hdf5_fields" in result.output
+    assert "Next action: review_outputs" in result.output
+    assert "Next command: runo runs log R20260507-0001" in result.output
+
+
+def test_status_reuses_valid_readiness_cache(tmp_path: Path) -> None:
+    """A post-sync status call should not repeat adapter output inspection."""
+    from runops.application.execution.readiness import (
+        probe_run_readiness,
+        write_readiness_cache,
+    )
+    from runops.core.manifest import read_manifest
+
+    create_minimal_project(tmp_path, name="test")
+    run_dir = tmp_path / "runs" / "R20260507-0002"
+    create_run_manifest(
+        run_dir,
+        status="completed",
+        job_id="12345",
+        submitted_at="2026-07-16T12:00:00+09:00",
+        simulator_name="emses",
+        adapter="emses",
+    )
+    write_toml(run_dir / "input" / "plasma.toml", {"jobcon": {"nstep": 100}})
+    (run_dir / "work").mkdir(parents=True, exist_ok=True)
+    (run_dir / "work" / "energy").write_text("100 1.0 2.0\n", encoding="utf-8")
+    manifest = read_manifest(run_dir)
+    write_readiness_cache(
+        run_dir,
+        probe_run_readiness(run_dir, manifest=manifest),
+        manifest=manifest,
+    )
+
+    with (
+        patch("runops.cli.status.Path.cwd", return_value=tmp_path),
+        patch(
+            "runops.application.execution.readiness.evaluate_run_readiness",
+            side_effect=AssertionError("deep readiness evaluation should not run"),
+        ),
+    ):
+        result = runner.invoke(app, ["runs", "status", str(run_dir)])
+
+    assert result.exit_code == 0, result.output
+    assert "Analysis: incomplete" in result.output
 
 
 def test_status_slurm_unavailable(tmp_path: Path) -> None:
@@ -290,11 +334,15 @@ def test_sync_completed(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "running" in result.output
     assert "completed" in result.output
+    assert "analysis=unknown" in result.output
+    assert "next=deep_validate" in result.output
+    assert "command=runo runs status R20260327-0001" in result.output
 
     from runops.core.manifest import read_manifest
 
     updated = read_manifest(run_dir)
     assert updated.run["status"] == "completed"
+    assert (run_dir / "status" / "readiness.json").is_file()
 
 
 # ---------------------------------------------------------------------------

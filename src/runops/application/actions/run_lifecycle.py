@@ -287,16 +287,55 @@ def sync_run(run_dir: Path) -> ActionResult:
     except SimctlError as e:
         return _error("sync_run", f"State update failed: {e}")
 
+    data: dict[str, Any] = {
+        "run_id": run_id,
+        "slurm_state": job_status.slurm_state,
+        "failure_reason": job_status.failure_reason,
+        "exit_code": job_status.exit_code,
+    }
+    if new_state is RunState.COMPLETED:
+        from runops.application.execution.readiness import (
+            probe_run_readiness,
+            write_readiness_cache,
+        )
+
+        try:
+            updated_manifest = read_manifest(run_dir)
+            readiness = probe_run_readiness(run_dir, manifest=updated_manifest)
+            cache_path = write_readiness_cache(
+                run_dir,
+                readiness,
+                manifest=updated_manifest,
+            )
+            data.update(
+                {
+                    "readiness": readiness.to_dict(),
+                    "recommended_action": readiness.recommended_action,
+                    "recommended_command": readiness.recommended_command,
+                    "requires_human": readiness.requires_human,
+                    "readiness_cache": str(cache_path),
+                }
+            )
+        except Exception as exc:  # pragma: no cover - optional diagnostic boundary
+            data.update(
+                {
+                    "readiness": {
+                        "analysis_status": "unknown",
+                        "analysis_ready": False,
+                        "reason_codes": ["readiness_probe_error"],
+                        "warnings": [str(exc)],
+                    },
+                    "recommended_action": "deep_validate",
+                    "recommended_command": f"runo runs status {run_id}",
+                    "requires_human": False,
+                }
+            )
+
     return ActionResult(
         action="sync_run",
         status=ActionStatus.SUCCESS,
         message=f"State: {state_str} -> {new_state.value}",
-        data={
-            "run_id": run_id,
-            "slurm_state": job_status.slurm_state,
-            "failure_reason": job_status.failure_reason,
-            "exit_code": job_status.exit_code,
-        },
+        data=data,
         state_before=state_str,
         state_after=new_state.value,
     )

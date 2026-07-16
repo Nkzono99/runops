@@ -286,7 +286,7 @@ def _collect_run_stats(
         return {"total": 0}
 
     try:
-        from runops.application.execution.readiness import evaluate_run_readiness
+        from runops.application.execution.readiness import resolve_run_readiness
         from runops.core.discovery import discover_runs
         from runops.core.manifest import read_manifest
 
@@ -302,7 +302,7 @@ def _collect_run_stats(
                 state = m.run.get("status", "unknown")
                 counts[state] = counts.get(state, 0) + 1
                 if state == RunState.COMPLETED.value:
-                    readiness = evaluate_run_readiness(rd, manifest=m)
+                    readiness = resolve_run_readiness(rd, manifest=m)
                     if readiness.analysis_ready:
                         analysis_ready += 1
                     elif readiness.analysis_status == "unknown":
@@ -319,6 +319,10 @@ def _collect_run_stats(
                                     readiness.missing_required_artifacts
                                 ),
                                 "warnings": list(readiness.warnings),
+                                "reason_codes": list(readiness.reason_codes),
+                                "recommended_action": readiness.recommended_action,
+                                "recommended_command": readiness.recommended_command,
+                                "requires_human": readiness.requires_human,
                             }
                         )
             except SimctlError:

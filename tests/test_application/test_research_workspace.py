@@ -101,6 +101,36 @@ def test_inspection_reports_narrative_and_artifact_budget_issues(
     assert "artifact.duplicate_formats" in codes
 
 
+def test_inspection_warns_when_current_state_becomes_a_history_or_path_ledger(
+    tmp_path: Path,
+) -> None:
+    _scaffold(tmp_path)
+    (tmp_path / "research/CURRENT.md").write_text(
+        "# Current\n"
+        "## 2026-07-14\n"
+        "- `runs/a/output.h5`\n"
+        "## 2026-07-15\n"
+        "- [details](research/results/R0001-a/README.md)\n",
+        encoding="utf-8",
+    )
+    budget = ResearchBudget(
+        current_lines=4,
+        current_path_references=1,
+        current_chronological_headings=1,
+    )
+
+    status = inspect_workspace(tmp_path, budget=budget)
+    issues = {issue.code: issue for issue in status.issues}
+
+    assert status.current_lines == 5
+    assert status.current_path_references == 2
+    assert status.current_chronological_headings == 2
+    assert issues["current.too_many_lines"].severity == "warning"
+    assert issues["current.too_many_paths"].severity == "warning"
+    assert issues["current.looks_chronological"].severity == "warning"
+    assert status.ok is True
+
+
 def test_create_archive_and_restore_result_without_semantic_judgment(
     tmp_path: Path,
 ) -> None:

@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from runops.application.execution.readiness import evaluate_run_readiness
+from runops.application.execution.readiness import resolve_run_readiness
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
@@ -264,6 +264,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
         simulator_status = ""
         missing_required_artifacts: list[str] = []
         readiness_warnings: list[str] = []
+        readiness_reason_codes: list[str] = []
+        recommended_action = ""
         try:
             manifest = read_manifest(run_dir)
             run_id = str(manifest.run.get("id", run_id))
@@ -280,12 +282,14 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                 "variation": dict(manifest.variation),
                 "param": dict(manifest.params_snapshot),
             }
-            readiness = evaluate_run_readiness(run_dir, manifest=manifest)
+            readiness = resolve_run_readiness(run_dir, manifest=manifest)
             analysis_ready = readiness.analysis_ready
             analysis_status = readiness.analysis_status
             simulator_status = readiness.simulator_status
             missing_required_artifacts = list(readiness.missing_required_artifacts)
             readiness_warnings = list(readiness.warnings)
+            readiness_reason_codes = list(readiness.reason_codes)
+            recommended_action = readiness.recommended_action
         except SimctlError:
             manifest = None
 
@@ -305,6 +309,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
             "simulator_status": simulator_status,
             "missing_required_artifacts": missing_required_artifacts,
             "readiness_warnings": readiness_warnings,
+            "readiness_reason_codes": readiness_reason_codes,
+            "recommended_action": recommended_action,
         }
 
         if not summary_path.is_file():
@@ -329,6 +335,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                         "analysis_status": analysis_status or "unknown",
                         "missing_required_artifacts": missing_required_artifacts,
                         "warnings": readiness_warnings,
+                        "reason_codes": readiness_reason_codes,
+                        "recommended_action": recommended_action,
                     }
                 )
                 warnings.extend(
@@ -426,6 +434,8 @@ def collect_survey_summaries(survey_dir: Path) -> SurveyCollectionResult:
                     "analysis_status": analysis_status or "unknown",
                     "missing_required_artifacts": missing_required_artifacts,
                     "warnings": readiness_warnings,
+                    "reason_codes": readiness_reason_codes,
+                    "recommended_action": recommended_action,
                 }
             )
             warnings.extend(f"{run_id}: {warning}" for warning in readiness_warnings)

@@ -51,6 +51,25 @@ handoff、project 固有の reference plugin など、simulator / site どちら
 `capabilities` は統合される。project / site 側は adapter を編集せずに追加の委譲
 役割だけを載せられる。
 
+### `[research.workspace]` section (optional)
+
+active research memory の量と `CURRENT.md` の compact guidance を設定する。
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `current_chars` | integer | `20000` | `CURRENT.md` の hard limit |
+| `current_lines` | integer | `50` | `CURRENT.md` の推奨最大行数。超過は warning |
+| `current_path_references` | integer | `10` | local path-like 参照の推奨最大数。超過は warning |
+| `current_chronological_headings` | integer | `3` | 日付・時刻で始まる見出しの推奨最大数。超過は warning |
+| `journal_segment_chars` | integer | `64000` | active journal segment の文字数上限 |
+| `result_readme_chars` | integer | `30000` | result README の文字数上限 |
+| `active_results` | integer | `8` | active result 数の上限 |
+| `result_artifact_files` | integer | `50` | result ごとの artifact file 数上限 |
+| `result_artifact_bytes` | integer | `209715200` | result ごとの artifact 合計 bytes 上限 |
+
+compact guidance は普段の作業を止めない。`runo lint --strict` を選んだ場合だけ
+warning を gate として扱う。
+
 ### `[knowledge]` section (optional)
 
 External shared knowledge source integration. If absent, only local knowledge (insights and facts) is used.
@@ -683,6 +702,21 @@ completed -> archived -> purged
 `runo context --json` が adapter の `detect_status()` と
 `required_outputs()` から analysis readiness を計算する。
 
+`runo runs sync` が current attempt を初めて `completed` にしたときは、Adapter の
+bounded `probe_readiness()` を同じ action 内で 1 回実行し、派生 cache を
+`status/readiness.json` に保存する。cache は `job_id`, `submitted_at`, `attempt` と
+結び付けられ、attempt が変わると無効になる。manifest の canonical lifecycle state
+ではなく、後続の status / context / MCP が同じ output inspection を繰り返さないための
+再計算可能な observation である。bounded result が `unknown` の場合だけ後続 consumer
+が deep evaluation を 1 回行って cache を置き換え、deep result は `unknown` でも再利用する。
+ただし `runs list`、`runs dashboard --all`、MCP `runops.run.list` は bulk latency を
+bounded に保つ cache-only consumer であり、cache miss は `readiness_not_cached` として
+返すだけで deep evaluation を起動しない。
+
+readiness result は `reason_codes`, `partial_outputs`, `recommended_action`,
+`recommended_command`, `requires_human`, `evaluation_mode` を含む。通常の terminal
+診断は sync result だけで次 action まで決められる。
+
 - EMSES は `hdf5_fields` (field HDF5) を required output として扱う
 - BEACH は `summary` (`summary.txt`) を required output として扱う
 - required output が欠ける completed run は `analysis_status = "incomplete"`
@@ -698,6 +732,9 @@ retry intent と partial output の検出結果だけを manifest に記録す�
 | `run.retry_status` | string | `partial`, `retry_planned`, `retry_ready`, `manual_review`, `not_retryable` |
 | `run.partial_outputs` | table | adapter の `detect_outputs()` から検出した partial output category と件数 |
 | `run.retry_note` | string | `--note` で記録した任意メモ |
+| `run.readiness_disposition` | string | known non-ready output を破棄した場合の `discarded_incomplete` |
+| `run.readiness_review_reason` | string | `purge-work --discard-incomplete --reason` で記録した判断理由 |
+| `run.readiness_reviewed_at` | datetime string | readiness disposition を記録した UTC timestamp |
 | `job.retry_adjustments` | table | 次 attempt に適用予定の調整値 |
 | `job.next_attempt` | int | plan 時点で予定される次 attempt 番号 |
 
@@ -1132,6 +1169,9 @@ project 側 snapshot を `exports/papers/<paper-id>/<export-name>/` に生成す
 source run に対する paper-facing status を上書きできる。指定しない場合、
 analysis-ready な completed run は `accepted`、required artifact が欠ける completed
 run は `placeholder`、retry planned run は `retry_planned` として推定する。
+analysis-incomplete な run を明示的に `accepted` とする場合だけ、同じ command に
+`--accept-incomplete-reason <WHY>` を指定する。理由は export の source run record の
+`readiness_acceptance_reason` に保存される。
 
 ### 例
 
@@ -1139,6 +1179,8 @@ run は `placeholder`、retry planned run は `retry_planned` として推定す
 runo analyze export runs/sheath/angle_scan --paper draft-a
 runo analyze export R20260412-0003 --paper draft-a --name fig2-baseline
 runo analyze export R20260412-0003 --paper draft-a --paper-status placeholder
+runo analyze export R20260412-0003 --paper draft-a --paper-status accepted \
+  --accept-incomplete-reason "qualitative comparison only"
 runo analyze export runs/sheath/angle_scan --paper draft-a --mode symlink
 ```
 

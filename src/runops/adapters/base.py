@@ -212,6 +212,27 @@ class SimulatorAdapter(ABC):
         """
         return {}
 
+    def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
+        """Return a bounded simulator/output readiness observation.
+
+        This hook is used when a scheduler job first becomes terminal.  It
+        must avoid full output enumeration and unbounded log reads.  Adapters
+        that cannot provide a bounded probe should keep the default result;
+        runops will recommend an explicit deep validation instead of slowing
+        every scheduler synchronization.
+
+        The returned mapping may contain ``simulator_status``, ``outputs``
+        (using the same top-level labels as :meth:`detect_outputs`), and
+        ``warnings``.
+        """
+        return {
+            "simulator_status": "unknown",
+            "outputs": {},
+            "warnings": [
+                f"Adapter {self.name!r} does not provide bounded readiness probing."
+            ],
+        }
+
     @classmethod
     def agent_guide(cls) -> str:
         """Return a minimal AI agent fallback guide as markdown.

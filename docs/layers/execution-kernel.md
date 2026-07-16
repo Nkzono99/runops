@@ -57,7 +57,8 @@ completed -> archived -> purged
 - `runo runs create` / `runo runs sweep` が `created` run を作る。
 - `runo runs submit` が Slurm に投入し、job id と submit history を記録する。
 - `runo runs status` は状態を表示する。live Slurm query を含む場合でも正本は更新しない。
-- `runo runs sync` が Slurm 状態を `manifest.toml` / `status/` に反映する。
+- `runo runs sync` が Slurm 状態を `manifest.toml` / `status/` に反映し、completed
+  transition では bounded readiness、reason code、次 command を同じ action result に含める。
 - `runo runs cancel` は `scancel` と sync を同時に行う。
 - `runo runs archive` / `purge-work` / `delete` はライフサイクル操作として扱う。
 

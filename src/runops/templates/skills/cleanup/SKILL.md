@@ -22,6 +22,9 @@ runo runs archive --keep-in-place
 
 # work/ の不要ファイルを削除 (archived のみ)
 runo runs purge-work
+
+# cached readiness が incomplete だが破棄すると判断済みの場合は同じ command で理由を記録
+runo runs purge-work --discard-incomplete --reason "<判断理由>"
 ```
 
 ## 実行中 job の停止
@@ -41,6 +44,8 @@ runo runs delete
 ## 注意
 
 - `archive` / `purge-work` / `delete` は確認が必要な操作
+- known incomplete readiness の purge は別の mark-reviewed 工程を作らず、
+  `--discard-incomplete --reason` で判断と削除を同時に記録する
 - `archive` は既定で run ディレクトリを `runs/_archive/` に移す。既存のノートや
   スクリプトが古いパスを参照していないか確認する
 - `cancel` は追加確認プロンプトなしで進めてよいが、実行前に対象と理由を必ず報告する

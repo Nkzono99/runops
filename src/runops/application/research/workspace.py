@@ -18,6 +18,21 @@ JST = timezone(timedelta(hours=9), name="JST")
 _JOURNAL_HEADER = "# Research Journal\n\n"
 _RESULT_ID = re.compile(r"^R(?P<number>\d{4})-")
 _DUPLICATE_FORMATS = frozenset({".csv", ".json", ".md"})
+_CHRONOLOGICAL_HEADING = re.compile(
+    r"^\s{0,3}#{1,6}\s+(?:\d{4}[-/]\d{1,2}[-/]\d{1,2}|\d{1,2}:\d{2}\b)",
+    re.MULTILINE,
+)
+_PATH_PREFIXES = (
+    "./",
+    "../",
+    "/",
+    ".runops/",
+    "analysis/",
+    "exports/",
+    "materials/",
+    "research/",
+    "runs/",
+)
 
 
 class ResearchWorkspaceError(Exception):
@@ -49,6 +64,9 @@ class ResearchWorkspaceStatus:
 
     root: Path
     current_chars: int
+    current_lines: int
+    current_path_references: int
+    current_chronological_headings: int
     journal_chars: int
     active_result_count: int
     result_readme_chars: int
@@ -68,6 +86,9 @@ class ResearchWorkspaceStatus:
             "root": str(self.root),
             "ok": self.ok,
             "current_chars": self.current_chars,
+            "current_lines": self.current_lines,
+            "current_path_references": self.current_path_references,
+            "current_chronological_headings": self.current_chronological_headings,
             "journal_chars": self.journal_chars,
             "active_result_count": self.active_result_count,
             "result_readme_chars": self.result_readme_chars,
@@ -253,7 +274,8 @@ def inspect_workspace(
     issues: list[WorkspaceIssue] = []
 
     current = research / "CURRENT.md"
-    current_chars = _text_chars(current, root=root, issues=issues)
+    current_text = _read_text(current, root=root, issues=issues)
+    current_chars = len(current_text or "")
     if current_chars > selected_budget.current_chars:
         issues.append(
             _limit_issue(
@@ -262,6 +284,39 @@ def inspect_workspace(
                 root,
                 current_chars,
                 selected_budget.current_chars,
+            )
+        )
+    current_lines, current_paths, current_chronological = _current_guidance_metrics(
+        current_text or ""
+    )
+    if current_lines > selected_budget.current_lines:
+        issues.append(
+            _guidance_issue(
+                "current.too_many_lines",
+                current,
+                root,
+                current_lines,
+                selected_budget.current_lines,
+            )
+        )
+    if current_paths > selected_budget.current_path_references:
+        issues.append(
+            _guidance_issue(
+                "current.too_many_paths",
+                current,
+                root,
+                current_paths,
+                selected_budget.current_path_references,
+            )
+        )
+    if current_chronological > selected_budget.current_chronological_headings:
+        issues.append(
+            _guidance_issue(
+                "current.looks_chronological",
+                current,
+                root,
+                current_chronological,
+                selected_budget.current_chronological_headings,
             )
         )
 
@@ -337,6 +392,9 @@ def inspect_workspace(
     return ResearchWorkspaceStatus(
         root=root,
         current_chars=current_chars,
+        current_lines=current_lines,
+        current_path_references=current_paths,
+        current_chronological_headings=current_chronological,
         journal_chars=journal_chars,
         active_result_count=len(result_dirs),
         result_readme_chars=total_result_chars,
@@ -606,8 +664,18 @@ def _text_chars(
     root: Path,
     issues: list[WorkspaceIssue],
 ) -> int:
+    text = _read_text(path, root=root, issues=issues)
+    return len(text) if text is not None else 0
+
+
+def _read_text(
+    path: Path,
+    *,
+    root: Path,
+    issues: list[WorkspaceIssue],
+) -> str | None:
     if not path.exists():
-        return 0
+        return None
     if path.is_symlink() or not path.is_file():
         issues.append(
             WorkspaceIssue(
@@ -617,9 +685,9 @@ def _text_chars(
                 "narrative must be a regular non-symlink file",
             )
         )
-        return 0
+        return None
     try:
-        return len(path.read_text(encoding="utf-8"))
+        return path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
         issues.append(
             WorkspaceIssue(
@@ -629,7 +697,35 @@ def _text_chars(
                 f"cannot read UTF-8 narrative: {exc}",
             )
         )
-        return 0
+        return None
+
+
+def _current_guidance_metrics(text: str) -> tuple[int, int, int]:
+    lines = len(text.splitlines())
+    paths = sum(1 for token in _path_candidates(text) if _looks_like_local_path(token))
+    chronological = len(_CHRONOLOGICAL_HEADING.findall(text))
+    return lines, paths, chronological
+
+
+def _path_candidates(text: str) -> list[str]:
+    candidates: list[str] = []
+    for raw in text.split():
+        token = raw.strip("`*_[]{}<>,;:'\"")
+        if "](" in token:
+            token = token.rsplit("](", maxsplit=1)[1]
+        token = token.strip("`*_[](){}<>,;:'\".")
+        if token:
+            candidates.append(token)
+    return candidates
+
+
+def _looks_like_local_path(token: str) -> bool:
+    lowered = token.casefold()
+    if lowered.startswith(("http://", "https://", "mailto:")):
+        return False
+    if token in {"/", "//"} or "/" not in token:
+        return False
+    return token.startswith(_PATH_PREFIXES) or bool(Path(token).suffix)
 
 
 def _limit_issue(
@@ -644,6 +740,21 @@ def _limit_issue(
         code,
         _relative(path, root),
         f"quantity {actual} exceeds configured limit {limit}",
+    )
+
+
+def _guidance_issue(
+    code: str,
+    path: Path,
+    root: Path,
+    actual: int,
+    limit: int,
+) -> WorkspaceIssue:
+    return WorkspaceIssue(
+        "warning",
+        code,
+        _relative(path, root),
+        f"guidance quantity {actual} exceeds configured target {limit}",
     )
 
 

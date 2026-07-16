@@ -31,7 +31,12 @@ from runops.application.actions import (
 from runops.application.actions import (
     create_run as create_run_action,
 )
+from runops.application.execution.readiness import (
+    probe_run_readiness,
+    write_readiness_cache,
+)
 from runops.core.knowledge import list_insights, load_facts
+from runops.core.manifest import read_manifest, update_manifest
 from runops.core.state import RunState
 from runops.slurm.query import JobStatus
 
@@ -552,6 +557,50 @@ def test_purge_work_removes_work_artifacts_and_updates_state(tmp_path: Path) -> 
     assert (run_dir / "status" / "state.json").exists()
 
 
+def test_purge_work_gates_known_incomplete_readiness(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0002"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": "R20260330-0002", "status": "completed"},
+            "job": {"job_id": "12345", "attempt": 1},
+            "simulator": {"name": "emses", "adapter": "emses"},
+        },
+    )
+    (run_dir / "input").mkdir()
+    with (run_dir / "input" / "plasma.toml").open("wb") as stream:
+        tomli_w.dump({"jobcon": {"nstep": 100}}, stream)
+    (run_dir / "work").mkdir()
+    (run_dir / "work" / "energy").write_text("100 1.0 2.0\n", encoding="utf-8")
+    manifest = read_manifest(run_dir)
+    write_readiness_cache(
+        run_dir,
+        probe_run_readiness(run_dir, manifest=manifest),
+        manifest=manifest,
+    )
+    update_manifest(run_dir, {"run": {"status": "archived"}})
+    (run_dir / "work" / "outputs").mkdir()
+
+    blocked = purge_work(run_dir)
+
+    assert blocked.status is ActionStatus.PRECONDITION_FAILED
+    assert blocked.data["recommended_action"] == "review_outputs"
+    assert (run_dir / "work" / "outputs").exists()
+
+    accepted = purge_work(
+        run_dir,
+        discard_incomplete=True,
+        review_reason="outputs are unusable and will be regenerated",
+    )
+
+    assert accepted.status is ActionStatus.SUCCESS
+    updated = read_manifest(run_dir)
+    assert updated.run["readiness_disposition"] == "discarded_incomplete"
+    assert updated.run["readiness_review_reason"] == (
+        "outputs are unusable and will be regenerated"
+    )
+
+
 def test_archive_run_moves_directory_and_updates_manifest_path(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "scan" / "R20260330-0001"
     _write_manifest(
@@ -867,6 +916,50 @@ def test_execute_action_sync_run_updates_manifest_and_state_file(
     assert updated.run["status"] == "running"
     assert updated.run["last_slurm_state"] == "RUNNING"
     assert (run_dir / "status" / "state.json").exists()
+
+
+def test_execute_action_sync_completed_returns_and_caches_readiness(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0002"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": "R20260330-0002", "status": "running"},
+            "job": {
+                "job_id": "24680",
+                "submitted_at": "2026-07-16T12:00:00+09:00",
+                "attempt": 1,
+            },
+            "simulator": {"name": "emses", "adapter": "emses"},
+        },
+    )
+    write_toml = tomli_w.dump
+    (run_dir / "input").mkdir()
+    with (run_dir / "input" / "plasma.toml").open("wb") as stream:
+        write_toml({"jobcon": {"nstep": 100}}, stream)
+    (run_dir / "work").mkdir()
+    (run_dir / "work" / "energy").write_text("100 1.0 2.0\n", encoding="utf-8")
+
+    with patch(
+        "runops.slurm.query.query_job_status",
+        return_value=JobStatus(
+            run_state=RunState.COMPLETED,
+            slurm_state="COMPLETED",
+        ),
+    ):
+        result = execute_action("sync_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["readiness"]["analysis_status"] == "incomplete"
+    assert result.data["readiness"]["reason_codes"] == [
+        "missing_required_output:hdf5_fields"
+    ]
+    assert result.data["recommended_action"] == "review_outputs"
+    assert result.data["readiness"]["recommended_command"] == (
+        "runo runs log R20260330-0002"
+    )
+    assert (run_dir / "status" / "readiness.json").is_file()
 
 
 def test_execute_action_sync_run_refreshes_slurm_state_when_state_unchanged(

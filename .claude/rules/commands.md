@@ -48,12 +48,12 @@
 | コマンド | 説明 |
 |---------|------|
 | `runo runs status [RUNS...]` | run 状態確認 (複数指定可) |
-| `runo runs sync [RUNS...]` | Slurm 状態を manifest に反映 (複数 run 時はサマリ表示) |
+| `runo runs sync [RUNS...]` | Slurm 状態を manifest に反映。terminal transition では bounded readiness と次 command も返す |
 | `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
 | `runo runs jobs [PATH] [--watch SECS]` | 実行中ジョブ一覧 |
-| `runo runs dashboard [TARGETS...] [--watch SECS]` | 複数 run の進捗表 |
+| `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗表。`--all` では cached analysis / next action も表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...]` | run 一覧表示 |
+| `runo runs list [PATHS...]` | run 一覧と cached analysis / next action を表示 |
 
 ## 解析・知見
 
@@ -62,7 +62,7 @@
 | `runo analyze summarize [RUN]` | run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 集計 |
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 |
-| `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
+| `runo analyze export [RUN\|SURVEY] --paper PAPER [--accept-incomplete-reason WHY]` | paper-facing export bundle を作成。incomplete を accepted にする場合は理由必須 |
 | `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | story acceptance audit workspace (`analysis/stories/`) を作成。relative source は project root 基準 |
 | `runo analyze audit-story [STORY_DIR]` | story の要求 step と artifact index を照合し `audit.json` / `audit.md` を生成 |
 | `runo research status [PATH]` | active research の文字数・件数・bytes を表示 |
@@ -101,6 +101,6 @@
 | コマンド | 説明 |
 |---------|------|
 | `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
-| `runo runs purge-work [RUN]` | work/ 内の不要ファイル削除 (archived のみ) |
+| `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | work/ 内の不要ファイル削除。既知の non-ready output を破棄する場合は理由必須 |
 | `runo runs cancel [RUN]` | scancel + sync (submitted/running を停止) |
 | `runo runs delete [RUN]` | run ディレクトリ削除 (created/cancelled/failed のみ) |

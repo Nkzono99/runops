@@ -62,6 +62,9 @@ def test_research_status_json_uses_project_budget(tmp_path: Path) -> None:
     payload = json.loads(result.stdout)
     assert payload["budget"]["current_chars"] == 8
     assert payload["current_chars"] == len("# Current\n")
+    assert payload["current_lines"] == 1
+    assert payload["current_path_references"] == 0
+    assert payload["current_chronological_headings"] == 0
     assert payload["ok"] is False
     assert payload["issues"][0]["code"] == "current.too_large"
 

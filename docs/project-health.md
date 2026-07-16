@@ -33,7 +33,7 @@ Research / Knowledge / Harness / Upstream の各 layer を横断して見る hea
 | `runs` | `manifest.toml` の読み取り、`run_id` の存在と一意性、manifest status と last Slurm state の矛盾 |
 | `provenance` | completed run の `git_commit`, executable hash, simulator version |
 | `analysis` | completed run の `analysis/summary.json`, artifact index, legacy `figures_index.json` |
-| `knowledge` | research budget/layout、artifact 規則、`.runops/facts.toml` の source |
+| `knowledge` | research budget/layout、CURRENT の compact guidance、artifact 規則、`.runops/facts.toml` の source |
 | `plugins` | project / simulator / site 由来の推奨 Codex plugin metadata と委譲 role index。install 済み状態は見ない |
 
 `--scope` は comma-separated です。
@@ -51,6 +51,10 @@ runo lint --scope analysis,knowledge,plugins
 
 CI や preflight では `--strict` を使い、普段の作業では warning を見ながら必要なものだけ
 直す運用を想定します。
+
+`CURRENT.md` の行数、path 参照、時系列見出しの threshold は guidance warning です。
+通常 lint は exit code `0` のままなので作業速度を妨げず、チームが必要な場面だけ
+`--strict` で gate にできます。
 
 ## Migration との関係
 

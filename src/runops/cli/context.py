@@ -49,6 +49,13 @@ def context(
                 f"active_results={research.get('active_result_count', 0)}, "
                 f"status={'ok' if research.get('ok') else 'check required'}"
             )
+            typer.echo(
+                "Research guidance: "
+                f"current_lines={research.get('current_lines', 0)}, "
+                f"current_paths={research.get('current_path_references', 0)}, "
+                "current_chronology="
+                f"{research.get('current_chronological_headings', 0)}"
+            )
 
         sims = ctx.get("simulators", [])
         if sims:

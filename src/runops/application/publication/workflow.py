@@ -173,6 +173,7 @@ def export_publication_bundle(
     include_figures: bool = True,
     include_plots: bool = True,
     paper_status: str = "",
+    accept_incomplete_reason: str = "",
     force: bool = False,
 ) -> PublicationExportResult:
     """Export publication-facing artifacts for one run or survey-like directory."""
@@ -230,6 +231,7 @@ def export_publication_bundle(
                 project_root,
                 target_path,
                 paper_status=paper_status,
+                accept_incomplete_reason=accept_incomplete_reason,
             )
             source_run_ids = (str(run_record["run_id"]),)
             source_metadata = _build_run_source_metadata(
@@ -252,7 +254,12 @@ def export_publication_bundle(
                 mode=normalized_mode,
             )
             run_records = [
-                _build_run_record(project_root, run_dir, paper_status=paper_status)
+                _build_run_record(
+                    project_root,
+                    run_dir,
+                    paper_status=paper_status,
+                    accept_incomplete_reason=accept_incomplete_reason,
+                )
                 for run_dir in discover_runs(target_path)
             ]
             source_run_ids = tuple(record["run_id"] for record in run_records)

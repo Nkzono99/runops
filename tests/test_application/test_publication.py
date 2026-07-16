@@ -16,6 +16,7 @@ from runops.application.publication import (
 from runops.application.publication.files import (
     materialize_export_files as _materialize_export_files,
 )
+from runops.core.exceptions import SimctlError
 
 
 def _write_manifest(run_dir: Path, data: dict[str, Any]) -> None:
@@ -138,6 +139,34 @@ def test_export_manifest_separates_execution_and_paper_status(
     assert run_record["analysis_status"] == "ready"
     assert run_record["paper_status"] == "placeholder"
     assert manifest["source"]["paper_status_counts"] == {"placeholder": 1}
+
+
+def test_accepting_incomplete_run_requires_inline_reason(tmp_path: Path) -> None:
+    _create_project(tmp_path)
+    run_dir = _create_completed_run(tmp_path / "runs", "R20260507-0002")
+
+    with pytest.raises(SimctlError, match="accept-incomplete-reason"):
+        export_publication_bundle(
+            run_dir,
+            paper_id="draft-a",
+            name="blocked",
+            paper_status="accepted",
+        )
+
+    result = export_publication_bundle(
+        run_dir,
+        paper_id="draft-a",
+        name="accepted-with-caveat",
+        paper_status="accepted",
+        accept_incomplete_reason="used only for qualitative comparison",
+    )
+
+    manifest = json.loads(result.manifest_path.read_text(encoding="utf-8"))
+    run_record = manifest["source"]["run"]
+    assert run_record["paper_status"] == "accepted"
+    assert run_record["readiness_acceptance_reason"] == (
+        "used only for qualitative comparison"
+    )
 
 
 def test_force_export_preserves_existing_bundle_on_failure(

@@ -16,7 +16,7 @@ from runops.application.analysis.artifacts import (
     collect_run_artifacts,
     write_artifacts_index,
 )
-from runops.application.execution.readiness import RunReadiness, evaluate_run_readiness
+from runops.application.execution.readiness import RunReadiness, resolve_run_readiness
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData, read_manifest
 from runops.core.models import publication as publication_models
@@ -83,10 +83,20 @@ def _resolve_paper_status(
     readiness: RunReadiness,
     *,
     paper_status: str,
+    accept_incomplete_reason: str,
 ) -> str:
     explicit = paper_status.strip() or str(manifest.run.get("paper_status", "")).strip()
     if explicit:
         _validate_paper_status(explicit)
+        if (
+            explicit == "accepted"
+            and not readiness.analysis_ready
+            and not accept_incomplete_reason.strip()
+        ):
+            raise SimctlError(
+                "Cannot mark an analysis-incomplete run as accepted without "
+                "--accept-incomplete-reason <WHY>."
+            )
         return explicit
     retry_status = str(manifest.run.get("retry_status", "")).strip()
     if retry_status == "retry_planned":
@@ -103,11 +113,12 @@ def build_run_record(
     run_dir: Path,
     *,
     paper_status: str = "",
+    accept_incomplete_reason: str = "",
 ) -> dict[str, Any]:
     manifest = read_manifest(run_dir)
     run_id = str(manifest.run.get("id", run_dir.name)).strip() or run_dir.name
     execution_status = str(manifest.run.get("status", "")).strip()
-    readiness = evaluate_run_readiness(run_dir, manifest=manifest)
+    readiness = resolve_run_readiness(run_dir, manifest=manifest)
     summary_path = run_dir / "analysis" / "summary.json"
     summary_available = summary_path.is_file()
     summary_keys: list[str] = []
@@ -126,10 +137,13 @@ def build_run_record(
         "execution_status": execution_status,
         "analysis_status": readiness.analysis_status,
         "analysis_ready": readiness.analysis_ready,
+        "readiness_reason_codes": list(readiness.reason_codes),
+        "recommended_action": readiness.recommended_action,
         "paper_status": _resolve_paper_status(
             manifest,
             readiness,
             paper_status=paper_status,
+            accept_incomplete_reason=accept_incomplete_reason,
         ),
         "retry_status": str(manifest.run.get("retry_status", "")).strip(),
         "case": str(manifest.origin.get("case", "")).strip(),
@@ -150,6 +164,12 @@ def build_run_record(
         "figure_count": figure_count,
     }
     simulator_source = _simulator_source_snapshot(manifest)
+    if (
+        record["paper_status"] == "accepted"
+        and not readiness.analysis_ready
+        and accept_incomplete_reason.strip()
+    ):
+        record["readiness_acceptance_reason"] = accept_incomplete_reason.strip()
     if simulator_source:
         record["simulator_source"] = simulator_source
     return record

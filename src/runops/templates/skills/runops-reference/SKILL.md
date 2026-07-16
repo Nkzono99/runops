@@ -20,14 +20,14 @@ runo plugins --check     # 推薦 plugin metadata と導入状態を確認
 runo plugins --json      # delegated_capabilities を含む plugin payload
 runo lint                # project state の health check
 runo lint --scope structure,analysis,knowledge,plugins
-runo runs list           # run 一覧
+runo runs list           # run + cached analysis + next action 一覧
 runo runs list runs/a runs/b  # 複数 PATH 指定
 runo runs jobs           # submitted/running のジョブ一覧
 runo runs jobs --all     # 全 run のジョブ情報
 runo runs jobs -w 30     # 30 秒ごとに自動更新
-runo runs dashboard runs/<survey>     # 複数 run の進捗 (state, step/N, %, slurm)
+runo runs dashboard runs/<survey>     # active run の進捗
 runo runs dashboard runs/<survey> -w 30
-runo runs dashboard runs/<survey> --all  # completed/failed も表示
+runo runs dashboard runs/<survey> --all  # completed の cached analysis / next action も表示
 runo runs history        # 投入履歴 (最新20件)
 runo runs history -n 0   # 全件
 ```
@@ -109,10 +109,13 @@ runo runs submit --all --yes       # 会話上で確認済みの場合のみ
 runo runs status                    # cwd の run の状態 (manifest 更新なし)
 runo runs status R20260330-0001 R20260330-0002  # 複数を一気に
 runo runs status runs/sheath/angle_scan         # survey 配下を一括で
-runo runs sync                      # Slurm 状態を manifest に反映
+runo runs sync                      # Slurm 状態 + terminal readiness + 次 command を返す
 runo runs sync runs/sheath/angle_scan           # survey 一括 sync
                                                   # (created な run は silent skip)
 ```
+
+`runs list` と `runs dashboard --all` は cache-only の bulk view。completed run が
+`unknown / deep_validate` の場合だけ、表示された run_id に対して `runs status` を使う。
 
 ## ログ
 
@@ -197,6 +200,7 @@ runo runs archive --keep-in-place  # 移動せず状態だけ archived にする
 runo runs archive --move-to runs/_archive_2026  # custom archive root
 runo runs purge-work         # work/ の不要ファイル削除 (archived のみ)
 runo runs purge-work --yes
+runo runs purge-work --discard-incomplete --reason "<判断理由>"
 
 # created/cancelled/failed の run ディレクトリをハード削除
 # (completed/archived には使えない — archive → purge-work を使うこと)

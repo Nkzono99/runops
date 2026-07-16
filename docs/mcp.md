@@ -127,8 +127,8 @@ error / blocked も JSON-RPC protocol error ではなく、通常の tool result
 
 | Tool | Safety | 内容 |
 |------|--------|------|
-| `runops.run.list` | read | manifest を読んで run 一覧を返す |
-| `runops.run.inspect` | inspect | run manifest と readiness を返す |
+| `runops.run.list` | read | manifest と cached readiness、次 command、readiness 集計を bulk で返す。deep evaluation は起動しない |
+| `runops.run.inspect` | inspect | run manifest と cached/deep readiness、reason code、次 command を返す |
 | `runops.run.logs` | inspect | 最新 stdout/stderr log の tail を返す |
 | `runops.slurm.queue` | inspect | manifest に記録された job 情報を一覧する |
 | `runops.slurm.job.inspect` | inspect | `squeue` / `sacct` で job state を読む |

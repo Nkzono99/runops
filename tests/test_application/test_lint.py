@@ -355,6 +355,27 @@ def test_project_lint_reports_oversized_current_state(tmp_path: Path) -> None:
     )
 
 
+def test_project_lint_warns_when_current_state_exceeds_line_guidance(
+    tmp_path: Path,
+) -> None:
+    _write_project(tmp_path)
+    (tmp_path / "research" / "CURRENT.md").write_text(
+        "\n".join(f"line {index}" for index in range(51)) + "\n",
+        encoding="utf-8",
+    )
+
+    report = run_project_lint(tmp_path, scopes=("knowledge",))
+
+    issue = next(
+        issue
+        for issue in report.issues
+        if issue.issue_id == "knowledge.current.too_many_lines"
+    )
+    assert issue.severity == "warning"
+    assert "research/results" in issue.recommendation
+    assert report.status == "warning"
+
+
 def test_project_lint_reports_incomplete_codex_plugin_metadata(
     tmp_path: Path,
 ) -> None:

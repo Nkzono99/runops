@@ -416,6 +416,14 @@ def export(
             "placeholder, retry_planned, excluded, or superseded."
         ),
     ),
+    accept_incomplete_reason: str = typer.Option(
+        "",
+        "--accept-incomplete-reason",
+        help=(
+            "Required provenance note when --paper-status accepted overrides "
+            "an incomplete readiness result."
+        ),
+    ),
     force: bool = typer.Option(
         False,
         "--force",
@@ -438,6 +446,7 @@ def export(
             include_figures=include_figures,
             include_plots=include_plots,
             paper_status=paper_status,
+            accept_incomplete_reason=accept_incomplete_reason,
             force=force,
         )
     except (OSError, TypeError, json.JSONDecodeError, SimctlError) as e:

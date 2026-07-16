@@ -214,6 +214,9 @@ def init(
         f'[project]\nname = "{project_name}"\ndescription = ""\n\n'
         "[research.workspace]\n"
         "current_chars = 20000\n"
+        "current_lines = 50\n"
+        "current_path_references = 10\n"
+        "current_chronological_headings = 3\n"
         "journal_segment_chars = 64000\n"
         "result_readme_chars = 30000\n"
         "active_results = 8\n"

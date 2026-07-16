@@ -162,15 +162,21 @@ remaining run を full submit します。
 | コマンド | 説明 |
 |---------|------|
 | `runo runs status [RUNS...]` | run の状態確認。run_id / run dir / survey dir を複数渡せる |
-| `runo runs sync [RUNS...]` | Slurm 状態を `manifest.toml` に反映 |
+| `runo runs sync [RUNS...]` | Slurm 状態を反映し、terminal run では bounded readiness と次 command も返す |
 | `runo runs log [RUN]` | 最新 job の stdout/stderr 表示 + 進捗% |
 | `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 |
-| `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗を 1 つの表で表示 |
+| `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗を表示。`--all` では cached analysis / next action も表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...]` | run の一覧表示。複数 PATH、状態、タグでフィルタ可能 |
+| `runo runs list [PATHS...]` | run と cached analysis / next action の一覧。複数 PATH、状態、タグでフィルタ可能 |
 
 `runo runs status` は表示用で、正本更新は `runo runs sync` が行います。
 bulk sync では created run と terminal state の run は silent skip されます。
+sync が completed transition で返した readiness は current attempt の
+`status/readiness.json` に cache されるため、Agent は通常 `sync → status → log` を
+定型的に全実行せず、sync result の `recommended_command` へ直接進めます。
+`runs list`、`runs dashboard --all`、MCP `runops.run.list` は cache-only の bulk view
+です。cache miss は `unknown / deep_validate` として見せますが、一覧取得中に run ごとの
+deep evaluation は起動しません。
 `runs jobs --watch` / `runs dashboard --watch` は CLI が一定間隔で問い合わせ直す
 polling view です。常駐 Web/API と push 配信を持つ persistent real-time dashboard
 service ではありません。
@@ -182,13 +188,13 @@ service ではありません。
 | `runo analyze summarize [RUN]` | Adapter による run 解析 summary 生成 |
 | `runo analyze collect [DIR]` | survey 内の run から集計データ生成 |
 | `runo analyze plot [DIR]` | survey 集計結果の可視化 |
-| `runo analyze export [RUN\|SURVEY] --paper PAPER` | paper-facing export bundle を作成 |
+| `runo analyze export [RUN\|SURVEY] --paper PAPER [--accept-incomplete-reason WHY]` | paper-facing export。incomplete acceptance は理由必須 |
 | `runo analyze new-comparison NAME [--source PATH]` | cross-run 比較 workspace を作成 |
 | `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | strict source/schema の story acceptance workspace を作成 |
 | `runo analyze audit-story [STORY_DIR]` | source artifact を照合し `audit.json` / `audit.md` を生成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
 | `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | completed run を archived にし、既定で `runs/_archive/` へ移動 |
-| `runo runs purge-work [RUN]` | archived run の `work/` 内不要ファイル削除 |
+| `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | archived run の work 削除。既知 non-ready output の破棄は理由必須 |
 | `runo runs delete [RUN]` | created / cancelled / failed run を削除 |
 
 completed / archived run には `delete` を使わず、`archive` → `purge-work` の経路を使います。

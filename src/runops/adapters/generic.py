@@ -221,6 +221,14 @@ class GenericAdapter(SimulatorAdapter):
 
         return outputs
 
+    def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
+        """Return a bounded readiness observation for generic runs."""
+        return {
+            "simulator_status": self.detect_status(run_dir),
+            "outputs": {},
+            "warnings": [],
+        }
+
     def detect_status(self, run_dir: Path) -> str:
         """Determine simulation status from ``work/exit_code`` and logs.
 

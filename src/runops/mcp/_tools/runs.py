@@ -5,7 +5,10 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from runops.application.execution.readiness import evaluate_run_readiness
+from runops.application.execution.readiness import (
+    readiness_for_bulk_view,
+    resolve_run_readiness,
+)
 from runops.core.discovery import discover_runs
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
@@ -51,6 +54,7 @@ def run_list(
 
     rows: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
+    readiness_counts: Counter[str] = Counter()
     for run_dir in run_dirs:
         try:
             manifest = read_manifest(run_dir)
@@ -58,6 +62,10 @@ def run_list(
             continue
         summary = _run_summary(run_dir, manifest, root)
         counts[str(summary["status"])] += 1
+        readiness = readiness_for_bulk_view(run_dir, manifest=manifest)
+        if readiness is not None:
+            summary["readiness"] = readiness.to_summary_dict()
+            readiness_counts[readiness.analysis_status] += 1
         if status_filter and summary["status"] != status_filter:
             continue
         if tag and tag not in summary["tags"]:
@@ -85,6 +93,7 @@ def run_list(
             "matched_count": len(rows),
             "total_count": len(run_dirs),
             "state_counts": dict(counts),
+            "readiness_counts": dict(readiness_counts),
         },
         project_root=root,
         warnings=warnings,
@@ -115,12 +124,17 @@ def run_inspect(run: str, project_root: str | None = None) -> dict[str, Any]:
     readiness: dict[str, Any] | None = None
     if manifest.run.get("status") == RunState.COMPLETED.value:
         try:
-            details = evaluate_run_readiness(run_dir, manifest=manifest)
+            details = resolve_run_readiness(run_dir, manifest=manifest)
             readiness = {
                 "analysis_status": details.analysis_status,
                 "analysis_ready": details.analysis_ready,
                 "missing_required_artifacts": list(details.missing_required_artifacts),
                 "warnings": list(details.warnings),
+                "reason_codes": list(details.reason_codes),
+                "recommended_action": details.recommended_action,
+                "recommended_command": details.recommended_command,
+                "requires_human": details.requires_human,
+                "evaluation_mode": details.evaluation_mode,
             }
         except SimctlError:
             readiness = None

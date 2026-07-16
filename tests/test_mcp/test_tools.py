@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from runops.application.execution.readiness import RunReadiness, write_readiness_cache
 from runops.application.execution.submission import SubmitRequest, plan_submit
 from runops.core.manifest import ManifestData, write_manifest
 from runops.mcp import tools
@@ -305,6 +306,35 @@ def test_run_list_filters_by_status_and_tag(tmp_path: Path) -> None:
     assert result["status"] == "ok"
     assert result["data"]["matched_count"] == 1
     assert result["data"]["runs"][0]["run_id"] == "R20260512-0001"
+
+
+def test_run_list_includes_cached_readiness_and_aggregate(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    run_dir = _make_run(project_root, status="completed")
+    write_readiness_cache(
+        run_dir,
+        RunReadiness(
+            run_id="R20260512-0001",
+            execution_status="completed",
+            adapter="generic",
+            simulator_status="completed",
+            analysis_status="incomplete",
+            analysis_ready=False,
+            checks=(),
+            warnings=("Missing required output.",),
+            reason_codes=("missing_required_output:result",),
+            recommended_action="review_outputs",
+            evaluation_mode="bounded",
+        ),
+    )
+
+    result = tools.run_list(project_root=str(project_root))
+
+    assert result["status"] == "ok"
+    row = result["data"]["runs"][0]
+    assert row["readiness"]["analysis_status"] == "incomplete"
+    assert row["readiness"]["recommended_command"] == ("runo runs log R20260512-0001")
+    assert result["data"]["readiness_counts"] == {"incomplete": 1}
 
 
 def test_run_logs_returns_latest_log_tail(tmp_path: Path) -> None:

@@ -30,6 +30,9 @@ def test_runops_schema_is_the_project_schema() -> None:
     assert "research" in schema["properties"]
     workspace = schema["properties"]["research"]["properties"]["workspace"]
     assert workspace["properties"]["current_chars"]["default"] == 20000
+    assert workspace["properties"]["current_lines"]["default"] == 50
+    assert workspace["properties"]["current_path_references"]["default"] == 10
+    assert workspace["properties"]["current_chronological_headings"]["default"] == 3
     assert workspace["properties"]["active_results"]["default"] == 8
 
 

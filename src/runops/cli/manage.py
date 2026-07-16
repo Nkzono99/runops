@@ -200,6 +200,16 @@ def _confirm_archive(
 def purge_work(
     run: str = typer.Argument(None, help="Run directory or run_id (defaults to cwd)."),
     yes: bool = typer.Option(False, "--yes", help="Skip confirmation prompt."),
+    discard_incomplete: bool = typer.Option(
+        False,
+        "--discard-incomplete",
+        help="Allow deletion when cached readiness is incomplete or unknown.",
+    ),
+    reason: str = typer.Option(
+        "",
+        "--reason",
+        help="Required review reason when --discard-incomplete is used.",
+    ),
 ) -> None:
     """Remove unnecessary files from a run's work/ directory."""
     run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
@@ -238,7 +248,11 @@ def purge_work(
         typer.echo("Cancelled.")
         raise typer.Exit()
 
-    result = purge_work_action(run_dir)
+    result = purge_work_action(
+        run_dir,
+        discard_incomplete=discard_incomplete,
+        review_reason=reason,
+    )
     if result.status is not ActionStatus.SUCCESS:
         typer.echo(f"Error: {result.message}", err=True)
         raise typer.Exit(code=1)
