@@ -400,6 +400,8 @@ class TestInit:
         content = agents_path.read_text(encoding="utf-8")
         assert "runops" in content
         assert "runo context" in content
+        assert "目的駆動の実行契約" in content
+        assert all(field in content for field in ("Goal", "Done", "Budget"))
         assert "役割分担" in content
         assert "$new-case" in content
         assert "/new-case" not in content
@@ -436,12 +438,12 @@ class TestInit:
         assert "$setup-env" in setup_runops_content
         assert "$setup-plugins" in setup_runops_content
         assert "$setup-campaign" in setup_runops_content
-        assert "project は生成済み" in setup_runops_content
-        assert "状態確認だけで応答を終えない" in setup_runops_content
-        assert "project の状態はこちらで確認します" in setup_runops_content
-        assert "doctor で未解決の項目はありますか" not in setup_runops_content
+        assert "## 実行契約" in setup_runops_content
+        assert "Default milestone" in setup_runops_content
+        assert "context / doctor は各1回" in setup_runops_content
+        assert "local state から決まらない設計情報だけ" in setup_runops_content
         assert 'git commit -m "chore: scaffold runops project"' in setup_runops_content
-        assert "次に頼みやすい形で 2-4 個" in setup_runops_content
+        assert "次に自然な 2-4 個" in setup_runops_content
         assert "{{ skill_prefix }}" not in setup_runops_content
         setup_plugins_content = (
             codex_skills_dir / "setup-plugins" / "SKILL.md"
@@ -546,7 +548,7 @@ class TestInit:
         # Behavioural rules that used to live in PreToolUse hooks must now be
         # documented in this rule file.
         assert "runo runs submit" in workflow
-        assert "通常の project には `tools/runops/` がない" in workflow
+        assert "runops 本体の変更は研究 project と分離した source checkout" in workflow
 
     def test_init_subdirectory_claude_md(self, tmp_path: Path) -> None:
         """Context-specific CLAUDE.md files are created in cases/ and runs/."""

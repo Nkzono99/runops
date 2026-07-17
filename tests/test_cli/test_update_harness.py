@@ -86,6 +86,7 @@ class TestUpdateHarnessBasic:
         assert "Analysis Context" in agents
         assert "`analysis-context`" in agents
         assert "委譲役割: analysis-workflow, handoff" in agents
+        assert "目的駆動の実行契約" in agents
 
     def test_creates_harness_lock(self, tmp_path: Path) -> None:
         """init creates .runops/harness.lock with template hashes."""
@@ -505,11 +506,10 @@ class TestUpdateHarnessBasic:
 
         assert result.exit_code == 0
         content = skill_path.read_text(encoding="utf-8")
-        assert "project は生成済み" in content
-        assert "状態確認だけで応答を終えない" in content
-        assert "必ず「セットアップ後に行うこと」" in content
-        assert "project の状態はこちらで確認します" in content
-        assert "doctor で未解決の項目はありますか" not in content
+        assert "## 実行契約" in content
+        assert "Default milestone" in content
+        assert "context / doctor は各1回" in content
+        assert "local state から決まらない設計情報だけ" in content
         assert 'git commit -m "chore: scaffold runops project"' in content
 
 

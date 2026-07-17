@@ -1,18 +1,30 @@
 # Agent User Guide
 
 runops project では run directory が実行の主単位、`manifest.toml` が状態と provenance
-の正本です。Agent はまず次を確認します。
+の正本です。Agent は `context` で現在地を把握し、Goal に必要な追加情報だけを選びます。
 
 ```bash
 uvx --from runops runo context --json
+# research memory が Next の判断に必要な場合
 uvx --from runops runo research status
+# structure / analysis / knowledge / plugin の health が必要な場合
 uvx --from runops runo lint --scope structure,analysis,knowledge,plugins
 ```
+
+## 目的駆動の実行契約
+
+- **Goal**: 今回到達させる研究・project state
+- **Done**: 到達を示す evidence / artifact
+- **Budget**: run 数、cost、待機時間、観測回数
+- **Next**: Goal に最も近い一つの状態遷移
+
+Agent は Done に必要な skill と command だけを使い、到達した時点で結果を返します。
+たとえば submit の Done は job_id、初動確認の Done は step / progress marker の変化です。
 
 ## 人と Agent の境界
 
 - 人: 研究目的、base input、計算資源上限、残す result を決める。
-- Agent: case/survey 編集、run 生成、監視、解析、一時作業を進める。
+- Agent: Goal の範囲で case/survey 編集、run 生成、投入、状態同期、解析、一時作業を進める。
 - 要確認: 初回 bulk submit、資源増加、cancel、purge、delete、研究方針の転換。
 
 ## 研究記憶
@@ -64,7 +76,8 @@ runo analyze new-comparison <name> --source <survey>
 ```
 
 submit 前に command、対象 run、queue、QOS、nodes/tasks/walltime を示し、人の確認を
-得ます。policy で bulk submit が止まった場合、個別 submit に分解して迂回しません。
+得ます。submit Goal は job_id の記録で完了します。初動確認も Goal に含む場合は、
+progress marker と観測期限を設定して `check-status` skill に進みます。
 
 run-local artifact は `runs/**/analysis/`、survey 集計は `<survey>/summary/`、複数
 run/survey 比較は `research/results/` に置きます。

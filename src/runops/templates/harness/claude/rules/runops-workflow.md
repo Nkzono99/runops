@@ -1,95 +1,48 @@
-# runops ワークフロールール
+# runops ワークフロー不変条件
 
-このファイルは、以前 PreToolUse hook (`protect-files.sh`, `guard-bash.sh`,
-`approve-run.sh`) で強制していた挙動を、AI エージェントが読む rule として
-記述する。permissions.deny で機械的に止められるものは settings.json に
-任せ、ここでは「Agent が判断すべき振る舞い」を明示する。
+`.claude/settings.json` が高コスト・不可逆操作の機械的な境界を持つ。この rule は、
+Goal / Done に向かう状態遷移で正規の更新経路を選ぶために使う。
 
-## ファイル操作の制約
+## 状態遷移の不変条件
 
-以下は permissions.deny でも止めるが、Bash 経由 (cp, mv, rm, sed -i,
-リダイレクト等) では permissions が効かないので、Agent 側の自制で守る:
+| 対象 | 正規の更新経路 |
+|---|---|
+| run directory / `manifest.toml` / input / `submit/job.sh` | case / survey を source にした `runo runs create|sweep|regenerate` |
+| run state / provenance | `runo runs submit|sync|archive|purge-work|delete` |
+| runtime output | `work/` を evidence として保持し、runops command で整理する |
+| reusable simulator input | `case.toml`、input template、`survey.toml` |
+| insight / fact | `runo knowledge save|add-fact|promote-fact` |
+| `SITE.md`, `.runops/knowledge/`, `refs/` | generated / read-only source として参照する |
+| trial analysis | `runs/**/analysis/scratch/` |
+| curated analysis | `analysis/summary.json`, curated figure, `research/results/` |
 
-- run ディレクトリ (`Rxxxx/`) は手で作らない
-- `manifest.toml` は手動編集も Bash 書き込みもしない
-- `Rxxxx/input/*` を直接作らない (case template から再生成する)
-- `Rxxxx/submit/job.sh` は手書きしない (runops が生成する)
-- run は必ず `runo runs create` または `runo runs sweep` で生成する
-- `work/` の出力は読み取り専用扱い (移動・削除しない)
-- `.runops/knowledge/` の自動生成物は手で整形しない
-- `.runops/insights/` と `.runops/facts.toml` は直接編集せず、
-  `runo knowledge save` / `runo knowledge add-fact` を使う
-- `SITE.md` は site profile 由来の生成ドキュメントとして直接編集しない
-- `refs/` がある場合は任意の外部リポジトリ mirror として扱い、書き込まない
-- `runs/**/input/*` を緊急修正した場合は、同じ修正を上流の case へ戻す
+runops 本体の変更は研究 project と分離した source checkout で扱う。project では
+`uvx --from runops runo ...`、simulator runtime では `.venv/` を使う。
 
-## runops 本体の編集
+## Submit の実行契約
 
-- 通常の project には `tools/runops/` がない前提で作業する
-- runops 本体を修正する必要がある場合は、project の研究作業とは別の
-  source checkout を用意し、修正・検証・PR 化を分けて扱う
-- project 側では `uvx --from runops runo ...` で実行する runops version と
-  `.runops/harness.lock` の適用済み version、`.runops/knowledge/runops/` の
-  生成済み guide を確認入口にする
+| Goal | entry / Done |
+|---|---|
+| pilot submit | 対象・queue・資源・command の承認 / job_id と判定基準の報告 |
+| full submit | pilot evidence、`Decision: EXPAND`、cost ceiling、承認 / 全 job_id と投入 evidence の報告 |
+| startup validation | progress marker と観測期限 / marker の進行または期限時点の状態報告 |
 
-## venv
+`runo runs submit --dry-run --all` で bulk 対象を確定し、承認済みの場合は
+`runo runs submit --all --yes` で CLI prompt をまとめる。startup validation は
+`check-status` skill の観測予算に従う。
 
-- **runops コマンドは `uvx --from runops runo ...` で実行する**
-- `.venv/` は simulator package、解析依存、runtime tool を直接使うときだけ activate する
+## Human checkpoint
 
-## case 作成
+次の状態遷移は、対象と影響を示して承認を得る。
 
-- **case は `runo case new <name> -s <simulator>` で生成する**
-  (`cases/<sim>/` に自動配置)
-- 生成された `case.toml` や入力テンプレートの編集は自由
+- 初回 bulk submit、`runo runs submit --all`、資源増加 retry
+- purge / delete、実行 binary・module・launcher の変更
+- `runops.toml`, `simulators.toml`, `launchers.toml`, `CLAUDE.md`, `AGENTS.md`,
+  `.claude/settings.json`, `.codex/config.toml`, `.codex/rules/**` の変更
 
-## ジョブ投入の確認フロー
+cancel は対象と理由を報告して進める。
 
-`runo runs submit` は破壊的操作ではないが、HPC 資源・queue・quota に影響する。
-permissions では allow し、Agent 側の workflow rule として以下を守る:
+## Evidence checkpoint
 
-- 実行前に **投入内容 (コマンド・対象 run・queue・QOS・資源量) をユーザーに提示**
-  してから submit を呼ぶ
-- partition override: `-qn <name>`, QOS override: `--qos <name>`
-- `runo runs submit --all` は CLI 側でも確認する。会話上で明示確認済みの場合だけ `--yes` を使う
-- `--dry-run` と `--help` は確認用なのでそのまま実行してよい
-- 承認なしに実ジョブ投入を繰り返し試行しない
-- submit 後は job_id を報告して返す。自動で待機・sync・log 確認を始めない
-- 「正常に動いているか数 step 見て」等の明示依頼がある場合だけ、期限付きの
-  startup check を行う。`runo runs log -f` で無期限に待たない
-- policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。
-  止まった理由と予定していた submit command をユーザーへ返す
-- 一度の submit で複数 run が走る (例: `--all`) ときは特に慎重に説明する
-
-## 設定ファイルの変更
-
-以下は permissions.ask でユーザー承認が必要なファイル:
-`runops.toml`, `simulators.toml`, `launchers.toml`, `CLAUDE.md`,
-`AGENTS.md`, `**/CLAUDE.md`, `**/AGENTS.md`, `.claude/settings.json`,
-`.claude/hooks/**`, `.codex/config.toml`, `.codex/rules/**`. 変更前に意図と
-差分を提示する。
-
-## コミットの義務
-
-意味のある作業単位ごとに必ず Git コミットして履歴を残す。詳細は CLAUDE.md
-の「進捗のコミット (義務)」セクションを参照。最低限以下のタイミングで
-コミットする:
-
-- campaign / case / survey の新規作成・大幅変更
-- `runo runs sweep` で新しい run を生成したとき
-- 解析結果・知見を保存したとき
-- runops 本体の別 checkout で修正してテストが通ったとき
-- `runo runs submit` の前 (投入前のスナップショット)
-
-## 知見の記録
-
-- 実験の知見・結果は Agent の memory ではなく `/learn` で保存する
-- 保存先: `.runops/insights/`, `.runops/facts.toml`
-- 外部 source から来た候補 fact は `.runops/knowledge/candidates/facts/` に入る
-- 候補 fact を採用するときは `runo knowledge promote-fact <source>:<fact_id>` を使う
-- `high` confidence は複数 run の再現か deterministic 確認がある場合だけ使う
-
-## 解析 scratch
-
-- 試行中の図・ノート・一時集計は `runs/**/analysis/scratch/` に置く
-- `analysis/summary.json` や curated figure を scratch 出力で上書きしない
+意味のある状態遷移を一つの論理コミットにする。submit 前は snapshot commit、解析後は
+metric / figure と provenance、knowledge 昇格時は source result と evidence path を残す。

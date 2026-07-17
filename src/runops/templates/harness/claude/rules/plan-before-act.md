@@ -1,17 +1,16 @@
-# 実行前ルール
+# Goal contract
 
-複数ファイル編集または高コスト操作の前には、短い plan を出す。
+複数ファイル編集、高コスト操作、承認が必要な操作では、実行前に短い contract を示す。
 
 ```json
 {
-  "goal": "what you want to achieve",
-  "edits": ["file1.toml", "file2.toml"],
-  "commands": ["runo runs sweep ...", "runo runs submit --all ..."],
-  "checkpoints": ["Confirm survey size before bulk submit"]
+  "goal": "今回到達させる状態",
+  "done": ["到達を示す evidence"],
+  "budget": {"runs": 3, "wait_minutes": 10},
+  "next": "最も近い一つの状態遷移",
+  "commands": ["runo ..."]
 }
 ```
 
-- 高コスト操作では run 数・queue・retry 理由を書く
-- plan にない高コスト操作をいきなり実行しない
-- approval が必要な操作は、plan を出したところで止まる
-
+checkpoint が必要な操作は contract を示して承認を得る。実行後は Done と evidence を
+比較し、到達した時点で結果を返す。

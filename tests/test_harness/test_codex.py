@@ -140,7 +140,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "runo runs submit --dry-run --all" in codex_run_all
     assert "runo runs submit --all --dry-run" not in codex_run_all
     assert "research/CURRENT.md" in codex_run_all
-    assert "pilot result" in codex_run_all
+    assert "pilot evidence" in codex_run_all
     assert "full submit" in codex_run_all
     assert "pilot" in codex_run_all
     codex_create_run = bundle.files[".agents/skills/create-run/SKILL.md"]
@@ -166,11 +166,10 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "`$setup-env`" in codex_setup
     assert "`$setup-campaign`" in codex_setup
     assert "`$setup-plugins`" in codex_setup
-    assert "project は生成済み" in codex_setup
-    assert "状態確認だけで応答を終えない" in codex_setup
-    assert "必ず「セットアップ後に行うこと」" in codex_setup
-    assert "project の状態はこちらで確認します" in codex_setup
-    assert "doctor で未解決の項目はありますか" not in codex_setup
+    assert "## 実行契約" in codex_setup
+    assert "Default milestone" in codex_setup
+    assert "context / doctor は各1回" in codex_setup
+    assert "local state から決まらない設計情報だけ" in codex_setup
     assert 'git commit -m "chore: scaffold runops project"' in codex_setup
     assert "runo plugins --json" in codex_setup_plugins
     assert "Codex hooks は experimental" in codex_setup_plugins
@@ -178,29 +177,43 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "runops project 側で hook を自作しない" in codex_setup_plugins
     assert "`$setup-runops`" in codex_setup_plugins
     assert "`/setup-env`" in claude_setup
-    assert "状態確認だけで応答を終えない" in claude_setup
+    assert "## 実行契約" in claude_setup
     assert 'git commit -m "chore: scaffold runops project"' in claude_setup
     assert "{{ skill_prefix }}" not in codex_setup
     assert "{{ skill_prefix }}" not in codex_setup_plugins
 
 
-def test_bundle_only_monitors_post_submit_when_explicitly_requested() -> None:
-    """Submit returns promptly unless the user asks for a startup check."""
+def test_bundle_uses_goal_directed_bounded_control() -> None:
+    """The core harness drives toward an explicit outcome within a budget."""
     bundle = build_harness_bundle("demo", ["emses"])
 
     agents = bundle.files["AGENTS.md"]
+    claude = bundle.files["CLAUDE.md"]
     run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
     check_status = bundle.files[".agents/skills/check-status/SKILL.md"]
     claude_check_status = bundle.files[".claude/skills/check-status/SKILL.md"]
     claude_workflow = bundle.files[".claude/rules/runops-workflow.md"]
 
-    for content in (agents, run_all, claude_workflow):
-        assert "submit 後は job_id を報告して返す" in content
-        assert "自動で待機・sync・log 確認を始めない" in content
+    for content in (agents, claude):
+        assert "## 目的駆動の実行契約" in content
+        assert "Goal" in content
+        assert "Done" in content
+        assert "Budget" in content
+        assert "次の状態遷移" in content
+        assert "submit 後の既定動作" not in content
+        assert "自動で待機・sync・log 確認を始めない" not in content
+    assert len(agents.splitlines()) <= 180
+
+    assert "## 実行契約" in run_all
+    assert "job_id" in run_all
     for content in (check_status, claude_check_status):
-        assert "明示的に startup check を依頼した場合だけ" in content
-        assert "確認できた時点または期限に達した時点で終了" in content
-        assert "通常の submit 完了だけでは自動発火しない" in content
+        assert "## 実行契約" in content
+        assert "観測予算" in content
+        assert "進行を示す evidence" in content
+        assert "Do not auto-invoke" not in content
+        assert "自動発火しない" not in content
+    assert "状態遷移の不変条件" in claude_workflow
+    assert "自動で待機・sync・log 確認を始めない" not in claude_workflow
 
 
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:

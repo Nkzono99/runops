@@ -140,16 +140,17 @@ Agent との聞き取りを短くしたい場合は、研究目的と制約を�
 | survey を作る | `campaign の independent variables をもとに survey.toml を作って。命名規則も入れて。` |
 | run を展開する | `この survey から run を生成して。created 状態まで進めて。` |
 | 投入前にレビューする | `submit 前に plan と対象 run を確認して。初回 bulk submit なので確認を挟んで。` |
-| 投入だけ行う | `この3 runを投入して。job_idを報告したら、待機やlog確認はせず返して。` |
-| 初動だけ確認する | `投入後、正常に動いているか数step見て。10分以内で確認できたところまで報告して。` |
+| 投入まで行う | `Goalはこの3 runの投入。Doneは対象とjob_idの報告。` |
+| 初動まで確認する | `Goalは投入と初動確認。Doneはstepが2回進むこと、Budgetは10分。` |
 | 失敗 run を診断する | `failed run を確認して。log を読んで failure_reason を整理し、retry 方針を提案して。` |
 | 解析・知見を整理する | `completed run を summarize / collect して、insight と fact の候補を分けてまとめて。` |
 | runops にフィードバックする | project 固有情報を除いた再現手順と issue 下書きを作るよう依頼する |
 
 ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
 
-submit の既定動作は job_id の報告までです。投入後の待機、`sync`、log/step 確認は
-自動では始まりません。初動確認が必要なときだけ、確認条件と期限を依頼に含めてください。
+Agent は依頼から Goal / Done / Budget を組み立て、Done に必要な最短の状態遷移を選びます。
+submit の Done は job_id、初動確認の Done は progress evidence です。後者まで進めたい場合は、
+step、log marker、観測期限などを依頼に含めてください。
 
 ## SKILL を明示するとき
 

@@ -7,6 +7,7 @@ Harness Layer は、人間と Agent が runops project を安全に運用する�
 ## 目的
 
 - Agent が project の文脈を読めるようにする。
+- Goal / Done / Budget から最短の状態遷移を選べるようにする。
 - 高コスト / 不可逆操作に guardrail を置く。
 - 定型作業を skill として共有する。
 - Claude Code / Codex の違いを吸収し、同じ project 運用思想を保つ。
@@ -52,6 +53,23 @@ Harness Layer に置くもの:
 - runops local patch / feedback の手順
 - project-specific override
 
+### Feed-forward core
+
+通常運用は、禁止事項の列挙ではなく次の実行契約を正本にします。
+
+1. **Goal**: 今回到達させる研究・project state
+2. **Done**: 到達を示す evidence / artifact
+3. **Budget**: run 数、cost、待機時間、観測回数
+4. **Next**: Goal に最も近い一つの状態遷移
+
+Agent は Done に必要な source と skill だけを読み、到達時に返します。submit、監視、解析は
+別々の到達状態なので、後続段階は依頼の Done に含まれる場合に進みます。
+
+否定形の rule は、目的設定だけでは守れない安全 invariant に限定します。高コスト・不可逆
+command は policy / permission、人間の研究判断は checkpoint、定型手順は relevant skill に置きます。
+CLI command の網羅表を root instruction に複製せず、task-specific skill と選択した command の
+`--help` を progressive disclosure で参照します。
+
 置かないもの:
 
 - 研究判断の正本。これは `research/CURRENT.md`。
@@ -66,6 +84,7 @@ Harness Layer に置くもの:
 - `runo update-harness` は template 由来の harness を再生成する。
 - 既存 project の local edits と衝突する場合は `.new` を出して手動マージに回す。
 - shared な運用変更を入れたら Claude / Codex 側の drift を点検する。
+- root instruction は入口と feed-forward core に絞り、180 行を上限として回帰テストする。
 - project 固有の一時 override は `AGENTS.override.md` や user-local 設定に置き、Git 管理しない。
 - project 固有 harness を汎用化したくなったら [Upstream Integration Layer](upstream.md) に進む。
 

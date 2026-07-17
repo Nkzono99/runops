@@ -1,205 +1,128 @@
 このプロジェクトは runops で管理されています。
-CLI は `uvx --from runops runo ...` を標準経路として使う。`runops` も互換 alias として同じ
-CLI を実行できる。`.venv/` は simulator package や解析依存など project runtime 用に使う。
-人が研究目的・ベース入力・計算資源上限を決め、Agent はその範囲で
-campaign 設計、case / survey 編集、run 生成、投入、監視、解析、知見整理を進めます。
+CLI は `uvx --from runops runo ...` を標準経路として使う。`runops` は互換 alias、
+`.venv/` は simulator package や解析依存など project runtime 用です。
+人が研究目的・ベース入力・計算資源上限を決め、Agent はその範囲で研究状態を
+次の検証可能な状態へ進めます。
 
 ## コミュニケーション
 
 - **日本語で応答する**。コード・コマンド・変数名・エラーメッセージは英語のまま
 - commit message は英語 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)
 
-## まずやること
+## 目的駆動の実行契約
 
-0. **runops CLI は uvx で呼ぶ** — 例: `uvx --from runops runo context --json`
-   `.venv/` は必要な runtime tool を直接実行するときだけ activate する。
-1. `uvx --from runops runo context --json` で project の現在地を把握する
-2. 必要なら `uvx --from runops runo lint --scope structure,analysis,knowledge,plugins` で読み入口、成果物索引、推奨 plugin metadata を確認する
-3. `campaign.toml` を読む
-4. `research/CURRENT.md` と `runo research status` で現在地と量を確認する
-5. 関連する `cases/**/case.toml` と `runs/**/survey.toml` を読む
-6. `.runops/facts.toml` を読み、必要なら `.runops/knowledge/candidates/facts/` も確認する
-7. 必要なら最近の failed run の `runo runs status` / `runo runs log -e` を見る
-8. **定型作業は `{{ skill_prefix }}skill-name` で呼び出す** (下記「スキル」参照)
+作業前に、依頼から次の 4 項目を決める。小さな作業では内部で短く保持し、複数ファイル変更、
+高コスト操作、承認が必要な操作ではユーザーにも示す。
 
-## スキル
+- **Goal** — 今回到達させる研究・project の状態
+- **Done** — 到達を判断できる evidence または artifact
+- **Budget** — run 数、core-hour、待機時間、確認回数など今回使える上限
+- **Next** — Goal に最も近づく次の状態遷移を一つ
 
-`{{ skills_dir }}` に定型作業のスキルがある。
-`{{ skill_prefix }}skill-name` で直接呼び出すか、{{ agent_name }} が関連時に自動読み込みする。
+1. `uvx --from runops runo context --json` で現在地を一度把握する
+2. Next の判断に必要な source だけを読む
+3. 該当 skill と simulator / environment plugin に経路を渡す
+4. Done に必要な最短の command chain を実行する
+5. evidence を Done と比較し、到達時は結果を返す。未到達時は次の一遷移か blocker を返す
 
-| スキル | 用途 |
+依頼の到達状態を作業の終点にする。
+
+| 依頼 | Done の既定値 |
 |---|---|
-| `{{ skill_prefix }}new-case` | ケースを作成・編集する |
-| `{{ skill_prefix }}setup-runops` | project の初期セットアップと最初の聞き取り |
-| `{{ skill_prefix }}setup-plugins` | 推奨 Codex plugin の install / enable / plugin-provided hook 導線を整える |
-| `{{ skill_prefix }}create-run` | Run / Survey を生成する |
-| `{{ skill_prefix }}survey-design` | パラメータサーベイを設計する |
-| `{{ skill_prefix }}run-all` | survey の全 run を生成して投入する |
-| `{{ skill_prefix }}check-status` | run / survey の状態を確認・同期する |
-| `{{ skill_prefix }}analyze` | 完了 run の結果を解析・集計し、cross-run 比較 workspace を作る |
-| `{{ skill_prefix }}summarize-script` | `summarize.py` で run-local metric / figure を作る |
-| `{{ skill_prefix }}debug-failed` | 失敗 run を診断する |
-| `{{ skill_prefix }}cleanup` | run のアーカイブ・整理 |
-| `{{ skill_prefix }}learn` | 知見を記録する (curated, 名前付き) |
-| `{{ skill_prefix }}research-workspace` | bounded journal、current state、result を整理する |
-| `{{ skill_prefix }}patch-runops` | 必要時に別 checkout で runops 本体を修正し、PR/local-only を判定する |
-| `{{ skill_prefix }}update-runops` | uvx で runops tool と project harness を更新し、migration guide を確認する |
-| `{{ skill_prefix }}migrate-runops` | `docs/migrations/` に従って project 側状態を移行する |
-| `{{ skill_prefix }}python-package-refactor` | Python package の構造リファクタリングを API 保持と検証付きで進める |
-| `{{ skill_prefix }}release` | プロジェクトのマイルストーンタグを作成 |
-| `{{ skill_prefix }}setup-env` | 環境セットアップ |
-| `{{ skill_prefix }}setup-campaign` | campaign.toml を研究テーマから設計する |
+| case / survey を設計 | 設定、根拠、検証結果が揃う |
+| run を生成 | 対象 run が `created` になり、件数と由来を報告できる |
+| job を投入 | job_id と投入対象を記録・報告できる |
+| 初動を確認 | 指定した step / progress evidence、または観測期限時点の状態を報告できる |
+| 状態を確認 | manifest を同期し、状態要約と推奨する次アクションを報告できる |
+| 解析する | 再現可能な metric / figure と、その根拠を報告できる |
 
-コマンドの詳細は `runops-reference` スキル（自動読み込み）を参照。
+この表の Done に達したら応答を返す。後続段階は、その段階を Goal に含む依頼で開始する。
 
-## 役割分担
+## 読み入口とスキル
 
-### 人が決めるもの
-- 研究目的・ベース入力ファイル・計算資源の上限
+Next に応じて `campaign.toml`、`research/CURRENT.md`、関連する case / survey、run status、
+knowledge のうち必要なものを選ぶ。project 構造や索引の確認には
+`uvx --from runops runo lint --scope structure,analysis,knowledge,plugins` を使う。
 
-### Agent が進めてよいもの
-- campaign / case / survey の編集、run 生成・投入・監視・解析・知見整理
+`{{ skills_dir }}` の skill は `{{ skill_prefix }}skill-name` で呼び出せる。
 
-### 確認が必要なもの
-- 初回の大規模 survey / `runo runs submit --all` / 資源増加を伴う retry
-- `runo runs purge-work` / `runo runs delete` (実ファイル削除)
-- 実行バイナリ、モジュール、launcher の変更
+| 目的 | スキル |
+|---|---|
+| 初期化 | `{{ skill_prefix }}setup-runops`, `{{ skill_prefix }}setup-env`, `{{ skill_prefix }}setup-plugins` |
+| 研究・入力設計 | `{{ skill_prefix }}setup-campaign`, `{{ skill_prefix }}new-case`, `{{ skill_prefix }}survey-design` |
+| 実行 | `{{ skill_prefix }}create-run`, `{{ skill_prefix }}run-all`, `{{ skill_prefix }}check-status`, `{{ skill_prefix }}debug-failed` |
+| 解析 | `{{ skill_prefix }}analyze`, `{{ skill_prefix }}summarize-script` |
+| 研究記憶 | `{{ skill_prefix }}research-workspace`, `{{ skill_prefix }}learn` |
+| 保守 | `{{ skill_prefix }}cleanup`, `{{ skill_prefix }}patch-runops`, `{{ skill_prefix }}update-runops`, `{{ skill_prefix }}migrate-runops` |
+| package / release | `{{ skill_prefix }}python-package-refactor`, `{{ skill_prefix }}release` |
 
-production / large survey の full submit は、対応する result README に記録した pilot と
-`Decision: EXPAND` を確認してから行う。`--yes` はこの research gate を省略しない。
+command family の選択は `runops-reference`、正確な option は選んだ command の `--help` を参照する。
 
-### 報告してから進めるもの
-- `runo runs cancel` (実行中の job を停止するが、追加確認プロンプトは不要)
+## 役割分担と checkpoint
 
-### submit 後の既定動作
+- 人: 研究目的、ベース入力、計算資源上限、研究判断を決める
+- Agent: その境界内で設計、run 生成、投入、状態同期、解析、知見整理を進める
 
-- submit 後は job_id を報告して返す。自動で待機・sync・log 確認を始めない
-- 「smoke run を投入して」だけでは投入後の監視まで含めない
-- ユーザーが「正常に動いているか数 step 見て」「初動確認して」「log を確認して」
-  「監視して」のように明示した場合だけ、`{{ skill_prefix }}check-status` の startup check を行う
-- startup check は対象 run、確認条件、期限を先に定め、確認できた時点または期限に
-  達した時点で終了する。`runo runs log -f` で無期限に待たない
+| 操作クラス | 進行条件 |
+|---|---|
+| reversible かつ予算内 | Goal / Done に向けて進める |
+| 初回 bulk submit、`submit --all`、資源増加 retry | 対象、queue、資源量、cost、command を示し承認を得る |
+| production / large survey | result README の pilot evidence、`Decision: EXPAND`、承認を揃える |
+| purge / delete、実行バイナリ・module・launcher 変更 | 対象と影響を示し承認を得る |
+| cancel | 対象と理由を報告して実行する |
 
-## 進捗のコミット (義務)
+高コスト・不可逆 command の機械的な境界は `.codex/rules/` または
+`.claude/settings.json` を正本とする。
 
-意味のある作業単位ごとに **必ず Git コミットして履歴を残す**こと。
-コミットを溜めると、後から状態を巻き戻したり差分を読んだりするのが困難になる。
+## 状態遷移の不変条件
 
-### コミットするタイミング (最低限)
+| 対象 | 正規の更新経路 |
+|---|---|
+| run identity / state / provenance | `runo runs create|sweep|submit|sync|archive|purge-work|delete` |
+| `manifest.toml`, generated input, `job.sh` | runops が case / survey から生成する |
+| simulator 入力の再利用可能な変更 | 上流の `case.toml` / input template / `survey.toml` に反映する |
+| runtime output | `work/` を evidence として保持し、整理は runops command で行う |
+| insight / fact | `runo knowledge save|add-fact|promote-fact` |
+| site profile / reference mirror | 生成済みの read-only source として参照する |
 
-- campaign.toml / case / survey を新規作成・大幅変更したとき
-- `runo runs sweep` で新しい run を生成したとき (run 設定が確定したとき)
-- 解析結果・知見を `.runops/insights/` や `.runops/facts.toml` に保存したとき
-- runops 本体の別 checkout で修正してテストが通ったとき
-- `runo runs submit` の前 (投入前のスナップショットとして)
-- 1 つの作業フェーズが完了したとき (例: 新しい survey の設計が固まった、全 run の解析が終わった)
-
-### コミット粒度
-
-- 1 コミット = 1 つの論理的変更にする (機能追加と無関係な編集を混ぜない)
-- メッセージは「何を」「なぜ」変更したかを 1-2 行で記述
-- 作業の途中でも、テストが通る・少なくとも壊れていない単位でコミットする
-
-### しないこと
-
-- 大量の変更を 1 つのコミットに詰め込まない
-- コミットを溜めたまま新しい作業を始めない
-- `git push --force` / `git reset --hard` で履歴を破壊しない (deny されている)
+意味のある状態遷移ごとに、復元可能な一つの論理コミットを作る。submit 前は投入設定の
+snapshot commit を evidence に含める。
 
 ## 知見の保存と実験ノート
 
-実験で得た情報は、性質ごとに書き先を分ける:
+実験で得た情報は、性質ごとに書き先を分ける。
 
-| 種類 | 性質 | 書き先 | スキル |
-|---|---|---|---|
-| 再開可能な時系列の実験 journal | append-only, size-bounded | `research/journal/active.md`, `research/journal/archive/JNNNN.md` | `runo research append`, `runo research rotate` |
-| 現在の高レベルな研究判断 | mutable, size-bounded | `research/CURRENT.md` | 直接編集 |
-| 残す価値のある解析結果 | one narrative per result | `research/results/RNNNN-*/README.md` と `artifacts/` | `runo research new-result` |
-| 論文・manual・図・snippet | visible source material | `materials/` | 直接編集 |
-| 機械的に再利用する知見 | advanced, structured | `.runops/insights/<name>.md`, `.runops/facts.toml` | `{{ skill_prefix }}learn` |
+| 種類 | 書き先 |
+|---|---|
+| 現在の問い・判断・次の一手 | `research/CURRENT.md` |
+| 時系列の作業記録 | `research/journal/` (`runo research append`) |
+| 残す解析結果 | `research/results/RNNNN-*/README.md` と `artifacts/` |
+| 論文・manual・図・snippet | `materials/` |
+| 機械的に再利用する知見 | `.runops/insights/`, `.runops/facts.toml` (`{{ skill_prefix }}learn`) |
 
-- 「結果をまとめて」「知見を記録して」等の整理済情報は **`research/results/` に**
-- 「今、どの問いを active にしているか」「何を pause / kill したか」
-  「次に何をなぜ行うか」は **`research/CURRENT.md` に**
-- `research/CURRENT.md` は既定 50 行を目安にし、作業日誌や artifact inventory に戻さない。
-  時系列は journal、残す詳細解析は results、網羅的な artifact provenance は
-  export/source index に置く
-- 機械的に再利用したい atomic な知見だけ **`{{ skill_prefix }}learn` で advanced knowledge レイヤに**
-- 「今やってる作業のメモ」「途中経過」「議論の流れ」は **`runo research append` で journal に**。
-  短くてよいが、`Context:` と `Evidence:` を残し、model 名だけ・figure path だけで
-  前提を推測させない。
-- 参照 PDF / manual / snippet は **`materials/` に**
-- どちらも Agent 自身の memory に保存してはいけない (会話を跨いで失われる)
-- 共有 source 由来の candidate fact を採用するときは
-  `runo knowledge promote-fact` で local fact に昇格する
-
-### journal は準備フェーズから使う
-
-`runo research append` は解析時だけでなく **準備フェーズ (campaign 設計, case / survey 設計,
-パラメータ選定, 投入計画) の意思決定もここに残す**。
-意思決定の理由・トレードオフ・却下した代替案・不安要素を後から読み返せる
-形にしておくと、再現性と方針修正の根拠が手に入る。具体例:
-
-- 「vti を 1-19 eV にしたのは 4σ CFL で 19 eV が上限だから」
-- 「no_plate ケースは EMSES v4.9.0 で動かないので保留」
-- 「smoke test に R20260330-0001 / -0010 / -0019 を選んだ。両端と中央」
-- 「Series A を先に投入する。Series B はこの結果を見てから」
-
-結果や図を残す entry では、`Observation:` と `Interpretation:` を分ける。
-図を生成した場合は、原則として Markdown image を note に埋め込み、caption と
-`Artifacts:` (figure / script / data path) を添える。大量の図は contact sheet
-または代表図だけを埋め込み、全 figure path は `Artifacts:` に列挙する。
-
-設計フェーズの skill は **完了時に `runo research append` で経緯を残してから次に進む**。
-その作業によって active question、current decision、paused/killed、次の行動が
-変わった場合は、続けて `research/CURRENT.md` も更新する。
-
-### `{{ skill_prefix }}learn` は research workspace を素材として使う
-
-`research/journal/` と `materials/` は raw な原料、`{{ skill_prefix }}learn`
-は advanced / structured な最終産物。つまり **`{{ skill_prefix }}learn` を呼ぶときは、
-まず `research/`, `materials/` を読んで素材を集める**:
-
-1. `runo research status` で workspace の量と active result を確認
-2. 当該テーマに関連する journal segment と result README を読む
-3. `research/CURRENT.md` で現在の見立てと active question を確認する
-4. 関連する `materials/index.toml` / `materials/` の資料を確認する
-5. 散らばっている観察・仮説・反例を一つの insight にまとめる
-6. 必要な場合だけ `runo knowledge save` / `add-fact` で永続化する
-7. 出処になった日付を insight 本文に書き残しておくと、後から検証可能
-
-journal の entry が積み上がってストーリーになったら、
-`runo research new-result <topic>` で result を作り README に書き起こし、必要なら
-`{{ skill_prefix }}learn` で `.runops/insights/` / `facts.toml` に昇格する。
+準備・解析の判断根拠は journal、現在判断の変更は CURRENT、精製した evidence は result に置く。
+詳細な予算・rotation・昇格条件は `{{ skill_prefix }}research-workspace` と
+`{{ skill_prefix }}learn` に委譲する。
 
 ## サイト固有情報
 
 {% if supports_import -%}
 @SITE.md
 {%- else -%}
-プロジェクト root の `SITE.md` を参照してください (サイト固有の partition / module / queue 情報)。
+プロジェクト root の `SITE.md` を参照してください。
 {%- endif %}
 {% if codex_plugin_recommendations %}
 
 ## 推奨 Codex plugins
 
-この project / simulator / site 選択に基づく推奨 plugin。runops は project state を
-作るだけで、plugin の install / enable はユーザーの Codex 環境で行う。
-作業を始める前に `uvx --from runops runo plugins --check` で推薦 metadata を確認する。
-この check は install 済み状態ではなく、project が持つ推薦情報だけを検査する。
+Next が推薦 capability に該当するときは `{{ skill_prefix }}setup-plugins` と
+`uvx --from runops runo plugins --json` で導入状態と委譲先を確認する。
 
 {% for plugin in codex_plugin_recommendations -%}
 - **{{ plugin.display_name }}** (`{{ plugin.name }}`{% if plugin.visibility != "public" %}, {{ plugin.visibility }}{% endif %}) — {{ plugin.reason }}
 {% if plugin.capabilities %}
   委譲役割: {{ plugin.capabilities | join(", ") }}
 {% endif %}
-
-  導入:
-  ```bash
-{{ plugin.install_hint | indent(2, true) }}
-  ```
-
-  有効化: {{ plugin.activation_hint }}
 {% endfor %}
 {% endif %}
 
@@ -207,16 +130,11 @@ journal の entry が積み上がってストーリーになったら、
 
 1. `{{ skills_dir }}` と有効な simulator / environment plugin skill
 2. enabled knowledge (`.runops/knowledge/enabled/imports.md`) と `materials/`
-3. local reference mirrors (`refs/`) が存在する場合のみ、その cookbook / docs
-4. `uvx --from runops runo --help` / `uvx --from runops runo <command> --help`
-   (`runops` alias でも同じ)
-5. 実行中 package の場所 (`uvx --from runops python -c "import runops; print(runops.__file__)"`) は最後の手段
+3. `refs/` がある場合の cookbook / docs
+4. `uvx --from runops runo <command> --help`
 {% if doc_repos %}
 
 ## 任意のリファレンスミラー
-
-この project は `refs/` mirror を有効にしている。`refs/` は simulator plugin /
-明示的な knowledge source を補う local fallback であり、正本として編集しない。
 
 {% for url, dest in doc_repos -%}
 - `refs/{{ dest }}/` — cookbook: `refs/{{ dest }}/cookbook/`, docs: `refs/{{ dest }}/docs/`
@@ -229,6 +147,6 @@ journal の entry が積み上がってストーリーになったら、
 {% if supports_import -%}
 @{{ knowledge_imports_path }}
 {%- else -%}
-`{{ knowledge_imports_path }}` を読み込んでください (外部知識ソースの索引)。
+`{{ knowledge_imports_path }}` を読み込んでください。
 {%- endif %}
 {% endif %}

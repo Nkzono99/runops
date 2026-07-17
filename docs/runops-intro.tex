@@ -298,8 +298,9 @@ runops のハーネスには「スキル」と呼ばれる定型作業の手順�
 \begin{infobox}
 \textbf{具体例:}\\
 「Ti=1--19eV で 10 点サーベイを設計して、smoke test 3 点を gr20001a に投入して」\\
-→ AI がサーベイ設計 → run 生成 → 投入提案 (ユーザー承認) → job ID 報告まで実行。\\
-初動確認は「正常に動いているか数 step 見て」のように明示した場合だけ期限付きで行う。
+→ AI が Goal (投入)、Done (job ID)、Budget (run 数・資源量) を設定し、\\
+サーベイ設計 → run 生成 → 投入提案 (ユーザー承認) → job ID 報告まで実行する。\\
+初動も Goal に含める場合は、step の進行と観測期限を Done / Budget に加える。
 \end{infobox}
 
 \subsection*{\color{accent} 安全設計: 人間の承認が必要な操作}
@@ -339,8 +340,9 @@ AI がケース作成、サーベイ設計、run 生成を一貫して行い、�
 
 \subsection*{\color{accent} Phase 3: 実行 (AI 提案 → 人間承認)}
 
-ジョブ投入は AI が提案し、\textbf{ユーザーが承認}してから実行されます。通常は job ID を
-報告して返り、投入後の状態監視は明示的に依頼した場合だけ行います。
+ジョブ投入は AI が提案し、\textbf{ユーザーが承認}してから実行されます。Agent は
+Goal / Done / Budget に沿って最短の状態遷移を選び、投入 Goal は job ID、初動確認 Goal は
+progress evidence を報告して完了します。
 
 \begin{lstlisting}[language={},commentstyle={}]
 > smoke test 3 点を gr20001a に投入して
