@@ -212,6 +212,16 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         ),
         cli_commands=(("runs", "archive"),),
     ),
+    "restore_run": ActionSpec(
+        name="restore_run",
+        description="Restore an archived run without deleting its contents.",
+        required_params=("run_dir",),
+        preconditions=("run state == archived", "restore path does not exist"),
+        state_change="archived -> completed",
+        risk_level="medium",
+        cost_class="low",
+        cli_commands=(("runs", "restore"),),
+    ),
     "purge_work": ActionSpec(
         name="purge_work",
         description="Delete purgeable work/ artifacts from an archived run.",

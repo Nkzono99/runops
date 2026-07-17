@@ -11,6 +11,7 @@ from runops.application.actions.admin import (
     cancel_run,
     delete_run,
     purge_work,
+    restore_run,
 )
 from runops.application.actions.analysis import (
     collect_survey,
@@ -45,6 +46,7 @@ _DISPATCH: dict[str, Callable[..., ActionResult]] = {
     "plan_retry": plan_retry,
     "retry_run": retry_run,
     "archive_run": archive_run,
+    "restore_run": restore_run,
     "purge_work": purge_work,
     "cancel_run": cancel_run,
     "delete_run": delete_run,

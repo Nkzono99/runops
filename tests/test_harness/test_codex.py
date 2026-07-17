@@ -36,6 +36,8 @@ def test_build_codex_rules_allow_submit_and_gate_destructive_commands() -> None:
     assert 'pattern = ["runo", "runs", "submit"]' in content
     assert 'pattern = ["runops", "runs", "submit"]' in content
     assert "does not route around a blocked `--all` command" in content
+    assert "user-authorized bounded scope" in content
+    assert "explicit chat confirmation" not in content
     assert 'decision = "allow"' in content
     assert 'pattern = ["runo", "runs", "purge-work"]' in content
     assert 'pattern = ["runops", "runs", "purge-work"]' in content
@@ -83,6 +85,9 @@ def test_build_codex_readme_explains_submit_policy() -> None:
     assert "bulk submit" in content
     assert "個別 submit に分解して迂回しない" in content
     assert "submit 系は `allow`" in content
+    assert "bounded pilot submit" in content
+    assert "job_id と成功条件を返して handoff" in content
+    assert "ユーザーの明示確認後に submit" not in content
 
 
 def test_bundle_emits_codex_config_and_agents_skills() -> None:
@@ -134,6 +139,9 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "pilot evidence" in codex_run_all
     assert "full submit" in codex_run_all
     assert "pilot" in codex_run_all
+    assert "job_id と成功条件を返して会話を handoff" in codex_run_all
+    assert "完了観測を Done に含めない" in codex_run_all
+    assert "追加の承認ターンを作らない" in codex_run_all
     codex_create_run = bundle.files[".agents/skills/create-run/SKILL.md"]
     assert "job submitは別のGoal" in codex_create_run
     assert "runo runs submit --all -qn" not in codex_create_run
@@ -194,6 +202,10 @@ def test_bundle_uses_goal_directed_bounded_control() -> None:
 
     assert "## 実行契約" in run_all
     assert "job_id" in run_all
+    assert "startup validation が Goal に含まれる場合だけ" in run_all
+    assert "full / large submit だけ" in run_all
+    for content in (agents, claude):
+        assert "pilot submit は job_id と成功条件を返して handoff" in content
     for content in (check_status, claude_check_status):
         assert "## 実行契約" in content
         assert "**Budget**" in content
@@ -241,6 +253,7 @@ def test_project_skills_use_bounded_outcome_contracts() -> None:
     assert "Use after runo init/setup/update-harness" not in rendered["setup-plugins"]
     assert "$setup-runops` に戻り" not in rendered["setup-plugins"]
     assert "after experiments" not in rendered["cleanup"].split("---", 2)[1]
+    assert "runo runs restore" in rendered["cleanup"]
 
 
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:

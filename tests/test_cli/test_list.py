@@ -80,6 +80,45 @@ def test_list_discovers_runs(tmp_path: Path) -> None:
     assert "run_b" in result.output
 
 
+def test_list_hides_archived_and_purged_runs_by_default(tmp_path: Path) -> None:
+    _create_run(tmp_path, "R20260327-0001", status="created")
+    _create_run(tmp_path, "R20260327-0002", status="archived")
+    _create_run(tmp_path, "R20260327-0003", status="purged")
+
+    result = runner.invoke(app, ["runs", "list", str(tmp_path)])
+
+    assert result.exit_code == 0, result.output
+    assert "R20260327-0001" in result.output
+    assert "R20260327-0002" not in result.output
+    assert "R20260327-0003" not in result.output
+
+
+def test_list_include_archived_shows_inactive_runs(tmp_path: Path) -> None:
+    _create_run(tmp_path, "R20260327-0001", status="created")
+    _create_run(tmp_path, "R20260327-0002", status="archived")
+    _create_run(tmp_path, "R20260327-0003", status="purged")
+
+    result = runner.invoke(app, ["runs", "list", str(tmp_path), "--include-archived"])
+
+    assert result.exit_code == 0, result.output
+    assert "R20260327-0001" in result.output
+    assert "R20260327-0002" in result.output
+    assert "R20260327-0003" in result.output
+
+
+def test_list_explicit_archived_status_does_not_require_include_flag(
+    tmp_path: Path,
+) -> None:
+    _create_run(tmp_path, "R20260327-0001", status="created")
+    _create_run(tmp_path, "R20260327-0002", status="archived")
+
+    result = runner.invoke(app, ["runs", "list", str(tmp_path), "--status", "archived"])
+
+    assert result.exit_code == 0, result.output
+    assert "R20260327-0001" not in result.output
+    assert "R20260327-0002" in result.output
+
+
 def test_list_surfaces_cached_readiness_without_deep_evaluation(tmp_path: Path) -> None:
     run_id = "R20260327-0004"
     run_dir = _create_run(tmp_path, run_id, status="completed")

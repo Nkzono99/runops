@@ -45,7 +45,7 @@ VALID_TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.COMPLETED: frozenset({RunState.ARCHIVED}),
     RunState.FAILED: frozenset(),
     RunState.CANCELLED: frozenset(),
-    RunState.ARCHIVED: frozenset({RunState.PURGED}),
+    RunState.ARCHIVED: frozenset({RunState.COMPLETED, RunState.PURGED}),
     RunState.PURGED: frozenset(),
 }
 
@@ -68,7 +68,7 @@ RECONCILIATION_TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.COMPLETED: frozenset({RunState.ARCHIVED}),
     RunState.FAILED: frozenset(),
     RunState.CANCELLED: frozenset(),
-    RunState.ARCHIVED: frozenset({RunState.PURGED}),
+    RunState.ARCHIVED: frozenset({RunState.COMPLETED, RunState.PURGED}),
     RunState.PURGED: frozenset(),
 }
 

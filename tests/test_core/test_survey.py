@@ -9,10 +9,14 @@ import pytest
 
 from runops.core.exceptions import SurveyConfigError
 from runops.core.survey import (
+    NamingConfig,
+    NamingGroup,
     expand_axes,
     expand_survey,
     generate_display_name,
+    generate_semantic_label,
     load_survey,
+    render_run_directory_name,
 )
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -77,6 +81,59 @@ class TestLoadSurvey:
         assert len(survey.linked) == 1
         assert survey.linked[0]["nx"] == [32, 64]
         assert survey.linked[0]["ny"] == [32, 64]
+
+    def test_load_semantic_naming_config(self, tmp_path: Path) -> None:
+        (tmp_path / "survey.toml").write_text(
+            '[survey]\nid = "S1"\nname = "t"\nbase_case = "c"\n'
+            'simulator = "s"\nlauncher = "l"\n\n'
+            "[axes]\nnx = [64, 192]\nny = [64, 192]\nnz = [64, 192]\n\n"
+            "[naming]\n"
+            'directory = "{run_id}--{label}"\n'
+            "max_length = 40\n\n"
+            "[naming.aliases]\n"
+            '"solver.dt" = "dt"\n\n'
+            "[[naming.groups]]\n"
+            'label = "size"\n'
+            'keys = ["nx", "ny", "nz"]\n'
+            'strategy = "uniform_ratio"\n'
+        )
+
+        survey = load_survey(tmp_path)
+
+        assert survey.naming.directory_template == "{run_id}--{label}"
+        assert survey.naming.max_length == 40
+        assert survey.naming.aliases == {"solver.dt": "dt"}
+        assert survey.naming.groups[0].label == "size"
+        assert survey.naming.groups[0].keys == ("nx", "ny", "nz")
+
+    @pytest.mark.parametrize(
+        ("naming", "message"),
+        [
+            ("max_length = 0\n", "max_length"),
+            ('directory = "../{run_id}"\n', "directory"),
+            (
+                '[[naming.groups]]\nlabel = "size"\nkeys = ["nx", "ny"]\n'
+                'strategy = "unknown"\n',
+                "strategy",
+            ),
+        ],
+    )
+    def test_invalid_semantic_naming_config(
+        self,
+        tmp_path: Path,
+        naming: str,
+        message: str,
+    ) -> None:
+        (tmp_path / "survey.toml").write_text(
+            '[survey]\nid = "S1"\nname = "t"\nbase_case = "c"\n'
+            'simulator = "s"\nlauncher = "l"\n\n'
+            "[axes]\nnx = [64, 192]\n\n"
+            "[naming]\n"
+            f"{naming}"
+        )
+
+        with pytest.raises(SurveyConfigError, match=message):
+            load_survey(tmp_path)
 
     def test_linked_mismatched_lengths(self, tmp_path: Path) -> None:
         (tmp_path / "survey.toml").write_text(
@@ -245,3 +302,85 @@ class TestGenerateDisplayName:
     def test_string_values(self) -> None:
         result = generate_display_name("mode_{mode}", {"mode": "fast"})
         assert result == "mode_fast"
+
+
+class TestSemanticNaming:
+    def test_collapses_uniform_group_ratio(self) -> None:
+        survey_naming = NamingConfig(
+            groups=(NamingGroup(label="size", keys=("nx", "ny", "nz")),)
+        )
+
+        result = generate_semantic_label(
+            {"nx": 64, "ny": 64, "nz": 64},
+            {"nx": 192, "ny": 192, "nz": 192},
+            ("nx", "ny", "nz"),
+            survey_naming,
+        )
+
+        assert result == "size-x3"
+
+    def test_falls_back_to_individual_changes_when_group_is_not_uniform(self) -> None:
+        survey_naming = NamingConfig(
+            groups=(NamingGroup(label="size", keys=("nx", "ny", "nz")),)
+        )
+
+        result = generate_semantic_label(
+            {"nx": 64, "ny": 64, "nz": 64},
+            {"nx": 192, "ny": 128, "nz": 64},
+            ("nx", "ny", "nz"),
+            survey_naming,
+        )
+
+        assert result == "nx-x3-ny-x2"
+
+    def test_uses_aliases_and_absolute_values_when_ratio_is_unavailable(self) -> None:
+        survey_naming = NamingConfig(aliases={"plasma.mode": "mode"})
+
+        result = generate_semantic_label(
+            {"plasma.mode": "slow"},
+            {"plasma.mode": "fast", "seed": 3},
+            ("plasma.mode", "seed"),
+            survey_naming,
+        )
+
+        assert result == "mode-fast-seed-3"
+
+    def test_uses_absolute_value_for_ungrouped_numeric_parameter(self) -> None:
+        result = generate_semantic_label(
+            {"angle": 10},
+            {"angle": 30},
+            ("angle",),
+            NamingConfig(),
+        )
+
+        assert result == "angle-30"
+
+    def test_single_parameter_group_opts_into_ratio_label(self) -> None:
+        result = generate_semantic_label(
+            {"density": 2.0},
+            {"density": 4.0},
+            ("density",),
+            NamingConfig(groups=(NamingGroup(label="density", keys=("density",)),)),
+        )
+
+        assert result == "density-x2"
+
+    def test_labels_unchanged_control_as_baseline(self) -> None:
+        result = generate_semantic_label(
+            {"nx": 64},
+            {"nx": 64},
+            ("nx",),
+            NamingConfig(),
+        )
+
+        assert result == "baseline"
+
+    def test_directory_name_keeps_run_id_and_sanitizes_label(self) -> None:
+        assert (
+            render_run_directory_name(
+                "R20260717-0001",
+                "Size x3 / high resolution",
+                NamingConfig(max_length=20),
+            )
+            == "R20260717-0001--size-x3-high-resolut"
+        )

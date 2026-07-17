@@ -31,7 +31,9 @@ campaign.toml
 
 - 研究の「なぜ」は `campaign.toml` に置く。
 - simulator input の共通条件は `case.toml` と template に置く。
-- 掃引軸、点数、命名、job override は `survey.toml` に置く。
+- 掃引軸、点数、semantic naming rule、job override は `survey.toml` に置く。
+- agent は parameter alias / semantic group を survey 設計時に一度決め、run ごとの
+  命名は `runo runs sweep` の決定的な展開に任せる。
 - run ごとの実行事実、provenance、state は [Execution Kernel](execution-kernel.md) の
   `manifest.toml` に置く。
 - run の結果から作る summary / figure は [Analysis Layer](analysis.md) に置く。

@@ -12,6 +12,7 @@ from runops.application.actions import archive_run as archive_run_action
 from runops.application.actions import cancel_run as cancel_run_action
 from runops.application.actions import delete_run as delete_run_action
 from runops.application.actions import purge_work as purge_work_action
+from runops.application.actions import restore_run as restore_run_action
 from runops.cli.run_lookup import resolve_run_or_cwd, resolve_run_targets
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
@@ -195,6 +196,26 @@ def _confirm_archive(
     else:
         prompt = f"Archive and move {len(plans)} completed runs? [{preview}]"
     return typer.confirm(prompt, default=False)
+
+
+def restore(
+    run: str = typer.Argument(..., help="Archived run directory or run_id."),
+) -> None:
+    """Restore an archived run to its pre-archive location."""
+    run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
+    result = restore_run_action(run_dir)
+    if result.status is not ActionStatus.SUCCESS:
+        typer.echo(f"Error: {result.message}", err=True)
+        raise typer.Exit(code=1)
+
+    run_id = str(result.data.get("run_id", run_dir.name))
+    restored_path = str(result.data.get("restore_path", run_dir))
+    typer.echo(f"Restored run {run_id}.")
+    if bool(result.data.get("moved")):
+        source_path = str(result.data.get("source_path", run_dir))
+        typer.echo(f"  Moved: {source_path} -> {restored_path}")
+    else:
+        typer.echo(f"  Path: {restored_path}")
 
 
 def purge_work(

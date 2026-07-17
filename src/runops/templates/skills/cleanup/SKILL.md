@@ -1,13 +1,13 @@
 ---
 name: cleanup
-description: Use when the user explicitly requests archive, cancel, purge, or deletion for identified runs.
+description: Use when the user explicitly requests restore, archive, cancel, purge, or deletion for identified runs.
 ---
 
 # 指定runをrequested lifecycle stateへ移す
 
 ## 実行契約
 
-- **Goal**: 指定runをarchived / cancelled / purged / deletedの要求状態へ移す
+- **Goal**: 指定runをcompletedへ復元、またはarchived / cancelled / purged / deletedの要求状態へ移す
 - **Done**: 対象、実行command、結果state、保持・削除したevidenceを報告できる
 - **Budget**: 明示されたrun集合と一つのlifecycle transition
 - **Invariant**: canonical runops commandとhuman checkpointを使い、対象外のrunやevidenceに触れない
@@ -15,13 +15,14 @@ description: Use when the user explicitly requests archive, cancel, purge, or de
 ## Plan
 
 ```bash
-runo runs list $ARGUMENTS
+runo runs list --include-archived $ARGUMENTS
 ```
 
 | requested state | entry | command |
 |---|---|---|
 | `archived` | completed | `runo runs archive` |
 | `archived` in place | completed | `runo runs archive --keep-in-place` |
+| `completed`へ復元 | archived | `runo runs restore` |
 | work purged | archived | `runo runs purge-work` |
 | incomplete work purged | archived + discard判断 | `runo runs purge-work --discard-incomplete --reason "<理由>"` |
 | `cancelled` | submitted / running | `runo runs cancel` |
@@ -30,6 +31,7 @@ runo runs list $ARGUMENTS
 ## Checkpoint
 
 - archive / purge / deleteは対象、移動先、削除範囲、evidence readinessを示して承認を得る
+- restoreは元のpathが空いていることを確認し、artifactを保持したまま実行する
 - cancelは対象と理由を報告して実行する
 - completed evidenceを縮小するGoalはarchive → purgeのstate順序を使う
 

@@ -23,6 +23,7 @@ from runops.application.actions import (
     plan_retry,
     promote_fact,
     purge_work,
+    restore_run,
     retry_run,
     save_insight,
     submit_run,
@@ -664,6 +665,108 @@ def test_archive_run_rejects_existing_destination_before_state_change(
 
     manifest = read_manifest(run_dir)
     assert manifest.run["status"] == "completed"
+
+
+def test_restore_run_moves_directory_back_without_deleting_outputs(
+    tmp_path: Path,
+) -> None:
+    original = tmp_path / "runs" / "scan" / "R20260330-0001"
+    archived = tmp_path / "runs" / "_archive" / "scan" / "R20260330-0001"
+    output = archived / "work" / "outputs" / "result.dat"
+    output.parent.mkdir(parents=True)
+    output.write_text("preserved\n")
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {
+                "run_dir": str(archived),
+                "created_at_path": str(original),
+                "archived_from": str(original),
+            },
+            "extensions": {"example": {"preserved": True}},
+        },
+    )
+
+    result = restore_run(archived)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_before == "archived"
+    assert result.state_after == "completed"
+    assert not archived.exists()
+    assert (original / "work" / "outputs" / "result.dat").read_text() == "preserved\n"
+
+    from runops.core.manifest import read_manifest
+
+    manifest = read_manifest(original)
+    assert manifest.run["status"] == "completed"
+    assert manifest.path["run_dir"] == str(original.resolve())
+    assert manifest.path["restored_from"] == str(archived.resolve())
+    assert "restored_at" in manifest.path
+    assert manifest.extra_sections["extensions"] == {"example": {"preserved": True}}
+
+
+def test_restore_run_in_place_changes_state_without_moving(tmp_path: Path) -> None:
+    run_dir = tmp_path / "runs" / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": "R20260330-0001", "status": "archived"}},
+    )
+
+    result = restore_run(run_dir)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["moved"] is False
+    assert run_dir.exists()
+
+    from runops.core.manifest import read_manifest
+
+    assert read_manifest(run_dir).run["status"] == "completed"
+
+
+def test_restore_run_rejects_existing_destination_before_mutation(
+    tmp_path: Path,
+) -> None:
+    original = tmp_path / "runs" / "R20260330-0001"
+    archived = tmp_path / "runs" / "_archive" / "R20260330-0001"
+    original.mkdir(parents=True)
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {"archived_from": str(original)},
+        },
+    )
+
+    result = restore_run(archived)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "already exists" in result.message
+    assert archived.exists()
+
+    from runops.core.manifest import read_manifest
+
+    assert read_manifest(archived).run["status"] == "archived"
+
+
+def test_restore_run_rejects_dangling_symlink_destination(tmp_path: Path) -> None:
+    original = tmp_path / "runs" / "R20260330-0001"
+    archived = tmp_path / "runs" / "_archive" / "R20260330-0001"
+    original.parent.mkdir(parents=True)
+    original.symlink_to(tmp_path / "missing-run")
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {"archived_from": str(original)},
+        },
+    )
+
+    result = restore_run(archived)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert original.is_symlink()
+    assert archived.exists()
 
 
 def test_submit_run_updates_manifest_and_state_file(tmp_path: Path) -> None:

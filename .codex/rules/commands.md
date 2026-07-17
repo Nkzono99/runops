@@ -34,8 +34,8 @@
 | コマンド | 説明 |
 |---------|------|
 | `runo case new CASE [--minimal] [--survey]` | case のスキャフォールド生成 |
-| `runo runs create CASE` | case から単一 run を生成 |
-| `runo runs sweep [DIR] [--dry-run]` | survey.toml からパラメータ直積で全 run 生成 |
+| `runo runs create CASE [--label LABEL]` | case から単一 run を生成。label は directory suffix と display name に使う |
+| `runo runs sweep [DIR] [--dry-run]` | survey.toml から全 run を生成。semantic label と directory preview を決定的に生成 |
 | `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
 | `runo runs submit --all [DIR] [--yes]` | ready plan を一括投入。survey は structured experiment gate 必須 (`--yes` は確認のみ省略) |
 | `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
@@ -53,7 +53,7 @@
 | `runo runs jobs [PATH] [--watch SECS]` | 実行中ジョブ一覧 |
 | `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗表。`--all` では cached analysis / next action も表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...]` | run 一覧と cached analysis / next action を表示 |
+| `runo runs list [PATHS...] [--include-archived]` | run 一覧と cached analysis / next action を表示。既定では archived / purged を除外 |
 
 ## 解析・知見
 
@@ -101,6 +101,7 @@
 | コマンド | 説明 |
 |---------|------|
 | `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
+| `runo runs restore RUN` | archived run を archive 前の場所へ artifact ごと復元 |
 | `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | work/ 内の不要ファイル削除。既知の non-ready output を破棄する場合は理由必須 |
 | `runo runs cancel [RUN]` | scancel + sync (submitted/running を停止) |
 | `runo runs delete [RUN]` | run ディレクトリ削除 (created/cancelled/failed のみ) |

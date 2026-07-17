@@ -70,7 +70,55 @@
       "properties": {
         "display_name": {
           "type": "string",
-          "description": "Template for run display names"
+          "description": "Optional template for run display names; when empty, labels are generated from parameter changes"
+        },
+        "directory": {
+          "type": "string",
+          "default": "{run_id}--{label}",
+          "description": "Run directory basename template containing {run_id} and optionally {label}"
+        },
+        "max_length": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 120,
+          "default": 48,
+          "description": "Maximum semantic label length in directory names"
+        },
+        "aliases": {
+          "type": "object",
+          "description": "Human-readable aliases for parameter keys",
+          "additionalProperties": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "groups": {
+          "type": "array",
+          "description": "Parameter groups that may collapse into one semantic label",
+          "items": {
+            "type": "object",
+            "required": ["label", "keys"],
+            "properties": {
+              "label": {
+                "type": "string",
+                "minLength": 1
+              },
+              "keys": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "strategy": {
+                "type": "string",
+                "enum": ["uniform_ratio"],
+                "default": "uniform_ratio"
+              }
+            },
+            "additionalProperties": true
+          }
         }
       },
       "additionalProperties": true

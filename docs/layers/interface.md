@@ -142,8 +142,8 @@ MCP provider は Agent / host 向けの edge interface です。read / inspect /
 | コマンド | 説明 |
 |---------|------|
 | `runo case new CASE [--minimal] [--survey]` | 新規 case のスキャフォールド生成 |
-| `runo runs create CASE` | case から単一 run を生成 |
-| `runo runs sweep [DIR] [--dry-run]` | `survey.toml` からパラメータ直積で run を一括生成 |
+| `runo runs create CASE [--label LABEL]` | case から human-readable label 付き単一 run を生成 |
+| `runo runs sweep [DIR] [--dry-run]` | `survey.toml` から semantic label 付き run を一括生成 |
 | `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
 | `runo runs submit --all [DIR] [--yes]` | ready plan の run を確認付きで一括投入 (`--yes` で確認省略) |
 | `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
@@ -167,7 +167,7 @@ remaining run を full submit します。
 | `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 |
 | `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗を表示。`--all` では cached analysis / next action も表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...]` | run と cached analysis / next action の一覧。複数 PATH、状態、タグでフィルタ可能 |
+| `runo runs list [PATHS...] [--include-archived]` | run と cached analysis / next action の一覧。既定では archived / purged を除外 |
 
 `runo runs status` は表示用で、正本更新は `runo runs sync` が行います。
 bulk sync では created run と terminal state の run は silent skip されます。
@@ -194,6 +194,7 @@ service ではありません。
 | `runo analyze audit-story [STORY_DIR]` | source artifact を照合し `audit.json` / `audit.md` を生成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
 | `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | completed run を archived にし、既定で `runs/_archive/` へ移動 |
+| `runo runs restore RUN` | archived run を元のパスへ artifact ごと戻して completed にする |
 | `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | archived run の work 削除。既知 non-ready output の破棄は理由必須 |
 | `runo runs delete [RUN]` | created / cancelled / failed run を削除 |
 
@@ -226,6 +227,8 @@ created -> submitted -> running -> completed
 created/submitted/running -> failed
 submitted/running -> cancelled
 completed -> archived -> purged
+             |
+             +-> completed  (restore)
 ```
 
 Slurm の観測結果によっては `submitted -> completed` のように途中状態を飛び越す

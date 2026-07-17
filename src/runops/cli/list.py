@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Annotated, Optional
 
 import typer
 
@@ -27,6 +27,13 @@ def list_runs(
     tag: Optional[str] = typer.Option(
         None, "--tag", help="Filter by classification tag."
     ),
+    include_archived: Annotated[
+        bool,
+        typer.Option(
+            "--include-archived",
+            help="Include archived and purged runs in the unfiltered listing.",
+        ),
+    ] = False,
 ) -> None:
     """List runs under one or more paths."""
     search_dirs = list(paths) if paths else [Path.cwd()]
@@ -67,6 +74,12 @@ def list_runs(
 
         # Apply filters
         if status_filter and run_status != status_filter:
+            continue
+        if (
+            not status_filter
+            and not include_archived
+            and run_status in {"archived", "purged"}
+        ):
             continue
         if tag and tag not in tags:
             continue

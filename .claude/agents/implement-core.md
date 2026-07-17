@@ -29,6 +29,7 @@ created -> submitted -> running -> completed
 created/submitted/running -> failed
 submitted/running -> cancelled
 completed -> archived -> purged
+archived -> completed (restore)
 ```
 
 ## Workflow

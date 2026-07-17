@@ -21,6 +21,9 @@ from runops.application.actions.admin import (
 from runops.application.actions.admin import (
     purge_work as purge_work,
 )
+from runops.application.actions.admin import (
+    restore_run as restore_run,
+)
 from runops.application.actions.analysis import (
     collect_survey as collect_survey,
 )
@@ -104,6 +107,7 @@ __all__ = [
     "plan_retry",
     "promote_fact",
     "purge_work",
+    "restore_run",
     "retry_run",
     "save_insight",
     "show_log",

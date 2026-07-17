@@ -31,6 +31,12 @@ hypothesisとobservablesからindependent axesを選び、control、failure-dete
 `[survey]`, `[axes]`, `[naming]`, `[job]`を持つ`survey.toml`を作り、
 `runo runs sweep <survey> --dry-run`のrun数、組合せ、概算costをDone evidenceにする。
 
+`[naming].display_name`を空にする場合は、base caseとの差分を一目で識別できるよう、
+長いparameter keyには`[naming.aliases]`、同じ意味を持つ複数parameterには
+`[[naming.groups]]`を一度だけ設計する。例えば`nx`, `ny`, `nz`の一様な倍率変更は
+`label = "size"`, `strategy = "uniform_ratio"`として`size-x3`へ畳み込む。
+runごとにLLMで名前を生成せず、dry-runに表示される決定的なdirectory名を検証する。
+
 parameterの正確なsyntaxは`runo runs sweep --help`とschema、物理的意味は専門skillを使う。
 
 ## Pilot / full entry

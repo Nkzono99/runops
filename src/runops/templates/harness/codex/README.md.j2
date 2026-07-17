@@ -74,18 +74,21 @@ runops CLI は project 側では `uvx --from runops runo ...` で実行します
 uvx --from runops runo runs submit --dry-run --all runs/survey -qn gr10451a
 ```
 
-実投入は必ず会話上でユーザー確認を得てから実行します。`submit` は破壊的操作
-ではありませんが、HPC 資源・queue・quota に影響します。default の project
-rule は `runo runs submit` / `runops runs submit` を permission layer では
+`submit` は破壊的操作ではありませんが、HPC資源・queue・quotaに影響します。
+Goalにbounded pilot submitが含まれ、exact対象と資源がcost ceiling内なら、その依頼を
+認可として扱います。full / large / bulk submitと資源増加retryは、対象・costを示した
+human checkpointを維持します。defaultのproject ruleは
+`runo runs submit` / `runops runs submit` をpermission layerでは
 `allow` します。ここで `--all` だけを `prompt` にすると、`approval_policy =
 "never"` 環境で bulk submit が hard block され、Agent が個別 submit に分解して
 迂回する悪い動きを誘発するためです。
 
 Agent 側の行動ルールは AGENTS.md / skills 側に置きます:
 
-- まず `uvx --from runops runo runs submit --dry-run ...` で対象 run と skip を確認する
-- 実行前に command、対象 run、queue、QOS、資源量を会話上で提示する
-- ユーザーの明示確認後に submit する
+- bounded pilotは通常のsubmit preconditionを使い、別dry-runは対象・資源が曖昧な場合に使う
+- pilot投入後はjob_id と成功条件を返して handoffする
+- startup validationはGoalに含まれる場合だけbounded checkへ進む
+- full / large / bulk submitはdry-runで対象・skip・costを示し、human checkpoint後に進める
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない
 
 ルールを変更したら、最低限次を確認してください:

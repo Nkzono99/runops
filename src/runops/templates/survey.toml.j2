@@ -13,9 +13,23 @@ launcher = "{{ launcher }}"
 # "species[2].ray_zenith_angle_deg" = [0, 30, 60, 90]
 
 [naming]
-# Template for run display names. Use parameter leaf names or underscore forms.
+# Empty means: derive a semantic label from changes relative to the base case.
+# Set a template to override automatic labels with parameter leaf/underscore forms.
 {% raw %}# Example: display_name = "dt{{tmgrid_dt}}_angle{{ray_zenith_angle_deg}}"{% endraw %}
 display_name = ""
+directory = "{run_id}--{label}"
+max_length = 48
+
+# Optional aliases make fallback labels shorter.
+# [naming.aliases]
+# "species[2].ray_zenith_angle_deg" = "angle"
+
+# LLMs/agents may define semantic groups once; sweep expansion stays deterministic.
+# Uniform ratios collapse, e.g. nx/ny/nz all x3 -> size-x3.
+# [[naming.groups]]
+# label = "size"
+# keys = ["tmgrid.nx", "tmgrid.ny", "tmgrid.nz"]
+# strategy = "uniform_ratio"
 
 [job]
 # Override job settings from case.toml (optional).

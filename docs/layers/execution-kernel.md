@@ -50,6 +50,8 @@ created -> submitted -> running -> completed
 created/submitted/running -> failed
 submitted/running -> cancelled
 completed -> archived -> purged
+             |
+             +-> completed  (restore)
 ```
 
 状態操作の原則:
@@ -60,7 +62,7 @@ completed -> archived -> purged
 - `runo runs sync` が Slurm 状態を `manifest.toml` / `status/` に反映し、completed
   transition では bounded readiness、reason code、次 command を同じ action result に含める。
 - `runo runs cancel` は `scancel` と sync を同時に行う。
-- `runo runs archive` / `purge-work` / `delete` はライフサイクル操作として扱う。
+- `runo runs archive` / `restore` / `purge-work` / `delete` はライフサイクル操作として扱う。
 
 ## Provenance
 

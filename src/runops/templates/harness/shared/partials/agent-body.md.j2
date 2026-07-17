@@ -70,6 +70,10 @@ command family の選択は `runops-reference`、正確な option は選んだ c
 | purge / delete、実行バイナリ・module・launcher 変更 | 対象と影響を示し承認を得る |
 | cancel | 対象と理由を報告して実行する |
 
+Goalに含まれるbounded pilotは、exact runと資源がcost ceiling内なら通常のsubmit
+preconditionを通して投入する。pilot submit は job_id と成功条件を返して handoff し、
+startup validationはそれ自体がGoalに含まれる場合だけbounded observationへ進む。
+
 高コスト・不可逆 command の機械的な境界は `.codex/rules/` または
 `.claude/settings.json` を正本とする。
 
@@ -77,15 +81,15 @@ command family の選択は `runops-reference`、正確な option は選んだ c
 
 | 対象 | 正規の更新経路 |
 |---|---|
-| run identity / state / provenance | `runo runs create|sweep|submit|sync|archive|purge-work|delete` |
+| run identity / state / provenance | `runo runs create|sweep|submit|sync|archive|restore|purge-work|delete` |
 | `manifest.toml`, generated input, `job.sh` | runops が case / survey から生成する |
 | simulator 入力の再利用可能な変更 | 上流の `case.toml` / input template / `survey.toml` に反映する |
 | runtime output | `work/` を evidence として保持し、整理は runops command で行う |
 | insight / fact | `runo knowledge save|add-fact|promote-fact` |
 | site profile / reference mirror | 生成済みの read-only source として参照する |
 
-意味のある状態遷移ごとに、復元可能な一つの論理コミットを作る。submit 前は投入設定の
-snapshot commit を evidence に含める。
+意味のある状態遷移ごとに、復元可能な一つの論理コミットを作る。投入設定を今回変更した
+場合はsubmit前にcommitし、変更がなければcurrent commit / dirty provenanceをevidenceにする。
 
 ## 知見の保存と実験ノート
 

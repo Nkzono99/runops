@@ -6,6 +6,7 @@ import os
 import secrets
 import shutil
 import stat
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -126,17 +127,19 @@ def archive_run(run_dir: Path, *, move_to: Path | None = None) -> ActionResult:
 
         final_dir = destination
         moved = True
-        try:
-            manifest = read_manifest(final_dir)
-            if "created_at_path" not in manifest.path:
-                manifest.path["created_at_path"] = str(source)
-            manifest.path["run_dir"] = str(final_dir)
-            manifest.path["archived_from"] = str(source)
-            manifest.path["archived_at"] = datetime.now(tz=timezone.utc).isoformat()
-            write_manifest(final_dir, manifest)
-        except SimctlError as e:
-            return _error("archive_run", str(e))
 
+    try:
+        manifest = read_manifest(final_dir)
+        if "created_at_path" not in manifest.path:
+            manifest.path["created_at_path"] = str(source)
+        manifest.path["run_dir"] = str(final_dir)
+        manifest.path["archived_from"] = str(source)
+        manifest.path["archived_at"] = datetime.now(tz=timezone.utc).isoformat()
+        write_manifest(final_dir, manifest)
+    except SimctlError as e:
+        return _error("archive_run", str(e))
+
+    if moved:
         emit_event(
             "artifact_move",
             action="archive_run",
@@ -168,7 +171,7 @@ def archive_run(run_dir: Path, *, move_to: Path | None = None) -> ActionResult:
 def _validate_archive_destination(source: Path, destination: Path) -> str | None:
     if destination == source:
         return None
-    if destination.exists():
+    if os.path.lexists(destination):
         return f"Archive destination already exists: {destination}"
     try:
         destination.relative_to(source)
@@ -176,6 +179,95 @@ def _validate_archive_destination(source: Path, destination: Path) -> str | None
         return None
     return (
         f"Archive destination cannot be inside the source run directory: {destination}"
+    )
+
+
+@logged_action("restore_run")
+def restore_run(run_dir: Path) -> ActionResult:
+    """Restore an archived run to its pre-archive path without deleting data."""
+    from runops.core.manifest import read_manifest, update_manifest
+    from runops.core.state import update_state
+
+    source = run_dir.resolve()
+    state_str, err = _require_state(source, RunState.ARCHIVED)
+    if err:
+        return _precondition_fail("restore_run", err)
+
+    manifest = read_manifest(source)
+    run_id = manifest.run.get("id", source.name)
+    restore_path = manifest.path.get("archived_from") or manifest.path.get(
+        "created_at_path"
+    )
+    destination = (
+        Path(os.path.abspath(Path(str(restore_path)).expanduser()))
+        if restore_path
+        else None
+    )
+    if destination == source:
+        destination = None
+
+    if destination is not None:
+        collision_error = _validate_archive_destination(source, destination)
+        if collision_error:
+            return _precondition_fail("restore_run", collision_error)
+
+    final_dir = source
+    moved = False
+    if destination is not None:
+        try:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(source), str(destination))
+        except (OSError, shutil.Error) as e:
+            return _error(
+                "restore_run", f"Failed to move {source} to {destination}: {e}"
+            )
+        final_dir = destination
+        moved = True
+
+    try:
+        update_state(final_dir, RunState.COMPLETED)
+        update_manifest(
+            final_dir,
+            {
+                "path": {
+                    "run_dir": str(final_dir),
+                    "restored_from": str(source),
+                    "restored_at": datetime.now(tz=timezone.utc).isoformat(),
+                }
+            },
+        )
+    except SimctlError as e:
+        if moved:
+            with suppress(OSError, shutil.Error):
+                shutil.move(str(final_dir), str(source))
+        return _error("restore_run", str(e))
+
+    if moved:
+        emit_event(
+            "artifact_move",
+            action="restore_run",
+            summary=f"Restore archived run {run_id}",
+            path=final_dir,
+            data={
+                "run_id": run_id,
+                "source_path": str(source),
+                "restore_path": str(final_dir),
+            },
+            requires_verbose=True,
+        )
+
+    return ActionResult(
+        action="restore_run",
+        status=ActionStatus.SUCCESS,
+        message="Run restored",
+        data={
+            "run_id": run_id,
+            "moved": moved,
+            "source_path": str(source),
+            "restore_path": str(final_dir),
+        },
+        state_before=state_str,
+        state_after=RunState.COMPLETED.value,
     )
 
 

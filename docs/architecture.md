@@ -130,7 +130,7 @@ Case 自体は直接実行しません。create コマンドまたは survey の
 
 - **定義ファイル**: `runs/.../survey.toml`
 - **データクラス**: `SurveyData` (`core/survey/`)
-- **主な責務**: パラメータ軸の定義、直積展開、連動展開、display_name のテンプレート生成
+- **主な責務**: パラメータ軸の定義、直積展開、連動展開、semantic run naming
 
 ```python
 @dataclass(frozen=True)
@@ -143,13 +143,18 @@ class SurveyData:
     classification: ClassificationData
     axes: dict[str, list[Any]]       # 直積展開
     linked: list[dict[str, list[Any]]]  # 連動 (zip) 展開
-    naming_template: str
+    naming: NamingConfig
     job: JobData
     survey_dir: Path
     raw: dict[str, Any]
 ```
 
 `expand_survey()` 関数が `[axes]`（直積）と `[[linked]]`（zip）を組み合わせて展開します:
+
+`NamingConfig` は明示的な `display_name` template、parameter aliases、
+`uniform_ratio` semantic groups、directory basename template を保持する。
+run の identity は manifest 内の `run_id` のまま、既定 directory は
+`RYYYYMMDD-NNNN--<semantic-label>` になる。
 
 ```python
 # axes のみ（従来の直積）
@@ -387,8 +392,9 @@ class RunState(str, Enum):
          +--------+ +----------+ +--------+
          |cancelled| |completed | | failed |
          +--------+ +----+-----+ +--------+
-                         |
-                         v
+                         |  ^
+                 archive |  | restore
+                         v  |
                     +----------+
                     | archived |
                     +----+-----+
@@ -403,6 +409,10 @@ class RunState(str, Enum):
 
 `VALID_TRANSITIONS` ディクショナリが許可された遷移を定義し、`transition_state()` が遷移の正当性を検証します。不正な遷移は `InvalidStateTransitionError` を送出します。
 
+`runo runs restore` は `archived -> completed` の可逆遷移であり、archive 前の
+directory と全 artifact を復元する。`purged` は削除済み artifact を復元できないため
+restore 対象外とする。
+
 `update_state()` は以下を実行します:
 1. manifest.toml から現在の状態を読み取り
 2. 遷移の正当性を検証
@@ -416,7 +426,7 @@ class RunState(str, Enum):
 ### create (単一 run 生成)
 
 ```
-CLI: runo runs create CASE --dest DIR
+CLI: runo runs create CASE --dest DIR [--label LABEL]
   |
   +--> find_project_root() --> load_project()
   |      ProjectConfig を取得

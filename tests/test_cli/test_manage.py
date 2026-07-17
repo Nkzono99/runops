@@ -1,4 +1,4 @@
-"""Tests for runops runs archive / purge-work / cancel / delete commands."""
+"""Tests for runops runs archive / restore / purge-work / cancel / delete."""
 
 from __future__ import annotations
 
@@ -91,6 +91,8 @@ class TestArchive:
         assert run_dir.exists()
         data = _read_manifest(run_dir)
         assert data["run"]["status"] == "archived"
+        assert data["path"]["run_dir"] == str(run_dir.resolve())
+        assert data["path"]["archived_from"] == str(run_dir.resolve())
 
     def test_archive_move_to_custom_root(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
@@ -187,6 +189,41 @@ class TestArchive:
         assert archived.exists()
         assert created.exists()
         assert "Skipped 1 run(s)" in result.output
+
+
+class TestRestore:
+    def test_restore_archived_run_to_original_location(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            "R20260327-0001",
+            status="completed",
+        )
+        output = run_dir / "work" / "outputs" / "result.dat"
+        output.parent.mkdir(parents=True)
+        output.write_text("preserved\n")
+        monkeypatch.chdir(tmp_path)
+
+        archived = runner.invoke(app, ["runs", "archive", "--yes", "R20260327-0001"])
+        assert archived.exit_code == 0, archived.output
+
+        restored = runner.invoke(app, ["runs", "restore", "R20260327-0001"])
+
+        assert restored.exit_code == 0, restored.output
+        assert "Restored run R20260327-0001" in restored.output
+        assert run_dir.exists()
+        assert output.read_text() == "preserved\n"
+        assert _read_manifest(run_dir)["run"]["status"] == "completed"
+
+    def test_restore_rejects_non_archived_run(self, tmp_path: Path) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
+
+        result = runner.invoke(app, ["runs", "restore", str(run_dir)])
+
+        assert result.exit_code == 1
+        assert "archived" in result.output.lower()
 
 
 class TestPurgeWork:

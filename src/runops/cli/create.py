@@ -12,7 +12,11 @@ from runops.application.run_creation import plan_survey_runs
 from runops.core.case import JobData
 from runops.core.exceptions import SimctlError
 from runops.core.project import find_project_root, load_project
-from runops.core.survey import generate_display_name
+from runops.core.survey import (
+    generate_display_name,
+    generate_semantic_label,
+    preview_run_directory_name,
+)
 
 
 def _echo_warnings(warnings: list[str], *, context: str = "") -> None:
@@ -33,6 +37,13 @@ def create(
         Optional[Path],
         typer.Option("--dest", "-d", help="Destination directory (defaults to cwd)."),
     ] = None,
+    label: Annotated[
+        str,
+        typer.Option(
+            "--label",
+            help="Human-readable run label used in the directory name.",
+        ),
+    ] = "",
 ) -> None:
     """Create a run in the current directory.
 
@@ -49,10 +60,10 @@ def create(
         )
         raise typer.Exit(code=1)
 
-    _create_single(case_name, target_dir)
+    _create_single(case_name, target_dir, label=label)
 
 
-def _create_single(case_name: str, target_dir: Path) -> None:
+def _create_single(case_name: str, target_dir: Path, *, label: str = "") -> None:
     """Create a single run from a case template."""
     try:
         project_root = find_project_root(target_dir)
@@ -61,6 +72,7 @@ def _create_single(case_name: str, target_dir: Path) -> None:
             project_root=project_root,
             case_name=case_name,
             dest_dir=target_dir,
+            display_name=label,
         )
     except SimctlError as exc:
         typer.echo(f"Error creating run: {exc}", err=True)
@@ -72,6 +84,9 @@ def _create_single(case_name: str, target_dir: Path) -> None:
 
     _echo_warnings(list(result.data.get("warnings", [])))
     typer.echo(f"Created run: {result.data.get('run_id', '???')}")
+    display_name = str(result.data.get("display_name", ""))
+    if display_name:
+        typer.echo(f"  Label: {display_name}")
     typer.echo(f"  Path: {result.data.get('run_dir', target_dir)}")
 
 
@@ -176,13 +191,25 @@ def _sweep_dry_run(survey_dir: Path) -> None:
     typer.echo("Planned runs:")
     for combo in combinations:
         merged_params = {**plan.base_case.params, **combo}
-        display_name = generate_display_name(
-            plan.survey_data.naming_template,
-            merged_params,
+        if plan.survey_data.naming_template:
+            display_name = generate_display_name(
+                plan.survey_data.naming_template,
+                merged_params,
+            )
+        else:
+            display_name = generate_semantic_label(
+                plan.base_case.params,
+                merged_params,
+                list(plan.variation_keys),
+                plan.survey_data.naming,
+            )
+        directory_name = preview_run_directory_name(
+            display_name,
+            plan.survey_data.naming,
         )
         params_str = _format_combo(combo)
         if display_name:
-            typer.echo(f"  {display_name:<24} {params_str}")
+            typer.echo(f"  {display_name:<24} {directory_name:<40} {params_str}")
         else:
             typer.echo(f"  {params_str}")
 

@@ -191,6 +191,29 @@ class TestCreate:
         match = re.search(r"R\d{8}-\d{4}", result.output)
         assert match is not None
 
+    def test_create_label_is_used_in_directory_name(self, tmp_path: Path) -> None:
+        project_dir = _make_project(tmp_path)
+        _make_case(project_dir, "my_case")
+        dest = project_dir / "runs" / "survey1"
+
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "create",
+                "my_case",
+                "--dest",
+                str(dest),
+                "--label",
+                "High resolution",
+            ],
+        )
+
+        assert result.exit_code == 0, result.output
+        run_dir = next(path for path in dest.iterdir() if path.is_dir())
+        assert run_dir.name.endswith("--high-resolution")
+        assert "High resolution" in result.output
+
 
 # ---------------------------------------------------------------------------
 # sweep command tests
@@ -239,6 +262,79 @@ class TestSweep:
         # Check that display names appear in output
         assert "nx32_ny32" in result.output
         assert "nx64_ny64" in result.output
+        run_names = {
+            path.name
+            for path in survey_dir.iterdir()
+            if (path / "manifest.toml").exists()
+        }
+        assert any(name.endswith("--nx32-ny32") for name in run_names)
+
+    def test_sweep_collapses_uniform_parameter_group_into_label(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project_dir = _make_project(tmp_path)
+        case_dir = _make_case(project_dir, "base_case")
+        with (case_dir / "case.toml").open("a") as case_file:
+            case_file.write("nz = 64\n")
+        survey_dir = project_dir / "runs" / "size_survey"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text(
+            "[survey]\n"
+            'id = "S20260717-size"\n'
+            'name = "Size sweep"\n'
+            'base_case = "base_case"\n'
+            'simulator = "test_sim"\n'
+            'launcher = "slurm_srun"\n\n'
+            "[axes]\n"
+            "nx = [192]\n"
+            "ny = [192]\n"
+            "nz = [192]\n\n"
+            "[naming]\n"
+            "max_length = 48\n\n"
+            "[[naming.groups]]\n"
+            'label = "size"\n'
+            'keys = ["nx", "ny", "nz"]\n'
+        )
+
+        result = runner.invoke(app, ["runs", "sweep", str(survey_dir)])
+
+        assert result.exit_code == 0, result.output
+        assert "size-x3" in result.output
+        run_dir = next(
+            path for path in survey_dir.iterdir() if (path / "manifest.toml").exists()
+        )
+        assert run_dir.name.endswith("--size-x3")
+
+    def test_sweep_dry_run_previews_semantic_directory_label(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        project_dir = _make_project(tmp_path)
+        case_dir = _make_case(project_dir, "base_case")
+        with (case_dir / "case.toml").open("a") as case_file:
+            case_file.write("nz = 64\n")
+        survey_dir = project_dir / "runs" / "size_survey"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text(
+            "[survey]\n"
+            'base_case = "base_case"\n'
+            'simulator = "test_sim"\n'
+            'launcher = "slurm_srun"\n\n'
+            "[axes]\nnx = [192]\nny = [192]\nnz = [192]\n\n"
+            "[[naming.groups]]\n"
+            'label = "size"\n'
+            'keys = ["nx", "ny", "nz"]\n'
+        )
+
+        result = runner.invoke(
+            app,
+            ["runs", "sweep", str(survey_dir), "--dry-run"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "{run_id}--size-x3" in result.output
+        assert list(survey_dir.glob("*/manifest.toml")) == []
 
     def test_sweep_no_survey_toml(self, tmp_path: Path) -> None:
         """Sweep fails gracefully when survey.toml is missing."""

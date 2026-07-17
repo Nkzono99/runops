@@ -100,6 +100,7 @@ def test_command_tree_is_stable_for_primary_and_alias_apps() -> None:
         "runs log",
         "runs purge-work",
         "runs regenerate",
+        "runs restore",
         "runs retry",
         "runs status",
         "runs submit",
@@ -191,6 +192,7 @@ def test_runs_help_shows_grouped_run_commands() -> None:
         "clone",
         "extend",
         "archive",
+        "restore",
         "purge-work",
     ]:
         assert cmd in result.output

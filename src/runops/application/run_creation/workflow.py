@@ -7,7 +7,6 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from uuid import uuid4
 
 from runops.adapters.base import SimulatorAdapter
 from runops.core.case import (
@@ -27,7 +26,9 @@ from runops.core.project import ProjectConfig
 from runops.core.run import RunInfo, create_run_directory
 from runops.core.site import SiteProfile, load_site_profile
 from runops.core.survey import (
+    NamingConfig,
     generate_display_name,
+    generate_semantic_label,
 )
 from runops.jobgen.generator import generate_job_script
 from runops.launchers.base import Launcher
@@ -145,6 +146,7 @@ def create_prepared_run(
     existing_ids: set[str] | None = None,
     params: dict[str, Any] | None = None,
     display_name: str = "",
+    naming: NamingConfig | None = None,
     survey_id: str = "",
     variation_keys: list[str] | None = None,
 ) -> CreatedRunResult:
@@ -170,9 +172,18 @@ def create_prepared_run(
         known_ids = collect_existing_run_ids(project.root_dir / "runs")
 
     for _ in range(_RUN_ID_ALLOCATION_ATTEMPTS):
-        run_id, final_run_dir = _next_available_run_target(parent_dir, known_ids)
-        staging_name = f".tmp-{run_id}-{uuid4().hex}"
-        staging_run_dir = create_run_directory(parent_dir, staging_name)
+        run_id, final_run_dir = _next_available_run_target(
+            parent_dir,
+            known_ids,
+            display_name=display_name,
+            naming=naming,
+        )
+        staging_name = f".tmp-{run_id}"
+        try:
+            staging_run_dir = create_run_directory(parent_dir, staging_name)
+        except FileExistsError:
+            known_ids.add(run_id)
+            continue
         created_at = datetime.now(tz=timezone.utc).isoformat()
         final_run_info = RunInfo(
             run_id=run_id,
@@ -274,7 +285,8 @@ def create_prepared_run(
                 event_path=final_run_dir / "manifest.toml",
                 log_event=False,
             )
-            if final_run_dir.exists():
+            existing_id_paths = list(parent_dir.glob(f"{run_id}*"))
+            if existing_id_paths or final_run_dir.exists():
                 raise _RunIdCollisionError(run_id)
             try:
                 staging_run_dir.rename(final_run_dir)
@@ -339,6 +351,7 @@ def create_case_run(
         site=site,
         params=params,
         display_name=display_name or case_data.name,
+        naming=NamingConfig(),
         existing_ids=collect_existing_run_ids(project.root_dir / "runs"),
     )
 
@@ -360,10 +373,18 @@ def create_survey_runs(
     results: list[CreatedRunResult] = []
     for combo in plan.combinations:
         merged_params = {**plan.base_case.params, **combo}
-        display_name = generate_display_name(
-            plan.survey_data.naming_template,
-            merged_params,
-        )
+        if plan.survey_data.naming_template:
+            display_name = generate_display_name(
+                plan.survey_data.naming_template,
+                merged_params,
+            )
+        else:
+            display_name = generate_semantic_label(
+                plan.base_case.params,
+                merged_params,
+                list(plan.variation_keys),
+                plan.survey_data.naming,
+            )
         results.append(
             create_prepared_run(
                 parent_dir=survey_dir,
@@ -375,6 +396,7 @@ def create_survey_runs(
                 existing_ids=existing_ids,
                 params=merged_params,
                 display_name=display_name,
+                naming=plan.survey_data.naming,
                 survey_id=plan.survey_data.id,
                 variation_keys=list(plan.variation_keys),
             )

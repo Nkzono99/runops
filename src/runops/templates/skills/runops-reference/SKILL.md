@@ -34,10 +34,10 @@ runo <group> <command> --help
 | failure diagnosis / retry | `{{ skill_prefix }}debug-failed` → `runo runs retry` |
 | run-local / cross-run 解析 | `{{ skill_prefix }}analyze`, `{{ skill_prefix }}summarize-script` |
 | research memory / knowledge | `{{ skill_prefix }}research-workspace`, `{{ skill_prefix }}learn` |
-| archive / purge / delete | `{{ skill_prefix }}cleanup` |
+| restore / archive / purge / delete | `{{ skill_prefix }}cleanup` |
 | harness / migration | `{{ skill_prefix }}update-runops`, `{{ skill_prefix }}migrate-runops` |
 
-survey 全体の submit は直接実行せず `{{ skill_prefix }}run-all` に経路を渡し、pilot evidence、
+full / large survey 全体の submit は直接実行せず `{{ skill_prefix }}run-all` に経路を渡し、pilot evidence、
 `research/CURRENT.md` の判断、cost ceiling、承認を entry criteria とする。
 
 ## State transition map
@@ -48,6 +48,7 @@ created -> runs submit -> submitted
 submitted/running -> runs sync -> current state + recommended action
 completed -> analyze summarize|collect -> analysis evidence
 completed -> runs archive -> archived -> runs purge-work
+                                -> runs restore -> completed
 ```
 
 各 command の output に recommended command がある場合は、それを次の候補として Goal / Done と

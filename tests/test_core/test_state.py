@@ -66,6 +66,9 @@ class TestValidateTransition:
     def test_valid_archived_to_purged(self) -> None:
         assert validate_transition(RunState.ARCHIVED, RunState.PURGED) is True
 
+    def test_valid_archived_to_completed_for_restore(self) -> None:
+        assert validate_transition(RunState.ARCHIVED, RunState.COMPLETED) is True
+
     def test_invalid_created_to_completed(self) -> None:
         assert validate_transition(RunState.CREATED, RunState.COMPLETED) is False
 

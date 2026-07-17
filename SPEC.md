@@ -329,6 +329,9 @@ S20260327-cavity-u-a
 
 人間向けの短い表示名。
 suffix 的な役割を持つ。
+新規 run のディレクトリ名は、既定で不変な `run_id` と filesystem-safe な
+`display_name` slug を `RYYYYMMDD-NNNN--<label>` の形で併記する。
+`display_name` が空ならディレクトリ名は `run_id` のみとする。
 
 例:
 
@@ -585,6 +588,16 @@ seed = [1, 2, 3]
 
 [naming]
 display_name = "u{u}_a{aspect}_s{seed}"
+directory = "{run_id}--{label}"
+max_length = 48
+
+[naming.aliases]
+"tmgrid.dt" = "dt"
+
+[[naming.groups]]
+label = "size"
+keys = ["tmgrid.nx", "tmgrid.ny", "tmgrid.nz"]
+strategy = "uniform_ratio"
 
 [job]
 partition = "gr20001a"
@@ -598,6 +611,14 @@ walltime = "12:00:00"
 field は case 側から継承する。scalar field は survey 側の値が空でない
 場合に上書きし、list field は survey 側に field が存在する場合にリスト
 全体を置換する（空リストも明示的な置換として扱う）。
+
+`display_name` が空の場合は、base case から変化した parameter を使って決定的な
+label を生成する。`uniform_ratio` group の全 key が同じ倍率なら、例えば
+`nx`, `ny`, `nz` の各3倍を `size-x3` に畳み込む。成立しない group は個別の
+parameter 差分へフォールバックする。group 外の数値は倍率を仮定せず値を表示する。
+group は単一 key にも使え、明示的に倍率表記へ opt-in できる。
+LLM は survey 設計時に alias / group を
+提案してよいが、run 展開時の命名は外部 model call を行わず決定的に処理する。
 
 ## 11.2.1 連動パラメータ (`[[linked]]`)
 
@@ -818,7 +839,8 @@ scientific evidence の受理条件にしない。
 
 ### `archived`
 
-必要に応じて出力整理済み
+active view から退避済み。既定では run directory 全体を `runs/_archive/` へ移し、
+入力・出力・restart・解析 artifact は保持する
 
 ### `purged`
 
@@ -833,6 +855,8 @@ created -> submitted -> running -> completed
 created/submitted/running -> failed
 submitted/running -> cancelled
 completed -> archived -> purged
+             |
+             +-> completed  (restore)
 ```
 
 `runo runs cancel` は `submitted` / `running` の run に対して `scancel` と
@@ -1080,8 +1104,8 @@ hidden compatibility alias で、`--yes` と別 semantics を持たない。
 
 ## 18.2 run 生成
 
-* `runo runs create CASE_NAME`
-* `runo runs sweep [<survey.toml のあるディレクトリ>]`
+* `runo runs create CASE_NAME [--label LABEL]`
+* `runo runs sweep [<survey.toml のあるディレクトリ>] [--dry-run]`
 
 ---
 
@@ -1109,8 +1133,10 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 ## 18.5 一覧
 
-* `runo runs list [PATHS...]`
+* `runo runs list [PATHS...]` — 既定では archived / purged を除く active view
+* `runo runs list [PATHS...] --include-archived` — archived / purged を含める
 * `runo runs list --status failed`
+* `runo runs list --status archived` — 明示した archived run だけを表示する
 * `runo runs list --tag production`
 
 ---
@@ -1137,6 +1163,7 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 * `runo runs archive <run_dir or run_id>` — completed → archived。既定では `runs/_archive/<元の runs/ 相対パス>` へ移動する
 * `runo runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
 * `runo runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
+* `runo runs restore <run_dir or run_id>` — archived → completed。`archived_from` へフォルダごと戻し、全 artifact を保持する。in-place archive は状態だけ戻す
 * `runo runs purge-work [<run_dir or run_id>]` — archived → purged。cached readiness が
   incomplete / unknown の場合は `--discard-incomplete --reason <WHY>` を同じ command に指定して
   review provenance を残す

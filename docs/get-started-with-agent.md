@@ -154,6 +154,19 @@ Agentは依頼からGoal / Done / Budget / Invariantを組み立て、現在のe
 submit の Done は job_id、初動確認の Done は progress evidence です。後者まで進めたい場合は、
 step、log marker、観測期限などを依頼に含めてください。
 
+## 完了 run を退避する
+
+普段見る run を絞りたい場合、completed run は内容を削除せず `runs/_archive/` へ移せます。
+
+```bash
+runo runs archive R2026...
+runo runs list                       # archived / purged は既定で非表示
+runo runs list --include-archived    # 保管分を含めて表示
+runo runs restore R2026...           # archive 前の場所へ全 artifact を復元
+```
+
+出力を今後も使う場合は `runo runs purge-work` を実行しないでください。
+
 ## SKILL を明示するとき
 
 通常は「何をしてほしいか」を書けば十分です。意図がずれるときだけ、ひと言添えてください。

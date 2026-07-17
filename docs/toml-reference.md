@@ -485,7 +485,13 @@ tags = ["magnetic", "angle_scan"]
 "plasma.phiz" = [0.0, 45.0, 90.0]
 
 [naming]
-display_name = "wc{wc}_phi{phiz}"
+# Empty means: derive labels from changes relative to the base case.
+display_name = ""
+directory = "{run_id}--{label}"
+max_length = 48
+
+[naming.aliases]
+"plasma.phiz" = "angle"
 
 [job]
 partition = "gr20001a"
@@ -553,7 +559,35 @@ steps = [100, 1000]
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `display_name` | string | No | Template for run display names. Use `{key}` placeholders (leaf key after last dot) |
+| `display_name` | string | No | 明示的な表示名 template。空なら base case との差分から semantic label を自動生成 |
+| `directory` | string | No | directory basename template。既定 `{run_id}--{label}`。`{run_id}` は必須 |
+| `max_length` | integer | No | directory に使う label の最大文字数。既定 `48` |
+| `aliases` | table | No | parameter key から短い人間向け名称への対応 |
+| `groups` | array of tables | No | 一つ以上の parameter を倍率ベースの意味へ畳み込む規則 |
+
+`[[naming.groups]]` の現在の `strategy` は `uniform_ratio`。group の全 key が
+base case から同じ倍率で変化した場合だけ、`size-x3` のようにまとめる。
+倍率が揃わない場合は `nx-x3-ny-x2` のような個別差分へフォールバックする。
+group 外の数値は倍率と仮定せず、`angle-30` のように値そのものを表示する。
+明示的な `display_name` template がある場合は、semantic label より優先される。
+
+```toml
+[[naming.groups]]
+label = "size"
+keys = ["tmgrid.nx", "tmgrid.ny", "tmgrid.nz"]
+strategy = "uniform_ratio"
+```
+
+生成例:
+
+```text
+R20260717-0001--baseline/
+R20260717-0002--size-x3/
+R20260717-0003--size-x3-dt-x0-5/
+```
+
+LLM/agent は survey 設計時に aliases と groups を提案できるが、`runs sweep` は
+model API を呼ばず、保存済み規則をローカルで決定的に適用する。
 
 ### `[job]`
 
@@ -681,10 +715,12 @@ status_dir = "status"
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `run_dir` | string | Current physical run directory. Updated when `runo runs archive` relocates a run. |
+| `run_dir` | string | Current physical run directory. Updated when archive or restore relocates a run. |
 | `created_at_path` | string | Original run directory before archive relocation, when known. |
 | `archived_from` | string | Source directory used for the latest archive relocation. |
 | `archived_at` | datetime string | ISO 8601 timestamp for the latest archive relocation. |
+| `restored_from` | string | Archived directory used for the latest restore. |
+| `restored_at` | datetime string | ISO 8601 timestamp for the latest restore. |
 
 ### State Machine
 
@@ -693,6 +729,8 @@ created -> submitted -> running -> completed
 created/submitted/running -> failed
 submitted/running -> cancelled
 completed -> archived -> purged
+             |
+             +-> completed  (restore)
 ```
 
 ### Execution state と analysis readiness

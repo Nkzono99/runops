@@ -36,6 +36,7 @@ CLI_OPERATION_BINDINGS: tuple[CliOperationBinding, ...] = (
         "write",
     ),
     CliOperationBinding(("runs", "archive"), ("archive_run",), "destructive"),
+    CliOperationBinding(("runs", "restore"), ("restore_run",), "write"),
     CliOperationBinding(
         ("runs", "purge-work"),
         ("purge_work",),

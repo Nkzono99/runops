@@ -66,7 +66,8 @@ operator 作業に限るのが基本です。必要な場合の詳細は
 runops の中心にある思想は、以下の分離です。
 
 - **run directory が日常運用の主単位**
-  すべての実行、状態、解析、履歴は `runs/.../RYYYYMMDD-NNNN/` を基点に扱う。
+  すべての実行、状態、解析、履歴は
+  `runs/.../RYYYYMMDD-NNNN--semantic-label/` を基点に扱う。
 
 - **`manifest.toml` が run の正本**
   run id、状態、由来、job id、Slurm 状態、provenance、parameter snapshot を

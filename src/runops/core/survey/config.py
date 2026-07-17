@@ -7,6 +7,7 @@ Supports both Cartesian product (axes) and co-varying (linked) parameters.
 from __future__ import annotations
 
 import itertools
+import string
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -24,6 +25,11 @@ from runops.core.case import (
     _parse_job,
 )
 from runops.core.exceptions import SurveyConfigError
+from runops.core.survey.naming import (
+    DEFAULT_DIRECTORY_TEMPLATE,
+    NamingConfig,
+    NamingGroup,
+)
 
 _SURVEY_FILE = "survey.toml"
 
@@ -43,7 +49,7 @@ class SurveyData:
         classification: Classification metadata.
         axes: Parameter axes for cartesian product expansion.
         linked: List of co-varying parameter groups (zip expansion).
-        naming_template: Template string for generating display_name.
+        naming: Deterministic display and directory naming rules.
         job: Slurm job configuration.
         survey_dir: Absolute path to the survey directory.
         raw: The raw parsed survey.toml dictionary.
@@ -57,10 +63,15 @@ class SurveyData:
     classification: ClassificationData = field(default_factory=ClassificationData)
     axes: dict[str, list[Any]] = field(default_factory=dict)
     linked: list[dict[str, list[Any]]] = field(default_factory=list)
-    naming_template: str = ""
+    naming: NamingConfig = field(default_factory=NamingConfig)
     job: JobData = field(default_factory=JobData)
     survey_dir: Path = field(default_factory=lambda: Path("."))
     raw: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def naming_template(self) -> str:
+        """Compatibility accessor for the configured display-name template."""
+        return self.naming.display_name
 
 
 def load_survey(survey_dir: Path) -> SurveyData:
@@ -192,11 +203,7 @@ def load_survey(survey_dir: Path) -> SurveyData:
                 f" group {i} in {survey_file}"
             )
 
-    # Parse naming template
-    naming_section = raw.get("naming", {})
-    naming_template = ""
-    if isinstance(naming_section, dict):
-        naming_template = str(naming_section.get("display_name", ""))
+    naming = _parse_naming(raw.get("naming", {}), survey_file)
 
     job = _parse_job(raw.get("job", {}))
 
@@ -209,11 +216,130 @@ def load_survey(survey_dir: Path) -> SurveyData:
         classification=classification,
         axes=axes,
         linked=linked,
-        naming_template=naming_template,
+        naming=naming,
         job=job,
         survey_dir=survey_dir,
         raw=raw,
     )
+
+
+def _parse_naming(raw: Any, survey_file: Path) -> NamingConfig:
+    """Parse and validate deterministic run naming rules."""
+    if not isinstance(raw, dict):
+        raise SurveyConfigError(f"Invalid [naming] section in {survey_file}")
+
+    display_name = str(raw.get("display_name", ""))
+    directory_template = str(raw.get("directory", DEFAULT_DIRECTORY_TEMPLATE)).strip()
+    _validate_directory_template(directory_template, survey_file)
+
+    max_length = raw.get("max_length", 48)
+    if (
+        not isinstance(max_length, int)
+        or isinstance(max_length, bool)
+        or max_length < 1
+        or max_length > 120
+    ):
+        raise SurveyConfigError(
+            f"naming.max_length must be an integer from 1 to 120 in {survey_file}"
+        )
+
+    raw_aliases = raw.get("aliases", {})
+    if not isinstance(raw_aliases, dict):
+        raise SurveyConfigError(f"naming.aliases must be a table in {survey_file}")
+    aliases: dict[str, str] = {}
+    for key, value in raw_aliases.items():
+        if not isinstance(value, str) or not value.strip():
+            raise SurveyConfigError(
+                f"Naming alias for {key!r} must be a non-empty string in {survey_file}"
+            )
+        aliases[str(key)] = value.strip()
+
+    raw_groups = raw.get("groups", [])
+    if not isinstance(raw_groups, list):
+        raise SurveyConfigError(
+            f"naming.groups must be an array of tables in {survey_file}"
+        )
+    groups: list[NamingGroup] = []
+    grouped_keys: set[str] = set()
+    for index, raw_group in enumerate(raw_groups):
+        if not isinstance(raw_group, dict):
+            raise SurveyConfigError(
+                f"naming.groups entry {index} must be a table in {survey_file}"
+            )
+        label = raw_group.get("label")
+        keys = raw_group.get("keys")
+        strategy = str(raw_group.get("strategy", "uniform_ratio"))
+        if not isinstance(label, str) or not label.strip():
+            raise SurveyConfigError(
+                f"naming.groups entry {index} requires a non-empty label"
+                f" in {survey_file}"
+            )
+        if (
+            not isinstance(keys, list)
+            or not keys
+            or not all(isinstance(key, str) and key for key in keys)
+            or len(set(keys)) != len(keys)
+        ):
+            raise SurveyConfigError(
+                f"naming.groups entry {index} keys must contain unique names"
+                f" in {survey_file}"
+            )
+        if strategy != "uniform_ratio":
+            raise SurveyConfigError(
+                f"Unsupported naming.groups strategy {strategy!r} in {survey_file}"
+            )
+        key_tuple = tuple(keys)
+        overlap = grouped_keys.intersection(key_tuple)
+        if overlap:
+            raise SurveyConfigError(
+                f"Naming group keys {sorted(overlap)} appear in multiple groups"
+                f" in {survey_file}"
+            )
+        grouped_keys.update(key_tuple)
+        groups.append(
+            NamingGroup(
+                label=label.strip(),
+                keys=key_tuple,
+                strategy=strategy,
+            )
+        )
+
+    return NamingConfig(
+        display_name=display_name,
+        directory_template=directory_template,
+        max_length=max_length,
+        aliases=aliases,
+        groups=tuple(groups),
+    )
+
+
+def _validate_directory_template(template: str, survey_file: Path) -> None:
+    if not template or "/" in template or "\\" in template:
+        raise SurveyConfigError(
+            f"naming.directory must be a directory basename in {survey_file}"
+        )
+    try:
+        parsed_fields = list(string.Formatter().parse(template))
+    except ValueError as exc:
+        raise SurveyConfigError(
+            f"Invalid naming.directory template in {survey_file}: {exc}"
+        ) from exc
+    fields = [field_name for _, field_name, _, _ in parsed_fields if field_name]
+    has_advanced_formatting = any(
+        format_spec or conversion
+        for _, field_name, format_spec, conversion in parsed_fields
+        if field_name is not None
+    )
+    if (
+        fields.count("run_id") != 1
+        or fields.count("label") > 1
+        or not set(fields).issubset({"run_id", "label"})
+        or has_advanced_formatting
+    ):
+        raise SurveyConfigError(
+            "naming.directory must contain one plain {run_id} and at most one "
+            f"plain {{label}} in {survey_file}"
+        )
 
 
 def expand_axes(axes: dict[str, list[Any]]) -> list[dict[str, Any]]:
