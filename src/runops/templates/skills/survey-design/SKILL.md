@@ -10,6 +10,7 @@ description: Use when the requested outcome is a survey.toml, pilot matrix, para
 - **Goal**: 仮説を検証するaxes、pilot、full candidateをsurvey定義にする
 - **Done**: `survey.toml`、pilot points、run数、cost見積もり、検証結果を報告できる
 - **Budget**: 指定caseと一つの情報gapごとに最も近いsourceだけを読む。full matrixはcost ceiling内
+- **Invariant**: immutable parameterとcost ceilingを守り、run生成やsubmitへ自動で進まない
 
 ## Source routing
 
@@ -23,14 +24,12 @@ description: Use when the requested outcome is a survey.toml, pilot matrix, para
 
 各gapが解消した時点でsource探索を終える。
 
-## 状態遷移
+## Outcome loop
 
-1. hypothesisとobservablesから必要なindependent axesを選ぶ
-2. control、failure-detecting edge、代表点から最小pilotを作る
-3. pilot evidence後に検討するfull matrix candidateとcost ceilingを分ける
-4. `[survey]`, `[axes]`, `[naming]`, `[job]`を持つ`survey.toml`を作る
-5. `runo runs sweep <survey> --dry-run`でrun数、parameter組合せ、概算costを検証する
-6. Doneと、full submitに進むための判定基準を報告する
+hypothesisとobservablesからindependent axesを選び、control、failure-detecting edge、代表点で
+最小pilotを作る。pilot後のfull matrix candidateとcost ceilingは分けて定義する。
+`[survey]`, `[axes]`, `[naming]`, `[job]`を持つ`survey.toml`を作り、
+`runo runs sweep <survey> --dry-run`のrun数、組合せ、概算costをDone evidenceにする。
 
 parameterの正確なsyntaxは`runo runs sweep --help`とschema、物理的意味は専門skillを使う。
 

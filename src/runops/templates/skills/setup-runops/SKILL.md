@@ -10,6 +10,7 @@ description: Use when a generated runops project needs orientation and progress 
 - **Goal**: 利用者が指定した最初の milestone まで project を進める
 - **Done**: project health と現在状態が分かり、milestone の artifact と次の依頼候補を示せる
 - **Budget**: context / doctor は各1回。plugin確認は Goal が推薦 capability に依存するとき1回
+- **Invariant**: requested milestoneで閉じ、後続phaseとproject外変更を自動で連鎖しない
 - **Default milestone**: campaign、case、survey、created run のうち依頼に最も近い段階
 
 この skill は `runo init` / `runo setup` / `runo update-harness` 後の project を入口にする。
@@ -24,21 +25,19 @@ project は生成済みとみなし、診断結果を Goal への routing に使
 | project が未作成 | `runo init` |
 | clone 元が指定済み | `runo setup <URL>` |
 
-## 主経路
+## Milestone routing
 
-1. project root を確定する
-2. 次を実行して context と blocker を得る
+project root確定後、contextとblockerが不明な場合だけ各commandを一度使う。
 
-   ```bash
-   uvx --from runops runo context --no-json
-   uvx --from runops runo doctor
-   ```
+```bash
+uvx --from runops runo context --no-json
+uvx --from runops runo doctor
+```
 
-3. Goal が plugin capability に依存する場合は `runo plugins --json` と
-   `{{ skill_prefix }}setup-plugins` で委譲先を確定する
-4. local state から決まらない設計情報だけをまとめて聞く
-5. milestone に対応する skill を実行する
-6. Done の artifact、残った blocker、次に頼める依頼例を報告する
+Goalがplugin capabilityに依存する場合だけ`runo plugins --json`と
+`{{ skill_prefix }}setup-plugins`で委譲先を確定する。local state から決まらない設計情報だけを
+まとめて確認し、milestoneに対応するskillへrouteする。Done artifact、blocker、次に頼める
+依頼例を返して終了する。
 
 ## 最小限の設計入力
 

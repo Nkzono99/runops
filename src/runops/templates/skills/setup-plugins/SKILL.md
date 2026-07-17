@@ -10,6 +10,7 @@ description: Use when the user requests plugin setup or the current Goal depends
 - **Goal**: 指定pluginまたはdelegated capabilityをinstall / enable / activation可能な状態にする
 - **Done**: 対象plugin、実施状態、残るuser action、activation方法、委譲roleを報告できる
 - **Budget**: requested capabilityに関係する推薦だけを扱い、metadata確認と検証を各1回
+- **Invariant**: 公式導線だけを使い、project外変更はcheckpointを得てcredentialを記録しない
 
 ## Inventory
 
@@ -22,11 +23,10 @@ requested capabilityを提供する最小のplugin集合を選ぶ。
 
 ## State transition
 
-1. project metadataから対象pluginと公式install / activation導線を選ぶ
-2. project外の変更は、変更先、理由、command、rollbackを示してcheckpointを得る
-3. `install_hint`またはplugin公式UI / installerでinstall・enableする
-4. `activation_hint`に従い、restart / new threadなどの残作業を確定する
-5. metadataを一度検証してDoneを返す
+project metadataから対象pluginと公式install / activation導線を選ぶ。project外の変更は、
+変更先、理由、command、rollbackを示してcheckpointを得る。`install_hint`または公式UI /
+installerを使い、`activation_hint`からrestart / new threadなどの残作業を確定する。
+metadataを一度検証してDoneを返す。
 
 ```bash
 uvx --from runops runo plugins --check

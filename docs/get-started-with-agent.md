@@ -149,7 +149,8 @@ Agent との聞き取りを短くしたい場合は、研究目的と制約を�
 
 ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
 
-Agent は依頼から Goal / Done / Budget を組み立て、Done に必要な最短の状態遷移を選びます。
+Agentは依頼からGoal / Done / Budget / Invariantを組み立て、現在のevidenceからDoneに必要な
+最短の状態遷移を選びます。
 submit の Done は job_id、初動確認の Done は progress evidence です。後者まで進めたい場合は、
 step、log marker、観測期限などを依頼に含めてください。
 

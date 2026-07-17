@@ -29,7 +29,7 @@ runops 本体の変更は研究 project と分離した source checkout で扱�
 
 `runo runs submit --dry-run --all` で bulk 対象を確定し、承認済みの場合は
 `runo runs submit --all --yes` で CLI prompt をまとめる。startup validation は
-`check-status` skill の観測予算に従う。
+`check-status` skill のBudgetに従う。
 
 ## Human checkpoint
 

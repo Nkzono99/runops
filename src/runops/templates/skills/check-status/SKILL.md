@@ -9,7 +9,8 @@ description: Use when the requested outcome requires current job state, progress
 
 - **Goal**: ユーザーが求める時点の state または progress evidence を得る
 - **Done**: 状態要約、進行を示す evidence、推奨する次アクションを報告できる
-- **観測予算**: 通常は sync 1 回。startup check は progress snapshot 2 回以内、または指定期限まで
+- **Budget**: 通常はsync 1回。startup checkはprogress snapshot 2回以内、または指定期限まで
+- **Invariant**: 観測だけを行い、submit、retry、完了待機へ自動で遷移しない
 
 依頼が state summary なら state の同期で完了する。依頼が startup validation を含むなら、
 指定した step / progress marker の変化を Done に加える。
@@ -37,13 +38,11 @@ cache 上で `ANALYSIS=unknown`, `NEXT=deep_validate` の run は、その run_i
 ユーザーの Done に「正常に動いている」「数 step 進んだ」などの初動 evidence が含まれる
 場合に使う。
 
-1. 対象 run、progress marker、観測期限を決める
-2. `runo runs sync <RUN>` で Slurm state を得る
-3. RUNNING なら `runo runs log <RUN> -n 50` で最初の snapshot を得る
-4. progress の変化が必要なら、観測予算内でもう一つ snapshot を得る
-5. progress evidence、または期限時点の PENDING / RUNNING / output 未生成状態を報告する
+対象run、progress marker、観測期限を先に確定する。`runo runs sync <RUN>`でRUNNINGなら
+`runo runs log <RUN> -n 50`をsnapshotにし、変化がDoneに必要な場合だけBudget内でもう一度読む。
+markerの進行、または期限時点のPENDING / RUNNING / output未生成状態をevidenceとして返す。
 
-期限指定がない startup check の観測予算は短い window と snapshot 2 回以内を採用する。
+期限指定がない startup check のBudgetは短い window と snapshot 2 回以内を採用する。
 job 完了までの観測は、それを Goal とする依頼として別の予算を設定する。
 
 ## Runtime health evidence

@@ -7,7 +7,7 @@ Harness Layer は、人間と Agent が runops project を安全に運用する�
 ## 目的
 
 - Agent が project の文脈を読めるようにする。
-- Goal / Done / Budget から最短の状態遷移を選べるようにする。
+- Goal / Done / Budget / Invariantから最短の状態遷移を選べるようにする。
 - 高コスト / 不可逆操作に guardrail を置く。
 - 定型作業を skill として共有する。
 - Claude Code / Codex の違いを吸収し、同じ project 運用思想を保つ。
@@ -60,17 +60,19 @@ Harness Layer に置くもの:
 1. **Goal**: 今回到達させる研究・project state
 2. **Done**: 到達を示す evidence / artifact
 3. **Budget**: run 数、cost、待機時間、観測回数
-4. **Next**: Goal に最も近い一つの状態遷移
+4. **Invariant**: 状態整合性、安全性、provenance のため破らない境界
 
-Agent は Done に必要な source と skill だけを読み、到達時に返します。submit、監視、解析は
+次の状態遷移は4項目と現在のevidenceから導出します。AgentはDoneに必要なsourceとskillだけを読み、
+到達時に返します。submit、監視、解析は
 別々の到達状態なので、後続段階は依頼の Done に含まれる場合に進みます。
 
-頻出skillは次の条件を満たします。
+project skillは次の条件を満たします。
 
 - descriptionは「いつの後に」ではなく、どのrequested outcomeで発火するかを書く。
 - 一つのskillは一つのDoneで閉じ、隣接phaseは次のGoal候補として返す。
 - source探索、診断、観測にはBudgetを置き、情報gapが解消した時点で終了する。
-- campaign、survey、run生成、解析、plugin setup、cleanupは90行以内を回帰テストする。
+- 全skillは4項目の実行契約を持ち、90行以内を回帰テストする。
+- 番号付きrecipeを既定にせず、高コスト操作もentry criteriaとcheckpoint tableで制御する。
 - research journalやknowledge昇格は、provenanceまたはknowledgeがGoalに含まれる場合に独立して扱う。
 - 汎用package開発skillはrunops開発ハーネスに置き、simulation research projectには配布しない。
 

@@ -1,40 +1,28 @@
 ---
 name: setup-env
-description: Set up or repair the project Python environment. Use when initializing a project or fixing environment issues.
+description: Use when the requested outcome is a healthy or repaired project runtime environment verified by runo doctor.
 ---
 
-# プロジェクト環境のセットアップ
+# project runtimeを利用可能にする
 
-## 方法 1: ブートストラップ (新規プロジェクト)
+## 実行契約
 
-```bash
-uvx --from runops runo init
-uvx --from runops runo doctor
-```
+- **Goal**: 指定projectのPython / simulator runtimeをdoctor可能な状態にする
+- **Done**: 選択したruntime経路、導入package、`runo doctor`結果を報告できる
+- **Budget**: 一つのproject環境と、診断で不足が確認されたdependencyだけ
+- **Invariant**: runops CLIは原則`uvx`、`.venv`はproject runtimeに使い、無関係なpackageを更新しない
 
-## 方法 2: 手動セットアップ (既存プロジェクト)
+## Environment routing
 
-```bash
-uv venv .venv
-{{ pip_install_line }}
-uvx --from runops runo doctor
-```
+| state | route |
+|---|---|
+| project未作成 | `uvx --from runops runo init` |
+| 既存projectのruntime不足 | `uv venv .venv` → `{{ pip_install_line }}` |
+| offline / pinned CLI | `uv pip install runops --python .venv/bin/python` |
 
-runops CLI を project `.venv` に固定したい offline / pinned workflow だけ、
-明示的にインストールする:
+選んだrouteの後に`uvx --from runops runo doctor`を一度実行する。Windowsのpinned CLIは
+`.venv\Scripts\runo.exe`を使う。
 
-```bash
-uv pip install runops --python .venv/bin/python
-.venv/bin/runo doctor
-```
-
-Windows では `.venv\Scripts\runo.exe doctor` に読み替える。
-
-## 注意
-
-- `.venv/` は `.gitignore` に追加済み
-- HPC ノードでは login ノードで環境構築し、compute ノードでは同じ `.venv` を使う
-- `module load` が必要なモジュールは `simulators.toml` の `modules` に定義済み
-- runops 更新: `{{ skill_prefix }}update-runops` または
-  `uvx --from runops runo update-harness --plan` →
-  `uvx --from runops runo update-harness --apply-chain`
+- `.venv/`はGit管理しない
+- HPC moduleは`simulators.toml`の`modules`をsourceにする
+- runops / harness更新は`{{ skill_prefix }}update-runops`の別Goalとして扱う

@@ -1,127 +1,47 @@
 ---
 name: patch-runops
-description: Patch runops itself in a separate source checkout, verify the fix, then decide whether it stays local, becomes an issue, draft PR, or ready PR.
+description: Use when the requested outcome is an isolated, verified runops fix and an explicit upstream disposition.
 ---
 
-# runops 本体を別 checkout で patch する
+# projectと分離してrunops本体を直す
 
-通常の runops project には `tools/runops/` は作られない。runops 本体の bug /
-不足機能 / harness 摩擦を修正する必要がある場合は、研究 project とは別の
-source checkout を用意して作業する。
+## 実行契約
 
-この skill は **研究作業を止めないための local hotfix** と、
-**upstream に戻すかどうかの判定** を扱う。
+- **Goal**: projectで見つかったrunopsのbug /不足機能 / harness摩擦を別checkoutで修正する
+- **Done**: source commit、対象test、projectでの確認結果、upstream dispositionを報告できる
+- **Budget**: 一つのissueと関連source / targeted testsだけ
+- **Invariant**: 研究projectとsource変更を混ぜず、dirty worktreeとprivate research dataを保護する
 
-## 基本方針
+## Ownership routing
 
-- project 側の `campaign.toml`, `cases/`, `runs/`, `research/` と runops 本体の変更を混ぜない。
-- local patch の正本は別 checkout 内の Git branch / commit とする。
-- current project で確認したいときだけ、一時的に `.venv` へ package install する。
-- 作業メモや handoff は `runo research append` で残す。
-- 研究判断が変わる場合だけ `research/CURRENT.md` も更新する。
+| change | owner |
+|---|---|
+| project固有の研究判断・data・site秘密 | current project |
+| project固有harness override | current project |
+| 汎用CLI / core / adapter / launcher | separate runops checkout |
+| 汎用project scaffold / harness | checkoutの`src/runops/templates/` |
 
-## まず分類する
+生成済み`.agents/skills/`、`.claude/skills/`、`AGENTS.md`、`CLAUDE.md`や
+`research/`、`campaign.toml`、`cases/`、`runs/`をそのままupstreamへコピーしない。
 
-修正前に、何をどこに置くべきかを分類する。
-
-| 分類 | 置き場所 |
-|------|----------|
-| project 固有の研究判断・実データ・site 秘密 | project 側に残す |
-| project 固有 harness override | project 側に残す |
-| 汎用 CLI / core / adapter / launcher 修正 | runops source checkout |
-| 汎用 scaffold / skill / harness 改善 | runops source checkout の `src/runops/templates/` |
-| 一部だけ汎用、または設計が必要 | local patch + project 固有情報を除いた issue 下書き |
-
-project 側の生成物をそのまま upstream に入れない:
-
-- `.agents/skills/*`
-- `.claude/skills/*`
-- `AGENTS.md`
-- `CLAUDE.md`
-- `research/*`
-- `campaign.toml`
-- `cases/*`
-- `runs/*`
-
-## 手順
-
-### 1. source checkout を用意する
-
-既に runops repository が開いているならそれを使う。なければ project の外に clone する。
+## Patch route
 
 ```bash
 git clone https://github.com/Nkzono99/runops.git ../runops-src
-cd ../runops-src
-git status --short
-git branch --show-current
+git -C ../runops-src status --short
+git -C ../runops-src switch -c fix/<short-name>
 ```
 
-未コミット変更や作業 branch がある場合は、既存 patch を壊さない。
-続けるか、別 branch に分けるか、ユーザーに確認する。
+既存checkoutがあれば再利用し、未コミット変更を壊さない。修正はrunops開発ハーネスに従い、
+targeted test、Ruff、必要なtype checkを通してlogical commitにする。current projectでの確認が
+Doneに必要な場合だけ、そのcheckoutを一時installする。
 
-### 2. branch を切る
+| disposition | condition |
+|---|---|
+| `local-only` | project固有でupstream化しない |
+| `feedback-issue` | 汎用性または設計が未確定 |
+| `draft-pr` | 実装案はあるがreviewが必要 |
+| `ready-pr` | 小さく汎用で検証済み |
 
-```bash
-git checkout -b fix/<short-name>
-```
-
-### 3. 修正して current project で確認する
-
-runops checkout 内で実装する。project 側で確認が必要な場合だけ、project root から
-一時的に install する:
-
-```bash
-uv pip install ../runops-src --python .venv/bin/python
-```
-
-editable install が必要なのは、同じ project で何度も本体変更を反映しながら
-debug する場合だけ:
-
-```bash
-uv pip install -e ../runops-src --python .venv/bin/python
-```
-
-### 4. 最小テストを実行する
-
-runops checkout 内で対象テストを走らせる:
-
-```bash
-uv run pytest <target>
-uv run ruff check <target>
-uv run ruff format --check <target>
-```
-
-### 5. local commit を作る
-
-local patch の正本は Git commit とする。
-
-```bash
-git status --short
-git add <files>
-git commit -m "fix: <summary>"
-```
-
-project 側の note に branch / commit / current project での確認結果を残す:
-
-```bash
-runo research append "runops local patch" "$(cat <<'EOF'
-Context: runops source checkout branch=fix/<short-name>, commit=<sha>.
-Patch: <何を直したか>
-Current project check: <どの command/run で確認したか>
-Upstream disposition: local-only / feedback-issue / draft-pr / ready-pr
-EOF
-)"
-```
-
-## Upstream disposition
-
-local patch 後、必ず次のどれかに分類する。
-
-| 判定 | 意味 | 次の動き |
-|------|------|----------|
-| `local-only` | project 固有 | project 側に残し、runops 本体には戻さない |
-| `feedback-issue` | 一部汎用 / 設計が必要 / draft PR には早い | project 固有情報を除いて issue 下書きを作る |
-| `draft-pr` | 実装案も見せたいが設計レビューが必要 | draft PR |
-| `ready-pr` | 小さく汎用でテスト済み | 通常 PR |
-
-PR に進む場合は、project 固有の path、研究判断、未サニタイズの実験情報を含めない。
+issue / PR / pushは依頼されたexternal outcomeに含まれる場合だけ行い、project固有path、
+未公開result、credentialを除く。研究記録が必要ならcommitとdispositionだけを別Goalで残す。

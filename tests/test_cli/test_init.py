@@ -390,7 +390,9 @@ class TestInit:
         assert "runops" in content
         assert "runo context" in content
         assert "目的駆動の実行契約" in content
-        assert all(field in content for field in ("Goal", "Done", "Budget"))
+        assert all(
+            field in content for field in ("Goal", "Done", "Budget", "Invariant")
+        )
         assert "役割分担" in content
         assert "$new-case" in content
         assert "/new-case" not in content
@@ -428,6 +430,7 @@ class TestInit:
         assert "$setup-plugins" in setup_runops_content
         assert "$setup-campaign" in setup_runops_content
         assert "## 実行契約" in setup_runops_content
+        assert "**Invariant**" in setup_runops_content
         assert "Default milestone" in setup_runops_content
         assert "context / doctor は各1回" in setup_runops_content
         assert "local state から決まらない設計情報だけ" in setup_runops_content
@@ -438,6 +441,7 @@ class TestInit:
             codex_skills_dir / "setup-plugins" / "SKILL.md"
         ).read_text(encoding="utf-8")
         assert "## 実行契約" in setup_plugins_content
+        assert "**Invariant**" in setup_plugins_content
         assert "runo plugins --check" in setup_plugins_content
         assert "runo plugins --json" in setup_plugins_content
         assert "Codex hooks は experimental" in setup_plugins_content
@@ -449,12 +453,14 @@ class TestInit:
             encoding="utf-8"
         )
         assert "## 実行契約" in campaign_content
+        assert "**Invariant**" in campaign_content
         assert "runo plugins --check" not in campaign_content
         assert "runo plugins --json" not in campaign_content
         analyze_content = (skills_dir / "analyze" / "SKILL.md").read_text(
             encoding="utf-8"
         )
         assert "## 実行契約" in analyze_content
+        assert "**Invariant**" in analyze_content
         assert "--list-recipes" in analyze_content
         assert "analysis/scratch/" in analyze_content
         assert "research/results/" in analyze_content

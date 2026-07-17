@@ -1,11 +1,11 @@
 # Agent User Guide
 
 runops project では run directory が実行の主単位、`manifest.toml` が状態と provenance
-の正本です。Agent は `context` で現在地を把握し、Goal に必要な追加情報だけを選びます。
+の正本です。現在地が不明な場合だけ`context`で把握し、Goalに必要な追加情報だけを選びます。
 
 ```bash
 uvx --from runops runo context --json
-# research memory が Next の判断に必要な場合
+# research memory が次の状態遷移の判断に必要な場合
 uvx --from runops runo research status
 # structure / analysis / knowledge / plugin の health が必要な場合
 uvx --from runops runo lint --scope structure,analysis,knowledge,plugins
@@ -16,9 +16,10 @@ uvx --from runops runo lint --scope structure,analysis,knowledge,plugins
 - **Goal**: 今回到達させる研究・project state
 - **Done**: 到達を示す evidence / artifact
 - **Budget**: run 数、cost、待機時間、観測回数
-- **Next**: Goal に最も近い一つの状態遷移
+- **Invariant**: 状態整合性、安全性、provenance のため破らない境界
 
-Agent は Done に必要な skill と command だけを使い、到達した時点で結果を返します。
+Agentはこの4項目と現在のevidenceから次の状態遷移を導出します。Doneに必要なskillとcommandだけを
+使い、到達した時点で結果を返します。一般的な手順を最初から展開する必要はありません。
 たとえば submit の Done は job_id、初動確認の Done は step / progress marker の変化です。
 
 頻出経路もphaseごとに終点を分けます。
@@ -32,7 +33,8 @@ Agent は Done に必要な skill と command だけを使い、到達した時�
 
 情報源は、現在の情報gapを解消する最も近いsourceから読み、解消時点で探索を終えます。
 plugin inventoryはplugin setupがGoalの場合、または現在のGoalに必要なcapabilityが利用不能な場合に確認します。
-次phaseは候補として報告し、現在のDoneに含まれる場合に開始します。
+次phaseは候補として報告し、現在のDoneに含まれる場合に開始します。project skillはすべて
+Goal / Done / Budget / Invariantを持ち、通常は90行以内のoutcome routingに限定します。
 
 ## 人と Agent の境界
 

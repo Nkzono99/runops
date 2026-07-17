@@ -1,38 +1,35 @@
 ---
 name: debug-failed
-description: Diagnose failed runs and propose fixes. Use when a run has failed and needs investigation.
+description: Use when the requested outcome is an evidence-backed cause and next action for one or more failed runs.
 ---
 
-# 失敗した Run を診断する
+# failed runの原因をevidenceから特定する
+
+## 実行契約
+
+- **Goal**: failed runを分類し、修正・retry・deferの判断材料を作る
+- **Done**: failure reason、根拠log、影響する設定、推奨next actionを報告できる
+- **Budget**: 指定runだけ。sync / statusは各1回、logは原因gapを解消する範囲に限定する
+- **Invariant**: 既存runのmanifestとwork evidenceを変更せず、retryを自動実行しない
+
+## Evidence routing
 
 ```bash
-cd $ARGUMENTS
-runo runs sync
-runo runs status
-runo runs log -e
-runo runs log
+runo runs sync <run>
+runo runs status <run>
+runo runs log <run> -e
+runo runs log <run> -n 100
 ```
 
-必要なら `work/` 以下も確認:
+statusの`failure_reason`とreason codeを入口にし、必要な場合だけ`work/`の対応する
+stderr / stdout末尾を読む。directory全体や無関係なrunを走査しない。
 
-```bash
-ls work/
-tail -n 100 work/*.err
-tail -n 100 work/*.out
-```
-
-## 判断の目安
-
-| failure_reason | 対処 |
+| failure reason | 判断候補 |
 |---|---|
-| `timeout` | walltime 延長候補 |
-| `oom` | メモリ増加または問題サイズ縮小 |
-| `preempted` | 同条件再投入 |
-| `exit_error` | log / err を確認してから判断 |
+| `timeout` | walltime、進捗率、checkpoint有無から延長可否を判断 |
+| `oom` | peak memory evidenceと問題サイズから資源増加か縮小を判断 |
+| `preempted` | input変更なしのretry候補 |
+| `exit_error` | 最初のactionable errorとsimulator固有診断へroute |
 
-## retry の進め方
-
-- case.toml または survey.toml を修正して新しい run を生成する
-- 同じ run の試行回数が 3 回前後に達したら、自動 retry を止めて原因を要約する
-
-
+再利用する修正はcase / surveyへ戻して新しいrunを生成する。同条件retryを提案する場合も、
+試行履歴と上限を示す。3回前後の反復失敗は原因要約をDoneとして返し、追加retryを止める。

@@ -10,6 +10,7 @@ description: Use when the user explicitly requests archive, cancel, purge, or de
 - **Goal**: 指定runをarchived / cancelled / purged / deletedの要求状態へ移す
 - **Done**: 対象、実行command、結果state、保持・削除したevidenceを報告できる
 - **Budget**: 明示されたrun集合と一つのlifecycle transition
+- **Invariant**: canonical runops commandとhuman checkpointを使い、対象外のrunやevidenceに触れない
 
 ## Plan
 

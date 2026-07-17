@@ -10,15 +10,14 @@ description: Use when the requested outcome is a campaign.toml that defines the 
 - **Goal**: 自然言語の研究テーマを検証可能な campaign 定義にする
 - **Done**: hypothesis、variables、observables、units、reasons が揃い、検証結果を報告できる
 - **Budget**: 既存 `campaign.toml` とユーザー入力を基本sourceにし、未解決の物理的意味だけ専門skillで補う
+- **Invariant**: campaign設計で閉じ、case、survey、run生成、plugin確認へ自動で進まない
 
-## 状態遷移
+## Outcome loop
 
-1. 既存 `campaign.toml` から project name、simulator、現在の研究scopeを読む
-2. ユーザー入力から theme、hypothesis、independent / dependent / fixed / controlled、observablesを抽出する
-3. parameter名、物理範囲、unitが未解決なら該当simulator / environment skillにその問いだけを渡す
-4. 研究の意味を変える不足情報をまとめて確認する
-5. `campaign.toml` を更新し、projectのstructure validationを一度実行する
-6. Doneの各項目と、仮定・未解決点を報告する
+既存`campaign.toml`とユーザー入力からtheme、hypothesis、independent / dependent / fixed /
+controlled、observablesを抽出する。parameter名、物理範囲、unitの未解決gapだけを該当simulator /
+environment skillへ渡し、研究の意味を変える不足情報はまとめて確認する。更新後にprojectの
+structure validationを一度実行し、Done、仮定、未解決点を返す。
 
 ## campaign contract
 

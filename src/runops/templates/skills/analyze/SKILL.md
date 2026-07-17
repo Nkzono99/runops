@@ -10,6 +10,7 @@ description: Use when the requested outcome explicitly requires metrics, figures
 - **Goal**: 指定run / surveyから要求されたmetric、figure、comparison、exportを作る
 - **Done**: requested artifact、再現command、主要結果、source runを報告できる
 - **Budget**: 指定targetとartifact数。選んだ解析routeだけを実行する
+- **Invariant**: raw outputとprovenanceを保持し、knowledge昇格や別routeを自動で連鎖しない
 
 ## Goal routing
 

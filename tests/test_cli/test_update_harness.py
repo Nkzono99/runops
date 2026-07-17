@@ -568,7 +568,9 @@ class TestUpdateHarnessBasic:
         assert result.exit_code == 0
         content = skill_path.read_text(encoding="utf-8")
         assert "## 実行契約" in content
-        assert all(field in content for field in ("Goal", "Done", "Budget"))
+        assert all(
+            field in content for field in ("Goal", "Done", "Budget", "Invariant")
+        )
         assert "runo plugins --check" not in content
 
 

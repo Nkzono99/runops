@@ -17,13 +17,12 @@ CLI は `uvx --from runops runo ...` を標準経路として使う。`runops` �
 - **Goal** — 今回到達させる研究・project の状態
 - **Done** — 到達を判断できる evidence または artifact
 - **Budget** — run 数、core-hour、待機時間、確認回数など今回使える上限
-- **Next** — Goal に最も近づく次の状態遷移を一つ
+- **Invariant** — 状態整合性、安全性、provenance のため破らない境界
 
-1. `uvx --from runops runo context --json` で現在地を一度把握する
-2. Next の判断に必要な source だけを読む
-3. 該当 skill と simulator / environment plugin に経路を渡す
-4. Done に必要な最短の command chain を実行する
-5. evidence を Done と比較し、到達時は結果を返す。未到達時は次の一遷移か blocker を返す
+次の状態遷移はこの4項目と現在のevidenceから導出する。現在地が不明な場合だけ
+`uvx --from runops runo context --json`を一度使い、情報gapを解消する最も近いsource、
+該当skill、最短のcommand chainを選ぶ。Doneに到達したら返し、未到達なら次の一遷移か
+blockerを返す。一般的な作業手順を最初から展開しない。
 
 依頼の到達状態を作業の終点にする。
 

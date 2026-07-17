@@ -185,6 +185,8 @@ def test_bundle_uses_goal_directed_bounded_control() -> None:
         assert "Goal" in content
         assert "Done" in content
         assert "Budget" in content
+        assert "Invariant" in content
+        assert "- **Next**" not in content
         assert "次の状態遷移" in content
         assert "submit 後の既定動作" not in content
         assert "自動で待機・sync・log 確認を始めない" not in content
@@ -194,7 +196,8 @@ def test_bundle_uses_goal_directed_bounded_control() -> None:
     assert "job_id" in run_all
     for content in (check_status, claude_check_status):
         assert "## 実行契約" in content
-        assert "観測予算" in content
+        assert "**Budget**" in content
+        assert "**Invariant**" in content
         assert "進行を示す evidence" in content
         assert "Do not auto-invoke" not in content
         assert "自動発火しない" not in content
@@ -202,25 +205,31 @@ def test_bundle_uses_goal_directed_bounded_control() -> None:
     assert "自動で待機・sync・log 確認を始めない" not in claude_workflow
 
 
-def test_frequent_research_skills_have_single_bounded_outcomes() -> None:
-    """Frequent skills stop at their requested outcome without phase chaining."""
+def test_project_skills_use_bounded_outcome_contracts() -> None:
+    """Project skills expose outcomes and boundaries instead of long recipes."""
     bundle = build_harness_bundle("demo", ["emses"])
-    limits = {
-        "setup-campaign": 65,
-        "survey-design": 65,
-        "create-run": 70,
-        "analyze": 60,
-        "setup-plugins": 90,
-        "cleanup": 50,
-    }
+    skill_paths = sorted(
+        path
+        for path in bundle.files
+        if path.startswith(".agents/skills/") and path.endswith("/SKILL.md")
+    )
+    assert len(skill_paths) == 20
 
     rendered: dict[str, str] = {}
-    for name, limit in limits.items():
-        content = bundle.files[f".agents/skills/{name}/SKILL.md"]
+    for path in skill_paths:
+        name = path.split("/")[2]
+        content = bundle.files[path]
         rendered[name] = content
         assert "## 実行契約" in content
-        assert all(field in content for field in ("Goal", "Done", "Budget"))
-        assert len(content.splitlines()) <= limit
+        assert all(
+            field in content
+            for field in ("**Goal**", "**Done**", "**Budget**", "**Invariant**")
+        )
+        assert len(content.splitlines()) <= 90
+        assert "## 手順" not in content
+        assert "## 実装手順" not in content
+        numbered_steps = tuple(f"{index}. " for index in range(1, 11))
+        assert not any(line.startswith(numbered_steps) for line in content.splitlines())
 
     assert "Use after" not in rendered["setup-campaign"].split("---", 2)[1]
     assert "runo plugins --check" not in rendered["setup-campaign"]

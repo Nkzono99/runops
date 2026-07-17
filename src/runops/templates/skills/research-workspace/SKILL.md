@@ -1,34 +1,30 @@
 ---
 name: research-workspace
-description: Keep project research memory bounded by character and artifact budgets; append or rotate the journal, promote durable results, and archive results without deleting evidence.
+description: Use when the requested outcome is one bounded research-memory transition such as append, rotate, promote, archive, or validation.
 ---
 
-# Research workspace を整理する
+# research memoryを一つの要求状態へ移す
 
-研究記憶の正本は `research/` の次の 3 層だけにする。
+## 実行契約
 
-- `CURRENT.md`: 現在の問い、判断、次の一手。既定 50 行目安で、過程の全文や
-  artifact 一覧を置かない
-- `journal/`: append-only な作業記録。量の上限で segment を無要約ローテーションする
-- `results/RNNNN-topic/`: 残す解析結果。説明は `README.md` 1 枚、実体は `artifacts/`
+- **Goal**: 指定された研究記憶を適切な層へappend、rotate、promote、archiveする
+- **Done**: 更新先、保持したsource、結果IDまたはarchive状態、check結果を報告できる
+- **Budget**: 一つのmemory transitionと対象artifact。設定済みline / byte budget内
+- **Invariant**: evidenceを削除・要約置換せず、AIが重要度を推測して自動昇格しない
 
-途中生成物は `.runops/work/<goal-id>/` に置く。ここを durable result とみなさない。
+## Storage routing
 
-## 手順
+| memory | canonical location / command |
+|---|---|
+| 現在の問い・判断・次の一手 | `research/CURRENT.md`（50 行目安。時系列やartifact 一覧を置かない） |
+| 時系列の作業記録 | `runo research append` → `research/journal/` |
+| durable result | `runo research new-result` → `research/results/RNNNN-*/` |
+| inactive result | `runo research archive RNNNN` |
+| temporary work | `.runops/work/<goal-id>/` |
 
-1. `runo research status` を実行し、文字数・件数・bytes と警告を確認する。
-2. 作業経緯は `runo research append "<title>" "<body>"` で追記する。
-3. journal が上限に達したら CLI の自動 rotation に任せる。手動なら `runo research rotate --force`。
-4. 再利用・再検証する価値が確定したものだけ `runo research new-result <topic>` で昇格する。
-5. result の結論、根拠、限界、再現手順、artifact index は 1 枚の `README.md` に集約する。
-6. `artifacts/` に Markdown を作らない。同じ論理データの CSV/JSON/Markdown 重複を避ける。
-7. active result が増えたら `runo research archive RNNNN` で可逆 archive する。削除しない。
-8. 最後に `runo research check` を通す。
+`runo research status`で該当budgetだけを確認し、選んだtransitionを実行して
+`runo research check`でDoneを検証する。journal rotationはCLIの自動処理を優先し、必要時だけ
+`runo research rotate --force`を使う。
 
-`CURRENT.md` に時系列見出しや path が増えた場合、古い詳細を再展開せず、時系列は
-`runo research append`、精製した報告は `research/results/`、網羅的 provenance は
-export/source index へ移す。`runo lint --scope knowledge` の guidance warning は hard
-failure ではないが、次の handoff 前に解消する。
-
-AI が重要度を推測して既存 evidence を削除・要約置換してはいけない。重要性の判断が
-必要なら、原文を保ったまま result 候補と理由を人に示す。
+resultの人向け説明は`README.md`一枚、実体は`artifacts/`に置く。`artifacts/` に Markdown を作らない。
+同じ論理データのCSV / JSON / Markdown重複も作らない。

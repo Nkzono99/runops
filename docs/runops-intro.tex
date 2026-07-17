@@ -332,7 +332,8 @@ runops のハーネスには「スキル」と呼ばれる定型作業の手順�
 
 \subsection*{\color{accent} Phase 2: 準備 (AI が自動実行)}
 
-AI がケース作成、サーベイ設計、run 生成を一貫して行い、設計の経緯を lab notebook に自動記録します。
+AIは依頼された到達状態までケース作成、サーベイ設計、run生成を進めます。各phaseは独立した
+Doneを持ち、lab notebook記録は依頼またはprovenance要件に含まれる場合だけ行います。
 
 \begin{lstlisting}[language={},commentstyle={}]
 > Ti サーベイを設計して、run を生成して
@@ -341,7 +342,7 @@ AI がケース作成、サーベイ設計、run 生成を一貫して行い、�
 \subsection*{\color{accent} Phase 3: 実行 (AI 提案 → 人間承認)}
 
 ジョブ投入は AI が提案し、\textbf{ユーザーが承認}してから実行されます。Agent は
-Goal / Done / Budget に沿って最短の状態遷移を選び、投入 Goal は job ID、初動確認 Goal は
+Goal / Done / Budget / Invariantに沿って最短の状態遷移を選び、投入Goalはjob ID、初動確認Goalは
 progress evidence を報告して完了します。
 
 \begin{lstlisting}[language={},commentstyle={}]

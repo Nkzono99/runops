@@ -10,6 +10,7 @@ description: Use when the requested outcome is one or more created run directori
 - **Goal**: 指定caseまたはsurveyをimmutableなrun identityへ展開する
 - **Done**: created run_id、件数、base case、overrides、概算cost、生成先を報告できる
 - **Budget**: ユーザー指定の単一runまたはsurvey matrix。surveyはdry-runで件数確認後に生成する
+- **Invariant**: run identityとgenerated filesはrunopsに作らせ、submitへ自動で進まない
 
 ## Entry
 
@@ -34,10 +35,9 @@ runo runs sweep runs/<survey>
 runo runs list runs/<path>
 ```
 
-1. case / surveyのsourceと生成先を確定する
-2. surveyはdry-runの件数・parameter組合せ・costをBudgetと比較する
-3. `runo runs create`または`runo runs sweep`を一度実行する
-4. bulk viewでcreated run_id、件数、由来を確認してDoneを返す
+case / surveyのsourceと生成先を確定する。surveyはdry-runの件数・parameter組合せ・costを
+Budgetと比較し、範囲内なら選んだ生成commandを一度実行する。bulk viewのcreated run_id、
+件数、由来をDone evidenceとして返す。
 
 ## State invariant
 

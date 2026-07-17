@@ -11,6 +11,7 @@ user-invocable: false
 - **Goal**: 現在地から Done へ進む一つの runops command family を選ぶ
 - **Done**: 対象、effect、正確な command を説明できる
 - **Budget**: task-specific skill と選んだ command の `--help` だけを読む
+- **Invariant**: command選択だけを扱い、隣接phaseや別familyを自動実行しない
 
 project 側の標準形は `uvx --from runops runo <command>`。以下では `runo` と省略する。
 正確な option は選択後に一度だけ確認する。
