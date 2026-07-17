@@ -65,6 +65,15 @@ Harness Layer に置くもの:
 Agent は Done に必要な source と skill だけを読み、到達時に返します。submit、監視、解析は
 別々の到達状態なので、後続段階は依頼の Done に含まれる場合に進みます。
 
+頻出skillは次の条件を満たします。
+
+- descriptionは「いつの後に」ではなく、どのrequested outcomeで発火するかを書く。
+- 一つのskillは一つのDoneで閉じ、隣接phaseは次のGoal候補として返す。
+- source探索、診断、観測にはBudgetを置き、情報gapが解消した時点で終了する。
+- campaign、survey、run生成、解析、plugin setup、cleanupは90行以内を回帰テストする。
+- research journalやknowledge昇格は、provenanceまたはknowledgeがGoalに含まれる場合に独立して扱う。
+- 汎用package開発skillはrunops開発ハーネスに置き、simulation research projectには配布しない。
+
 否定形の rule は、目的設定だけでは守れない安全 invariant に限定します。高コスト・不可逆
 command は policy / permission、人間の研究判断は checkpoint、定型手順は relevant skill に置きます。
 CLI command の網羅表を root instruction に複製せず、task-specific skill と選択した command の

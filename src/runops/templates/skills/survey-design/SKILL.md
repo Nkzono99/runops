@@ -1,82 +1,43 @@
 ---
 name: survey-design
-description: Design a parameter survey. Use when planning a parameter sweep, creating survey.toml, or exploring parameter space.
+description: Use when the requested outcome is a survey.toml, pilot matrix, parameter-space proposal, or bounded cost estimate.
 ---
 
-# パラメータサーベイを設計する
+# 検証可能なparameter surveyを設計する
 
-## 手順
+## 実行契約
 
-1. `research/CURRENT.md` と対応する result `README.md` を読む。pilot 計画がない production / large
-   survey は `{{ skill_prefix }}research-workspace` で現在判断を整理する
-2. 指定されたケースの `case.toml` と入力ファイルを読む
-3. simulator plugin skill、enabled knowledge、`materials/` で既存の入力例や制約を探す
-4. `refs/` mirror がある場合だけ cookbook を fallback として確認する
-   - `cookbook/index.toml` で `tags` と `recommended_for` から候補を絞る
-   - 候補の `meta.toml` で `[recommended].vary_first` と `[edit_policy]` を確認
-   - `[cost]` から計算コストを見積もる
-5. `.runops/facts.toml` で既知の制約を確認する
-6. pilot matrix と full matrix candidate を区別して `survey.toml` を生成する
-7. pilot に使う exact parameter point と、sweep 後に対応する run_id を
-   `research/CURRENT.md` または対応 result README へ記録する
-8. pilot / full 別の run 数とコスト見積もりを報告する
+- **Goal**: 仮説を検証するaxes、pilot、full candidateをsurvey定義にする
+- **Done**: `survey.toml`、pilot points、run数、cost見積もり、検証結果を報告できる
+- **Budget**: 指定caseと一つの情報gapごとに最も近いsourceだけを読む。full matrixはcost ceiling内
 
-## cookbook の活用
+## Source routing
 
-```bash
-# refs mirror がある場合だけ cookbook の entry 一覧を確認
-test -f refs/<repo>/cookbook/index.toml && cat refs/<repo>/cookbook/index.toml
+| 情報gap | 最初のsource |
+|---|---|
+| active question / prior decision | `research/CURRENT.md` と該当result README |
+| parameter名、物理範囲、安定性 | simulator plugin skill / enabled knowledge |
+| base値、job資源 | 対象`case.toml`とinput |
+| projectで確定したconstraint | `.runops/facts.toml` |
+| 上記で不足する既知例 | `materials/`、最後に`refs/` cookbook |
 
-# 候補 entry の詳細を確認
-test -f refs/<repo>/cookbook/examples/<category>/<name>/meta.toml && \
-  cat refs/<repo>/cookbook/examples/<category>/<name>/meta.toml
+各gapが解消した時点でsource探索を終える。
 
-# 入力例を参照
-test -f refs/<repo>/cookbook/examples/<category>/<name>/input.toml && \
-  cat refs/<repo>/cookbook/examples/<category>/<name>/input.toml
+## 状態遷移
 
-# 既知の制約を確認
-runo knowledge facts
-```
+1. hypothesisとobservablesから必要なindependent axesを選ぶ
+2. control、failure-detecting edge、代表点から最小pilotを作る
+3. pilot evidence後に検討するfull matrix candidateとcost ceilingを分ける
+4. `[survey]`, `[axes]`, `[naming]`, `[job]`を持つ`survey.toml`を作る
+5. `runo runs sweep <survey> --dry-run`でrun数、parameter組合せ、概算costを検証する
+6. Doneと、full submitに進むための判定基準を報告する
 
-## survey の作成
+parameterの正確なsyntaxは`runo runs sweep --help`とschema、物理的意味は専門skillを使う。
 
-```bash
-mkdir -p runs/<category>/<survey_name>
-# survey.toml を作成 (フォーマットは runops-reference skill / CLI help 参照)
-runo runs sweep runs/<category>/<survey_name>
-runo runs list runs/<category>/<survey_name>
-```
+## Pilot / full entry
 
-## 注意
+- pilotはcontrol、failure-detecting edge、代表点を含む最小集合
+- full candidateはpilotの判定基準と`Decision: EXPAND`をentry criteriaに持つ
+- immutable parameterはbase caseに固定し、sensitive axisには理由と安全範囲を持たせる
 
-- pilot result を人が確認し、`research/CURRENT.md` の判断を更新する前に full submit しない
-- pilot は control、failure-detecting edge、代表点を含む最小集合にする
-- cookbook の `[edit_policy].immutable` パラメータは survey 軸にしない
-- `[edit_policy].sensitive` パラメータを振る場合は理由を plan に書く
-- `status = "stable"` の entry をベースにする
-- fragment を使う場合は `[merge]` と `[compatibility]` を確認する
-
-## `{{ skill_prefix }}research-workspace` で残すべきこと
-
-survey 設計の意思決定は bounded journal に残す:
-
-- どのパラメータ軸を選んだか・なぜか (物理的に何を見たいか)
-- スイープ範囲・点数を決めた根拠 (CFL, 物理的に意味のある下限上限)
-- 振らないパラメータの fix 値とその理由
-- 想定 core-hour と queue, 投入順序の判断
-- 一度試して没にした設計 (e.g. 解像度を上げて 1 軸にした, 2 軸を諦めた)
-
-```bash
-runo research append "Series A vti scan 設計" "$(cat <<'EOF'
-独立軸: vti = 1, 3, 5, ..., 19 eV (10 点, 線形).
-理由: 4σ CFL で 19 eV が上限, 1 eV が drift 主導側の下限.
-固定: vflow=400 km/s, vte=10 eV, plate -34 V.
-コスト: 10 run × 800 core × 8 h ≈ 64k core-h. gr20001a で OK.
-EOF
-)"
-```
-
-## TOML フォーマット
-
-詳細は `runops-reference` skill、`runo runs sweep --help`、または schemas を参照。
+survey設計がDone。run生成、submit、journal整理は、それぞれをGoalに含む依頼で開始する。

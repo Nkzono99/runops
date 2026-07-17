@@ -129,28 +129,17 @@ class TestInit:
         assert "`$update-runops`" in codex_content
         assert "{{ skill_prefix }}" not in codex_content
 
-    def test_init_creates_python_package_refactor_skill_resources(
+    def test_init_omits_development_only_python_refactor_skill(
         self,
         tmp_path: Path,
     ) -> None:
-        """Skill resources are scaffolded beside python-package-refactor."""
+        """Generated research projects omit the generic package-dev skill."""
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
         codex_skill_dir = tmp_path / ".agents" / "skills" / "python-package-refactor"
         claude_skill_dir = tmp_path / ".claude" / "skills" / "python-package-refactor"
 
-        assert (codex_skill_dir / "SKILL.md").is_file()
-        assert (codex_skill_dir / "scripts" / "inspect_python_package.py").is_file()
-        assert (codex_skill_dir / "references" / "refactor-playbook.md").is_file()
-        assert not (codex_skill_dir / "README.md").exists()
-        assert not (codex_skill_dir / "manifest.txt").exists()
-        assert (claude_skill_dir / "scripts" / "inspect_python_package.py").is_file()
-
-        codex_content = (codex_skill_dir / "SKILL.md").read_text(encoding="utf-8")
-        claude_content = (claude_skill_dir / "SKILL.md").read_text(encoding="utf-8")
-        assert "name: python-package-refactor" in codex_content
-        assert ".agents/skills/python-package-refactor/scripts/" in codex_content
-        assert ".claude/skills/python-package-refactor/scripts/" in claude_content
-        assert "{{ skills_dir }}" not in codex_content
+        assert not codex_skill_dir.exists()
+        assert not claude_skill_dir.exists()
 
     def test_init_simproject_content(self, tmp_path: Path) -> None:
         """runops.toml has correct project name derived from dir name."""
@@ -448,6 +437,7 @@ class TestInit:
         setup_plugins_content = (
             codex_skills_dir / "setup-plugins" / "SKILL.md"
         ).read_text(encoding="utf-8")
+        assert "## 実行契約" in setup_plugins_content
         assert "runo plugins --check" in setup_plugins_content
         assert "runo plugins --json" in setup_plugins_content
         assert "Codex hooks は experimental" in setup_plugins_content
@@ -455,9 +445,16 @@ class TestInit:
         assert "runops project 側で hook を自作しない" in setup_plugins_content
         assert "$setup-runops" in setup_plugins_content
         assert "{{ skill_prefix }}" not in setup_plugins_content
+        campaign_content = (codex_skills_dir / "setup-campaign" / "SKILL.md").read_text(
+            encoding="utf-8"
+        )
+        assert "## 実行契約" in campaign_content
+        assert "runo plugins --check" not in campaign_content
+        assert "runo plugins --json" not in campaign_content
         analyze_content = (skills_dir / "analyze" / "SKILL.md").read_text(
             encoding="utf-8"
         )
+        assert "## 実行契約" in analyze_content
         assert "--list-recipes" in analyze_content
         assert "analysis/scratch/" in analyze_content
         assert "research/results/" in analyze_content

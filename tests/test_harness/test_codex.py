@@ -105,17 +105,8 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert ".agents/skills/patch-runops/SKILL.md" in bundle.files
     assert ".agents/skills/update-runops/SKILL.md" in bundle.files
     assert ".agents/skills/migrate-runops/SKILL.md" in bundle.files
-    assert ".agents/skills/python-package-refactor/SKILL.md" in bundle.files
-    assert (
-        ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
-        in bundle.files
-    )
-    assert (
-        ".agents/skills/python-package-refactor/references/refactor-playbook.md"
-        in bundle.files
-    )
-    assert ".agents/skills/python-package-refactor/README.md" not in bundle.files
-    assert ".agents/skills/python-package-refactor/manifest.txt" not in bundle.files
+    assert ".agents/skills/python-package-refactor/SKILL.md" not in bundle.files
+    assert not any("python-package-refactor" in path for path in bundle.files)
     assert "cases/AGENTS.md" in bundle.files
     assert "runs/AGENTS.md" in bundle.files
     agents = bundle.files["AGENTS.md"]
@@ -129,7 +120,7 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "$patch-runops" in agents
     assert "$update-runops" in agents
     assert "$migrate-runops" in agents
-    assert "$python-package-refactor" in agents
+    assert "$python-package-refactor" not in agents
     assert "$setup-runops" in agents
     assert "$setup-plugins" in agents
     codex_research = bundle.files[".agents/skills/research-workspace/SKILL.md"]
@@ -144,15 +135,10 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "full submit" in codex_run_all
     assert "pilot" in codex_run_all
     codex_create_run = bundle.files[".agents/skills/create-run/SKILL.md"]
-    assert "`$run-all` へ委譲" in codex_create_run
+    assert "job submitは別のGoal" in codex_create_run
     assert "runo runs submit --all -qn" not in codex_create_run
     codex_reference = bundle.files[".agents/skills/runops-reference/SKILL.md"]
     assert "直接実行せず `$run-all`" in codex_reference
-    codex_refactor = bundle.files[".agents/skills/python-package-refactor/SKILL.md"]
-    claude_refactor = bundle.files[".claude/skills/python-package-refactor/SKILL.md"]
-    assert ".agents/skills/python-package-refactor/scripts/" in codex_refactor
-    assert ".claude/skills/python-package-refactor/scripts/" in claude_refactor
-    assert "{{ skills_dir }}" not in codex_refactor
     codex_summarize = bundle.files[".agents/skills/summarize-script/SKILL.md"]
     assert "cases/<simulator>/<case>/summarize.py" in codex_summarize
     assert "{{ skill_prefix }}" not in codex_summarize
@@ -214,6 +200,38 @@ def test_bundle_uses_goal_directed_bounded_control() -> None:
         assert "自動発火しない" not in content
     assert "状態遷移の不変条件" in claude_workflow
     assert "自動で待機・sync・log 確認を始めない" not in claude_workflow
+
+
+def test_frequent_research_skills_have_single_bounded_outcomes() -> None:
+    """Frequent skills stop at their requested outcome without phase chaining."""
+    bundle = build_harness_bundle("demo", ["emses"])
+    limits = {
+        "setup-campaign": 65,
+        "survey-design": 65,
+        "create-run": 70,
+        "analyze": 60,
+        "setup-plugins": 90,
+        "cleanup": 50,
+    }
+
+    rendered: dict[str, str] = {}
+    for name, limit in limits.items():
+        content = bundle.files[f".agents/skills/{name}/SKILL.md"]
+        rendered[name] = content
+        assert "## 実行契約" in content
+        assert all(field in content for field in ("Goal", "Done", "Budget"))
+        assert len(content.splitlines()) <= limit
+
+    assert "Use after" not in rendered["setup-campaign"].split("---", 2)[1]
+    assert "runo plugins --check" not in rendered["setup-campaign"]
+    assert "runo plugins --json" not in rendered["setup-campaign"]
+    assert "runo research append" not in rendered["create-run"]
+    assert "runo runs submit -qn" not in rendered["create-run"]
+    assert "after runs complete" not in rendered["analyze"].split("---", 2)[1]
+    assert "知見があれば" not in rendered["analyze"]
+    assert "Use after runo init/setup/update-harness" not in rendered["setup-plugins"]
+    assert "$setup-runops` に戻り" not in rendered["setup-plugins"]
+    assert "after experiments" not in rendered["cleanup"].split("---", 2)[1]
 
 
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:

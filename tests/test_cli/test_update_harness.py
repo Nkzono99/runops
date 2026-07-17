@@ -103,11 +103,8 @@ class TestUpdateHarnessBasic:
         assert ".agents/skills/new-case/SKILL.md" in lock
         assert ".agents/skills/setup-plugins/SKILL.md" in lock
         assert ".agents/skills/patch-runops/SKILL.md" in lock
-        assert ".agents/skills/python-package-refactor/SKILL.md" in lock
-        assert (
-            ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
-            in lock
-        )
+        assert ".agents/skills/python-package-refactor/SKILL.md" not in lock
+        assert not any("python-package-refactor" in path for path in lock)
         assert ".agents/skills/research-workspace/SKILL.md" in lock
         assert "cases/AGENTS.md" in lock
         assert "runs/AGENTS.md" in lock
@@ -130,6 +127,41 @@ class TestUpdateHarnessBasic:
         assert "Retired 1 obsolete managed file" in result.output
         assert not obsolete.exists()
         assert ".claude/rules/upstream-feedback.md" not in load_harness_lock(tmp_path)
+
+    def test_retires_development_only_python_refactor_skill(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """An old generated package-dev skill is removed from research projects."""
+        _init_project(tmp_path)
+        skill = tmp_path / ".agents/skills/python-package-refactor/SKILL.md"
+        script = (
+            tmp_path
+            / ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
+        )
+        skill.parent.mkdir(parents=True, exist_ok=True)
+        script.parent.mkdir(parents=True, exist_ok=True)
+        skill.write_text("old skill\n", encoding="utf-8")
+        script.write_text("old script\n", encoding="utf-8")
+        lock = load_harness_lock(tmp_path)
+        lock[".agents/skills/python-package-refactor/SKILL.md"] = hash_text(
+            "old skill\n"
+        )
+        lock[
+            ".agents/skills/python-package-refactor/scripts/inspect_python_package.py"
+        ] = hash_text("old script\n")
+        save_harness_lock(tmp_path, lock)
+
+        result = runner.invoke(app, ["update-harness", str(tmp_path), "--skip-pull"])
+
+        assert result.exit_code == 0
+        assert "Retired 2 obsolete managed file(s)" in result.output
+        assert not skill.exists()
+        assert not script.exists()
+        assert not skill.parent.exists()
+        assert not any(
+            "python-package-refactor" in path for path in load_harness_lock(tmp_path)
+        )
 
     def test_overwrites_unedited_files(self, tmp_path: Path) -> None:
         """Files matching their lock hash are silently overwritten."""
@@ -511,6 +543,33 @@ class TestUpdateHarnessBasic:
         assert "context / doctor は各1回" in content
         assert "local state から決まらない設計情報だけ" in content
         assert 'git commit -m "chore: scaffold runops project"' in content
+
+    def test_force_refreshes_bounded_campaign_skill(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        """update-harness installs the bounded campaign execution contract."""
+        _init_project(tmp_path)
+        skill_path = tmp_path / ".agents" / "skills" / "setup-campaign" / "SKILL.md"
+        skill_path.write_text("stale campaign skill\n", encoding="utf-8")
+
+        result = runner.invoke(
+            app,
+            [
+                "update-harness",
+                str(tmp_path),
+                "--skip-pull",
+                "--force",
+                "--only",
+                ".agents/skills/setup-campaign/SKILL.md",
+            ],
+        )
+
+        assert result.exit_code == 0
+        content = skill_path.read_text(encoding="utf-8")
+        assert "## 実行契約" in content
+        assert all(field in content for field in ("Goal", "Done", "Budget"))
+        assert "runo plugins --check" not in content
 
 
 class TestHarnessLock:

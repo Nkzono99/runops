@@ -19,8 +19,8 @@ def render_skill_files(
 ) -> dict[str, str]:
     """Return ``{"<skill-name>/<path>": content}`` for bundled skills.
 
-    Claude Code invokes project skills as slash commands (``/note``), while
-    Codex mentions them with ``$`` (``$note``).  The shared SKILL.md templates
+    Claude Code invokes project skills as slash commands (``/skill-name``), while
+    Codex mentions them with ``$`` (``$skill-name``).  The shared SKILL.md templates
     may use ``skill_prefix`` so each harness gets native instructions.
 
     Skill support resources (``scripts/``, ``references/``, ``examples/``) are

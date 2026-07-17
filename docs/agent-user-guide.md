@@ -21,6 +21,19 @@ uvx --from runops runo lint --scope structure,analysis,knowledge,plugins
 Agent は Done に必要な skill と command だけを使い、到達した時点で結果を返します。
 たとえば submit の Done は job_id、初動確認の Done は step / progress marker の変化です。
 
+頻出経路もphaseごとに終点を分けます。
+
+| Goal | Done |
+|---|---|
+| campaign設計 | hypothesis、variables、observablesを持つ検証済み`campaign.toml` |
+| survey設計 | `survey.toml`、pilot points、dry-runのrun数・cost |
+| run生成 | created run_id、件数、由来 |
+| 解析 | requested metric / figure / exportと再現command |
+
+情報源は、現在の情報gapを解消する最も近いsourceから読み、解消時点で探索を終えます。
+plugin inventoryはplugin setupがGoalの場合、または現在のGoalに必要なcapabilityが利用不能な場合に確認します。
+次phaseは候補として報告し、現在のDoneに含まれる場合に開始します。
+
 ## 人と Agent の境界
 
 - 人: 研究目的、base input、計算資源上限、残す result を決める。

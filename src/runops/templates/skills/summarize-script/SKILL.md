@@ -104,7 +104,7 @@ summary["figures"].append(
    `summary/survey_summary.csv`, `summary/survey_summary.json`, `summary/artifacts.toml` を確認する。
 9. 必要なら `runo analyze plot <survey> --list-columns` で plot 可能な列を確認する。
 10. 結果と evidence path を `{{ skill_prefix }}research-workspace` で残す。
-11. 研究判断が変わる場合だけ `{{ skill_prefix }}research-agenda` も更新する。
+11. 研究判断が変わる場合は `research/CURRENT.md` も更新する。
 
 ## 最小テンプレート
 

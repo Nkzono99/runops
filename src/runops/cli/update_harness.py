@@ -81,6 +81,27 @@ def _harness_path_requested(
     )
 
 
+def _prune_empty_retired_skill_dirs(project_dir: Path, rel_path: str) -> None:
+    """Remove empty parents below a generated skill root after retirement."""
+    parts = Path(rel_path).parts
+    skill_roots = ((".agents", "skills"), (".claude", "skills"))
+    root_parts = next(
+        (root for root in skill_roots if parts[: len(root)] == root),
+        None,
+    )
+    if root_parts is None:
+        return
+
+    stop = project_dir.joinpath(*root_parts)
+    parent = (project_dir / rel_path).parent
+    while parent != stop:
+        try:
+            parent.rmdir()
+        except OSError:
+            break
+        parent = parent.parent
+
+
 def _has_reference_repos(project_dir: Path, simulator_names: list[str]) -> bool:
     """Return whether this project has adapter-declared refs mirrors."""
     if not simulator_names:
@@ -474,6 +495,7 @@ def update_harness(
             if disk_hash == lock[rel_path]:
                 if not dry_run:
                     full_path.unlink()
+                    _prune_empty_retired_skill_dirs(project_dir, rel_path)
                     updated_lock.pop(rel_path, None)
                 retired.append(rel_path)
             else:

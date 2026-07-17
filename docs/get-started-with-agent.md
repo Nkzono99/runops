@@ -135,15 +135,16 @@ Agent との聞き取りを短くしたい場合は、研究目的と制約を�
 
 | やりたいこと | 依頼の例 |
 |---|---|
-| 研究意図を整理する | `campaign.toml を整えて。仮説、独立変数、観測量がわかる形にして。` |
+| 研究意図を整理する | `Goalはcampaign設計。Doneは仮説、独立変数、観測量、単位、理由が揃うこと。` |
 | case を作る | `このテンプレートをベースに case を作って。共通 job 設定と params は case に寄せて。` |
-| survey を作る | `campaign の independent variables をもとに survey.toml を作って。命名規則も入れて。` |
-| run を展開する | `この survey から run を生成して。created 状態まで進めて。` |
+| survey を作る | `Goalはsurvey設計。Doneはpilot点、run数、概算costをdry-runで確認できること。` |
+| run を展開する | `Goalはこのsurveyからのrun生成。Doneはcreated run_id、件数、由来の報告。` |
 | 投入前にレビューする | `submit 前に plan と対象 run を確認して。初回 bulk submit なので確認を挟んで。` |
 | 投入まで行う | `Goalはこの3 runの投入。Doneは対象とjob_idの報告。` |
 | 初動まで確認する | `Goalは投入と初動確認。Doneはstepが2回進むこと、Budgetは10分。` |
 | 失敗 run を診断する | `failed run を確認して。log を読んで failure_reason を整理し、retry 方針を提案して。` |
-| 解析・知見を整理する | `completed run を summarize / collect して、insight と fact の候補を分けてまとめて。` |
+| 解析する | `Goalはcompleted runの比較図作成。Doneは図、source run、再現commandの報告。` |
+| 知見を昇格する | `この解析結果のclaimを、適用範囲とevidence path付きでfact候補にして。` |
 | runops にフィードバックする | project 固有情報を除いた再現手順と issue 下書きを作るよう依頼する |
 
 ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
