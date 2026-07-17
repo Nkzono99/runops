@@ -184,6 +184,25 @@ def test_bundle_emits_codex_config_and_agents_skills() -> None:
     assert "{{ skill_prefix }}" not in codex_setup_plugins
 
 
+def test_bundle_only_monitors_post_submit_when_explicitly_requested() -> None:
+    """Submit returns promptly unless the user asks for a startup check."""
+    bundle = build_harness_bundle("demo", ["emses"])
+
+    agents = bundle.files["AGENTS.md"]
+    run_all = bundle.files[".agents/skills/run-all/SKILL.md"]
+    check_status = bundle.files[".agents/skills/check-status/SKILL.md"]
+    claude_check_status = bundle.files[".claude/skills/check-status/SKILL.md"]
+    claude_workflow = bundle.files[".claude/rules/runops-workflow.md"]
+
+    for content in (agents, run_all, claude_workflow):
+        assert "submit 後は job_id を報告して返す" in content
+        assert "自動で待機・sync・log 確認を始めない" in content
+    for content in (check_status, claude_check_status):
+        assert "明示的に startup check を依頼した場合だけ" in content
+        assert "確認できた時点または期限に達した時点で終了" in content
+        assert "通常の submit 完了だけでは自動発火しない" in content
+
+
 def test_bundle_uses_simulator_adapter_alias_for_plugin_recommendations() -> None:
     """Direct harness generation keeps simulator names decoupled from adapters."""
     bundle = build_harness_bundle(

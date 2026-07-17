@@ -103,6 +103,10 @@ runo runs submit --all -qn compute
 runo runs submit --all --yes       # 会話上で確認済みの場合のみ
 ```
 
+submit 後は job_id を報告して返す。通常は自動で `sync` / `log` / 待機へ進まない。
+ユーザーが初動確認や数 step の確認を明示した場合だけ `{{ skill_prefix }}check-status` の
+期限付き startup check を使う。
+
 ## 状態確認と同期
 
 ```bash

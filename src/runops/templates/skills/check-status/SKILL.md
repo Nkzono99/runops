@@ -1,9 +1,12 @@
 ---
 name: check-status
-description: Check and sync run or survey status. Use when monitoring job progress or after submission.
+description: Check and sync run or survey status only when the user explicitly asks for status, monitoring, logs, or a bounded post-submit startup check. Do not auto-invoke after submission.
 ---
 
 # Run / Survey の状態を確認・同期する
+
+通常の submit 完了だけでは自動発火しない。submit 後は job_id を報告して返し、
+自動で待機・sync・log 確認を始めない。
 
 ```bash
 # プロジェクト全体の active jobs
@@ -36,6 +39,22 @@ deep evaluation は起動しない。`ANALYSIS=unknown`, `NEXT=deep_validate` �
 
 状態をサマリーとして報告する: completed / running / failed / submitted の数。
 `sync` を先に走らせて Slurm 上の最新状態を manifest に反映してから一覧する。
+
+## Startup check (明示依頼時のみ)
+
+ユーザーが「正常に動いているか数 step 見て」「初動確認して」「log を確認して」
+「監視して」と明示的に startup check を依頼した場合だけ行う。
+「smoke run を投入して」だけでは startup check まで含めない。
+
+1. 対象 run、成功条件、待機期限を先に示す
+2. `runo runs sync <RUN>` で Slurm state を確認する
+3. RUNNING になったら `runo runs log <RUN> -n 50` で progress marker / step を読む
+4. 必要なら bounded interval でもう一度だけ確認し、step が進んだかを見る
+5. progress を確認できた時点または期限に達した時点で終了して報告する
+
+期限の指定がなければ短い startup window に留める。PENDING が続く場合や出力がまだ
+無い場合は、その状態を報告して返す。`runo runs log -f`、無期限 loop、job 完了までの
+待機には進まない。
 
 ## ハング検出 (running run の runtime health check)
 

@@ -54,6 +54,9 @@ permissions では allow し、Agent 側の workflow rule として以下を守�
 - `runo runs submit --all` は CLI 側でも確認する。会話上で明示確認済みの場合だけ `--yes` を使う
 - `--dry-run` と `--help` は確認用なのでそのまま実行してよい
 - 承認なしに実ジョブ投入を繰り返し試行しない
+- submit 後は job_id を報告して返す。自動で待機・sync・log 確認を始めない
+- 「正常に動いているか数 step 見て」等の明示依頼がある場合だけ、期限付きの
+  startup check を行う。`runo runs log -f` で無期限に待たない
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。
   止まった理由と予定していた submit command をユーザーへ返す
 - 一度の submit で複数 run が走る (例: `--all`) ときは特に慎重に説明する

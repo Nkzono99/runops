@@ -18,6 +18,7 @@ description: Generate and submit all runs from a survey. Use when ready to launc
 6. `runo runs submit --dry-run --all` で投入対象と skip を確認する
 7. remaining run 数、queue、資源量、cost ceiling、実行 command を報告して明示確認を取る
 8. `runo runs submit --all` で full submit する
+9. submit 後は job_id を報告して返す。自動で待機・sync・log 確認を始めない
 
 ```bash
 runo runs sweep $ARGUMENTS
@@ -32,6 +33,7 @@ runo runs submit --dry-run --all -qn <queue>
 runo runs submit --all -qn <queue>
 # 会話上で明示確認済みなら CLI prompt を省略
 runo runs submit --all --yes -qn <queue>
+# → job_id を報告して終了。明示依頼がなければ startup check は行わない
 ```
 
 ## 注意
@@ -41,6 +43,8 @@ runo runs submit --all --yes -qn <queue>
 - pilot evidence や判断が不足する場合は個別 submit 分解で迂回しない
 - CURRENT の判断が `REVISE`, `STOP`, `WAIT`、または欠落なら full submit を行わない
 - 初回の大規模 survey と EXPAND 後の full submit は承認を取る
+- 「smoke run を投入して」だけでは投入後の監視を始めない。正常動作や数 step の
+  確認まで依頼された場合だけ `{{ skill_prefix }}check-status` の startup check へ進む
 - policy や環境で bulk submit が止まった場合、個別 submit に分解して迂回しない。
   止まった理由と予定していた command をユーザーへ返す
 
