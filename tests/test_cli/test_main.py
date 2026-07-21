@@ -100,6 +100,7 @@ def test_command_tree_is_stable_for_primary_and_alias_apps() -> None:
         "runs log",
         "runs purge-work",
         "runs regenerate",
+        "runs relabel",
         "runs restore",
         "runs retry",
         "runs status",

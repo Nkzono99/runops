@@ -35,6 +35,7 @@ CLI_OPERATION_BINDINGS: tuple[CliOperationBinding, ...] = (
         ("plan_retry", "retry_run"),
         "write",
     ),
+    CliOperationBinding(("runs", "relabel"), ("relabel_run",), "write"),
     CliOperationBinding(
         ("runs", "archive"),
         ("archive_run", "archive_bundle"),

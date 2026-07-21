@@ -21,6 +21,7 @@ from runops.application.actions.analysis import (
 )
 from runops.application.actions.bundle_archive import archive_bundle, restore_bundle
 from runops.application.actions.knowledge import add_fact, promote_fact, save_insight
+from runops.application.actions.relabel import relabel_run
 from runops.application.actions.result import ActionResult, ActionStatus
 from runops.application.actions.run_lifecycle import (
     create_run,
@@ -46,6 +47,7 @@ _DISPATCH: dict[str, Callable[..., ActionResult]] = {
     "export_publication": export_publication,
     "plan_retry": plan_retry,
     "retry_run": retry_run,
+    "relabel_run": relabel_run,
     "archive_run": archive_run,
     "archive_bundle": archive_bundle,
     "restore_run": restore_run,
