@@ -1,193 +1,119 @@
 # runops
 
-runops は、HPC / Slurm 上のシミュレーション研究を **AI エージェントと進める**
-ための実行基盤です。
+runops は、HPC / Slurm 上のシミュレーション研究を AI エージェントと進めるための
+実行管理基盤です。
 
-人間が多数の CLI コマンドを覚えて日々叩くための道具ではありません。CLI は
-存在しますが、それは Agent が project state を安全に読み書きするための
-execution kernel です。人間は研究意図、制約、判断、確認を与え、Agent が
-`campaign.toml`、case、survey、run、manifest、analysis、bounded research memory を整えます。
+研究者は目的・制約・判断を伝えます。Agent は runops を使い、実験条件、run、Slurm
+job、解析結果、provenance を一つの project state として管理します。
 
-最初に読むべき入口は [AI エージェントではじめる](docs/get-started-with-agent.md) です。
+## はじめる
 
-## なぜ runops が必要か
-
-HPC シミュレーション研究では、研究そのものよりも周辺の運用が重くなりがちです。
-
-- 入力ファイルと投入スクリプトがどの仮説から来たのか分からなくなる
-- survey のパラメータ、run directory、Slurm job、解析結果がばらける
-- 失敗 run の retry や continuation の由来が追えなくなる
-- ノート、知見、論文用 export、共有知識が別々の場所で腐る
-- AI Agent に任せようとしても、どこを触ってよくてどこが正本か伝わらない
-
-runops はこの問題を、単なる CLI ではなく **Agent が扱える研究 project state** として
-整理します。
-
-## AI 前提の作業ループ
-
-日常運用の主役は、CLI ではなく Agent との会話です。
-
-1. 人間が研究意図を伝える
-2. Agent が `campaign.toml`、case、survey を設計する
-3. runops が run directory と `manifest.toml` を生成する
-4. Agent が投入前 plan、対象 run、queue、資源量を提示する
-5. 人間が高コスト操作や破壊的操作だけ確認する
-6. Agent が状態同期、log 読解、解析、research journal、知見整理を進める
-7. 判断が変わったら `research/CURRENT.md` と次の survey に戻す
-
-このループの具体的な始め方は
-[docs/get-started-with-agent.md](docs/get-started-with-agent.md) を見てください。
-project state の全体像は [docs/layers/README.md](docs/layers/README.md) にまとめています。
-
-## 人間と Agent の分担
-
-人間が主に行うこと:
-
-- 研究テーマ、仮説、探索範囲、観測量を言語化する
-- ベース入力や物理的制約の意図を伝える
-- 初回 bulk submit、retry、archive、delete などの gate を確認する
-- 結果の科学的な解釈や次の判断をレビューする
-
-Agent が主に行うこと:
-
-- project context、推奨 plugin、`research/CURRENT.md`、materials、environment を読む
-- 必要な場合だけ、明示的 knowledge source や任意の `refs/` fallback mirror を参照する
-- `campaign.toml`、case、survey の草案を作る
-- run 生成、submit、sync、status、log、analysis を runops 経由で進める
-- 作業経緯を `research/journal/`、残す解析を `research/results/` に整理する
-- runops 本体への改善要望や local patch 候補を整理する
-
-CLI を手で直接使う場面は、bootstrap、debug、CI、Agent 実装確認、緊急時の
-operator 作業に限るのが基本です。必要な場合の詳細は
-[Interface Layer](docs/layers/interface.md) に移しました。
-
-## コア設計思想
-
-runops の中心にある思想は、以下の分離です。
-
-- **run directory が日常運用の主単位**
-  すべての実行、状態、解析、履歴は
-  `runs/.../RYYYYMMDD-NNNN--semantic-label/` を基点に扱う。
-
-- **`manifest.toml` が run の正本**
-  run id、状態、由来、job id、Slurm 状態、provenance、parameter snapshot を
-  manifest に記録する。journal や会話ログは補助情報であり、正本ではない。
-
-- **不変と可変を分ける**
-  `run.id` は不変。path は分類・整理のために変わりうる。run の由来と
-  parameter snapshot を残すことで、移動や再分類に耐える。
-
-- **case / survey / run を混ぜない**
-  case は reusable な基本定義、survey は parameter expansion、run は実行単位。
-  run の input を場当たり的に直さず、再利用すべき変更は case / survey に戻す。
-
-- **Simulator Adapter に閉じ込める**
-  simulator 固有の input rendering、runtime 解決、出力検出、summary は Adapter が持つ。
-  core は simulator に依存しない。
-
-- **Launcher Profile に閉じ込める**
-  `srun` / `mpirun` / `mpiexec`、site 固有の Slurm directive、module load は
-  Launcher と site profile に寄せる。Python は MPI rank の wrapper にならない。
-
-- **Agent harness は project state の一部**
-  `.claude/`、`.agents/`、`.codex/`、`AGENTS.md`、`CLAUDE.md` は、Agent に
-  触ってよい場所、確認すべき gate、使う skill を伝える運用面の正本です。
-
-## Project が memory になる
-
-`runo init` で生成される project は、単なる実行ディレクトリではなく、
-人間と Agent の共有 memory です。
-
-```
-project/
-  campaign.toml          # 研究意図、仮説、変数、観測量
-  cases/                 # reusable case definitions
-  runs/                  # survey と run directory
-  research/CURRENT.md    # 現在の研究判断だけを置く bounded entry point
-  research/journal/      # 文字数で原文 rotation する時系列ログ
-  research/results/      # 人が残すと判断した解析結果
-  materials/             # papers, manuals, figures, snippets
-  refs/                  # optional fallback mirrors / external knowledge mounts
-  .runops/work/          # Git 管理しない goal 単位の provisional output
-  .runops/               # environment, generated Agent context, facts
-  .claude/ .agents/ .codex/
-                         # Agent harness, skills, rules, permissions
-```
-
-この構造の意味は [レイヤー一覧](docs/layers/README.md) から辿れます。
-
-## Safety Gates
-
-runops は AI 前提ですが、何でも自動化するという意味ではありません。
-次の操作では人間の確認を挟みます。
-
-- 初回または高コストな `submit --all`
-- queue、QOS、node 数、walltime、memory を増やす retry
-- `cancel`、`archive`、`purge-work`、`delete`
-- 研究仮説や campaign の意味が変わる編集
-- project-state migration や harness 更新
-
-Agent は確認前に、対象 run、queue、資源量、想定 core-hour、変更理由を提示します。
-
-## 最小セットアップ
-
-新規 project:
+新しい project を作る場合:
 
 ```bash
 uvx --from runops runo init
 uvx --from runops runo doctor
 uvx --from runops runo plugins --check
-# Codex: $setup-plugins
-# Claude Code: /setup-plugins
 ```
 
-既存 project:
+既存 project を使う場合:
 
 ```bash
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 uvx --from runops runo doctor
-uvx --from runops runo plugins --check
-# Codex: $setup-plugins
-# Claude Code: /setup-plugins
 ```
 
-ここまで終わったら、CLI を順に叩くのではなく Agent に研究内容を渡します。
-依頼例は [docs/get-started-with-agent.md](docs/get-started-with-agent.md) にあります。
+初期化後は、CLI を順番に覚える必要はありません。生成された project で Agent に
+次のように依頼します。
 
-## runops 自体の開発
+```text
+この研究では、月面への太陽風入射角が表面帯電に与える影響を調べたい。
+既存の plasma.toml を基準に、仮説、独立変数、観測量を整理して。
+まず campaign と pilot survey の案を作り、submit 前に確認して。
+```
+
+詳しい始め方は [AI エージェントではじめる](docs/get-started-with-agent.md) を参照してください。
+
+## 何を管理するか
+
+| 対象 | 正本 | 役割 |
+|---|---|---|
+| 研究意図 | `campaign.toml` | 仮説、変数、観測量、判断基準 |
+| 再利用条件 | `cases/*/case.toml` | simulator、job、基本パラメータ |
+| パラメータ探索 | `runs/*/survey.toml` | 展開軸、pilot、本番 survey |
+| 1 回の実行 | `manifest.toml` | run ID、状態、由来、job、provenance |
+| 現在の判断 | `research/CURRENT.md` | 今読むべき結論と次の判断 |
+| 残す解析 | `research/results/` | evidence と再現手順を持つ成果 |
+
+run directory が日常運用の主単位です。`run.id` は不変ですが、directory は整理や
+archive のため移動できます。
+
+## 基本の流れ
+
+```text
+研究意図
+  -> campaign / case / survey
+  -> run 生成
+  -> submit / sync
+  -> 解析・比較
+  -> research の判断更新
+```
+
+Agent は投入前に対象 run、queue、資源量を示します。投入後は `manifest.toml` を正本に
+状態を同期し、解析結果には source run と再現 command を残します。
+
+## 安全性
+
+次の操作は確認を挟みます。
+
+- 初回または高コストな一括 submit
+- 資源量を増やす retry
+- `cancel`、`archive`、`purge-work`、`delete`
+- 研究仮説や campaign の意味を変える編集
+- project-state migration と harness 更新
+
+生成済みの `manifest.toml`、`input/`、`submit/job.sh` は直接編集せず、変更元の case や
+survey に戻します。
+
+## よく使う operator command
+
+普段は Agent が実行します。手動確認では次の command が入口です。
+
+```bash
+runo context --json       # project の現在地
+runo runs list            # active run 一覧
+runo runs status          # 状態表示
+runo runs sync            # Slurm 状態を manifest に反映
+runo lint                 # project state の health check
+```
+
+全 command は [.codex/rules/commands.md](.codex/rules/commands.md) にあります。
+
+## ドキュメント
+
+目的別の入口は [Documentation](docs/README.md) にまとめています。
+
+| 読みたいこと | 文書 |
+|---|---|
+| 最初の project を動かす | [AI エージェントではじめる](docs/get-started-with-agent.md) |
+| Agent の実行ルールを知る | [Agent User Guide](docs/agent-user-guide.md) |
+| project state の置き場所を知る | [Layer Docs](docs/layers/README.md) |
+| TOML field を調べる | [TOML リファレンス](docs/toml-reference.md) |
+| runops を拡張する | [拡張ガイド](docs/extending.md) |
+| 内部設計を調べる | [アーキテクチャ](docs/architecture.md) |
+
+## 開発
 
 ```bash
 git clone https://github.com/Nkzono99/runops.git
 cd runops
 uv sync --dev
-
 uv run pytest
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 uv run mypy src/
 ```
-
-## ドキュメント
-
-- [AI エージェントではじめる](docs/get-started-with-agent.md) — 最初の実用導線
-- [Agent ユーザーガイド](docs/agent-user-guide.md) — Agent が守る基本ルール
-- [Interface Layer](docs/layers/interface.md) — CLI / action surface / human gate の境界
-- [MCP Provider](docs/mcp.md) — MCP server / tool registry / safety contract
-- [レイヤー一覧](docs/layers/README.md) — project state の責務分離
-- [実験層](docs/layers/experiment.md) — campaign / case / survey の設計正本
-- [Execution Kernel](docs/layers/execution-kernel.md) — run / submit / sync / manifest
-- [解析層](docs/layers/analysis.md) — 解析・可視化成果物の運用
-- [研究判断層](docs/layers/research.md) — `CURRENT.md` / journal / retained results
-- [知識層](docs/layers/knowledge.md) — plugin / materials / knowledge / refs fallback
-- [ハーネス層](docs/layers/harness.md) — Agent instructions / skills / rules
-- [Upstream 連携層](docs/layers/upstream.md) — local patch / feedback / PR
-- [Project health check](docs/project-health.md) — `runo lint` による検査
-- [TOML リファレンス](docs/toml-reference.md) — 設定ファイルのフィールド定義
-- [アーキテクチャ](docs/architecture.md) — 内部設計とモジュール構成
-- [拡張ガイド](docs/extending.md) — Adapter / Launcher の追加方法
-- [移行ガイド](docs/migrations/README.md) — runops 更新時の migration
-- [SPEC.md](SPEC.md) — 詳細仕様
 
 ## ライセンス
 

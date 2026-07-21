@@ -1,59 +1,49 @@
-# Layer Docs
+# Project State Layers
 
-runops の project 側状態は複数の層に分かれます。
-層ごとの責務で迷った場合は、以下の文書を正本として参照してください。
-
-ここでいう Layer は、単なる runops 実装内部の module ではなく、project 運用上の
-正本・生成物・更新ルールが分かれる面です。Layer として扱う目安は次の通りです。
-
-- project 側に永続的な状態、生成物、または正本がある
-- 人間と Agent の両方が読み書き・参照する
-- 他の層と混ぜると再現性、判断、handoff、upstream 化が壊れる
-- 置き場所、更新方法、昇格/同期ルールを明文化する価値がある
+このページは、runops project の「何をどこに置くか」を調べるための索引です。
+実装 module の説明は [アーキテクチャ](../architecture.md) を参照してください。
 
 ## 全体像
 
 ![runops project layers](../figures/layers/overview.png)
 
-図では、日常運用の流れを `研究意図 -> 探索設計 -> 実行 -> 解析・可視化 -> 判断・知識`
-として描いています。各 Layer はこの流れの一部を担当しますが、重要なのは
-「どの状態がどこを正本にするか」を混ぜないことです。
+```text
+研究意図 -> 探索設計 -> 実行 -> 解析 -> 判断・再利用知識
+```
 
-Agent は Interface Layer と Harness Layer の制約を通して project state に触り、
-Experiment / Execution / Analysis / Research / Knowledge の各 Layer にある正本を
-読み書きします。Upstream Integration Layer は、運用中に見つかった runops 本体への
-改善や local patch を project の研究状態から切り離して扱うための境界です。
+各 Layer は、正本、生成物、更新方法が異なる project 運用上の境界です。
 
-この operational Layer taxonomy は product bounded context と競合する分類ではなく、
-project 側の正本を詳しく見るための view です。対応は次のとおりです。
+| Layer | 正本・主な対象 | 文書 |
+|---|---|---|
+| Interface | CLI、action、MCP、human gate | [interface.md](interface.md) |
+| Experiment | `campaign.toml`、`case.toml`、`survey.toml` | [experiment.md](experiment.md) |
+| Execution Kernel | run、`manifest.toml`、submit、sync、provenance | [execution-kernel.md](execution-kernel.md) |
+| Analysis | run-local 解析、survey 集計、cross-run 比較 | [analysis.md](analysis.md) |
+| Research | `CURRENT.md`、journal、残す result | [research.md](research.md) |
+| Knowledge | plugin、materials、facts、insights、refs | [knowledge.md](knowledge.md) |
+| Harness | `AGENTS.md`、`CLAUDE.md`、skills、rules | [harness.md](harness.md) |
+| Upstream Integration | feedback、local patch、issue、PR | [upstream.md](upstream.md) |
 
-| Product bounded context | Operational Layer docs |
-|-------------------------|------------------------|
-| **Execution Kernel** | Experiment + Execution Kernel |
-| **Research Workspace** | Analysis + Research + Knowledge |
-| **Agent Gateway** | Interface + Harness |
-| **Operator/Developer utilities** | Upstream Integration + operator utilities |
+## 迷ったときの判断
 
-実装レイヤの並びは `core -> application -> interfaces/infrastructure` です。
+- 実験条件を再利用するなら Experiment。
+- 1 回の実行状態や由来なら Execution Kernel。
+- 計算から直接得た図や集計なら Analysis。
+- 複数の evidence から得た判断なら Research。
+- 複数 project で再利用する小さな知見なら Knowledge。
+- Agent の権限や定型手順なら Harness。
+- runops 本体へ返す変更なら Upstream Integration。
 
-| Layer | Canonical Doc | 役割 |
-|-------|---------------|------|
-| Interface Layer | [interface.md](interface.md) | Agent / harness / operator が project state に触る command surface と gate |
-| Experiment Layer | [experiment.md](experiment.md) | `campaign.toml` → `case.toml` → `survey.toml` の実験設計正本 |
-| Execution Kernel | [execution-kernel.md](execution-kernel.md) | run / submit / sync / manifest / provenance の実行状態正本 |
-| Analysis Layer | [analysis.md](analysis.md) | 解析・可視化成果物、summary、survey 集計、cross-run 比較 |
-| Research Layer | [research.md](research.md) | 量で bounded な current / journal / durable results |
-| Knowledge Layer | [knowledge.md](knowledge.md) | Agent が再利用する plugin 導線、notes、materials、`.runops/insights/`、refs fallback |
-| Harness Layer | [harness.md](harness.md) | Agent の手順、権限、skills、rules、project-local harness |
-| Upstream Integration Layer | [upstream.md](upstream.md) | runops local patch、feedback issue、PR、update / migration の境界 |
+Interface は各 Layer を操作する入口です。`runo lint` は Layer を横断して project state を
+検査します。詳細は [Project Health Check](../project-health.md) を参照してください。
 
-`src/runops/cli/` は Interface Layer の実装の一部ですが、module 構成としての
-`cli/`, `core/`, `adapters/`, `launchers/`, `slurm/` は runops 実装内部の
-architecture layer です。実装構造は [architecture.md](../architecture.md) を正本とします。
+## Product context との対応
 
-runops 更新で project 側状態を移行する手順は layer そのものではなく、
-Upstream Integration Layer に付随する運用です。
-詳細は [../migrations/README.md](../migrations/README.md) を参照してください。
+| Product context | 関係する Layer |
+|---|---|
+| Execution Kernel | Experiment、Execution Kernel |
+| Research Workspace | Analysis、Research、Knowledge |
+| Agent Gateway | Interface、Harness |
+| Operator / Developer utilities | Upstream Integration、operator utilities |
 
-各 layer が Agent から読める状態に保たれているかは cross-layer の health check として
-[../project-health.md](../project-health.md) と `runo lint` を使います。
+project-state migration は [Migration Guide](../migrations/README.md) を参照してください。

@@ -1,6 +1,18 @@
 # 拡張ガイド
 
-このドキュメントでは、runops に新しい Simulator Adapter や Launcher Profile を追加する方法を説明します。
+runops に Simulator Adapter や Launcher Profile を追加する開発者向けリファレンスです。
+
+## この文書の使い方
+
+| 目的 | 読む節 |
+|---|---|
+| simulator を追加する | [新しい Simulator Adapter の追加](#新しい-simulator-adapter-の追加) |
+| MPI 起動方式を追加する | [新しい Launcher Profile の追加](#新しい-launcher-profile-の追加) |
+| 設定例だけ確認する | [設定ファイルリファレンス](#設定ファイルリファレンス) |
+| Agent 向け metadata を実装する | [AI エージェント対応メソッド](#ai-エージェント対応メソッド) |
+
+最初から通読せず、対象の拡張点とテスト節を対にして参照してください。field の完全な
+schema は [TOML リファレンス](toml-reference.md) にあります。
 
 ---
 
@@ -8,7 +20,8 @@
 
 ### 概要
 
-Simulator Adapter は、シミュレータ固有の処理を吸収するためのコンポーネントです。新しいシミュレータに対応するには、以下のステップで Adapter を実装します。
+Simulator Adapter は、シミュレータ固有の入力生成、runtime 解決、出力検出、解析を
+受け持ちます。追加作業は class 実装、登録、設定、contract test の4段階です。
 
 ### ステップ 1: Adapter クラスの作成
 
@@ -360,7 +373,8 @@ def collect_provenance(
 
 ### ステップ 3: Registry への登録
 
-上の例では `@register` デコレータを使って自動登録しています。これにより、モジュールが import された時点でグローバル Registry に登録されます。
+上の例では `@register` デコレータを使っています。module の import 時に global Registry
+へ登録されます。
 
 デコレータを使わない場合は、明示的に登録することもできます:
 
@@ -370,7 +384,14 @@ from runops.adapters.registry import register
 register(MySolverAdapter, name="my_solver")
 ```
 
-自動 import の仕組み: `simulators.toml` で `adapter = "my_solver"` と指定すると、`AdapterRegistry.load_from_config()` が `runops.adapters.my_solver` モジュールを自動的に import します。このため、モジュールファイル名が adapter 名と一致している必要があります。
+`simulators.toml` の `adapter = "my_solver"` は次の順で解決されます。
+
+1. installed package の `runops.adapters` entry point
+2. `runops.adapters.contrib.my_solver`
+3. `runops.adapters.my_solver`
+
+外部 package は entry point を推奨します。同梱 module は adapter 名と import path を
+一致させます。
 
 ### ステップ 4: simulators.toml への追加
 

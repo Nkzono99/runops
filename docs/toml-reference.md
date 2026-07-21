@@ -1,6 +1,23 @@
 # TOML Configuration Reference
 
-runops uses TOML files for all configuration. Each file has a JSON Schema for validation (`#:schema` comment at the top).
+runops が読み書きする設定、manifest、解析 metadata の field リファレンスです。
+各設定 file は先頭の `#:schema` comment で JSON Schema を参照できます。
+
+通読用ではありません。対象 file の節へ移動し、必要な field だけ参照してください。
+
+## File index
+
+| 対象 | 節 |
+|---|---|
+| project | [runops.toml](#runopstoml) |
+| simulator / launcher / site | [simulators.toml](#simulatorstoml)、[launchers.toml](#launcherstoml)、[site.toml](#sitetoml) |
+| case / survey | [case.toml](#casetoml)、[survey.toml](#surveytoml) |
+| run state | [manifest.toml](#manifesttoml)、[Run Directory Structure](#run-directory-structure) |
+| analysis / publication | [analysis outputs](#analysissummaryjson)、[survey summary](#survey-summary-outputs)、[publication export](#publication-export-outputs) |
+| research design / environment | [campaign.toml](#campaigntoml)、[environment.toml](#runopsenvironmenttoml) |
+
+利用手順は [AI エージェントではじめる](get-started-with-agent.md)、内部責務は
+[アーキテクチャ](architecture.md) を参照してください。
 
 ---
 

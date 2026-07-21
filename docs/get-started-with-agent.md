@@ -1,229 +1,150 @@
 # AI エージェントではじめる runops
 
-AI エージェントと一緒にシミュレーションプロジェクトを立ち上げるためのガイドです。
-TOML ファイルを最初から手で書く必要はありません。研究内容をエージェントに伝えれば、campaign・case・survey の設計から run 管理まで支援してもらえます。
+このページは、最初の project を作り、Agent に研究内容を渡すところまでのガイドです。
+TOML schema や全 CLI command を覚える必要はありません。
 
-このガイドの前提は、**人間が runops CLI を順番に叩いて研究を進めるのではない**
-ということです。CLI は Agent と harness が安全に project state を操作するための
-interface です。人間は研究意図、制約、確認、解釈に集中します。
+## 1. 用意するもの
 
-## あなたが用意するもの
+最初に次の情報があると、Agent が設計を始めやすくなります。
 
-エージェントに渡す前に、主に次の 2 点を決めておいてください。
+- 研究テーマと仮説
+- 変えたい条件と観測したい量
+- 使用する simulator
+- 既存の base input や参考資料（あれば）
+- 計算資源や期限の上限
 
-1. **研究の方向性** — テーマ、仮説、探索したい変数、注目する観測量
-2. **ベース入力の方針** — 既存の入力テンプレート、plugin/knowledge source、手元の資料のどれを起点に組み立てるか
+base input が未定でも始められます。その場合は、未定であることと、Agent に比較して
+ほしい候補を伝えてください。
 
-`runo init` では通常、simulator や launcher の設定を対話的に選ぶため、最初の依頼でそれらを毎回書き直す必要はありません。
-project / simulator / site に外部 Codex plugin 推薦がある場合、`runo init` と
-生成される `AGENTS.md` / `CLAUDE.md` に推奨 plugin と導入手順が表示されます。
-たとえば `emses` では MPIEMSES3D / emout の plugin、`camphor` site profile では
-KUDPC HPC plugin、`beach` では BEACH Context plugin が案内されます。
-既存 project では `runo setup` の出力と `runo update-harness` が
-`[project.codex_plugins]` も含めた同じ推薦 inventory を使うため、project 固有の
-解析 workflow や handoff plugin も生成 harness に反映できます。
-runops は plugin を自動 install せず、
-ユーザーの Codex 環境で `/plugins` や `codex plugin ...` により有効化します。
-生成済み project では、Codex なら `$setup-plugins`、Claude Code なら
-`/setup-plugins` を使うと、Agent が `install_hint` / `activation_hint` を読み、
-可能な範囲で install / enable / plugin-provided hook 導線を整えます。
-既存 project で推薦を確認したい場合は `runo plugins`、agent や外部 tool から
-読む場合は `runo plugins --json` を使います。`runo plugins --check` は推薦
-メタデータの欠落を検査しますが、user-local な plugin install 状態は検査しません。
+## 2. Project を作る
 
-ベース入力ファイル (`plasma.toml`, `beach.toml` など) を明示すると意図が伝わりやすくなります。
-一方で、まだベースを決めていない場合でも、Agent は `runo plugins --json` の
-`delegated_capabilities` から simulator/environment plugin を確認し、
-`.runops/knowledge/enabled/imports.md`、`materials/` を読んで case の叩き台を作れます。
-任意の `refs/` mirror にある docs/cookbook は、plugin や明示的 knowledge source が
-使えない場合の fallback として参照します。
-
-あとはエージェントが campaign 設計、case 作成、survey 展開、run 生成・投入・解析・知見整理を進めます。
-人間が CLI の全体を覚える必要はありません。
-
-## プロジェクトを用意する
-
-新規作成の場合:
+新規 project:
 
 ```bash
 uvx --from runops runo init
 uvx --from runops runo doctor
 uvx --from runops runo plugins --check
-# Codex: $setup-plugins
-# Claude Code: /setup-plugins
 ```
 
-既存プロジェクトをセットアップする場合:
+既存 project:
 
 ```bash
 uvx --from runops runo setup https://github.com/user/my-project.git
 cd my-project
 uvx --from runops runo doctor
 uvx --from runops runo plugins --check
-# Codex: $setup-plugins
-# Claude Code: /setup-plugins
 ```
 
-`runo init` がディレクトリ構造と初期ファイルを作ります。
-この bootstrap だけは人間が直接実行して構いません。その後は CLI を順番に叩くより、
-すぐにエージェントへ研究内容を渡して構成を整えてもらう方が早いです。
-あわせて Claude Code 向けのガードも生成され、`manifest.toml`、`input/`、`submit/job.sh`、
-`SITE.md` などの生成物は直接編集しない前提になります。
+`runo init` は project 構造と Agent harness を生成します。`manifest.toml`、`input/`、
+`submit/job.sh` などの生成物は直接編集せず、元になる case や survey を変更します。
 
-運用全体を俯瞰したい場合は [layers/README.md](layers/README.md) を先に見ると、
-Experiment Layer の `campaign.toml`・`case.toml`・`survey.toml` と、
-Execution Kernel の `manifest.toml` がそれぞれ何の役割を持つか掴みやすくなります。
+### 推奨 plugin
 
-## 最初の依頼の出し方
+simulator や site に対応する plugin がある場合、`runo init` と生成された harness に
+推薦が表示されます。runops は plugin を自動 install しません。
 
-`setup-plugins` は推奨 plugin と plugin-provided hook 導線を整えるための任意ステップです。
-plugin が整ったら、次に `setup-runops` で project の聞き取りへ進みます。
+- Codex: `$setup-plugins`
+- Claude Code: `/setup-plugins`
+- 推薦の再確認: `runo plugins`
+- 機械可読な一覧: `runo plugins --json`
 
-`setup-runops` は、**`runo init` / `runo setup` が終わった後**に使う
-開始時の聞き取り用 SKILL です。最初のプロンプトでは、細かい TOML や CLI
-コマンドを書かずに、生成済み project の中でこれだけ入力してください。
+plugin の選択順や knowledge source との関係は
+[Knowledge Layer](layers/knowledge.md) を参照してください。
 
-Codex の場合:
+## 3. Agent に依頼する
+
+短い聞き取りから始める場合:
+
+- Codex: `$setup-runops`
+- Claude Code: `/setup-runops`
+
+Agent が project context と環境を確認し、研究テーマ、simulator、base input、最初の
+到達点を順に聞きます。
+
+最初からまとめて伝えても構いません。
 
 ```text
-$setup-runops
+月面平面に太陽風プラズマが入射するときの表面帯電を調べたい。
+cases/emses/flat_surface/plasma.toml を base input にする。
+主な独立変数は照射角、観測量は表面電位とシース厚。
+
+まず project を確認し、campaign と pilot survey の案を作って。
+run 数と概算 cost を示し、submit は確認するまで行わないで。
 ```
 
-Claude Code の場合は `/setup-runops` と入力します。
-
-Agent が `runo doctor` や project context を確認し、セットアップに必要なことを
-順番に聞きます。研究テーマ、使いたい simulator、base input、最初にどこまで
-進めたいかなど、聞かれたことに答えていけば十分です。情報が揃ったら、
-campaign / case / survey / run 生成のどこまで進めるべきかを Agent が案内します。
-
-初回はそれ以上のプロンプトを用意する必要はありません。以後は Agent の質問に
-答えていく形で進めます。
-
-<details>
-<summary>最初からまとめて指示したい場合</summary>
-
-Agent との聞き取りを短くしたい場合は、研究目的と制約をまとめて直接伝えても
-構いません。その場合も、CLI コマンドを列挙するより、研究内容・base input・
-最初の到達点を書きます。
+base input が未定なら、候補の比較も依頼に含めます。
 
 ```text
-このプロジェクトでは、月面平面に太陽風プラズマが入射し、
-光電子放出があるときの表面帯電を調べたい。
-ベース入力テンプレートは cases/emses/flat_surface/plasma.toml を使いたい。
-照射角を主な独立変数として調べたい。
-
-まず project を確認して、plan を示したうえで campaign.toml と case 定義を整えて。
-必要なら survey の雛形まで作って。submit はまだしないで。
+照射角と表面帯電の関係を調べたい。base input は未定。
+利用可能な plugin、knowledge source、materials を確認し、候補と選定理由を示して。
 ```
 
-ベース入力が未定なら、次のように頼めます。
+## 4. 依頼に含めるとよい情報
 
-```text
-このプロジェクトでは、月面平面に太陽風プラズマが入射し、
-光電子放出があるときの表面帯電を調べたい。どのようなパラメータを用いるべきか。
-照射角を主な独立変数として調べたい。
+Agent は依頼から Goal、Done、Budget、Invariant を組み立てます。特に Done と Budget を
+明示すると、必要以上の作業や待機を避けられます。
 
-まず project を確認して、plan を示したうえで campaign.toml と case 定義を整えて。
-必要なら survey の雛形まで作って。submit はまだしないで。
-```
-
-</details>
-
-## よくある依頼パターン
-
-細かい TOML 構文を知らなくても、やりたいことをそのまま伝えれば動きます。
-
-| やりたいこと | 依頼の例 |
+| やりたいこと | 依頼例 |
 |---|---|
-| 研究意図を整理する | `Goalはcampaign設計。Doneは仮説、独立変数、観測量、単位、理由が揃うこと。` |
-| case を作る | `このテンプレートをベースに case を作って。共通 job 設定と params は case に寄せて。` |
-| survey を作る | `Goalはsurvey設計。Doneはpilot点、run数、概算costをdry-runで確認できること。` |
-| run を展開する | `Goalはこのsurveyからのrun生成。Doneはcreated run_id、件数、由来の報告。` |
-| 投入前にレビューする | `submit 前に plan と対象 run を確認して。初回 bulk submit なので確認を挟んで。` |
-| 投入まで行う | `Goalはこの3 runの投入。Doneは対象とjob_idの報告。` |
-| 初動まで確認する | `Goalは投入と初動確認。Doneはstepが2回進むこと、Budgetは10分。` |
-| 失敗 run を診断する | `failed run を確認して。log を読んで failure_reason を整理し、retry 方針を提案して。` |
-| 解析する | `Goalはcompleted runの比較図作成。Doneは図、source run、再現commandの報告。` |
-| 知見を昇格する | `この解析結果のclaimを、適用範囲とevidence path付きでfact候補にして。` |
-| runops にフィードバックする | project 固有情報を除いた再現手順と issue 下書きを作るよう依頼する |
+| campaign を作る | `仮説、独立変数、観測量、単位、理由が揃ったら完了。` |
+| survey を設計する | `pilot 点、run 数、概算 cost を dry-run で確認して。` |
+| run を生成する | `created run ID、件数、由来を報告して。` |
+| submit する | `対象と job ID の記録まで。初動待機はしない。` |
+| 初動を確認する | `step が2回進むまで、最大10分確認して。` |
+| 失敗を診断する | `log と failure reason を整理し、retry 方針を提案して。` |
+| 比較図を作る | `図、source run、再現 command を残して。` |
 
-ポイントは、run の入力を場当たり的に直すのではなく、再利用すべき変更を `campaign.toml` → `case.toml` → `survey.toml` に戻すよう依頼することです。
+再利用する変更は、run の生成済み input ではなく
+`campaign.toml` → `case.toml` → `survey.toml` の適切な段階へ戻します。
 
-Agentは依頼からGoal / Done / Budget / Invariantを組み立て、現在のevidenceからDoneに必要な
-最短の状態遷移を選びます。
-submit の Done は job_id、初動確認の Done は progress evidence です。後者まで進めたい場合は、
-step、log marker、観測期限などを依頼に含めてください。
+## 5. 人が確認する操作
 
-## 完了 run を退避する
+Agent 中心の運用でも、次の操作は確認を挟みます。
 
-普段見る run を絞りたい場合、completed run は内容を削除せず `runs/_archive/` へ移せます。
+- 新しい survey の初回 bulk submit
+- walltime、memory、node 数などを増やす retry
+- `cancel`、`archive`、`purge-work`、`delete`
+- 研究仮説や campaign の意味を変える編集
+- migration と harness 更新
+
+submit 前には、対象 run、queue、QOS、資源量、概算 cost を確認してください。
+
+## 6. 完了 run を整理する
+
+1 run を内容ごと退避する場合:
 
 ```bash
 runo runs archive R2026...
-runo runs list                       # archived / purged は既定で非表示
-runo runs list --include-archived    # 保管分を含めて表示
-runo runs restore R2026...           # archive 前の場所へ全 artifact を復元
+runo runs list --include-archived
+runo runs restore R2026...
 ```
 
-出力を今後も使う場合は `runo runs purge-work` を実行しないでください。
-
-survey 一式を `survey.toml` や cancelled / failed run も含めて退避する場合は、
-親ディレクトリを bundle として移動します。配下の run state は変わりません。
+survey の親を `survey.toml` や cancelled / failed run ごと退避する場合:
 
 ```bash
 runo runs archive runs/scan --bundle
-runo runs list --include-archived
 runo runs restore runs/_archive/scan --bundle
 ```
 
-submitted / running を含む bundle は移動されません。`runs/_archive/` は Git 管理可能で、
-`survey.toml`、manifest、入力パラメータ、解析スクリプトは記録できます。
-`work/`、`status/`、cache / scratch は active run と同様に `.gitignore` 対象です。
-
-配下の run を先に個別 archive しており、`runs/_archive/scan` が既にある場合、通常の
-bundle archive は競合として拒否します。元の親と相対パスが一致する archived / purged
-run だけを bundle に取り込むには、明示的に次を使います。
+先に個別 archive した run がある場合は、採用対象を確認してから統合します。
 
 ```bash
 runo runs archive runs/scan --bundle --adopt-archived
 ```
 
-確認前に採用対象の run ID と状態が表示されます。archive destination に対象 run 以外の
-ファイルがある場合や、元 path が別の親を指す場合は何も移動しません。bundle restore
-では採用した run も元の相対パスへ戻りますが、個々の `archived` / `purged` 状態は保持します。
+`--adopt-archived` が採用するのは、同じ親・同じ相対 path に由来する `archived` または
+`purged` run だけです。競合や所有不明 file があれば、bundle 全体を変更せず拒否します。
 
-## SKILL を明示するとき
+`runs/_archive/` では manifest、入力パラメータ、解析 script を Git 管理できます。
+`work/`、`status/`、cache / scratch は通常の run と同様に ignore されます。
 
-通常は「何をしてほしいか」を書けば十分です。意図がずれるときだけ、ひと言添えてください。
+## 7. 次に読む
 
-```text
-campaign 設計用の SKILL を使って campaign.toml を整理して。
-```
+- [Documentation](README.md) — 目的別の文書索引
+- [Agent User Guide](agent-user-guide.md) — Agent の実行契約と保存先
+- [Layer Docs](layers/README.md) — project state の責務分離
+- [Interface Layer](layers/interface.md) — CLI、action、human gate
+- [TOML リファレンス](toml-reference.md) — field を調べるとき
 
-```text
-知見整理用の SKILL を使って、今回の結果を insight として保存して。
-```
-
-## 人間が確認を入れる場面
-
-エージェント中心で進めても、以下の操作だけは確認を挟んでください。
-
-- **コストが高い操作** — 新しい survey の初回 bulk submit、walltime / memory / node 数を増やす retry
-- **破壊的な操作** — `cancel`、`archive`、`purge-work`、`delete`
-- **研究の意味が変わる操作** — 仮説の方向性が変わる `campaign.toml` の編集
-
-それ以外はエージェントに任せて大丈夫です。
-
-## runops へのフィードバック
-
-不満点や bug 候補は `runo research append` で project 内に短く記録できます。
-upstream issue を作る場合は、再現手順、期待/実際の挙動、workaround を下書きし、
-private path、クラスタ固有情報、未公開 result を除いたことを人が確認してから起票します。
-
-## 次に読む
-
-- [README.md](../README.md) — 生成される構造と全体像
-- [layers/README.md](layers/README.md) — interface / experiment / execution / analysis / research / knowledge / harness / upstream の責務分離
-- [layers/interface.md](layers/interface.md) — CLI / action surface / human gate の境界
-- [agent-user-guide.md](agent-user-guide.md) — Agent が守る基本ルール
-- [toml-reference.md](toml-reference.md) — TOML フィールドを手で確認したいとき
+runops 自体への bug や改善案は、project 固有情報を除いた再現手順、期待する挙動、
+実際の挙動、workaround をまとめてから upstream issue にします。

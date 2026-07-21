@@ -1,6 +1,19 @@
 # アーキテクチャ
 
-このドキュメントでは、runops のシステムアーキテクチャと設計思想を説明します。
+runops 本体を変更する開発者向けのリファレンスです。利用者が project の保存先を
+確認する場合は [Layer Docs](layers/README.md) を参照してください。
+
+## この文書の使い方
+
+- 全体の責務分離: [bounded contexts](#現在の-bounded-contexts-と-maturity) と
+  [モジュール構成](#モジュール構成)
+- domain object: [コアコンセプト](#コアコンセプト)
+- simulator / MPI 拡張: [Adapter](#adapter-パターン) と [Launcher](#launcher-パターン)
+- lifecycle: [状態マシン](#状態マシン) と [主要操作のデータフロー](#主要操作のデータフロー)
+- scheduler / job: [Slurm 連携](#slurm-連携) と [job.sh 生成](#jobsh-生成-jobgengeneratorpy)
+
+必要な節だけ参照してください。TOML field の正確な schema は
+[TOML リファレンス](toml-reference.md) が正本です。
 
 ## 現在の bounded contexts と maturity
 
@@ -22,11 +35,13 @@ story / narrative generation は **experimental** です。Execution Kernel の 
 core -> application -> interfaces/infrastructure
 ```
 
-この矢印は責務の並びで、全 import graph ではありません。強制している不変条件は
-`core/` が列挙済みの禁止 package を import しないことです（demo rendering の
-`templates.render` だけを legacy allowlist とする）。`application/` は use case と port/injection
-seam を持ちますが、run creation / analysis は既存の Adapter・Launcher・jobgen
-registry を application 内で composition します。CLI・MCP は入力と表示を担います。
+この矢印は責務の並びであり、全 import graph ではありません。
+
+- `core/` は列挙済みの禁止 package を import しない。
+- `templates.render` は demo rendering の legacy allowlist とする。
+- `application/` は use case と port / injection seam を持つ。
+- run creation / analysis は Adapter、Launcher、jobgen registry を compose する。
+- CLI と MCP は入力・確認・表示を担う。
 
 ## 設計原則
 
@@ -56,24 +71,22 @@ runops/
   templates/     project/case/survey/harness templates
 ```
 
-`core/` には domain/state/parsing と deterministic/runtime contract を置きます。
-filesystem / subprocess を扱う既存 runtime contract もありますが、強制する境界は
-application、CLI、MCP、Slurm、Adapter 実装、harness を import しないことです。
-`core/demo/replay.py` から `templates.render` への依存は既存 demo rendering contract の
-legacy exception とし、新しい `core/` 依存を増やしません。
-run 生成、submission、analysis、publication、notebook、harness upgrade の
-orchestration は `application/` に置きます。
-submission、notebook、operator utility の外部 effect は port / injected runner を使い、
-既存 run creation / analysis は top-level infrastructure registry を明示的に compose
-します。`cli/` と `mcp/` は同じ application plan を翻訳し、規則を複製しません。
+主な境界:
 
-`src/runops/sites/` は runtime site 設定そのものではなく、`runo init` が読む bundled
-preset 集です。実行時 site の正本は project root の `site.toml` です。
+- `core/`: domain、state、parsing、deterministic / runtime contract。application、CLI、
+  MCP、Slurm、Adapter 実装、harness を import しない。
+- `application/`: run 生成、submission、analysis、publication、research、harness upgrade
+  の orchestration。外部 effect は port や injected runner を使う。
+- `cli/` / `mcp/`: 同じ application plan を入力・出力形式へ翻訳する。domain rule を
+  複製しない。
+- `src/runops/sites/`: `runo init` 用の bundled preset。実行時の正本は project root の
+  `site.toml`。
 
-CLI の `main.py` は root option と top-level composition だけを持ち、`case`, `runs`,
-`analyze`, `notes` の complete Typer app は `cli/groups/` で command callback を登録します。
-Action-facing semantics は `application.actions.ActionSpec` と use case が正本であり、
-Typer signature から domain rule や MCP contract を生成しません。
+`core/demo/replay.py` から `templates.render` への依存だけは legacy exception です。
+新しい `core/` 依存は増やしません。
+
+CLI の `main.py` は root option と top-level composition だけを持ちます。command callback
+は `cli/groups/`、action semantics は `application.actions.ActionSpec` と use case が正本です。
 
 ---
 

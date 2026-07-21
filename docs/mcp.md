@@ -4,6 +4,13 @@ runops は Ops MCP Contract v0.1 に沿った MCP provider を持つ。
 MCP は runops の domain model ではなく、既存の CLI / Python API を
 AI host から安全に呼ぶための edge interface として扱う。
 
+## この文書の使い方
+
+- server を起動する: [入口](#入口)
+- 公開範囲を確認する: [Safety Posture](#safety-posture)
+- client を実装する: [Result Envelope](#result-envelope) と [Exposed Tools](#exposed-tools)
+- Codex / host に登録する: [Host Config Example](#codex--host-config-example)
+
 ## 入口
 
 ```bash
@@ -47,25 +54,30 @@ write / external / destructive tool は registry 上に disabled metadata とし
 将来 expose する場合も、`confirm=true`、`dry_run=false`、server policy enable、
 audit record を必須にする。
 
-Codex plugin については provider metadata と capabilities の
-`codex_plugin_policy` に境界を載せる。runops は plugin を自動 install / enable
-せず、project 側の推薦 metadata だけを検査する。install 済み状態はユーザー local な
-Codex 環境の責務として扱う。`inventory_schema_version` は
-`runops.project.plugins` / `runo plugins --json` が返す推薦 payload の schema を示す。
-`inventory_schema` と `check_result_schema` は、それぞれ
-`schemas/codex-plugin-inventory.json` と `schemas/codex-plugin-check-result.json`
-を指し、`runo plugins --json` / `runops.project.plugins` の JSON payload 自身も
-`$schema` に同じ値を含める。
-`inventory_fields`、`check_result_fields`、`recommendation_fields`、
-`source_fields`、`delegated_capabilities_field` は外部 client が期待できる field
-contract を示す。
-検査 payload は `ok`、warning を失敗扱いする `strict_ok`、`summary`、`issues` を
-返し、外部 tool は plugin 導入状態ではなく metadata 健全性だけを判断する。
-各推薦の `capabilities` は plugin へ委譲する役割ラベルで、install 状態ではない。
-各推薦は互換用の `source` 文字列に加えて、parse 済みの `sources` 配列を返す。
-`delegated_capabilities` は role label から推薦 plugin 名へ引くための index として
-返す。`capabilities` が文字列または非空文字列の配列として読めない場合は
-metadata warning になり、壊れた role index を静かに生成しない。
+### Codex plugin metadata
+
+MCP が扱うのは project 側の推薦 metadata です。runops は plugin を install / enable
+せず、ユーザー環境の導入状態も判定しません。
+
+schema contract:
+
+- `inventory_schema_version`: 推薦 payload の schema version
+- `inventory_schema`: `schemas/codex-plugin-inventory.json`
+- `check_result_schema`: `schemas/codex-plugin-check-result.json`
+- `*_fields`: 外部 client が期待できる field 一覧
+
+検査結果:
+
+- `ok`: metadata error がない
+- `strict_ok`: warning もない
+- `summary` / `issues`: 検査結果の要約と詳細
+
+推薦の `capabilities` は、plugin へ委譲する役割ラベルです。install 状態ではありません。
+`delegated_capabilities` は role label から推薦 plugin 名を引く index です。壊れた
+`capabilities` から不正な index を作らず、metadata warning を返します。
+
+各推薦は互換用の `source` に加え、parse 済みの `sources` 配列を返します。JSON payload
+自身の `$schema` は、provider metadata が示す schema と一致します。
 
 ## Result Envelope
 
