@@ -53,7 +53,7 @@
 | `runo runs jobs [PATH] [--watch SECS]` | 実行中ジョブ一覧 |
 | `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗表。`--all` では cached analysis / next action も表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...] [--include-archived]` | run 一覧と cached analysis / next action を表示。既定では archived / purged を除外 |
+| `runo runs list [PATHS...] [--include-archived]` | run 一覧と cached analysis / next action を表示。既定では archived / purged と archived bundle 配下を除外 |
 
 ## 解析・知見
 
@@ -100,8 +100,8 @@
 
 | コマンド | 説明 |
 |---------|------|
-| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | run アーカイブ (completed のみ。既定で `runs/_archive/` へ移動) |
-| `runo runs restore RUN` | archived run を archive 前の場所へ artifact ごと復元 |
+| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR] [--bundle] [--adopt-archived]` | 通常は completed run を archive。`--bundle` は親ディレクトリ全体を移動し、配下 run state を保持。`--adopt-archived` は同じ親から個別 archive 済みの run を検証して bundle へ採用 |
+| `runo runs restore RUN [--bundle]` | 通常は archived run を復元。`--bundle` は親ディレクトリ全体を archive 前の場所へ復元 |
 | `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | work/ 内の不要ファイル削除。既知の non-ready output を破棄する場合は理由必須 |
 | `runo runs cancel [RUN]` | scancel + sync (submitted/running を停止) |
 | `runo runs delete [RUN]` | run ディレクトリ削除 (created/cancelled/failed のみ) |

@@ -29,6 +29,11 @@ runs/**/analysis/cache/
 runs/**/analysis/scratch/
 runs/**/analysis/.ipynb_checkpoints/
 
+# Archived bundles use the same tracked/ignored split as active runs.
+# Do not ignore runs/_archive/ itself: survey.toml, manifest.toml, source
+# inputs, curated analysis, and .runops-archive.toml remain Git-trackable.
+# The work/status/cache patterns above continue to apply inside the archive.
+
 # materials/: keep text indexes tracked, treat bulky binaries as local by default
 materials/**/*.pdf
 materials/**/*.pptx

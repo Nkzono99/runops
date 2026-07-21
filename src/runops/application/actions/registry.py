@@ -19,6 +19,7 @@ from runops.application.actions.analysis import (
     show_log,
     summarize_run,
 )
+from runops.application.actions.bundle_archive import archive_bundle, restore_bundle
 from runops.application.actions.knowledge import add_fact, promote_fact, save_insight
 from runops.application.actions.result import ActionResult, ActionStatus
 from runops.application.actions.run_lifecycle import (
@@ -46,7 +47,9 @@ _DISPATCH: dict[str, Callable[..., ActionResult]] = {
     "plan_retry": plan_retry,
     "retry_run": retry_run,
     "archive_run": archive_run,
+    "archive_bundle": archive_bundle,
     "restore_run": restore_run,
+    "restore_bundle": restore_bundle,
     "purge_work": purge_work,
     "cancel_run": cancel_run,
     "delete_run": delete_run,

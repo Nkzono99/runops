@@ -212,12 +212,51 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         ),
         cli_commands=(("runs", "archive"),),
     ),
+    "archive_bundle": ActionSpec(
+        name="archive_bundle",
+        description=(
+            "Move a directory containing terminal/inactive runs as one bundle "
+            "without changing individual run states."
+        ),
+        required_params=("bundle_dir",),
+        optional_params=("archive_root", "adopt_archived"),
+        preconditions=(
+            "bundle contains at least one run",
+            "bundle contains no submitted or running runs",
+            (
+                "archive destination does not exist, or --adopt-archived "
+                "validates only matching archived/purged runs"
+            ),
+        ),
+        destructive=True,
+        risk_level="high",
+        cost_class="low",
+        requires_confirmation=True,
+        confirmation_reason=(
+            "Bundle archival moves a parent directory and all contents."
+        ),
+        cli_commands=(("runs", "archive"),),
+    ),
     "restore_run": ActionSpec(
         name="restore_run",
         description="Restore an archived run without deleting its contents.",
         required_params=("run_dir",),
         preconditions=("run state == archived", "restore path does not exist"),
         state_change="archived -> completed",
+        risk_level="medium",
+        cost_class="low",
+        cli_commands=(("runs", "restore"),),
+    ),
+    "restore_bundle": ActionSpec(
+        name="restore_bundle",
+        description=(
+            "Restore an archived bundle without changing individual run states."
+        ),
+        required_params=("bundle_dir",),
+        preconditions=(
+            "bundle archive metadata exists",
+            "restore destination does not exist",
+        ),
         risk_level="medium",
         cost_class="low",
         cli_commands=(("runs", "restore"),),

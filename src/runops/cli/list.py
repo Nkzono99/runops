@@ -8,7 +8,7 @@ from typing import Annotated, Optional
 import typer
 
 from runops.application.execution.readiness import readiness_for_bulk_view
-from runops.core.discovery import discover_runs
+from runops.core.discovery import discover_runs, find_archived_bundle
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
 
@@ -78,7 +78,10 @@ def list_runs(
         if (
             not status_filter
             and not include_archived
-            and run_status in {"archived", "purged"}
+            and (
+                run_status in {"archived", "purged"}
+                or find_archived_bundle(run_dir) is not None
+            )
         ):
             continue
         if tag and tag not in tags:

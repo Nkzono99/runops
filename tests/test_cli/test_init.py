@@ -197,6 +197,14 @@ class TestInit:
         assert "**/.runops-submit.lock" in content
         assert "runs/**/input/plasma.inp" in content
         assert "runs/**/analysis/scratch/" in content
+        assert "Archived bundles use the same tracked/ignored split" in content
+        ignore_patterns = {
+            line.strip()
+            for line in content.splitlines()
+            if line.strip() and not line.lstrip().startswith(("#", "!"))
+        }
+        assert "runs/_archive/" not in ignore_patterns
+        assert "runs/_archive/**" not in ignore_patterns
         assert "materials/**/*.pdf" in content
         assert "materials/**/*.pptx" in content
         assert "materials/**/*.docx" in content

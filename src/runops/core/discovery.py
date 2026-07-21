@@ -23,6 +23,22 @@ from runops.core.exceptions import (
 )
 
 _MANIFEST_FILE = "manifest.toml"
+ARCHIVE_BUNDLE_METADATA_FILE = ".runops-archive.toml"
+
+
+def find_archived_bundle(path: Path) -> Path | None:
+    """Return the nearest archived bundle containing ``path``.
+
+    Bundle archival is orthogonal to each run's lifecycle state, so callers
+    must use the marker file rather than infer archival from ``run.status``.
+    """
+    current = path.resolve()
+    if current.is_file():
+        current = current.parent
+    for candidate in (current, *current.parents):
+        if (candidate / ARCHIVE_BUNDLE_METADATA_FILE).is_file():
+            return candidate
+    return None
 
 
 def discover_runs(runs_dir: Path) -> list[Path]:

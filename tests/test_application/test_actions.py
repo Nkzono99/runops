@@ -10,19 +10,23 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+import tomli as tomllib
 import tomli_w
 
 from runops.application.actions import (
     ActionStatus,
     add_fact,
+    archive_bundle,
     archive_run,
     collect_survey,
     create_survey,
     execute_action,
     export_publication,
+    plan_bundle_archive,
     plan_retry,
     promote_fact,
     purge_work,
+    restore_bundle,
     restore_run,
     retry_run,
     save_insight,
@@ -36,6 +40,7 @@ from runops.application.execution.readiness import (
     probe_run_readiness,
     write_readiness_cache,
 )
+from runops.core.exceptions import ManifestError
 from runops.core.knowledge import list_insights, load_facts
 from runops.core.manifest import read_manifest, update_manifest
 from runops.core.state import RunState
@@ -637,6 +642,307 @@ def test_archive_run_moves_directory_and_updates_manifest_path(tmp_path: Path) -
     assert manifest.path["run_dir"] == str(destination.resolve())
     assert manifest.path["archived_from"] == str(run_dir.resolve())
     assert "archived_at" in manifest.path
+
+
+def test_archive_bundle_moves_parent_and_preserves_run_states(tmp_path: Path) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    bundle.mkdir(parents=True)
+    (bundle / "survey.toml").write_text('[survey]\ncase = "scan"\n')
+    completed = bundle / "R20260330-0001"
+    cancelled = bundle / "R20260330-0002"
+    _write_manifest(
+        completed,
+        {"run": {"id": "R20260330-0001", "status": "completed"}},
+    )
+    _write_manifest(
+        cancelled,
+        {
+            "run": {"id": "R20260330-0002", "status": "cancelled"},
+            "extensions": {"preserved": True},
+        },
+    )
+    (cancelled / "work" / "outputs").mkdir(parents=True)
+    (cancelled / "work" / "outputs" / "partial.dat").write_text("partial\n")
+
+    result = archive_bundle(bundle)
+
+    archived = tmp_path / "runs" / "_archive" / "scan"
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["run_count"] == 2
+    assert result.data["archive_path"] == str(archived.resolve())
+    assert not bundle.exists()
+    assert (archived / "survey.toml").is_file()
+    assert (archived / "R20260330-0002/work/outputs/partial.dat").is_file()
+    completed_manifest = read_manifest(archived / completed.name)
+    cancelled_manifest = read_manifest(archived / cancelled.name)
+    assert completed_manifest.run["status"] == "completed"
+    assert cancelled_manifest.run["status"] == "cancelled"
+    assert cancelled_manifest.extra_sections["extensions"] == {"preserved": True}
+    assert cancelled_manifest.path["run_dir"] == str(
+        (archived / cancelled.name).resolve()
+    )
+    assert cancelled_manifest.path["bundle_archived_from"] == str(cancelled.resolve())
+    assert (archived / ".runops-archive.toml").is_file()
+
+
+def test_archive_bundle_rejects_active_run_without_mutation(tmp_path: Path) -> None:
+    bundle = tmp_path / "runs" / "scan"
+    (bundle / "survey.toml").parent.mkdir(parents=True)
+    (bundle / "survey.toml").write_text("[survey]\n")
+    running = bundle / "R20260330-0001"
+    _write_manifest(
+        running,
+        {"run": {"id": "R20260330-0001", "status": "running"}},
+    )
+
+    result = archive_bundle(bundle)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "running" in result.message
+    assert bundle.is_dir()
+    assert not (bundle / ".runops-archive.toml").exists()
+    assert read_manifest(running).run["status"] == "running"
+
+
+def test_archive_bundle_rejects_existing_destination_without_mutation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    run_dir = bundle / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": "R20260330-0001", "status": "cancelled"}},
+    )
+    destination = tmp_path / "runs" / "_archive" / "scan"
+    destination.mkdir(parents=True)
+    (destination / "existing.txt").write_text("keep\n")
+
+    result = archive_bundle(bundle)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "already exists" in result.message
+    assert run_dir.is_dir()
+    assert not (bundle / ".runops-archive.toml").exists()
+    assert (destination / "existing.txt").read_text() == "keep\n"
+
+
+def test_restore_bundle_moves_parent_back_and_preserves_states(tmp_path: Path) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    (bundle / "survey.toml").parent.mkdir(parents=True)
+    (bundle / "survey.toml").write_text("[survey]\n")
+    cancelled = bundle / "R20260330-0001"
+    _write_manifest(
+        cancelled,
+        {"run": {"id": "R20260330-0001", "status": "cancelled"}},
+    )
+    archived_result = archive_bundle(bundle)
+    archived = Path(str(archived_result.data["archive_path"]))
+
+    result = restore_bundle(archived)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["restore_path"] == str(bundle.resolve())
+    assert bundle.is_dir()
+    assert not archived.exists()
+    assert (bundle / "survey.toml").is_file()
+    assert not (bundle / ".runops-archive.toml").exists()
+    manifest = read_manifest(bundle / cancelled.name)
+    assert manifest.run["status"] == "cancelled"
+    assert manifest.path["run_dir"] == str((bundle / cancelled.name).resolve())
+    assert manifest.path["bundle_restored_from"] == str(
+        (archived / cancelled.name).resolve()
+    )
+
+
+def test_restore_bundle_rejects_existing_destination_without_mutation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    run_dir = bundle / "R20260330-0001"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": "R20260330-0001", "status": "failed"}},
+    )
+    archived_result = archive_bundle(bundle)
+    archived = Path(str(archived_result.data["archive_path"]))
+    bundle.mkdir(parents=True)
+    (bundle / "existing.txt").write_text("keep\n")
+
+    result = restore_bundle(archived)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "already exists" in result.message
+    assert archived.is_dir()
+    assert (archived / ".runops-archive.toml").is_file()
+    assert (bundle / "existing.txt").read_text() == "keep\n"
+    assert read_manifest(archived / run_dir.name).run["status"] == "failed"
+
+
+def test_archive_bundle_adopts_individually_archived_and_purged_runs(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    bundle.mkdir(parents=True)
+    (bundle / "survey.toml").write_text("[survey]\n")
+    cancelled = bundle / "R20260330-0003"
+    _write_manifest(
+        cancelled,
+        {"run": {"id": "R20260330-0003", "status": "cancelled"}},
+    )
+
+    archive_root = tmp_path / "runs" / "_archive" / "scan"
+    archived = archive_root / "R20260330-0001"
+    purged = archive_root / "nested" / "R20260330-0002"
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {
+                "run_dir": str(archived),
+                "archived_from": str(bundle / archived.name),
+            },
+        },
+    )
+    _write_manifest(
+        purged,
+        {
+            "run": {"id": "R20260330-0002", "status": "purged"},
+            "path": {
+                "run_dir": str(purged),
+                "archived_from": str(bundle / "nested" / purged.name),
+            },
+        },
+    )
+
+    planned = plan_bundle_archive(bundle, adopt_archived=True)
+    result = archive_bundle(bundle, adopt_archived=True)
+
+    assert planned.status is ActionStatus.SUCCESS
+    assert planned.data["adopted_run_count"] == 2
+    assert planned.data["adopted_runs"] == [
+        {"run_id": "R20260330-0001", "status": "archived"},
+        {"run_id": "R20260330-0002", "status": "purged"},
+    ]
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["run_count"] == 3
+    assert result.data["adopted_run_count"] == 2
+    assert not bundle.exists()
+    assert (archive_root / "survey.toml").is_file()
+    assert read_manifest(archived).run["status"] == "archived"
+    assert read_manifest(purged).run["status"] == "purged"
+    assert read_manifest(archive_root / cancelled.name).run["status"] == "cancelled"
+    with open(archive_root / ".runops-archive.toml", "rb") as stream:
+        metadata = tomllib.load(stream)
+    assert metadata["bundle"]["adopted_run_ids"] == [
+        "R20260330-0001",
+        "R20260330-0002",
+    ]
+
+    restored = restore_bundle(archive_root)
+
+    assert restored.status is ActionStatus.SUCCESS
+    assert read_manifest(bundle / archived.name).run["status"] == "archived"
+    assert read_manifest(bundle / "nested" / purged.name).run["status"] == "purged"
+    assert read_manifest(bundle / cancelled.name).run["status"] == "cancelled"
+
+
+def test_archive_bundle_adoption_rejects_foreign_archived_run(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    current = bundle / "R20260330-0002"
+    _write_manifest(
+        current,
+        {"run": {"id": "R20260330-0002", "status": "cancelled"}},
+    )
+    archive_root = tmp_path / "runs" / "_archive" / "scan"
+    foreign = archive_root / "R20260330-0001"
+    _write_manifest(
+        foreign,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {"archived_from": str(tmp_path / "runs" / "other" / foreign.name)},
+        },
+    )
+
+    result = archive_bundle(bundle, adopt_archived=True)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "does not belong to bundle" in result.message
+    assert bundle.is_dir()
+    assert foreign.is_dir()
+    assert not (bundle / ".runops-archive.toml").exists()
+
+
+def test_archive_bundle_adoption_rejects_unowned_archive_file(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    current = bundle / "R20260330-0002"
+    _write_manifest(
+        current,
+        {"run": {"id": "R20260330-0002", "status": "cancelled"}},
+    )
+    archive_root = tmp_path / "runs" / "_archive" / "scan"
+    archived = archive_root / "R20260330-0001"
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {"archived_from": str(bundle / archived.name)},
+        },
+    )
+    (archive_root / "notes.md").write_text("unexpected\n")
+
+    result = archive_bundle(bundle, adopt_archived=True)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "unowned path" in result.message
+    assert bundle.is_dir()
+    assert archived.is_dir()
+    assert (archive_root / "notes.md").is_file()
+
+
+def test_archive_bundle_adoption_rolls_back_topology_on_manifest_failure(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    bundle = tmp_path / "runs" / "scan"
+    current = bundle / "R20260330-0002"
+    _write_manifest(
+        current,
+        {"run": {"id": "R20260330-0002", "status": "cancelled"}},
+    )
+    archive_root = tmp_path / "runs" / "_archive" / "scan"
+    archived = archive_root / "R20260330-0001"
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": "R20260330-0001", "status": "archived"},
+            "path": {"archived_from": str(bundle / archived.name)},
+        },
+    )
+
+    with patch(
+        "runops.application.actions.bundle_archive.write_manifest",
+        side_effect=ManifestError("injected failure"),
+    ):
+        result = archive_bundle(bundle, adopt_archived=True)
+
+    assert result.status is ActionStatus.ERROR
+    assert "injected failure" in result.message
+    assert current.is_dir()
+    assert archived.is_dir()
+    assert read_manifest(current).run["status"] == "cancelled"
+    assert read_manifest(archived).run["status"] == "archived"
+    assert not (bundle / ".runops-archive.toml").exists()
 
 
 def test_archive_run_rejects_existing_destination_before_state_change(

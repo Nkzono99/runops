@@ -167,6 +167,31 @@ runo runs restore R2026...           # archive 前の場所へ全 artifact を�
 
 出力を今後も使う場合は `runo runs purge-work` を実行しないでください。
 
+survey 一式を `survey.toml` や cancelled / failed run も含めて退避する場合は、
+親ディレクトリを bundle として移動します。配下の run state は変わりません。
+
+```bash
+runo runs archive runs/scan --bundle
+runo runs list --include-archived
+runo runs restore runs/_archive/scan --bundle
+```
+
+submitted / running を含む bundle は移動されません。`runs/_archive/` は Git 管理可能で、
+`survey.toml`、manifest、入力パラメータ、解析スクリプトは記録できます。
+`work/`、`status/`、cache / scratch は active run と同様に `.gitignore` 対象です。
+
+配下の run を先に個別 archive しており、`runs/_archive/scan` が既にある場合、通常の
+bundle archive は競合として拒否します。元の親と相対パスが一致する archived / purged
+run だけを bundle に取り込むには、明示的に次を使います。
+
+```bash
+runo runs archive runs/scan --bundle --adopt-archived
+```
+
+確認前に採用対象の run ID と状態が表示されます。archive destination に対象 run 以外の
+ファイルがある場合や、元 path が別の親を指す場合は何も移動しません。bundle restore
+では採用した run も元の相対パスへ戻りますが、個々の `archived` / `purged` 状態は保持します。
+
 ## SKILL を明示するとき
 
 通常は「何をしてほしいか」を書けば十分です。意図がずれるときだけ、ひと言添えてください。

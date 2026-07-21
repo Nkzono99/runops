@@ -7,11 +7,17 @@ from typing import Annotated, Optional
 
 import typer
 
-from runops.application.actions import ActionStatus, default_archive_destination
+from runops.application.actions import (
+    ActionStatus,
+    default_archive_destination,
+)
+from runops.application.actions import archive_bundle as archive_bundle_action
 from runops.application.actions import archive_run as archive_run_action
 from runops.application.actions import cancel_run as cancel_run_action
 from runops.application.actions import delete_run as delete_run_action
+from runops.application.actions import plan_bundle_archive as plan_bundle_archive_action
 from runops.application.actions import purge_work as purge_work_action
+from runops.application.actions import restore_bundle as restore_bundle_action
 from runops.application.actions import restore_run as restore_run_action
 from runops.cli.run_lookup import resolve_run_or_cwd, resolve_run_targets
 from runops.core.exceptions import SimctlError
@@ -76,8 +82,43 @@ def archive(
             help="Archive root to use instead of the default runs/_archive.",
         ),
     ] = None,
+    bundle: Annotated[
+        bool,
+        typer.Option(
+            "--bundle",
+            help=(
+                "Move one parent directory and all contained runs as a bundle "
+                "without changing individual run states."
+            ),
+        ),
+    ] = False,
+    adopt_archived: Annotated[
+        bool,
+        typer.Option(
+            "--adopt-archived",
+            help=(
+                "With --bundle, adopt matching archived/purged runs already "
+                "at the bundle destination."
+            ),
+        ),
+    ] = False,
 ) -> None:
     """Archive completed runs and move them under ``runs/_archive`` by default."""
+    if bundle:
+        _archive_bundle(
+            runs,
+            yes=yes,
+            all_runs=all_runs,
+            keep_in_place=keep_in_place,
+            move_to=move_to,
+            adopt_archived=adopt_archived,
+        )
+        return
+
+    if adopt_archived:
+        typer.echo("Error: --adopt-archived requires --bundle.", err=True)
+        raise typer.Exit(code=1)
+
     if keep_in_place and move_to is not None:
         typer.echo("Error: --move-to cannot be used with --keep-in-place.", err=True)
         raise typer.Exit(code=1)
@@ -198,10 +239,113 @@ def _confirm_archive(
     return typer.confirm(prompt, default=False)
 
 
+def _archive_bundle(
+    args: list[str] | None,
+    *,
+    yes: bool,
+    all_runs: bool,
+    keep_in_place: bool,
+    move_to: Path | None,
+    adopt_archived: bool,
+) -> None:
+    if keep_in_place:
+        typer.echo("Error: --bundle cannot be used with --keep-in-place.", err=True)
+        raise typer.Exit(code=1)
+    if all_runs:
+        typer.echo("Error: --bundle cannot be used with --all.", err=True)
+        raise typer.Exit(code=1)
+    source = _resolve_bundle_path(args)
+    archive_root = move_to.expanduser().resolve() if move_to is not None else None
+    plan = plan_bundle_archive_action(
+        source,
+        archive_root=archive_root,
+        adopt_archived=adopt_archived,
+    )
+    if plan.status is not ActionStatus.SUCCESS:
+        typer.echo(f"Error: {plan.message}", err=True)
+        raise typer.Exit(code=1) from None
+    destination = Path(str(plan.data["archive_path"]))
+    adopted_runs = plan.data.get("adopted_runs", [])
+    if isinstance(adopted_runs, list) and adopted_runs:
+        typer.echo("Previously archived runs to adopt:")
+        for adopted in adopted_runs:
+            if isinstance(adopted, dict):
+                typer.echo(
+                    f"  {adopted.get('run_id', '?')} ({adopted.get('status', '?')})"
+                )
+
+    if not yes and not typer.confirm(
+        f"Archive bundle {source.name} and move it to {destination}?",
+        default=False,
+    ):
+        typer.echo("Cancelled.")
+        raise typer.Exit()
+
+    result = archive_bundle_action(
+        source,
+        archive_root=archive_root,
+        adopt_archived=adopt_archived,
+    )
+    if result.status is not ActionStatus.SUCCESS:
+        typer.echo(f"Error: {result.message}", err=True)
+        raise typer.Exit(code=1)
+
+    run_count = int(result.data.get("run_count", 0))
+    noun = "run" if run_count == 1 else "runs"
+    bundle_name = str(result.data.get("bundle_name", source.name))
+    source_path = str(result.data.get("source_path", source))
+    archive_path = str(result.data.get("archive_path", destination))
+    typer.echo(f"Archived bundle {bundle_name} ({run_count} {noun}).")
+    typer.echo(f"  Moved: {source_path} -> {archive_path}")
+    adopted_count = int(result.data.get("adopted_run_count", 0))
+    if adopted_count:
+        adopted_noun = "run" if adopted_count == 1 else "runs"
+        typer.echo(f"Adopted {adopted_count} previously archived {adopted_noun}.")
+    typer.echo("  Run states were preserved; work/status/cache remain ignored by Git.")
+
+
+def _resolve_bundle_path(args: list[str] | None) -> Path:
+    if args and len(args) > 1:
+        typer.echo("Error: --bundle accepts exactly one directory.", err=True)
+        raise typer.Exit(code=1)
+    raw = args[0] if args else "."
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = Path.cwd() / candidate
+    resolved = candidate.resolve()
+    if not resolved.is_dir():
+        typer.echo(f"Error: bundle directory not found: {resolved}", err=True)
+        raise typer.Exit(code=1)
+    return resolved
+
+
 def restore(
     run: str = typer.Argument(..., help="Archived run directory or run_id."),
+    bundle: Annotated[
+        bool,
+        typer.Option(
+            "--bundle",
+            help="Restore a parent directory archived with runs archive --bundle.",
+        ),
+    ] = False,
 ) -> None:
     """Restore an archived run to its pre-archive location."""
+    if bundle:
+        bundle_dir = _resolve_bundle_path([run])
+        result = restore_bundle_action(bundle_dir)
+        if result.status is not ActionStatus.SUCCESS:
+            typer.echo(f"Error: {result.message}", err=True)
+            raise typer.Exit(code=1)
+
+        run_count = int(result.data.get("run_count", 0))
+        noun = "run" if run_count == 1 else "runs"
+        bundle_name = str(result.data.get("bundle_name", bundle_dir.name))
+        source_path = str(result.data.get("source_path", bundle_dir))
+        restore_path = str(result.data.get("restore_path", bundle_dir))
+        typer.echo(f"Restored bundle {bundle_name} ({run_count} {noun}).")
+        typer.echo(f"  Moved: {source_path} -> {restore_path}")
+        return
+
     run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
     result = restore_run_action(run_dir)
     if result.status is not ActionStatus.SUCCESS:

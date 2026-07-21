@@ -272,7 +272,13 @@ def test_action_spec_dict_includes_interface_metadata() -> None:
 
 def test_human_gate_actions_require_confirmation_metadata() -> None:
     """Always-gated lifecycle actions should advertise confirmation metadata."""
-    gated_actions = {"archive_run", "purge_work", "cancel_run", "delete_run"}
+    gated_actions = {
+        "archive_bundle",
+        "archive_run",
+        "purge_work",
+        "cancel_run",
+        "delete_run",
+    }
 
     for action_name in gated_actions:
         spec = actions.ACTION_SPECS[action_name]

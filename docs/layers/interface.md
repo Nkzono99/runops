@@ -193,12 +193,17 @@ service ではありません。
 | `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | strict source/schema の story acceptance workspace を作成 |
 | `runo analyze audit-story [STORY_DIR]` | source artifact を照合し `audit.json` / `audit.md` を生成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
-| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR]` | completed run を archived にし、既定で `runs/_archive/` へ移動 |
-| `runo runs restore RUN` | archived run を元のパスへ artifact ごと戻して completed にする |
+| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR] [--bundle] [--adopt-archived]` | 通常は completed run を archived にする。`--bundle` は親と全内容を移動し、各 run state を保持。`--adopt-archived` は一致する個別 archive 済み run を検証して採用 |
+| `runo runs restore RUN [--bundle]` | 通常は archived run を completed に戻す。`--bundle` は親と全内容を元のパスへ戻す |
 | `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | archived run の work 削除。既知 non-ready output の破棄は理由必須 |
 | `runo runs delete [RUN]` | created / cancelled / failed run を削除 |
 
 completed / archived run には `delete` を使わず、`archive` → `purge-work` の経路を使います。
+bundle archive は run state と直交し、submitted / running を含む親は移動しません。
+既存 archive destination は原則拒否し、`--adopt-archived` 指定時だけ同じ親・相対 path の
+archived / purged run を採用します。所有不明 path や source 側の衝突があれば変更しません。
+`runs/_archive/` 自体は Git 管理対象から外さず、active run と同じ `.gitignore` 規則で
+`work/`、`status/`、cache / scratch のみを除外します。
 
 ### Notes / Knowledge
 

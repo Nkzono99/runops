@@ -106,6 +106,25 @@ def test_list_include_archived_shows_inactive_runs(tmp_path: Path) -> None:
     assert "R20260327-0003" in result.output
 
 
+def test_list_hides_runs_in_archived_bundle_by_default(tmp_path: Path) -> None:
+    bundle = tmp_path / "runs" / "_archive" / "scan"
+    _create_run(bundle, "R20260327-0001", status="cancelled")
+    (bundle / ".runops-archive.toml").write_text(
+        '[bundle]\narchived_from = "/original/scan"\n'
+    )
+
+    hidden = runner.invoke(app, ["runs", "list", str(tmp_path / "runs")])
+    shown = runner.invoke(
+        app,
+        ["runs", "list", str(tmp_path / "runs"), "--include-archived"],
+    )
+
+    assert hidden.exit_code == 0
+    assert "R20260327-0001" not in hidden.output
+    assert shown.exit_code == 0
+    assert "R20260327-0001" in shown.output
+
+
 def test_list_explicit_archived_status_does_not_require_include_flag(
     tmp_path: Path,
 ) -> None:

@@ -413,6 +413,13 @@ class RunState(str, Enum):
 directory と全 artifact を復元する。`purged` は削除済み artifact を復元できないため
 restore 対象外とする。
 
+`runo runs archive/restore --bundle` はこの state machine を変更しない container 操作とする。
+親ディレクトリへ `.runops-archive.toml` を置いて物理的な active/archive view を表し、
+配下 run の `cancelled` 等の実行結果を保持する。submitted / running を含む bundle は
+移動前の precondition check で拒否する。
+`--adopt-archived` は provenance と相対 path が一致する個別 archive 済み run だけを
+明示的に bundle へ統合する。
+
 `update_state()` は以下を実行します:
 1. manifest.toml から現在の状態を読み取り
 2. 遷移の正当性を検証

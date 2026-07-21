@@ -190,6 +190,98 @@ class TestArchive:
         assert created.exists()
         assert "Skipped 1 run(s)" in result.output
 
+    def test_archive_bundle_moves_parent_with_cancelled_runs(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        survey_dir = tmp_path / "runs" / "scan"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text("[survey]\n")
+        _create_run(survey_dir, "R20260327-0001", status="completed")
+        _create_run(survey_dir, "R20260327-0002", status="cancelled")
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(
+            app,
+            ["runs", "archive", "--bundle", "--yes", "runs/scan"],
+        )
+
+        archived = tmp_path / "runs" / "_archive" / "scan"
+        assert result.exit_code == 0, result.output
+        assert "Archived bundle scan (2 runs)." in result.output
+        assert not survey_dir.exists()
+        assert (archived / "survey.toml").is_file()
+        assert _read_manifest(archived / "R20260327-0001")["run"]["status"] == (
+            "completed"
+        )
+        assert _read_manifest(archived / "R20260327-0002")["run"]["status"] == (
+            "cancelled"
+        )
+
+    def test_archive_bundle_rejects_keep_in_place(self, tmp_path: Path) -> None:
+        survey_dir = tmp_path / "runs" / "scan"
+        _create_run(survey_dir, "R20260327-0001", status="completed")
+
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "archive",
+                "--bundle",
+                "--keep-in-place",
+                str(survey_dir),
+            ],
+        )
+
+        assert result.exit_code == 1
+        assert "--bundle cannot be used with --keep-in-place" in result.output
+
+    def test_archive_bundle_adopts_previously_archived_run_with_preview(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        survey_dir = tmp_path / "runs" / "scan"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text("[survey]\n")
+        archived_run = _create_run(
+            survey_dir,
+            "R20260327-0001",
+            status="completed",
+        )
+        _create_run(survey_dir, "R20260327-0002", status="cancelled")
+        monkeypatch.chdir(tmp_path)
+        individual = runner.invoke(
+            app,
+            ["runs", "archive", "--yes", str(archived_run)],
+        )
+        assert individual.exit_code == 0, individual.output
+
+        result = runner.invoke(
+            app,
+            ["runs", "archive", "--bundle", "--adopt-archived", "runs/scan"],
+            input="y\n",
+        )
+
+        archive_root = tmp_path / "runs" / "_archive" / "scan"
+        assert result.exit_code == 0, result.output
+        assert "Previously archived runs to adopt:" in result.output
+        assert "R20260327-0001 (archived)" in result.output
+        assert "Adopted 1 previously archived run." in result.output
+        assert (archive_root / "survey.toml").is_file()
+        assert (archive_root / "R20260327-0001").is_dir()
+        assert (archive_root / "R20260327-0002").is_dir()
+
+    def test_adopt_archived_requires_bundle(self, tmp_path: Path) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
+
+        result = runner.invoke(
+            app,
+            ["runs", "archive", "--adopt-archived", str(run_dir)],
+        )
+
+        assert result.exit_code == 1
+        assert "--adopt-archived requires --bundle" in result.output
+
 
 class TestRestore:
     def test_restore_archived_run_to_original_location(
@@ -224,6 +316,31 @@ class TestRestore:
 
         assert result.exit_code == 1
         assert "archived" in result.output.lower()
+
+    def test_restore_bundle_moves_parent_back(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        survey_dir = tmp_path / "runs" / "scan"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text("[survey]\n")
+        _create_run(survey_dir, "R20260327-0001", status="cancelled")
+        monkeypatch.chdir(tmp_path)
+        archived = runner.invoke(
+            app,
+            ["runs", "archive", "--bundle", "--yes", "runs/scan"],
+        )
+        assert archived.exit_code == 0, archived.output
+
+        result = runner.invoke(
+            app,
+            ["runs", "restore", "--bundle", "runs/_archive/scan"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Restored bundle scan (1 run)." in result.output
+        assert survey_dir.is_dir()
+        assert not (tmp_path / "runs" / "_archive" / "scan").exists()
 
 
 class TestPurgeWork:

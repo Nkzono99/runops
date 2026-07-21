@@ -36,6 +36,18 @@ from runops.application.actions.analysis import (
 from runops.application.actions.analysis import (
     summarize_run as summarize_run,
 )
+from runops.application.actions.bundle_archive import (
+    archive_bundle as archive_bundle,
+)
+from runops.application.actions.bundle_archive import (
+    default_bundle_archive_destination as default_bundle_archive_destination,
+)
+from runops.application.actions.bundle_archive import (
+    plan_bundle_archive as plan_bundle_archive,
+)
+from runops.application.actions.bundle_archive import (
+    restore_bundle as restore_bundle,
+)
 from runops.application.actions.knowledge import (
     add_fact as add_fact,
 )
@@ -93,20 +105,24 @@ __all__ = [
     "ActionSpec",
     "ActionStatus",
     "add_fact",
+    "archive_bundle",
     "archive_run",
     "cancel_run",
     "collect_survey",
     "create_run",
     "create_survey",
     "default_archive_destination",
+    "default_bundle_archive_destination",
     "delete_run",
     "execute_action",
     "export_publication",
     "get_action_spec",
     "list_actions",
+    "plan_bundle_archive",
     "plan_retry",
     "promote_fact",
     "purge_work",
+    "restore_bundle",
     "restore_run",
     "retry_run",
     "save_insight",

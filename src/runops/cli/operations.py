@@ -35,8 +35,16 @@ CLI_OPERATION_BINDINGS: tuple[CliOperationBinding, ...] = (
         ("plan_retry", "retry_run"),
         "write",
     ),
-    CliOperationBinding(("runs", "archive"), ("archive_run",), "destructive"),
-    CliOperationBinding(("runs", "restore"), ("restore_run",), "write"),
+    CliOperationBinding(
+        ("runs", "archive"),
+        ("archive_run", "archive_bundle"),
+        "destructive",
+    ),
+    CliOperationBinding(
+        ("runs", "restore"),
+        ("restore_run", "restore_bundle"),
+        "write",
+    ),
     CliOperationBinding(
         ("runs", "purge-work"),
         ("purge_work",),

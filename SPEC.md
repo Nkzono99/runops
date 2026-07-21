@@ -493,6 +493,12 @@ runs/**/analysis/cache/
 runs/**/analysis/.ipynb_checkpoints/
 ```
 
+`runs/_archive/` 自体は ignore しない。bundle archive 後も
+`survey.toml`、`manifest.toml`、source input、curated analysis、
+`.runops-archive.toml` は Git 管理可能とする。一方、上記の `runs/**` pattern は
+archive 配下にも同様に適用し、`work/`、`status/`、cache / scratch、生成済み input は
+Git 管理対象へ戻さない。
+
 ---
 
 ## 9.5 symlink 方針
@@ -842,6 +848,14 @@ scientific evidence の受理条件にしない。
 active view から退避済み。既定では run directory 全体を `runs/_archive/` へ移し、
 入力・出力・restart・解析 artifact は保持する
 
+親ディレクトリを `--bundle` で退避する操作は run lifecycle と直交する。
+bundle 配下の `completed` / `cancelled` / `failed` / `created` 等の状態は変更せず、
+`.runops-archive.toml` を親ディレクトリの archive marker とする。
+archive destination が既に存在する場合は既定で拒否する。`--adopt-archived` を明示した
+場合に限り、同じ親から同じ相対パスへ個別 archive 済みで、状態が `archived` または
+`purged` の run のみを bundle へ採用できる。destination 内に対象 run 外の path がある、
+元 path と相対位置が一致しない、または source 側と衝突する場合は全体を変更せず拒否する。
+
 ### `purged`
 
 不要 work を削除済み
@@ -1133,8 +1147,8 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 
 ## 18.5 一覧
 
-* `runo runs list [PATHS...]` — 既定では archived / purged を除く active view
-* `runo runs list [PATHS...] --include-archived` — archived / purged を含める
+* `runo runs list [PATHS...]` — 既定では archived / purged と archived bundle 配下を除く active view
+* `runo runs list [PATHS...] --include-archived` — archived / purged と archived bundle 配下を含める
 * `runo runs list --status failed`
 * `runo runs list --status archived` — 明示した archived run だけを表示する
 * `runo runs list --tag production`
@@ -1163,7 +1177,10 @@ single-target モードでは "nothing to sync" notice を出してエラー扱�
 * `runo runs archive <run_dir or run_id>` — completed → archived。既定では `runs/_archive/<元の runs/ 相対パス>` へ移動する
 * `runo runs archive <run_dir or run_id> --keep-in-place` — completed → archived の状態変更のみ行う
 * `runo runs archive <run_dir or run_id> --move-to <archive_root>` — custom archive root へ移動する
+* `runo runs archive <parent_dir> --bundle` — `survey.toml` と配下 run を親ごと `runs/_archive/<元の runs/ 相対パス>` へ移動する。run state は保持し、submitted / running を含む場合は全体を変更せず拒否する
+* `runo runs archive <parent_dir> --bundle --adopt-archived` — 同じ親から個別 archive 済みの archived / purged run を検証して bundle へ採用する。確認前に対象 run ID と状態を表示し、競合や所有不明 path があれば変更せず拒否する
 * `runo runs restore <run_dir or run_id>` — archived → completed。`archived_from` へフォルダごと戻し、全 artifact を保持する。in-place archive は状態だけ戻す
+* `runo runs restore <archived_parent_dir> --bundle` — `.runops-archive.toml` の `archived_from` へ親ごと戻し、各 run state を保持する
 * `runo runs purge-work [<run_dir or run_id>]` — archived → purged。cached readiness が
   incomplete / unknown の場合は `--discard-incomplete --reason <WHY>` を同じ command に指定して
   review provenance を残す

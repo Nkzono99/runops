@@ -721,6 +721,27 @@ status_dir = "status"
 | `archived_at` | datetime string | ISO 8601 timestamp for the latest archive relocation. |
 | `restored_from` | string | Archived directory used for the latest restore. |
 | `restored_at` | datetime string | ISO 8601 timestamp for the latest restore. |
+| `bundle_archived_from` | string | Run path before its parent directory was bundle-archived. Does not change `run.status`. |
+| `bundle_archived_at` | datetime string | ISO 8601 timestamp for the latest parent bundle archive. |
+| `bundle_restored_from` | string | Run path inside the archived parent used for the latest bundle restore. |
+| `bundle_restored_at` | datetime string | ISO 8601 timestamp for the latest parent bundle restore. |
+
+### `.runops-archive.toml`
+
+`runo runs archive PARENT --bundle` が archived parent の直下へ生成する restore marker。
+Git 管理可能な小さな provenance file であり、配下 run の lifecycle state は表さない。
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `bundle.format_version` | integer | Bundle archive metadata format. Currently `1`. |
+| `bundle.archived_from` | absolute path string | Parent directory restored by `runo runs restore --bundle`. |
+| `bundle.archived_at` | datetime string | ISO 8601 archive timestamp. |
+| `bundle.run_count` | integer | Number of run manifests moved with the parent. |
+| `bundle.adopted_run_ids` | array of strings | Individually archived/purged run IDs adopted with `--adopt-archived`; empty for a normal bundle archive. |
+
+`runs/_archive/` 自体は `.gitignore` 対象にしない。ただし `runs/**/work/`、
+`runs/**/status/`、analysis cache / scratch、生成済み input の除外規則は archive 配下にも
+適用される。
 
 ### State Machine
 
