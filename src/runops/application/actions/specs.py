@@ -92,6 +92,23 @@ ACTION_SPECS: dict[str, ActionSpec] = {
         cost_class="medium",
         cli_commands=(("runs", "sweep"),),
     ),
+    "relabel_run": ActionSpec(
+        name="relabel_run",
+        description="Add a semantic directory label without changing the run ID.",
+        required_params=("run_dir",),
+        preconditions=(
+            "run state not in {submitted, running}",
+            "run display_name is non-empty",
+            "destination path does not exist",
+        ),
+        risk_level="medium",
+        cost_class="low",
+        requires_confirmation=True,
+        confirmation_reason=(
+            "Relabeling moves the run directory and updates path metadata."
+        ),
+        cli_commands=(("runs", "relabel"),),
+    ),
     "submit_run": ActionSpec(
         name="submit_run",
         description="Submit a run to Slurm via sbatch.",

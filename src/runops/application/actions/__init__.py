@@ -59,6 +59,10 @@ from runops.application.actions.knowledge import (
 )
 from runops.application.actions.registry import _DISPATCH as _DISPATCH
 from runops.application.actions.registry import execute_action as execute_action
+from runops.application.actions.relabel import (
+    plan_run_relabel as plan_run_relabel,
+)
+from runops.application.actions.relabel import relabel_run as relabel_run
 from runops.application.actions.result import (
     ActionResult as ActionResult,
 )
@@ -120,8 +124,10 @@ __all__ = [
     "list_actions",
     "plan_bundle_archive",
     "plan_retry",
+    "plan_run_relabel",
     "promote_fact",
     "purge_work",
+    "relabel_run",
     "restore_bundle",
     "restore_run",
     "retry_run",

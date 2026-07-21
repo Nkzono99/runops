@@ -42,6 +42,7 @@
 | `runo runs extend` | スナップショットから継続 run 生成 |
 | `runo runs retry [RUN] [--plan]` | failed/cancelled run の retry 準備 (`--plan` は状態を戻さず記録のみ) |
 | `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
+| `runo runs relabel [RUNS...] [--dry-run] [--yes]` | inactiveな旧run directoryへmanifestのdisplay name由来labelを付与 |
 
 ## モニタリング
 
