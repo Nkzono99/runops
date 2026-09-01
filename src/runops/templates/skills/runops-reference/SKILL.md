@@ -25,10 +25,12 @@ runo <group> <command> --help
 
 | Goal | command / skill |
 |---|---|
-| project の現在地 | `runo context --json`, 必要な scope の `runo lint` |
+| project の現在地 | `runo context --json`, `runo triage`, 必要な scope の `runo lint` |
+| Experiment admission / decision | `runo experiments create|list|inspect|review|close` |
 | case 作成 | `{{ skill_prefix }}new-case` → `runo case new` |
-| survey 設計 | `{{ skill_prefix }}survey-design` |
-| run 生成 | `{{ skill_prefix }}create-run` → `runo runs create|sweep` |
+| survey 設計 / read-only plan | `{{ skill_prefix }}survey-design` → `runo runs sweep` |
+| selected Run 生成 | `{{ skill_prefix }}create-run` → `runo runs create` または `sweep --apply --point|--all --expect-plan` |
+| smoke / debug | `runo test smoke|debug|list|record|clean` |
 | pilot / full submit | `{{ skill_prefix }}run-all` → `runo runs submit` |
 | state / progress evidence | `{{ skill_prefix }}check-status` → `runo runs sync|status|log` |
 | failure diagnosis / retry | `{{ skill_prefix }}debug-failed` → `runo runs retry` |
@@ -38,17 +40,23 @@ runo <group> <command> --help
 | harness / migration | `{{ skill_prefix }}update-runops`, `{{ skill_prefix }}migrate-runops` |
 
 full / large survey 全体の submit は直接実行せず `{{ skill_prefix }}run-all` に経路を渡し、pilot evidence、
-`research/CURRENT.md` の判断、cost ceiling、承認を entry criteria とする。
+owning Experiment の `decision=expand`、sealed Result evidence、cost ceiling、承認を entry criteria とする。
 
 ## State transition map
 
 ```text
-case/survey -> runs create|sweep -> created
+question -> experiments create -> active Experiment
+survey -> runs sweep -> read-only candidate plan
+selected point + plan hash -> runs sweep --apply -> created
+case + Experiment -> runs create -> created
+case smoke/debug -> test smoke|debug -> T receipt (Runではない)
 created -> runs submit -> submitted
 submitted/running -> runs sync -> current state + recommended action
 completed -> analyze summarize|collect -> analysis evidence
 completed -> runs archive -> archived -> runs purge-work
                                 -> runs restore -> completed
+terminal -> runs review -> reviewed (Result selectionとは別)
+claim + evidence -> research seal -> sealed Result
 ```
 
 各 command の output に recommended command がある場合は、それを次の候補として Goal / Done と

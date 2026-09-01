@@ -1,16 +1,14 @@
-"""CLI command for regenerating a run's input/ from its case template."""
+"""CLI command for inspecting case-template drift of an immutable Run."""
 
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
 import typer
 
-from runops.application.run_creation import RegenerateResult, regenerate_run
+from runops.application.actions import ActionStatus, execute_action
 from runops.cli.run_lookup import resolve_run_or_cwd
-from runops.core.exceptions import ProjectConfigError, SimctlError
-from runops.core.project import find_project_root, load_project
 
 
 def regenerate(
@@ -22,68 +20,62 @@ def regenerate(
         bool,
         typer.Option(
             "--dry-run",
-            help="Show the file-level diff without mutating input/.",
+            help="Inspect the file-level diff without mutating immutable input/.",
         ),
     ] = False,
 ) -> None:
-    """Regenerate ``input/`` for a run from its recorded case + params.
+    """Inspect recorded case drift; in-place regeneration is disabled.
 
-    Preserves the ``run_id``, ``manifest.toml``, and ``analysis/`` of the
-    existing run. Only allowed for runs in the ``created`` / ``failed`` /
-    ``cancelled`` states — regenerating an in-flight run would desync
-    outputs from inputs.
-
-    If the run has a non-empty ``work/`` directory a warning is printed
-    since the existing outputs may no longer correspond to the new inputs.
+    A formal Run's ``input/`` and scientific identity are frozen. Pass
+    ``--dry-run`` to compare the recorded input with the current case template.
+    To apply a parameter change, derive a new Run with ``runs clone --set``.
     """
     run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
+    result = execute_action(
+        "inspect_regeneration",
+        run_dir=run_dir,
+        dry_run=dry_run,
+    )
+    if result.status is not ActionStatus.SUCCESS:
+        typer.echo(f"Error: {result.message}", err=True)
+        raise typer.Exit(code=1)
 
-    try:
-        project_root = find_project_root(run_dir)
-        project = load_project(project_root)
-    except SimctlError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(code=1) from None
-
-    try:
-        result = regenerate_run(project, run_dir, dry_run=dry_run)
-    except ProjectConfigError as e:
-        typer.echo(f"Error: {e}", err=True)
-        raise typer.Exit(code=1) from None
-
-    _print_result(result, dry_run=dry_run)
-
-    if result.work_exists:
+    _print_result(result.data)
+    if bool(result.data.get("work_exists")):
         typer.echo(
-            "\nWarning: work/ is non-empty — existing outputs may no longer "
-            "correspond to the regenerated input/.",
+            "\nWarning: work/ is non-empty — existing outputs may not "
+            "correspond to the current case template.",
             err=True,
         )
 
 
-def _print_result(result: RegenerateResult, *, dry_run: bool) -> None:
-    prefix = "[dry-run] " if dry_run else ""
-    verb = "Would regenerate" if dry_run else "Regenerated"
-    typer.echo(f"{prefix}{verb} input for {result.run_id} from case {result.case_name}")
-
-    if not result.has_changes:
-        typer.echo(f"{prefix}(no changes; input/ already matches the case template)")
+def _print_result(data: dict[str, Any]) -> None:
+    typer.echo(
+        f"[dry-run] Would regenerate input for {data.get('run_id', '?')} "
+        f"from case {data.get('case_name', '?')}"
+    )
+    if not bool(data.get("has_changes")):
+        typer.echo("[dry-run] (no changes; input/ already matches the case template)")
         return
 
-    for path in result.added:
+    for path in data.get("added", []):
         typer.echo(f"  + {path}")
-    for path in result.modified:
+    for path in data.get("modified", []):
         typer.echo(f"  ~ {path}")
-    for path in result.removed:
+    for path in data.get("removed", []):
         typer.echo(f"  - {path}")
 
-    summary = []
-    if result.added:
-        summary.append(f"{len(result.added)} added")
-    if result.modified:
-        summary.append(f"{len(result.modified)} modified")
-    if result.removed:
-        summary.append(f"{len(result.removed)} removed")
-    if result.unchanged:
-        summary.append(f"{len(result.unchanged)} unchanged")
+    summary: list[str] = []
+    for key, label in (
+        ("added", "added"),
+        ("modified", "modified"),
+        ("removed", "removed"),
+        ("unchanged", "unchanged"),
+    ):
+        values = data.get(key, [])
+        if values:
+            summary.append(f"{len(values)} {label}")
     typer.echo(f"  ({', '.join(summary)})")
+
+
+__all__ = ["regenerate"]

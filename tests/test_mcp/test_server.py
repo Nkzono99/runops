@@ -52,10 +52,12 @@ _TOOL_ATTRS = {
     "runops.project.inspect": "project_inspect",
     "runops.project.plugins": "project_plugins",
     "runops.project.doctor": "project_doctor",
+    "runops.experiment.list": "experiment_list",
     "runops.publication.exports.list": "publication_exports_list",
     "runops.publication.export.inspect": "publication_export_inspect",
     "runops.analysis.artifacts": "analysis_artifacts",
     "runops.survey.summary": "survey_summary",
+    "runops.survey.plan": "survey_plan",
     "runops.analysis.plot_columns": "analysis_plot_columns",
     "runops.run.list": "run_list",
     "runops.run.inspect": "run_inspect",
@@ -108,6 +110,7 @@ def test_tools_facade_contains_only_explicit_reexports() -> None:
 def test_capability_modules_own_facade_callables() -> None:
     from runops.mcp._tools import (
         analysis,
+        experiments,
         project,
         provider,
         publication,
@@ -126,6 +129,7 @@ def test_capability_modules_own_facade_callables() -> None:
         ),
         publication: ("publication_exports_list", "publication_export_inspect"),
         analysis: ("analysis_artifacts", "survey_summary", "analysis_plot_columns"),
+        experiments: ("experiment_list", "survey_plan"),
         runs: ("run_list", "run_inspect", "run_logs"),
         scheduler: ("slurm_queue", "slurm_job_inspect", "job_plan_submit"),
     }
@@ -177,6 +181,14 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         "stub": "runops.project.plugins",
         "kwargs": {"project_root": "root", "strict": True},
     }
+    assert fake.tools["runops.experiment.list"]["callback"](
+        project_root="root",
+        lifecycle="active",
+        limit=4,
+    ) == {
+        "stub": "runops.experiment.list",
+        "kwargs": {"project_root": "root", "lifecycle": "active", "limit": 4},
+    }
     assert fake.tools["runops.publication.exports.list"]["callback"](
         project_root="root",
         paper_id="draft-a",
@@ -227,6 +239,20 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
             "limit": 2,
         },
     }
+    assert fake.tools["runops.survey.plan"]["callback"](
+        "runs/survey-a",
+        project_root="root",
+        offset=2,
+        limit=3,
+    ) == {
+        "stub": "runops.survey.plan",
+        "kwargs": {
+            "survey": "runs/survey-a",
+            "project_root": "root",
+            "offset": 2,
+            "limit": 3,
+        },
+    }
     assert fake.tools["runops.analysis.plot_columns"]["callback"](
         "runs/survey-a",
         project_root="root",
@@ -239,13 +265,20 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         status_filter="created",
         tag="smoke",
         limit=3,
+        include_archived=True,
     ) == {
         "stub": "runops.run.list",
         "kwargs": {
             "project_root": "root",
             "status_filter": "created",
             "tag": "smoke",
+            "experiment_id": None,
+            "purpose": None,
+            "review_status": None,
+            "storage_tier": None,
+            "storage_form": None,
             "limit": 3,
+            "include_archived": True,
         },
     }
     assert fake.tools["runops.run.inspect"]["callback"](
@@ -302,6 +335,7 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         "runops.health",
         "runops.analysis.artifacts",
         "runops.analysis.plot_columns",
+        "runops.experiment.list",
         "runops.project.list",
         "runops.project.plugins",
         "runops.publication.export.inspect",
@@ -310,6 +344,7 @@ def test_registered_tool_wrappers_delegate_to_domain_tools(
         "runops.run.inspect",
         "runops.run.logs",
         "runops.survey.summary",
+        "runops.survey.plan",
         "runops.slurm.queue",
         "runops.slurm.job.inspect",
         "runops.job.plan_submit",

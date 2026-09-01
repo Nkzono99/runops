@@ -939,6 +939,34 @@ def test_retry_interruption_after_claim_clear_keeps_terminal_manifest_guard(
     assert _checks(recovery_plan)["job_id_empty"].passed is False
 
 
+def test_retry_preflight_failure_preserves_claim_and_terminal_manifest(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260710-0001"
+    _create_ready_run(
+        run_dir,
+        status="cancelled",
+        job={"job_id": "12345"},
+    )
+    claim = run_dir / ".runops-submit.lock"
+    claim.write_text("accepted:12345\n", encoding="utf-8")
+
+    def reject_budget() -> None:
+        raise RuntimeError("budget rejected")
+
+    with pytest.raises(RuntimeError, match="budget rejected"):
+        reset_retry_under_submission_lock(
+            run_dir,
+            lambda: None,
+            preflight=reject_budget,
+        )
+
+    assert claim.read_text(encoding="utf-8") == "accepted:12345\n"
+    unchanged = read_manifest(run_dir)
+    assert unchanged.run["status"] == "cancelled"
+    assert unchanged.job["job_id"] == "12345"
+
+
 @pytest.mark.parametrize("clock_failure", ["naive", "raises"])
 def test_apply_submit_rejects_invalid_clock_before_scheduler_or_mutation(
     tmp_path: Path,

@@ -26,6 +26,7 @@ def _create_run(
     *,
     status: str = "completed",
     params: dict[str, Any] | None = None,
+    walltime: str = "00:10:00",
 ) -> Path:
     """Create a minimal run directory with manifest.toml and input files."""
     run_dir = parent / run_id
@@ -66,6 +67,7 @@ def _create_run(
             "scheduler": "slurm",
             "job_id": "12345",
             "partition": "debug",
+            "walltime": walltime,
             "submitted_at": "2026-03-27T00:00:00+00:00",
             "attempt": 1,
             "attempts": [{"job_id": "12345", "submitted_at": "old"}],
@@ -198,6 +200,19 @@ def test_clone_nonexistent_run() -> None:
     assert "Error" in result.output
 
 
+def test_clone_rejects_non_completed_source(tmp_path: Path) -> None:
+    source = _create_run(tmp_path, "R20260327-0001", status="created")
+
+    result = runner.invoke(
+        app,
+        ["runs", "clone", str(source), "--dest", str(tmp_path)],
+    )
+
+    assert result.exit_code == 1
+    assert "completed-equivalent snapshot" in result.output
+    assert [path for path in tmp_path.iterdir() if path.is_dir()] == [source]
+
+
 def _make_project(tmp_path: Path) -> Path:
     """Create a minimal project structure for clone regeneration."""
     (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
@@ -216,6 +231,112 @@ def _make_project(tmp_path: Path) -> Path:
     (tmp_path / "cases").mkdir()
     (tmp_path / "runs").mkdir()
     return tmp_path
+
+
+def test_managed_clone_rejects_strict_discovery_pruned_destination(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_project(tmp_path)
+    source = _create_run(project_dir / "runs", "R20260327-0001")
+    destination = project_dir / "runs" / ".tmp-hidden"
+
+    result = runner.invoke(
+        app,
+        ["runs", "clone", str(source), "--dest", str(destination)],
+    )
+
+    assert result.exit_code == 1
+    assert "transaction directory" in result.output
+    assert not destination.exists()
+
+
+def test_managed_clone_rejects_destination_inside_formal_run(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_project(tmp_path)
+    source = _create_run(project_dir / "runs", "R20260327-0001")
+
+    result = runner.invoke(
+        app,
+        ["runs", "clone", str(source), "--dest", str(source / "derived")],
+    )
+
+    assert result.exit_code == 1
+    assert "inside existing formal Run" in result.output
+    assert not (source / "derived").exists()
+
+
+def test_ownerless_managed_clone_obeys_project_unreviewed_cap(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_project(tmp_path)
+    (project_dir / "runops.toml").write_text(
+        "[project]\n"
+        'name = "test-project"\n\n'
+        "[experiments.policy]\n"
+        "require_experiment = false\n"
+        "max_unreviewed_completed_runs = 1\n",
+        encoding="utf-8",
+    )
+    source = _create_run(project_dir / "runs", "R20260327-0001")
+
+    result = runner.invoke(
+        app,
+        ["runs", "clone", str(source), "--dest", str(project_dir / "runs")],
+    )
+
+    assert result.exit_code == 1
+    assert "project-wide unreviewed completed Run backlog" in result.output
+    assert sorted((project_dir / "runs").glob("*/manifest.toml")) == [
+        source / "manifest.toml"
+    ]
+
+
+def test_ownerless_managed_clone_rejects_non_positive_walltime(
+    tmp_path: Path,
+) -> None:
+    project_dir = _make_project(tmp_path)
+    source = _create_run(
+        project_dir / "runs",
+        "R20260327-0001",
+        walltime="00:00:00",
+    )
+
+    result = runner.invoke(
+        app,
+        ["runs", "clone", str(source), "--dest", str(project_dir / "runs")],
+    )
+
+    assert result.exit_code == 1
+    assert "invalid job.walltime" in result.output
+    assert sorted((project_dir / "runs").glob("*/manifest.toml")) == [
+        source / "manifest.toml"
+    ]
+
+
+def test_external_source_cannot_bypass_managed_destination_experiment_policy(
+    tmp_path: Path,
+) -> None:
+    source = _create_run(tmp_path / "external", "R20260327-0001")
+    project_dir = tmp_path / "managed"
+    project_dir.mkdir()
+    _make_project(project_dir)
+    (project_dir / "runops.toml").write_text(
+        "[project]\n"
+        'name = "test-project"\n\n'
+        "[experiments.policy]\n"
+        "require_experiment = true\n",
+        encoding="utf-8",
+    )
+
+    result = runner.invoke(
+        app,
+        ["runs", "clone", str(source), "--dest", str(project_dir / "runs")],
+    )
+
+    assert result.exit_code == 1
+    assert "requires --experiment" in result.output
+    assert list((project_dir / "runs").iterdir()) == []
 
 
 def _make_case(project_dir: Path, case_name: str) -> Path:

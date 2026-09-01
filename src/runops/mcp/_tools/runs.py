@@ -9,7 +9,11 @@ from runops.application.execution.readiness import (
     readiness_for_bulk_view,
     resolve_run_readiness,
 )
-from runops.core.discovery import discover_runs
+from runops.application.run_query import (
+    filter_run_query,
+    query_runs,
+    resolve_run_query_view,
+)
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
 from runops.core.state import RunState
@@ -29,7 +33,13 @@ def run_list(
     project_root: str | None = None,
     status_filter: str | None = None,
     tag: str | None = None,
+    experiment_id: str | None = None,
+    purpose: str | None = None,
+    review_status: str | None = None,
+    storage_tier: str | None = None,
+    storage_form: str | None = None,
     limit: int = 200,
+    include_archived: bool = False,
 ) -> dict[str, Any]:
     """List runs under a project."""
     started_at, started_perf = _tool_start()
@@ -38,11 +48,25 @@ def run_list(
         "project_root": project_root,
         "status_filter": status_filter,
         "tag": tag,
+        "experiment_id": experiment_id,
+        "purpose": purpose,
+        "review_status": review_status,
+        "storage_tier": storage_tier,
+        "storage_form": storage_form,
         "limit": limit,
+        "include_archived": include_archived,
     }
     try:
         root = _resolve_project_root(project_root)
-        run_dirs = discover_runs(root / "runs")
+        queried = query_runs(
+            root,
+            view=resolve_run_query_view(
+                include_archived=include_archived,
+                status_filter=status_filter,
+                storage_tier=storage_tier,
+                storage_form=storage_form,
+            ),
+        )
     except SimctlError as exc:
         return blocked_envelope(
             tool=spec.name,
@@ -55,10 +79,44 @@ def run_list(
     rows: list[dict[str, Any]] = []
     counts: Counter[str] = Counter()
     readiness_counts: Counter[str] = Counter()
-    for run_dir in run_dirs:
-        try:
-            manifest = read_manifest(run_dir)
-        except SimctlError:
+    matching_paths = {
+        entry.run_dir
+        for entry in filter_run_query(
+            queried,
+            status_filter=status_filter,
+            tag=tag,
+            experiment_id=experiment_id,
+            purpose=purpose,
+            review_status=review_status,
+            storage_tier=storage_tier,
+            storage_form=storage_form,
+        )
+    }
+    for entry in queried:
+        manifest = entry.manifest
+        run_dir = entry.run_dir
+        if manifest is None:
+            counts["unknown"] += 1
+            if run_dir not in matching_paths:
+                continue
+            try:
+                relative_path = run_dir.relative_to(root).as_posix()
+            except ValueError:
+                relative_path = str(run_dir)
+            rows.append(
+                {
+                    "run_id": "???",
+                    "display_name": "",
+                    "status": "unknown",
+                    "path": str(run_dir),
+                    "relative_path": relative_path,
+                    "origin_case": "",
+                    "origin_survey": "",
+                    "job_id": "",
+                    "tags": [],
+                    "manifest_error": True,
+                }
+            )
             continue
         summary = _run_summary(run_dir, manifest, root)
         counts[str(summary["status"])] += 1
@@ -66,9 +124,7 @@ def run_list(
         if readiness is not None:
             summary["readiness"] = readiness.to_summary_dict()
             readiness_counts[readiness.analysis_status] += 1
-        if status_filter and summary["status"] != status_filter:
-            continue
-        if tag and tag not in summary["tags"]:
+        if run_dir not in matching_paths:
             continue
         rows.append(summary)
 
@@ -91,7 +147,7 @@ def run_list(
         data={
             "runs": clipped,
             "matched_count": len(rows),
-            "total_count": len(run_dirs),
+            "total_count": len(queried),
             "state_counts": dict(counts),
             "readiness_counts": dict(readiness_counts),
         },

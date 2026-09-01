@@ -87,11 +87,11 @@
 
 \medskip
 
-runops v0.3.0 ~/~ Claude Code (Anthropic)
+runops v1.3.0 ~/~ Claude Code (Anthropic)
 
 \vspace{4cm}
 
-{\small\color{gray} 2026-04-10}
+{\small\color{gray} 2026-09-01}
 \end{center}
 
 \newpage
@@ -123,16 +123,20 @@ runops は Python 製の CLI ツールで、以下の機能を提供します。
 
 \begin{itemize}[nosep]
   \item \textbf{Run 中心の管理:} 各シミュレーション実行を一意な run\_id で識別し、入力・出力・設定・来歴を 1 つのディレクトリに集約
-  \item \textbf{パラメータサーベイ:} survey.toml にサーベイ軸を定義し、直積展開で run を自動生成 (手作業でのパラメータ計算が不要)
+  \item \textbf{Bounded Experiment:} 問い・baseline・有限 budget・終了条件を Experiment として admission し、AI が作る候補数と実体化する Run 数を分離
+  \item \textbf{Lazy パラメータサーベイ:} survey.toml の候補は read-only に preview し、plan hash と明示選択を通った点だけを Run に materialize
+  \item \textbf{TestAttempt の分離:} smoke/debug は通常 Run と別の T ID・receipt に置き、同一条件の成功済み cache hit では新しい directory を作らない
+  \item \textbf{直交する整理軸:} Run の lifecycle、理由付き review、storage の hot/cold・full/compacted、Result evidence を混同しない
   \item \textbf{Slurm 統合:} ジョブスクリプトの自動生成、投入 (sbatch)、状態同期 (squeue/sacct)、ログ取得を一元管理
   \item \textbf{Simulator Adapter:} EMSES・BEACH 等のシミュレータごとに入力形式・実行方法・出力検出を抽象化 (新シミュレータの追加が容易)
-  \item \textbf{知見管理:} 実験の知見を curated knowledge (insights + facts) と lab notebook (時系列ノート) の 2 層で記録
+  \item \textbf{知見管理:} 現在判断・時系列 journal・claim ごとの Result evidence を分け、残す解析だけを seal して検証可能にする
   \item \textbf{来歴 (Provenance):} manifest.toml に run の全情報を記録し、「いつ・誰が・どの設定で・どの commit から」実行したか追跡可能
 \end{itemize}
 
-\subsection*{\color{accent} 基本概念: 4 層の階層構造}
+\subsection*{\color{accent} 基本概念: 有限な問いから選択済み Run へ}
 
-runops はシミュレーション研究を 4 つの階層で整理します:
+runops はシミュレーション研究を次の単位で整理します。Case は再利用可能な入力テンプレート、
+Experiment は今判断する一つの問いです。
 
 \begin{center}
 \begin{tabular}{lll}
@@ -140,17 +144,23 @@ runops はシミュレーション研究を 4 つの階層で整理します:
 \textbf{階層} & \textbf{定義ファイル} & \textbf{役割} \\
 \midrule
 Campaign & campaign.toml & 研究テーマ全体 (仮説・変数・観測量) \\
+Experiment & experiments/E...toml & 一つの問い・baseline・budget・終了条件 \\
 Case & case.toml & シミュレーション設定のテンプレート \\
-Survey & survey.toml & パラメータサーベイ定義 (掃引軸) \\
-Run & manifest.toml & 個々のシミュレーション実行 (自動生成) \\
+Survey & survey.toml & Experiment に属する lazy 候補定義 (掃引軸) \\
+Run & manifest.toml & 明示 materialize した個々のシミュレーション実行 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-例えば「イオン温度を 1--19\,eV で 10 点掃引」という実験は、Campaign の中の 1 つの Survey として定義され、AI Agent が自動的に 10 個の Run を生成します。各 Run は固有の run\_id を持ち、入力ファイル・ジョブスクリプト・manifest が自動で配置されます。
+例えば「イオン温度を 1--19\,eV で 10 点掃引」という案は、まず Experiment と Survey の
+read-only plan になります。この時点では Run directory も run\_id も作りません。人が選んだ
+pilot 点だけを plan hash 付きで materialize すると、初めて各 Run に固有の run\_id、入力、
+ジョブスクリプト、manifest が配置されます。
 
 \begin{infobox}
-これらの階層構造を理解しておけば、実際のファイル操作やコマンド実行は AI Agent が行います。ユーザーは「Ti を 1--19\,eV で 10 点掃引したい」と自然言語で伝えるだけで、AI が campaign.toml から survey.toml、run 生成まで一貫して処理します。
+これらの単位を理解しておけば、実際のファイル操作やコマンド実行は AI Agent が行います。
+ユーザーは「Ti を 1--19\,eV で 10 点の候補にし、まず両端と中央だけ pilot にして」と
+伝えます。AI は候補を preview し、budget と選択点を提示します。全候補を暗黙に Run 化しません。
 \end{infobox}
 
 % ====== Section 3 ======
@@ -235,8 +245,9 @@ claude
 \begin{lstlisting}[language={},commentstyle={}]
 > 環境を確認して (runo doctor を実行)
 > EMSES 用の flat_plate ケースを作って
-> Ti=1-19eV で 10 点のサーベイを設計して
-> smoke test として 3 点を gr20001a に投入して
+> 問い・baseline・budget・終了条件を持つ Experiment を作って
+> Ti=1-19eV で 10 点のサーベイ候補を preview して
+> smoke は正式 Run と分け、pilot は選んだ 3 点だけ Run にして
 > 完了した run を解析して
 \end{lstlisting}
 
@@ -285,21 +296,23 @@ runops のハーネスには「スキル」と呼ばれる定型作業の手順�
 \midrule
 「EMSES 用の新しいケースを作って」 & ケース作成 \\
 「Ti を 10 点掃引するサーベイを設計して」 & パラメータサーベイ設計 \\
-「全 run を生成して投入して」 & run 生成 → 投入 (承認あり) \\
+「候補を preview して pilot 3点だけ投入して」 & plan → 選択 Run 生成 → 投入 (承認あり) \\
+「smoke test をして」 & T ID の TestAttempt を準備・記録 (通常 Run と分離) \\
 「今の進捗を確認して」 & 状態確認・Slurm 同期 \\
 「完了した run を解析して」 & 解析・集計 \\
 「失敗した run を調べて」 & 失敗 run の診断 \\
-「結果を知見として記録して」 & 知見の整理・保存 \\
-「今の作業をノートに残して」 & lab notebook に記録 \\
+「この claim を根拠付きで残して」 & Result 作成 → Run/artifact evidence を seal \\
+「今の判断を記録して」 & CURRENT または bounded journal に記録 \\
 \bottomrule
 \end{tabular}
 \end{center}
 
 \begin{infobox}
 \textbf{具体例:}\\
-「Ti=1--19eV で 10 点サーベイを設計して、smoke test 3 点を gr20001a に投入して」\\
+「Ti=1--19eV で 10 点を候補化し、両端と中央を pilot として gr20001a に投入して」\\
 → AI が Goal (投入)、Done (job ID)、Budget (run 数・資源量) を設定し、\\
-サーベイ設計 → run 生成 → 投入提案 (ユーザー承認) → job ID 報告まで実行する。\\
+Experiment 確認 → read-only plan → 3点の明示 materialize → 投入提案
+(ユーザー承認) → job ID 報告まで実行する。\\
 初動も Goal に含める場合は、step の進行と観測期限を Done / Budget に加える。
 \end{infobox}
 
@@ -310,7 +323,8 @@ runops のハーネスには「スキル」と呼ばれる定型作業の手順�
 \begin{itemize}[nosep]
   \item \textbf{runo runs submit} (ジョブ投入): 対象 run・queue・資源量を提示してから実行
   \item \textbf{runo runs delete / purge-work} (実ファイル削除)
-  \item 大規模 survey の\textbf{一括投入} (\texttt{--all})
+  \item Survey の\textbf{全点 materialize} (\texttt{--all}) と Experiment の \texttt{decision=expand}
+  \item 大規模 survey の\textbf{一括投入} (\texttt{runs submit --all})
   \item 設定ファイル (CLAUDE.md, settings.json 等) の変更
 \end{itemize}
 
@@ -321,7 +335,8 @@ runops のハーネスには「スキル」と呼ばれる定型作業の手順�
 
 \subsection*{\color{accent} Phase 1: 計画 (人間 → AI に伝える)}
 
-研究の方向性を AI Agent に自然言語で伝えます。AI が campaign.toml の作成・編集を行います。
+研究の方向性を AI Agent に自然言語で伝えます。長期目的は campaign.toml、今回判断する
+一つの問いは baseline・budget・有効期限・exit criteria を持つ Experiment にします。
 
 \begin{lstlisting}[language={},commentstyle={}]
 > 研究テーマは「太陽風プラズマ中の吸収平板によるイオン枯渇」。
@@ -332,11 +347,12 @@ runops のハーネスには「スキル」と呼ばれる定型作業の手順�
 
 \subsection*{\color{accent} Phase 2: 準備 (AI が自動実行)}
 
-AIは依頼された到達状態までケース作成、サーベイ設計、run生成を進めます。各phaseは独立した
-Doneを持ち、lab notebook記録は依頼またはprovenance要件に含まれる場合だけ行います。
+AIは依頼された到達状態までケース作成とサーベイ設計を進めます。\texttt{runo runs sweep} の
+既定は read-only plan で、directory と Run ID は増えません。Run 生成には \texttt{--apply}、
+\texttt{--point} または \texttt{--all}、preview の \texttt{--expect-plan} が必要です。
 
 \begin{lstlisting}[language={},commentstyle={}]
-> Ti サーベイを設計して、run を生成して
+> Ti サーベイを設計して候補を preview し、pilot 3点だけ Run にして
 \end{lstlisting}
 
 \subsection*{\color{accent} Phase 3: 実行 (AI 提案 → 人間承認)}
@@ -346,7 +362,7 @@ Goal / Done / Budget / Invariantに沿って最短の状態遷移を選び、投
 progress evidence を報告して完了します。
 
 \begin{lstlisting}[language={},commentstyle={}]
-> smoke test 3 点を gr20001a に投入して
+> 選択済み pilot 3 点を gr20001a に投入して
 > [AI が投入内容を提示 -> ユーザーが承認]
 > 進捗を確認して
 \end{lstlisting}
@@ -361,11 +377,13 @@ progress evidence を報告して完了します。
 \subsection*{\color{accent} Phase 5: 知見整理 (AI が自動実行)}
 
 \begin{lstlisting}[language={},commentstyle={}]
-> 結果を知見として記録して
+> terminal Run を理由付きで review し、この claim を Result evidence として seal して
 > 次のサーベイの方針を議論しよう
 \end{lstlisting}
 
-AI が curated knowledge (insights + facts) を保存し、次のサーベイの方針を提案します。ユーザーとの議論を経て Phase 1 に戻ります。
+AI は terminal Run を理由付きで review し、残す claim だけを Result にまとめます。Result の
+Run / artifact evidence は claim-local で、smoke/debug の T ID は scientific evidence に
+できません。README と evidence を seal した後、Experiment の判断を更新して Phase 1 に戻ります。
 
 % ====== Section 6 ======
 \section*{\color{darkblue} 6.\quad 運用フィードバックの仕組み}
@@ -379,12 +397,13 @@ runops のハーネスには、AI Agent が日常運用中に runops 自体の�
 \begin{enumerate}[nosep]
   \item \textbf{AI が改善提案をユーザーに説明} (勝手に issue を切らない)
   \item ユーザーが OK したら \textbf{AI が gh issue create で issue を作成}
-  \item 投げた issue の URL を \textbf{lab notebook に自動記録}
+  \item 投げた issue の URL を必要に応じて \textbf{bounded journal に記録}
   \item 当面の研究作業は \textbf{workaround で継続} (フィードバックで作業を止めない)
 \end{enumerate}
 
 \begin{infobox}
-\textbf{実例:} 実際の ion\_depression プロジェクトでは、運用中に 5 件の改善提案が GitHub issue として提出され、うち数件は v0.3.0 で対応済みです。例: encoding 修正、\texttt{--qos} オプション追加、\texttt{runs sync} の集約表示など。
+\textbf{実例:} 実運用では encoding 修正、\texttt{--qos} オプション追加、
+\texttt{runs sync} の集約表示などが改善提案として upstream へ還元されています。
 \end{infobox}
 
 \subsection*{\color{accent} /update-runops スキル (ユーザーが手動で呼ぶ)}
@@ -443,9 +462,18 @@ runops のハーネスには「意味のある作業単位ごとに Git コミ�
 
 AI Agent に残すべき作業経緯は \texttt{research/journal/active.md} へ追記します。日付ごとのファイルは増やさず、設定文字数に達したときだけ原文のまま \texttt{journal/archive/JNNNN.md} へ rotation します。現在有効な判断は \texttt{research/CURRENT.md}、残す解析は \texttt{research/results/} に分けます。
 
+case / survey の \texttt{notes.md} と Run の \texttt{analysis/notes.md} は新規作成しません。
+途中の prose は gitignored な \texttt{.runops/work/} に置き、\texttt{runo lint} の warning を
+使って旧来の分散 note を見つけます。
+
 \subsection*{\color{accent} Smoke test を活用する}
 
-大規模サーベイの前に、両端と中央の 2--3 点だけ先行投入 (smoke test) して入力の妥当性を確認するのが効果的です。「まず 3 点だけ smoke test して」と AI に指示すれば、適切な点を選んで投入します。
+smoke/debug は \texttt{runo test smoke|debug} で T ID の TestAttempt として準備し、通常の
+Run 一覧・Experiment budget・Result evidence から分離します。同一の完全な identity で直近の
+成功 receipt があれば cache reuse し、新しい T ID や directory を作りません。
+
+大規模サーベイの前に科学的な傾向を見る 2--3 点は smoke と呼ばず、正式な pilot Run として
+選択 materialize します。smoke は実行系の健全性確認、pilot は研究上の evidence です。
 
 \subsection*{\color{accent} プロジェクトを GitHub private repo で管理する}
 

@@ -2,6 +2,13 @@
 
 from __future__ import annotations
 
+from .identity import (
+    RunIdentityAllocationError,
+    create_reserved_run_directory,
+    project_run_identity_lock,
+    release_unused_run_id,
+    reserve_run_id,
+)
 from .manifest import (
     build_job_config as _build_job_config,
 )
@@ -37,17 +44,26 @@ from .resolve import (
     load_project_from_path,
     validate_case_references,
 )
+from .staging import commit_staged_directory
 from .workflow import (
     CreatedRunResult,
     SurveyExpansionPlan,
+    allows_equivalent_execution,
+    build_standalone_manifest_metadata,
     create_case_run,
     create_prepared_run,
     create_survey_runs,
+    finalize_manifest_metadata,
+    find_equivalent_completed_run,
+    materialized_point_identity_is_valid,
+    materialized_scientific_identity_is_valid,
+    require_formal_run_target,
 )
 
 __all__ = [
     "CreatedRunResult",
     "RegenerateResult",
+    "RunIdentityAllocationError",
     "SurveyExpansionPlan",
     "_build_job_config",
     "_build_manifest",
@@ -58,13 +74,25 @@ __all__ = [
     "_merge_job",
     "_merge_site_modules",
     "_rewrite_staging_paths",
+    "allows_equivalent_execution",
+    "build_standalone_manifest_metadata",
+    "commit_staged_directory",
     "create_case_run",
     "create_prepared_run",
+    "create_reserved_run_directory",
     "create_survey_runs",
+    "finalize_manifest_metadata",
+    "find_equivalent_completed_run",
     "load_adapter_for_simulator",
     "load_launcher_for_name",
     "load_project_from_path",
+    "materialized_point_identity_is_valid",
+    "materialized_scientific_identity_is_valid",
     "plan_survey_runs",
+    "project_run_identity_lock",
     "regenerate_run",
+    "release_unused_run_id",
+    "require_formal_run_target",
+    "reserve_run_id",
     "validate_case_references",
 ]

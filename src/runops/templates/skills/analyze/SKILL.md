@@ -20,7 +20,8 @@ description: Use when the requested outcome explicitly requires metrics, figures
 | survey table | `runo analyze collect <survey>` |
 | 定型plot | `runo analyze plot <survey> --list-recipes` → 選択recipe |
 | 指定x/y plot | `runo analyze plot <survey> --list-columns` → `--x/--y` |
-| cross-run comparison | `runo analyze new-comparison <name> --source <survey>` |
+| cross-run trial comparison | `runo analyze new-comparison <name> --source <survey>` |
+| durable claim | `runo research new-result` → artifact作成 → `runo research seal` |
 | publication bundle | `runo analyze export <target> --paper <paper-id>` |
 
 一つの依頼で必要なrouteだけを選ぶ。summaryが選択routeのentry criteriaなら対象runに限定して
@@ -30,10 +31,14 @@ description: Use when the requested outcome explicitly requires metrics, figures
 ## Artifact placement
 
 - run-local curated artifact: `runs/**/analysis/`
-- run-local trial: `runs/**/analysis/scratch/`
+- trial / provisional output: `.runops/work/<goal-id>/`
 - survey aggregation: `<survey>/summary/`
 - cross-run result: `research/results/RNNNN-*/README.md`と`artifacts/`
 - publication export: `exports/papers/`
 
 解析artifactと結果報告がDone。再利用knowledgeへの昇格は、claimとevidenceを指定した
 `{{ skill_prefix }}learn`の別Goalとして扱う。
+
+残すclaimがGoalならResult READMEを唯一のnarrativeとし、RunまたはRun/Result artifactを
+evidenceに指定してsealする。Run evidenceはcompleted相当、理由付きreview、identity / source /
+baseline / input snapshotのquality gateを通す。T IDと`.runops/test-runs/**`はscientific evidenceにしない。

@@ -7,7 +7,7 @@ import fcntl
 import os
 import stat
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager, suppress
+from contextlib import AbstractContextManager, contextmanager, nullcontext, suppress
 from pathlib import Path
 from typing import TypeVar
 
@@ -170,9 +170,15 @@ def submission_guard(run_dir: Path) -> Iterator[SubmissionGuard]:
 def reset_retry_under_submission_lock(
     run_dir: Path,
     resetter: Callable[[], _ResetResult],
+    *,
+    mutation_guard: AbstractContextManager[None] | None = None,
+    preflight: Callable[[], None] | None = None,
 ) -> _ResetResult:
-    """Validate terminal state, durably clear its claim, then reset under lock."""
-    with _submission_lock(run_dir) as lock_descriptor:
+    """Validate, preflight, and reset under the Run then mutation lock order."""
+    with (
+        _submission_lock(run_dir) as lock_descriptor,
+        mutation_guard or nullcontext(),
+    ):
         manifest = read_manifest(run_dir)
         current_state = str(manifest.run.get("status", ""))
         if current_state not in {
@@ -183,6 +189,8 @@ def reset_retry_under_submission_lock(
                 current_state,
                 RunState.CREATED.value,
             )
+        if preflight is not None:
+            preflight()
         _write_submission_claim(
             lock_descriptor,
             "",

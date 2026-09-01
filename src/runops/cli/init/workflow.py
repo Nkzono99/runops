@@ -221,7 +221,12 @@ def init(
         "result_readme_chars = 30000\n"
         "active_results = 8\n"
         "result_artifact_files = 50\n"
-        "result_artifact_bytes = 209715200\n"
+        "result_artifact_bytes = 209715200\n\n"
+        "[experiments.policy]\n"
+        "require_experiment = true\n"
+        "max_active_experiments = 5\n"
+        "default_max_materialized_runs = 3\n"
+        "max_unreviewed_completed_runs = 12\n"
     )
     if _write_if_missing(project_dir / _SIMPROJECT_FILE, simproject_content):
         created.append(_SIMPROJECT_FILE)
@@ -323,6 +328,12 @@ def init(
         created.append("runs/")
     else:
         skipped.append("runs/")
+
+    # Bounded decision units are small TOML files, separate from Run trees.
+    if _mkdir_if_missing(project_dir / "experiments"):
+        created.append("experiments/")
+    else:
+        skipped.append("experiments/")
 
     # .runops/ skeleton (provisional goal work + generated knowledge)
     _create_runops_skeleton(project_dir, created)

@@ -26,6 +26,38 @@
         }
       }
     },
+    "experiments": {
+      "type": "object",
+      "description": "Bounded Experiment admission and WIP configuration",
+      "properties": {
+        "policy": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "require_experiment": {
+              "type": "boolean",
+              "default": false
+            },
+            "max_active_experiments": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 5
+            },
+            "default_max_materialized_runs": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 3
+            },
+            "max_unreviewed_completed_runs": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 12
+            }
+          }
+        }
+      },
+      "additionalProperties": true
+    },
     "knowledge": {
       "type": "object",
       "description": "Knowledge integration configuration",

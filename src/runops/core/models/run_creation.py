@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from typing import Any
 
 from runops.core.case import CaseData
 from runops.core.run import RunInfo
-from runops.core.survey import SurveyData as SurveyData
+from runops.core.survey import (
+    SurveyData as SurveyData,
+)
+from runops.core.survey import (
+    SurveyPoint,
+    expand_survey,
+    iter_survey_points,
+)
 
 
 @dataclass(frozen=True)
@@ -16,17 +24,33 @@ class CreatedRunResult:
 
     run_info: RunInfo
     warnings: tuple[str, ...] = ()
+    reused: bool = False
 
 
 @dataclass(frozen=True)
 class SurveyExpansionPlan:
-    """Resolved survey expansion shared by dry-run and real sweep creation."""
+    """Lazy, deterministic survey plan shared by preview and materialization."""
 
     survey_data: SurveyData
     base_case: CaseData
     effective_case: CaseData
-    combinations: tuple[dict[str, Any], ...]
     variation_keys: tuple[str, ...]
+    candidate_count: int
+    plan_hash: str
+    estimated_core_hours: float | None
+
+    def iter_points(self) -> Iterator[SurveyPoint]:
+        """Stream candidates with full effective parameters and stable IDs."""
+        return iter_survey_points(
+            self.survey_data.axes,
+            self.survey_data.linked,
+            base_params=self.base_case.params,
+        )
+
+    @property
+    def combinations(self) -> tuple[dict[str, Any], ...]:
+        """Materialize the legacy variation-only view on explicit access."""
+        return tuple(expand_survey(self.survey_data.axes, self.survey_data.linked))
 
 
 @dataclass(frozen=True)

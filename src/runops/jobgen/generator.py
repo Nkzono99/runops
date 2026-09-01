@@ -17,6 +17,8 @@ import stat
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from runops.core.case import parse_walltime_hours
+
 if TYPE_CHECKING:
     from runops.core.site import SiteProfile
 
@@ -185,6 +187,13 @@ def _validate_job_config(job_config: dict[str, Any]) -> None:
     missing = [k for k in _REQUIRED_JOB_KEYS if k not in job_config]
     if missing:
         raise JobScriptError(f"Missing required job config keys: {', '.join(missing)}")
+
+    walltime = job_config.get("walltime")
+    if not isinstance(walltime, str) or parse_walltime_hours(walltime) is None:
+        raise JobScriptError(
+            "Invalid walltime: expected a positive H+:MM:SS or D-H+:MM:SS "
+            "duration with minutes and seconds in 00..59"
+        )
 
     qos = job_config.get("qos")
     if isinstance(qos, str) and any(char in qos for char in ("\n", "\r")):

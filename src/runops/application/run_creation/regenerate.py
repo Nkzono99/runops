@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import shutil
 import tempfile
 from pathlib import Path
 
@@ -26,7 +25,7 @@ def regenerate_run(
     *,
     dry_run: bool = False,
 ) -> RegenerateResult:
-    """Re-render ``input/`` for an existing run from its recorded case."""
+    """Compare recorded inputs without mutating a Run's frozen identity."""
     manifest = read_manifest(run_dir)
     run_id = str(manifest.run.get("id", run_dir.name))
     state = str(manifest.run.get("status", ""))
@@ -34,6 +33,12 @@ def regenerate_run(
         raise ProjectConfigError(
             f"cannot regenerate run in state '{state}': "
             f"expected one of {sorted(_REGENERATE_ALLOWED_STATES)}"
+        )
+    if not dry_run:
+        raise ProjectConfigError(
+            "in-place Run regeneration is disabled because input/scientific identity "
+            "is immutable; use `runo runs clone --set ...` or create a new Run. "
+            "Use `runo runs regenerate --dry-run` only to inspect drift"
         )
 
     case_name = str(manifest.origin.get("case", "")) if manifest.origin else ""
@@ -93,27 +98,14 @@ def regenerate_run(
         modified = tuple(sorted(p for p in common if new_files[p] != old_files[p]))
         unchanged = tuple(sorted(p for p in common if new_files[p] == old_files[p]))
 
-        if dry_run:
-            return RegenerateResult(
-                run_id=run_id,
-                case_name=case_name,
-                added=added,
-                modified=modified,
-                removed=removed,
-                unchanged=unchanged,
-                work_exists=work_exists,
-            )
+        return RegenerateResult(
+            run_id=run_id,
+            case_name=case_name,
+            added=added,
+            modified=modified,
+            removed=removed,
+            unchanged=unchanged,
+            work_exists=work_exists,
+        )
 
-        if input_dir.is_dir():
-            shutil.rmtree(input_dir)
-        shutil.copytree(staged_input, input_dir)
-
-    return RegenerateResult(
-        run_id=run_id,
-        case_name=case_name,
-        added=added,
-        modified=modified,
-        removed=removed,
-        unchanged=unchanged,
-        work_exists=work_exists,
-    )
+    raise AssertionError("temporary input comparison did not return")

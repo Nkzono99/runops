@@ -254,6 +254,12 @@ def reset_state_for_retry(
         {
             "run": merged_run_updates,
             "job": merged_job_updates,
+            "curation": {
+                "review_status": "unreviewed",
+                "reviewed_at": "",
+                "reviewed_by": "",
+                "reason": "",
+            },
         },
     )
     _write_state_json(

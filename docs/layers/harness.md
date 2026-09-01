@@ -59,7 +59,7 @@ Harness Layer に置くもの:
 
 1. **Goal**: 今回到達させる研究・project state
 2. **Done**: 到達を示す evidence / artifact
-3. **Budget**: run 数、cost、待機時間、観測回数
+3. **Budget**: candidate 数、materialized Run 数、active / unreviewed WIP、core-hour、待機時間、観測回数
 4. **Invariant**: 状態整合性、安全性、provenance のため破らない境界
 
 次の状態遷移は4項目と現在のevidenceから導出します。AgentはDoneに必要なsourceとskillだけを読み、
@@ -84,10 +84,12 @@ CLI command の網羅表を root instruction に複製せず、task-specific ski
 置かないもの:
 
 - 研究判断の正本。これは `research/CURRENT.md`。
+- formal question / budget / exit / expansion decision の正本。これは `experiments/E...toml`。
 - run の状態、job 履歴、provenance。これは Execution Kernel の `manifest.toml`。
 - 時系列の研究ログ。これは量で rotation する `research/journal/active.md`。
 - simulator output。これは `runs/**/work/`。
 - 解析成果物。run-local は `runs/**/analysis/`、残す横断結果は `research/results/`。
+- smoke / debug receipt。これは `.runops/test-runs/T.../` で、formal Run や Result evidence ではない。
 - upstream issue の本文そのもの。これは GitHub issue と evidence path。
 
 ## 更新ルール

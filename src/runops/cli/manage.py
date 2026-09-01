@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Annotated, Optional
 
 import typer
 
 from runops.application.actions import (
+    ActionResult,
     ActionStatus,
     default_archive_destination,
 )
@@ -19,9 +21,21 @@ from runops.application.actions import plan_bundle_archive as plan_bundle_archiv
 from runops.application.actions import purge_work as purge_work_action
 from runops.application.actions import restore_bundle as restore_bundle_action
 from runops.application.actions import restore_run as restore_run_action
+from runops.application.actions.admin import (
+    inspect_archive_recoveries,
+    inspect_archive_recovery,
+    inspect_purge_recovery,
+    inspect_restore_recoveries,
+    inspect_restore_recovery,
+)
+from runops.application.actions.bundle_archive import (
+    inspect_bundle_adoption_recovery,
+)
+from runops.application.run_query import query_runs
 from runops.cli.run_lookup import resolve_run_or_cwd, resolve_run_targets
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import read_manifest
+from runops.core.project import find_project_root
 from runops.core.state import RunState
 
 
@@ -79,7 +93,10 @@ def archive(
         Optional[Path],
         typer.Option(
             "--move-to",
-            help="Archive root to use instead of the default runs/_archive.",
+            help=(
+                "Archive root override. Managed projects require a path under "
+                "runs/_archive on the same filesystem."
+            ),
         ),
     ] = None,
     bundle: Annotated[
@@ -123,12 +140,31 @@ def archive(
         typer.echo("Error: --move-to cannot be used with --keep-in-place.", err=True)
         raise typer.Exit(code=1)
 
-    targets = _resolve_archive_targets(runs, all_runs=all_runs)
     archive_root = move_to.expanduser().resolve() if move_to is not None else None
+    recovery_plans, unresolved = _resolve_archive_recovery_plans(
+        runs,
+        all_runs=all_runs,
+        keep_in_place=keep_in_place,
+        archive_root=archive_root,
+    )
+    targets = (
+        []
+        if runs and not unresolved
+        else _resolve_archive_targets(unresolved, all_runs=all_runs)
+    )
 
-    plans: list[tuple[Path, str, Path | None]] = []
+    plans: list[tuple[Path, str, Path | None]] = list(recovery_plans)
+    recovery_endpoints = {
+        endpoint
+        for source, _run_id, destination in recovery_plans
+        for endpoint in (source, destination)
+        if endpoint is not None
+    }
+    recovery_ids = {run_id: source for source, run_id, _destination in recovery_plans}
     skipped: list[tuple[str, str]] = []
     for run_dir in targets:
+        if run_dir in recovery_endpoints:
+            continue
         try:
             manifest = read_manifest(run_dir)
         except SimctlError as e:
@@ -136,8 +172,41 @@ def archive(
             continue
 
         run_id = str(manifest.run.get("id", run_dir.name))
+        if run_id in recovery_ids:
+            typer.echo(
+                "Error: archive recovery is ambiguous because Run ID "
+                f"{run_id} also exists at {run_dir}.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
         current_status = str(manifest.run.get("status", ""))
         if current_status != RunState.COMPLETED.value:
+            recovery_source = run_dir
+            raw_archived_from = manifest.path.get("archived_from")
+            if current_status == RunState.ARCHIVED.value and isinstance(
+                raw_archived_from,
+                str,
+            ):
+                recovery_source = _canonical_missing_path(Path(raw_archived_from))
+            recovery_destination = (
+                None
+                if keep_in_place
+                else default_archive_destination(
+                    recovery_source,
+                    archive_root=archive_root,
+                )
+            )
+            try:
+                recovery_id = inspect_archive_recovery(
+                    recovery_source,
+                    move_to=recovery_destination,
+                )
+            except SimctlError as exc:
+                typer.echo(f"Error: cannot inspect archive recovery: {exc}", err=True)
+                raise typer.Exit(code=1) from None
+            if recovery_id is not None:
+                plans.append((recovery_source, recovery_id, recovery_destination))
+                continue
             skipped.append((run_id, f"state is '{current_status}'"))
             continue
 
@@ -209,11 +278,177 @@ def _resolve_archive_targets(
     *,
     all_runs: bool,
 ) -> list[Path]:
-    """Resolve archive arguments while keeping no-arg archive conservative."""
-    cwd = Path.cwd()
-    if args or all_runs:
-        return resolve_run_targets(args, search_dir=cwd)
-    return [resolve_run_or_cwd(None, search_dir=cwd)]
+    """Resolve only the active formal Run view for individual archival.
+
+    Generic recursive discovery can mistake Result manifests for Runs and can
+    descend into cold bundles whose child lifecycle states must be preserved.
+    Managed-project scopes therefore stay inside the canonical ``runs/`` tree
+    and use the checked active-view walker.
+    """
+    cwd = Path.cwd().resolve()
+    try:
+        if not args:
+            if all_runs:
+                return _discover_active_archive_scope(cwd)
+            run_dir = resolve_run_or_cwd(None, search_dir=cwd)
+            return [_require_active_archive_target(run_dir)]
+
+        selected: dict[Path, None] = {}
+        for raw in args:
+            candidate = Path(raw).expanduser()
+            candidate = (
+                candidate.resolve()
+                if candidate.is_absolute()
+                else (cwd / candidate).resolve()
+            )
+            if candidate.exists():
+                if (candidate / "manifest.toml").exists():
+                    selected.setdefault(_require_active_archive_target(candidate), None)
+                else:
+                    for run_dir in _discover_active_archive_scope(candidate):
+                        selected.setdefault(run_dir, None)
+                continue
+
+            run_dir = resolve_run_or_cwd(raw, search_dir=cwd)
+            selected.setdefault(_require_active_archive_target(run_dir), None)
+        return sorted(selected)
+    except SimctlError as exc:
+        typer.echo(f"Error resolving archive targets: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+
+
+def _discover_active_archive_scope(scope: Path) -> list[Path]:
+    """Discover active Runs without escaping a managed project's Run tree."""
+    resolved = scope.resolve()
+    try:
+        project_root = find_project_root(resolved).resolve()
+    except SimctlError:
+        query_scope = resolved
+    else:
+        runs_root = (project_root / "runs").resolve()
+        if resolved == project_root:
+            query_scope = runs_root
+        elif resolved == runs_root or resolved.is_relative_to(runs_root):
+            query_scope = resolved
+        else:
+            raise SimctlError(
+                "archive directory scope must be the project root or lie under "
+                f"the canonical runs tree: {runs_root}"
+            )
+    return [entry.run_dir for entry in query_runs(query_scope, view="active")]
+
+
+def _require_active_archive_target(run_dir: Path) -> Path:
+    """Require an explicit Run to be visible in the active formal namespace."""
+    resolved = run_dir.resolve()
+    visible = _discover_active_archive_scope(resolved)
+    if visible != [resolved]:
+        raise SimctlError(
+            "archive target is not a unique active formal Run (it may already "
+            f"be cold, archived, or outside the canonical Run tree): {resolved}"
+        )
+    return resolved
+
+
+def _canonical_missing_path(path: Path) -> Path:
+    expanded = Path(os.path.abspath(path.expanduser()))
+    return expanded.parent.resolve() / expanded.name
+
+
+def _resolve_archive_recovery_plans(
+    args: list[str] | None,
+    *,
+    all_runs: bool,
+    keep_in_place: bool,
+    archive_root: Path | None,
+) -> tuple[list[tuple[Path, str, Path | None]], list[str] | None]:
+    """Resolve receipt-backed retries before ordinary Run discovery.
+
+    Run ID lookup and bulk discovery normally see only the endpoint that still
+    exists after a move.  Recovery must instead select the original source
+    recorded in the project lifecycle receipt.
+    """
+    plans_by_source: dict[Path, tuple[Path, str, Path | None]] = {}
+    unresolved: list[str] = []
+
+    def add_plan(source: Path, run_id: str, destination: Path | None) -> None:
+        plan = (source, run_id, destination)
+        existing = plans_by_source.get(source)
+        if existing is not None and existing != plan:
+            typer.echo(
+                f"Error: conflicting archive recovery plans for {source}.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        conflicting_source = next(
+            (
+                planned_source
+                for planned_source, planned_id, _planned_destination in (
+                    plans_by_source.values()
+                )
+                if planned_id == run_id and planned_source != source
+            ),
+            None,
+        )
+        if conflicting_source is not None:
+            typer.echo(
+                "Error: multiple pending archive recoveries match Run ID "
+                f"{run_id}: {conflicting_source}, {source}",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+        plans_by_source[source] = plan
+
+    def add_project_recoveries(*, scope: Path, run_id: str | None) -> int:
+        try:
+            recoveries = inspect_archive_recoveries(
+                scope,
+                run_id=run_id,
+                archive_root=archive_root,
+                keep_in_place=keep_in_place,
+            )
+        except SimctlError as exc:
+            typer.echo(f"Error: cannot inspect archive recovery: {exc}", err=True)
+            raise typer.Exit(code=1) from None
+        for recovery in recoveries:
+            add_plan(
+                recovery.source,
+                recovery.run_id,
+                recovery.destination,
+            )
+        return len(recoveries)
+
+    cwd = Path.cwd().resolve()
+    if not args:
+        if all_runs:
+            add_project_recoveries(scope=cwd, run_id=None)
+        return list(plans_by_source.values()), args
+
+    for raw in args:
+        candidate = _canonical_missing_path(Path(raw))
+        recovered_by_id = add_project_recoveries(scope=cwd, run_id=raw)
+        if recovered_by_id:
+            continue
+        if os.path.lexists(candidate):
+            if candidate.is_dir() and not (candidate / "manifest.toml").exists():
+                add_project_recoveries(scope=candidate, run_id=None)
+            unresolved.append(raw)
+            continue
+        destination = (
+            None
+            if keep_in_place
+            else default_archive_destination(candidate, archive_root=archive_root)
+        )
+        try:
+            run_id = inspect_archive_recovery(candidate, move_to=destination)
+        except SimctlError as exc:
+            typer.echo(f"Error: cannot inspect archive recovery: {exc}", err=True)
+            raise typer.Exit(code=1) from None
+        if run_id is None:
+            unresolved.append(raw)
+            continue
+        add_plan(candidate, run_id, destination)
+    return list(plans_by_source.values()), unresolved
 
 
 def _confirm_archive(
@@ -254,8 +489,43 @@ def _archive_bundle(
     if all_runs:
         typer.echo("Error: --bundle cannot be used with --all.", err=True)
         raise typer.Exit(code=1)
-    source = _resolve_bundle_path(args)
+    source = _resolve_bundle_path(args, allow_missing=adopt_archived)
     archive_root = move_to.expanduser().resolve() if move_to is not None else None
+    if adopt_archived:
+        try:
+            recovery = inspect_bundle_adoption_recovery(
+                source,
+                archive_root=archive_root,
+            )
+        except SimctlError as exc:
+            typer.echo(
+                f"Error: cannot inspect bundle adoption recovery: {exc}",
+                err=True,
+            )
+            raise typer.Exit(code=1) from None
+        if recovery is not None:
+            destination = Path(str(recovery.data["archive_path"]))
+            if not yes and not typer.confirm(
+                f"Resume interrupted bundle adoption {source} -> {destination}?",
+                default=False,
+            ):
+                typer.echo("Cancelled.")
+                raise typer.Exit()
+            result = archive_bundle_action(
+                source,
+                archive_root=archive_root,
+                adopt_archived=True,
+            )
+            if result.status is not ActionStatus.SUCCESS:
+                typer.echo(f"Error: {result.message}", err=True)
+                raise typer.Exit(code=1)
+            _render_bundle_archive_success(
+                result,
+                source=source,
+                destination=destination,
+            )
+            return
+
     plan = plan_bundle_archive_action(
         source,
         archive_root=archive_root,
@@ -290,21 +560,40 @@ def _archive_bundle(
         typer.echo(f"Error: {result.message}", err=True)
         raise typer.Exit(code=1)
 
-    run_count = int(result.data.get("run_count", 0))
+    _render_bundle_archive_success(
+        result,
+        source=source,
+        destination=destination,
+    )
+
+
+def _render_bundle_archive_success(
+    result: ActionResult,
+    *,
+    source: Path,
+    destination: Path,
+) -> None:
+    data = result.data
+
+    run_count = int(data.get("run_count", 0))
     noun = "run" if run_count == 1 else "runs"
-    bundle_name = str(result.data.get("bundle_name", source.name))
-    source_path = str(result.data.get("source_path", source))
-    archive_path = str(result.data.get("archive_path", destination))
+    bundle_name = str(data.get("bundle_name", source.name))
+    source_path = str(data.get("source_path", source))
+    archive_path = str(data.get("archive_path", destination))
     typer.echo(f"Archived bundle {bundle_name} ({run_count} {noun}).")
     typer.echo(f"  Moved: {source_path} -> {archive_path}")
-    adopted_count = int(result.data.get("adopted_run_count", 0))
+    adopted_count = int(data.get("adopted_run_count", 0))
     if adopted_count:
         adopted_noun = "run" if adopted_count == 1 else "runs"
         typer.echo(f"Adopted {adopted_count} previously archived {adopted_noun}.")
     typer.echo("  Run states were preserved; work/status/cache remain ignored by Git.")
 
 
-def _resolve_bundle_path(args: list[str] | None) -> Path:
+def _resolve_bundle_path(
+    args: list[str] | None,
+    *,
+    allow_missing: bool = False,
+) -> Path:
     if args and len(args) > 1:
         typer.echo("Error: --bundle accepts exactly one directory.", err=True)
         raise typer.Exit(code=1)
@@ -312,11 +601,13 @@ def _resolve_bundle_path(args: list[str] | None) -> Path:
     candidate = Path(raw).expanduser()
     if not candidate.is_absolute():
         candidate = Path.cwd() / candidate
-    resolved = candidate.resolve()
-    if not resolved.is_dir():
+    resolved = candidate.parent.resolve() / candidate.name
+    if allow_missing and not os.path.lexists(resolved):
+        return resolved
+    if resolved.is_symlink() or not resolved.is_dir():
         typer.echo(f"Error: bundle directory not found: {resolved}", err=True)
         raise typer.Exit(code=1)
-    return resolved
+    return resolved.resolve()
 
 
 def restore(
@@ -346,7 +637,35 @@ def restore(
         typer.echo(f"  Moved: {source_path} -> {restore_path}")
         return
 
-    run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
+    run_dir: Path
+    try:
+        project_recoveries = inspect_restore_recoveries(
+            Path.cwd().resolve(),
+            run_id=run,
+        )
+    except SimctlError as exc:
+        typer.echo(f"Error: cannot inspect restore recovery: {exc}", err=True)
+        raise typer.Exit(code=1) from None
+    if project_recoveries:
+        run_dir = project_recoveries[0].source
+    else:
+        requested = _canonical_missing_path(Path(run))
+        if os.path.lexists(requested):
+            run_dir = resolve_run_or_cwd(run, search_dir=Path.cwd())
+        else:
+            try:
+                recovery = inspect_restore_recovery(requested)
+            except SimctlError as exc:
+                typer.echo(f"Error: cannot inspect restore recovery: {exc}", err=True)
+                raise typer.Exit(code=1) from None
+            run_dir = (
+                recovery[0]
+                if recovery is not None
+                else resolve_run_or_cwd(
+                    run,
+                    search_dir=Path.cwd(),
+                )
+            )
     result = restore_run_action(run_dir)
     if result.status is not ActionStatus.SUCCESS:
         typer.echo(f"Error: {result.message}", err=True)
@@ -386,7 +705,19 @@ def purge_work(
         raise typer.Exit(code=1) from None
 
     current_status = manifest.run.get("status", "")
-    if current_status != RunState.ARCHIVED.value:
+    if current_status == RunState.PURGED.value:
+        try:
+            recovery_id = inspect_purge_recovery(run_dir)
+        except SimctlError as exc:
+            typer.echo(f"Error: cannot inspect purge recovery: {exc}", err=True)
+            raise typer.Exit(code=1) from None
+        if recovery_id is None:
+            typer.echo(
+                "Error: can only purge 'archived' runs, but run is 'purged'.",
+                err=True,
+            )
+            raise typer.Exit(code=1)
+    elif current_status != RunState.ARCHIVED.value:
         typer.echo(
             f"Error: can only purge 'archived' runs, but run is '{current_status}'.",
             err=True,
@@ -423,7 +754,8 @@ def purge_work(
         raise typer.Exit(code=1)
 
     typer.echo(f"Purged work files for run {run_id}.")
-    typer.echo(f"  Freed: {_format_size(total_freed)}")
+    removed_bytes = result.data.get("bytes_removed", total_freed)
+    typer.echo(f"  Freed: {_format_size(int(removed_bytes))}")
     typer.echo(f"  Path: {run_dir}")
 
 

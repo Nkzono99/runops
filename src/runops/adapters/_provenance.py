@@ -29,6 +29,7 @@ def collect_executable_provenance(
         "exe_hash": "",
         "git_commit": "",
         "git_dirty": False,
+        "git_state_observed": False,
         "source_repo": runtime_info.get("source_repo", ""),
         "build_command": runtime_info.get("build_command", ""),
         "package_version": runtime_info.get("package_version", ""),
@@ -41,9 +42,10 @@ def collect_executable_provenance(
     if runtime_info.get("resolver_mode") == "local_source":
         source_repo = runtime_info.get("source_repo", "")
         if source_repo:
-            commit, dirty = _collect_git_state(Path(source_repo))
+            commit, dirty, observed = _collect_git_state(Path(source_repo))
             provenance["git_commit"] = commit
             provenance["git_dirty"] = dirty
+            provenance["git_state_observed"] = observed
 
     return provenance
 
@@ -57,13 +59,15 @@ def _compute_file_hash(path: Path) -> str:
     return f"sha256:{digest.hexdigest()}"
 
 
-def _collect_git_state(repo_path: Path) -> tuple[str, bool]:
-    """Return the current commit and worktree-dirty flag when available."""
+def _collect_git_state(repo_path: Path) -> tuple[str, bool, bool]:
+    """Return commit, dirty state, and whether both Git queries succeeded."""
     if not repo_path.is_dir():
-        return "", False
+        return "", False, False
 
     commit = ""
     dirty = False
+    commit_observed = False
+    status_observed = False
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -74,6 +78,7 @@ def _collect_git_state(repo_path: Path) -> tuple[str, bool]:
         )
         if result.returncode == 0:
             commit = result.stdout.strip()
+            commit_observed = True
 
         result = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -84,10 +89,11 @@ def _collect_git_state(repo_path: Path) -> tuple[str, bool]:
         )
         if result.returncode == 0:
             dirty = bool(result.stdout.strip())
-    except FileNotFoundError:
-        logger.debug("git not found on PATH; skipping git provenance")
+            status_observed = True
+    except OSError as exc:
+        logger.debug("cannot execute git; skipping git provenance: %s", exc)
 
-    return commit, dirty
+    return commit, dirty, commit_observed and status_observed
 
 
 __all__ = ["collect_executable_provenance"]

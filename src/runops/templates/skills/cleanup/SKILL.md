@@ -27,6 +27,7 @@ runo runs list --include-archived $ARGUMENTS
 | incomplete work purged | archived + discard判断 | `runo runs purge-work --discard-incomplete --reason "<理由>"` |
 | `cancelled` | submitted / running | `runo runs cancel` |
 | directory deleted | created / cancelled / failed | `runo runs delete` |
+| old TestAttempt deleted | terminal `passed|failed|skipped` + age cutoff | `runo test clean --older-than-days N` |
 
 ## Checkpoint
 
@@ -34,5 +35,11 @@ runo runs list --include-archived $ARGUMENTS
 - restoreは元のpathが空いていることを確認し、artifactを保持したまま実行する
 - cancelは対象と理由を報告して実行する
 - completed evidenceを縮小するGoalはarchive → purgeのstate順序を使う
+- sealed ResultがincludeしたRun-owned path evidenceはpurgeせず、Result側へcopyしてresealするか保護を維持する
+- retention `review_after` / `expire_after`だけを削除権限にしない
+- archive / restore / purge後はlifecycleと独立なstorage metadataも確認する:
+  archive=`cold`, restore=`hot`, purge=`cold/compacted`
+- TestAttempt cleanupは古いactive attemptが一件でもあれば全体を拒否する
+- `runo triage`のstaging診断は自動削除権限ではなく、24時間以上残った候補を目視確認する入口とする
 
 承認された一遷移を実行し、更新stateと残存artifactを確認してDoneを返す。

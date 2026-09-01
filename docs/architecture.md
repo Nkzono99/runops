@@ -21,8 +21,8 @@ runops は 1 package のまま、責務を 4 context に分けます。
 
 | Context | 主な責務 | Maturity |
 |---------|----------|----------|
-| **Execution Kernel** | run identity、manifest/state、run 生成、submission、Adapter/Launcher/Slurm port | candidate-stable |
-| **Research Workspace** | notes、analysis、publication、knowledge、paper request | evolving |
+| **Execution Kernel** | Experiment admission、lazy Survey、Run / TestAttempt identity、manifest/state、submission、Adapter/Launcher/Slurm port | candidate-stable |
+| **Research Workspace** | bounded journal / CURRENT、Result evidence / seal、analysis、publication、knowledge | evolving |
 | **Agent Gateway** | action facade、MCP、project harness、plugin metadata | evolving |
 | **Operator/Developer utilities** | init、migration、lint、update、update-harness、diagnostics、demo replay | operator-facing |
 
@@ -50,7 +50,9 @@ core -> application -> interfaces/infrastructure
 3. **Simulator Adapter パターン**: シミュレータ固有処理は Adapter に閉じ込める。core はシミュレータに依存しない
 4. **Launcher Profile パターン**: MPI 起動方式は Launcher に閉じ込める
 5. **MPI に介入しない**: Python ツールは MPI rank ごとのラッパにならない。job.sh で srun/mpirun を直接実行
-6. **manifest.toml が正本**: run の状態・由来・provenance はすべて manifest.toml に記録
+6. **manifest.toml が正本**: Run の状態・由来・provenance・intent・identity・curation・storage を記録
+7. **候補と実体を分離**: Survey plan は lazy / read-only、explicit selection と hash gate だけが directory を作る
+8. **TestAttempt を隔離**: smoke / debug は T ID / receipt を使い、Run discovery と Result evidence に混ぜない
 
 ---
 
@@ -137,13 +139,25 @@ class CaseData:
 
 Case 自体は直接実行しません。create コマンドまたは survey の base_case として参照されます。
 
+### Experiment
+
+一つの question、baseline、finite budget、有効期限、exit criteria を持つ admission unit です。
+`experiments/EYYYYMMDD-NNNN--slug.toml` 一枚で active/closed lifecycle と review decision を
+管理し、proposal / review directory の増殖を避けます。
+Experiment-local budget は owning Experiment がある Run だけに適用します。一方、project の
+未 review completed Run 上限は owner-independent gate であり、Experiment 未所属でも
+create / Survey materialization / clone / extend / retry の直前に strict Run namespace を
+列挙して適用します。namespace を完全に読めない場合は admission を fail-closed にします。
+`budget.expires_at` 到達後も review / close は許可しますが、全 formal Run 生成経路は
+fail-closed にし、期限切れ active Experiment は triage の attention item にします。
+
 ### Survey
 
 パラメータサーベイの親単位です。
 
 - **定義ファイル**: `runs/.../survey.toml`
 - **データクラス**: `SurveyData` (`core/survey/`)
-- **主な責務**: パラメータ軸の定義、直積展開、連動展開、semantic run naming
+- **主な責務**: owning Experiment、phase / intent / budget、lazy parameter candidates、semantic naming
 
 ```python
 @dataclass(frozen=True)
@@ -162,7 +176,9 @@ class SurveyData:
     raw: dict[str, Any]
 ```
 
-`expand_survey()` 関数が `[axes]`（直積）と `[[linked]]`（zip）を組み合わせて展開します:
+`count_survey_points()` は product を構築せず候補数を求め、`iter_survey_points()` が
+`[axes]`（直積）と `[[linked]]`（zip）を lazy に列挙します。各 point は full effective
+params の canonical `point_id` を持ちます。legacy `expand_survey()` は互換 helper です:
 
 `NamingConfig` は明示的な `display_name` template、parameter aliases、
 `uniform_ratio` semantic groups、directory basename template を保持する。
@@ -189,6 +205,11 @@ expand_survey({"seed": [1, 2]}, [{"nx": [32, 64], "ny": [32, 64]}])
 - **データクラス**: `RunInfo` (`core/run/`)
 - **ディレクトリ構造**: `input/`, `submit/`, `work/`, `analysis/`, `status/`
 
+formal Run の親 path は strict discovery から可視でなければなりません。transaction 用に
+prune される `.tmp-*` / `.delete-*` component、および既存 `manifest.toml` を持つ Run の
+子孫を materialization target にすることはできません。`job.walltime` も全生成・派生経路で
+正の `H+:MM:SS` / `D-H+:MM:SS` として同じ parser で検証します。
+
 ```python
 @dataclass(frozen=True)
 class RunInfo:
@@ -199,7 +220,26 @@ class RunInfo:
     params: dict[str, Any]
 ```
 
-run_id は `RYYYYMMDD-NNNN` 形式で、プロジェクト内で一意です。`next_run_id()` が既存の run_id を走査して次の連番を決定します。
+run_id は `RYYYYMMDD-NNNN` 形式で、プロジェクト内で一意です。project-wide lock と
+persistent monotonic sequence が予約し、失敗で gap が生じても ID を再利用しません。
+completed-equivalent の reuse で新規 Run を公開しなかった最新予約だけは lock 下で解放し、
+同じ request の反復が sequence を消費しないようにします。
+reuse は parameter/input hash の一致だけでは行わず、実 executable の canonical SHA-256 を
+必須とします。`local_source` は commit が分かる clean build のみ対象とし、compute node でしか
+解決できない executable や不完全 provenance は新規 Run として materialize します。
+ただし同一 `survey.id + point_id + plan_hash` の再 apply は別 Run の同一性を推論せず、所有済みの
+同じ Run を返す recovery です。この経路は frozen input / parameter / provenance hash を再検証し、
+strong provenance が未取得でも新しい directory を増やさず idempotently 完了します。
+
+### TestAttempt
+
+`.runops/test-runs/TYYYYMMDD-NNNN/` に `test-receipt.toml` と input snapshot を持つ
+smoke / debug unit です。通常 Run ID、discovery、Experiment budget、scientific Result evidence
+から分離します。同じ complete identity の passed cache hit は既存 attempt を返し、
+新しい directory を作りません。record と cache hit は input 実体を再ハッシュします。
+cleanup transaction は receipt v2 に directory identity、tree entry fingerprint、
+tree/receipt/input digest を固定します。deleting phase は変更されていない survivor の部分集合だけを
+受理して部分的な削除失敗を再開し、rollback・resume・削除直前の drift や差し替えを fail closed にします。
 
 ### Manifest
 
@@ -219,11 +259,15 @@ ManifestData は以下のセクションで構成されます:
 | `classification` | model, submodel, tags |
 | `simulator` | name, adapter, resolver_mode |
 | `launcher` | name |
-| `simulator_source` | git_commit, exe_hash, source_repo 等 |
+| `simulator_source` | git_commit, git_dirty, git_state_observed, exe_hash, source_repo 等 |
 | `job` | scheduler, job_id, partition, nodes, ntasks, walltime |
 | `variation` | changed_keys (survey で変化したパラメータ) |
 | `params_snapshot` | 全パラメータのスナップショット |
 | `files` | 標準ディレクトリ名 |
+| `intent` | Experiment / Survey / phase / purpose / baseline |
+| `identity` | point / condition / input / execution / provenance / plan hash |
+| `curation` | Run outcome の review status。evidence selection ではない |
+| `storage` | lifecycle と直交する tier / representation / retention hint |
 
 ---
 
@@ -426,12 +470,32 @@ class RunState(str, Enum):
 directory と全 artifact を復元する。`purged` は削除済み artifact を復元できないため
 restore 対象外とする。
 
+個別 Run の archive / restore は、Run directory の外にある
+`.runops/lifecycle/` へ manifest/state の preimage、source、destination を含む durable
+receipt を move 前に保存する。中断後は同じ command が receipt の digest、Run identity、
+managed namespace と現在の topology を再検証し、未完了部分だけを forward-complete する。
+live manifest/state は receipt の exact preimage または transaction が一意に所有する
+transition/commit postimage と完全一致する必要がある。通常例外の rollback と receipt cleanup
+にも同じ検証を適用し、非所有 field の drift や置換を検出した場合は metadata・配置を
+変更せず receipt を保持する。判定不能な receipt は `runo triage` が診断して自動復旧しない。
+
 `runo runs archive/restore --bundle` はこの state machine を変更しない container 操作とする。
 親ディレクトリへ `.runops-archive.toml` を置いて物理的な active/archive view を表し、
 配下 run の `cancelled` 等の実行結果を保持する。submitted / running を含む bundle は
-移動前の precondition check で拒否する。
+移動前の precondition check で拒否する。通常 bundle archive / restore も最初の marker
+変更や move より前に source parent へ action 別の durable receipt v1 を保存する。receipt は
+source/destination topology、root directory と scaffold identity、各 child Run の directory/tree
+identity、manifest exact pre/postimage、archive marker の exact pre/postimage を固定する。
+process death 後は同じ command が receipt 所有の partial phase だけを forward-complete し、
+drift、directory replacement、未知 artifact を検出した場合は rollback、上書き、move、cleanup を
+行わず receipt と live tree を保持する。commit 後の receipt cleanup 直後に中断した再実行は、
+marker と child path/storage fields を read-only に検証して完了済みとして扱う。
 `--adopt-archived` は provenance と相対 path が一致する個別 archive 済み run だけを
-明示的に bundle へ統合する。
+明示的に bundle へ統合する。adoption receipt v2 は各 child manifest の pre/postimage
+digest、Run directory の device/inode と tree identity、source bundle の scaffold identity を
+move 前に固定する。再開時に non-owned manifest field、同じ ID/status の別 directory、未知の
+artifact を検出した場合は、move、manifest update、transaction cleanup を一切行わず receipt と
+staging を診断用に保持する。
 
 `update_state()` は以下を実行します:
 1. manifest.toml から現在の状態を読み取り
@@ -495,16 +559,13 @@ CLI: runo runs sweep DIR
   |
   +--> load_project() + load_survey() + load_case()
   |
-  +--> expand_survey(axes, linked)
-  |      axes 直積 × linked zip を展開 (N 個の組合せ)
+  +--> count + lazy candidate page + plan hash
+  |      read-only; directory 0 / Run ID 消費 0
   |
-  +--> N 回ループ:
-         +--> merge params (base_case + sweep 差分)
-         +--> generate_display_name()
-         +--> _generate_run()  (create と同一ロジック)
-         |      run_id 採番 + ディレクトリ作成
-         |      入力生成 + job.sh 生成 + manifest 書き出し
-         +--> existing_ids に追加 (重複防止)
+  +--> --apply + (--point | --all) + --expect-plan
+         +--> lock内でplan hash / Experiment / budgetを再検査
+         +--> existing survey.id + point_id + plan_hash はidentity再検証後に同じRunを返す
+         +--> selected new pointだけrun_id予約 + directory commit
 ```
 
 ### submit (job 投入)
@@ -622,7 +683,9 @@ exec srun ./solver input/params.json
 
 ## Run 探索 (`core/discovery.py`)
 
-`discover_runs(runs_dir)` は `runs/` ディレクトリ以下を再帰的に走査し、`manifest.toml` を持つディレクトリを run として認識します。
+`discover_runs(runs_dir)` は `runs/` ディレクトリ以下を再帰的に走査し、`manifest.toml` を持つディレクトリを Run として認識します。active query は archived / purged と archive marker 配下を除き、all query だけが含めます。CLI / MCP / context は同じ query service を使います。
+
+`.runops/test-runs/` は別 tree / receipt なので Run discovery の対象外です。
 
 これにより、`runs/` 以下の任意の深さの多重ネストに対応できます:
 
@@ -748,8 +811,8 @@ research/journal + materials + .runops/work
 research/journal/active.md ← runo research append (append-only)
 research/journal/archive/JNNNN.md
                              ← 文字数で原文 rotation
-research/results/RNNNN-topic/README.md
-                             ← 明示昇格した durable result
+research/results/RNNNN-topic/{README.md,manifest.toml,artifacts/}
+                             ← claim-local evidence + sealを持つdurable Result
     ↓ /learn で素材として読む
 .runops/insights/, facts.toml ← curated 化
 ```
@@ -758,8 +821,10 @@ curated knowledge と research workspace は役割を分ける:
 
 - 整理済の永続知見 (上書き可・名前付き) は `.runops/insights/` / `facts.toml`
 - 時系列の意思決定・観察ログは `research/journal/active.md`
-- `runo research append` は `## HH:MM <title>` 形式で追記し、文字数上限前に rotation する
-- durable result は `research/results/` へ明示昇格し、README 1 枚に narrative を集約する
+- `runo research append` は JST heading と任意の kind / subject で追記し、文字数上限前に rotation する
+- durable Result は `research/results/` へ明示昇格し、README 1 枚に narrative、manifest に
+  Result-local evidence edge / immutable seal を置く
+- T ID と `.runops/test-runs/**` は scientific Result evidence にできない
 - CURRENT / result で判断を整理し、artifact evidence を経て
   insight / fact へ昇格
 

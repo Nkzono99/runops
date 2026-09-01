@@ -4,15 +4,15 @@ from __future__ import annotations
 
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 from unittest.mock import patch
 
 import tomli_w
 from typer.testing import CliRunner
 
+from runops.application.actions import ActionResult, ActionStatus
 from runops.cli.main import app
 from runops.core.exceptions import SimctlError
-from runops.core.run import RunInfo
+from runops.core.project import ExperimentPolicy, ProjectConfig
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -22,11 +22,22 @@ else:
 runner = CliRunner()
 
 
+def _project(project_root: Path) -> ProjectConfig:
+    return ProjectConfig(
+        name="demo",
+        description="",
+        root_dir=project_root.resolve(),
+        simulators={"emses": {}},
+        experiment_policy=ExperimentPolicy(),
+    )
+
+
 def _create_source_run(
     project_root: Path,
     *,
     status: str = "completed",
     include_adapter: bool = True,
+    walltime: str = "02:00:00",
 ) -> Path:
     (project_root / "runops.toml").write_text('[project]\nname = "demo"\n')
     source_dir = project_root / "runs" / "R20260409-0001"
@@ -53,7 +64,7 @@ def _create_source_run(
                     "partition": "debug",
                     "nodes": 2,
                     "ntasks": 8,
-                    "walltime": "02:00:00",
+                    "walltime": walltime,
                 },
                 "params_snapshot": {"nstep": 1000, "dt": 0.1},
             },
@@ -82,7 +93,7 @@ def _create_source_run(
 def test_extend_creates_continuation_run_and_copies_artifacts(tmp_path: Path) -> None:
     source_dir = _create_source_run(tmp_path)
     new_dir = tmp_path / "runs" / "R20260409-0002"
-    project = SimpleNamespace(simulators={"emses": {}})
+    project = _project(tmp_path)
 
     class FakeAdapter:
         def setup_continuation(
@@ -93,27 +104,21 @@ def test_extend_creates_continuation_run_and_copies_artifacts(tmp_path: Path) ->
             nstep_override: int | None,
         ) -> dict[str, str]:
             assert source_dir.name == "R20260409-0001"
-            assert new_dir.name == "R20260409-0002"
+            assert new_dir.name == ".tmp-R20260409-0002"
             assert nstep_override == 2000
             return {"restart": "linked"}
 
     with (
-        patch("runops.cli.extend.load_project", return_value=project),
+        patch("runops.application.run_derivation.load_project", return_value=project),
         patch("runops.adapters.registry.load_from_config"),
         patch("runops.adapters.registry.get", return_value=FakeAdapter),
         patch(
-            "runops.cli.extend.collect_existing_run_ids",
+            "runops.application.run_derivation.collect_existing_run_ids",
             return_value={"R20260409-0001"},
         ),
         patch(
-            "runops.cli.extend.create_run",
-            return_value=RunInfo(
-                run_id="R20260409-0002",
-                run_dir=new_dir,
-                display_name="extend_R20260409-0001",
-                created_at="2026-04-09T00:00:00+00:00",
-                params={"nstep": 1000, "dt": 0.1},
-            ),
+            "runops.application.run_derivation.reserve_run_id",
+            return_value="R20260409-0002",
         ),
     ):
         result = runner.invoke(
@@ -147,12 +152,57 @@ def test_extend_creates_continuation_run_and_copies_artifacts(tmp_path: Path) ->
     assert manifest["run"]["status"] == "created"
 
 
-def test_extend_warns_for_non_completed_source_and_surfaces_auto_submit_failure(
+def test_extend_rejects_non_completed_source_before_creation(
     tmp_path: Path,
 ) -> None:
     source_dir = _create_source_run(tmp_path, status="created")
-    new_dir = tmp_path / "runs" / "R20260409-0002"
-    project = SimpleNamespace(simulators={"emses": {}})
+    with patch("runops.application.run_derivation.load_project") as mock_load_project:
+        result = runner.invoke(app, ["runs", "extend", "--run", str(source_dir)])
+
+    assert result.exit_code == 1
+    assert "completed-equivalent snapshot" in result.output
+    mock_load_project.assert_not_called()
+    assert not (tmp_path / "runs" / "R20260409-0002").exists()
+
+
+def test_extend_rejects_strict_discovery_pruned_destination(tmp_path: Path) -> None:
+    source_dir = _create_source_run(tmp_path)
+    destination = tmp_path / "runs" / ".delete-hidden"
+
+    result = runner.invoke(
+        app,
+        ["runs", "extend", "--dest", str(destination), str(source_dir)],
+    )
+
+    assert result.exit_code == 1
+    assert "transaction directory" in result.output
+    assert not destination.exists()
+
+
+def test_extend_rejects_destination_inside_formal_run(tmp_path: Path) -> None:
+    source_dir = _create_source_run(tmp_path)
+    destination = source_dir / "continuations"
+
+    result = runner.invoke(
+        app,
+        ["runs", "extend", "--dest", str(destination), str(source_dir)],
+    )
+
+    assert result.exit_code == 1
+    assert "inside existing formal Run" in result.output
+    assert not destination.exists()
+
+
+def test_ownerless_extend_obeys_project_unreviewed_cap(tmp_path: Path) -> None:
+    source_dir = _create_source_run(tmp_path)
+    (tmp_path / "runops.toml").write_text(
+        "[project]\n"
+        'name = "demo"\n\n'
+        "[experiments.policy]\n"
+        "require_experiment = false\n"
+        "max_unreviewed_completed_runs = 1\n",
+        encoding="utf-8",
+    )
 
     class FakeAdapter:
         def setup_continuation(
@@ -165,29 +215,82 @@ def test_extend_warns_for_non_completed_source_and_surfaces_auto_submit_failure(
             return {}
 
     with (
-        patch("runops.cli.extend.load_project", return_value=project),
+        patch("runops.adapters.registry.load_from_config"),
+        patch("runops.adapters.registry.get", return_value=FakeAdapter),
+    ):
+        result = runner.invoke(app, ["runs", "extend", str(source_dir)])
+
+    assert result.exit_code == 1
+    assert "project-wide unreviewed completed Run backlog" in result.output
+    assert sorted((tmp_path / "runs").glob("*/manifest.toml")) == [
+        source_dir / "manifest.toml"
+    ]
+
+
+def test_ownerless_extend_rejects_non_positive_walltime(tmp_path: Path) -> None:
+    source_dir = _create_source_run(tmp_path, walltime="00:00:00")
+
+    class FakeAdapter:
+        def setup_continuation(
+            self,
+            *,
+            source_dir: Path,
+            new_dir: Path,
+            nstep_override: int | None,
+        ) -> dict[str, str]:
+            return {}
+
+    with (
+        patch("runops.adapters.registry.load_from_config"),
+        patch("runops.adapters.registry.get", return_value=FakeAdapter),
+    ):
+        result = runner.invoke(app, ["runs", "extend", str(source_dir)])
+
+    assert result.exit_code == 1
+    assert "invalid job.walltime" in result.output
+    assert sorted((tmp_path / "runs").glob("*/manifest.toml")) == [
+        source_dir / "manifest.toml"
+    ]
+
+
+def test_extend_surfaces_auto_submit_failure(tmp_path: Path) -> None:
+    source_dir = _create_source_run(tmp_path)
+    project = _project(tmp_path)
+
+    class FakeAdapter:
+        def setup_continuation(
+            self,
+            *,
+            source_dir: Path,
+            new_dir: Path,
+            nstep_override: int | None,
+        ) -> dict[str, str]:
+            return {}
+
+    with (
+        patch("runops.application.run_derivation.load_project", return_value=project),
         patch("runops.adapters.registry.load_from_config"),
         patch("runops.adapters.registry.get", return_value=FakeAdapter),
         patch(
-            "runops.cli.extend.collect_existing_run_ids",
+            "runops.application.run_derivation.collect_existing_run_ids",
             return_value={"R20260409-0001"},
         ),
         patch(
-            "runops.cli.extend.create_run",
-            return_value=RunInfo(
-                run_id="R20260409-0002",
-                run_dir=new_dir,
-                display_name="extend_R20260409-0001",
-                created_at="2026-04-09T00:00:00+00:00",
-                params={"nstep": 1000, "dt": 0.1},
+            "runops.application.run_derivation.reserve_run_id",
+            return_value="R20260409-0002",
+        ),
+        patch(
+            "runops.application.actions.run_lifecycle.submit_run",
+            return_value=ActionResult(
+                action="submit_run",
+                status=ActionStatus.ERROR,
+                message="submission failed",
             ),
         ),
-        patch("runops.cli.submit._submit_single_run", return_value=None),
     ):
         result = runner.invoke(app, ["runs", "extend", "--run", str(source_dir)])
 
     assert result.exit_code == 1
-    assert "Continuation is typically from completed runs." in result.output
     assert "Warning: auto-submit failed" in result.output
 
 
@@ -195,7 +298,7 @@ def test_extend_surfaces_manifest_read_errors(tmp_path: Path) -> None:
     with (
         patch("runops.cli.extend.resolve_run_or_cwd", return_value=tmp_path),
         patch(
-            "runops.cli.extend.read_manifest",
+            "runops.application.run_derivation.read_manifest",
             side_effect=SimctlError("missing manifest"),
         ),
     ):
@@ -209,7 +312,7 @@ def test_extend_surfaces_project_lookup_errors(tmp_path: Path) -> None:
     source_dir = _create_source_run(tmp_path)
 
     with patch(
-        "runops.cli.extend.load_project",
+        "runops.application.run_derivation.load_project",
         side_effect=SimctlError("project config is broken"),
     ):
         result = runner.invoke(app, ["runs", "extend", str(source_dir)])
@@ -220,10 +323,10 @@ def test_extend_surfaces_project_lookup_errors(tmp_path: Path) -> None:
 
 def test_extend_surfaces_adapter_loading_errors(tmp_path: Path) -> None:
     source_dir = _create_source_run(tmp_path)
-    project = SimpleNamespace(simulators={"emses": {}})
+    project = _project(tmp_path)
 
     with (
-        patch("runops.cli.extend.load_project", return_value=project),
+        patch("runops.application.run_derivation.load_project", return_value=project),
         patch("runops.adapters.registry.load_from_config"),
         patch(
             "runops.adapters.registry.get",
@@ -240,8 +343,7 @@ def test_extend_falls_back_to_simulator_name_when_adapter_is_missing(
     tmp_path: Path,
 ) -> None:
     source_dir = _create_source_run(tmp_path, include_adapter=False)
-    new_dir = tmp_path / "runs" / "R20260409-0002"
-    project = SimpleNamespace(simulators={"emses": {}})
+    project = _project(tmp_path)
 
     class FakeAdapter:
         def setup_continuation(
@@ -254,22 +356,16 @@ def test_extend_falls_back_to_simulator_name_when_adapter_is_missing(
             return {}
 
     with (
-        patch("runops.cli.extend.load_project", return_value=project),
+        patch("runops.application.run_derivation.load_project", return_value=project),
         patch("runops.adapters.registry.load_from_config"),
         patch("runops.adapters.registry.get", return_value=FakeAdapter) as mock_get,
         patch(
-            "runops.cli.extend.collect_existing_run_ids",
+            "runops.application.run_derivation.collect_existing_run_ids",
             return_value={"R20260409-0001"},
         ),
         patch(
-            "runops.cli.extend.create_run",
-            return_value=RunInfo(
-                run_id="R20260409-0002",
-                run_dir=new_dir,
-                display_name="extend_R20260409-0001",
-                created_at="2026-04-09T00:00:00+00:00",
-                params={"nstep": 1000},
-            ),
+            "runops.application.run_derivation.reserve_run_id",
+            return_value="R20260409-0002",
         ),
     ):
         result = runner.invoke(app, ["runs", "extend", str(source_dir)])
@@ -280,34 +376,29 @@ def test_extend_falls_back_to_simulator_name_when_adapter_is_missing(
 
 def test_extend_surfaces_run_creation_errors(tmp_path: Path) -> None:
     source_dir = _create_source_run(tmp_path)
-    project = SimpleNamespace(simulators={"emses": {}})
+    project = _project(tmp_path)
 
     class FakeAdapter:
         pass
 
     with (
-        patch("runops.cli.extend.load_project", return_value=project),
+        patch("runops.application.run_derivation.load_project", return_value=project),
         patch("runops.adapters.registry.load_from_config"),
         patch("runops.adapters.registry.get", return_value=FakeAdapter),
         patch(
-            "runops.cli.extend.collect_existing_run_ids",
-            return_value={"R20260409-0001"},
-        ),
-        patch(
-            "runops.cli.extend.create_run",
+            "runops.application.run_derivation.reserve_run_id",
             side_effect=SimctlError("run id collision"),
         ),
     ):
         result = runner.invoke(app, ["runs", "extend", str(source_dir)])
 
     assert result.exit_code == 1
-    assert "Error creating run: run id collision" in result.output
+    assert "Error: run id collision" in result.output
 
 
 def test_extend_surfaces_adapter_continuation_errors(tmp_path: Path) -> None:
     source_dir = _create_source_run(tmp_path)
-    new_dir = tmp_path / "runs" / "R20260409-0002"
-    project = SimpleNamespace(simulators={"emses": {}})
+    project = _project(tmp_path)
 
     class FakeAdapter:
         def setup_continuation(
@@ -320,25 +411,19 @@ def test_extend_surfaces_adapter_continuation_errors(tmp_path: Path) -> None:
             raise RuntimeError("snapshot missing")
 
     with (
-        patch("runops.cli.extend.load_project", return_value=project),
+        patch("runops.application.run_derivation.load_project", return_value=project),
         patch("runops.adapters.registry.load_from_config"),
         patch("runops.adapters.registry.get", return_value=FakeAdapter),
         patch(
-            "runops.cli.extend.collect_existing_run_ids",
+            "runops.application.run_derivation.collect_existing_run_ids",
             return_value={"R20260409-0001"},
         ),
         patch(
-            "runops.cli.extend.create_run",
-            return_value=RunInfo(
-                run_id="R20260409-0002",
-                run_dir=new_dir,
-                display_name="extend_R20260409-0001",
-                created_at="2026-04-09T00:00:00+00:00",
-                params={"nstep": 1000},
-            ),
+            "runops.application.run_derivation.reserve_run_id",
+            return_value="R20260409-0002",
         ),
     ):
         result = runner.invoke(app, ["runs", "extend", str(source_dir)])
 
     assert result.exit_code == 1
-    assert "Error in adapter continuation setup: snapshot missing" in result.output
+    assert "adapter continuation setup failed: snapshot missing" in result.output

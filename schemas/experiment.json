@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "experiment.toml",
+  "description": "One bounded research question admitted to the Execution Kernel",
+  "type": "object",
+  "required": ["schema_version", "experiment", "baseline", "budget", "exit"],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "experiment": {
+      "type": "object",
+      "required": [
+        "id",
+        "question",
+        "lifecycle",
+        "intent",
+        "decision",
+        "outcome"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^E\\d{8}-\\d{4}$"
+        },
+        "title": {"type": "string"},
+        "question": {"type": "string", "minLength": 1},
+        "lifecycle": {
+          "type": "string",
+          "enum": ["draft", "active", "closed"]
+        },
+        "intent": {
+          "type": "string",
+          "enum": ["explore", "confirm", "validate", "reproduce"]
+        },
+        "decision": {
+          "type": "string",
+          "enum": ["pending", "expand", "revise", "stop", "accept"]
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "unknown",
+            "supported",
+            "refuted",
+            "inconclusive",
+            "invalid"
+          ]
+        },
+        "created_at": {"type": "string", "format": "date-time"},
+        "created_by": {"type": "string"},
+        "closed_at": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": true
+    },
+    "baseline": {
+      "type": "object",
+      "required": ["run_ids", "reason"],
+      "properties": {
+        "run_ids": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^R\\d{8}-\\d{4}$"
+          }
+        },
+        "reason": {"type": "string"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "run_ids": {"minItems": 1},
+            "reason": {"maxLength": 0}
+          }
+        },
+        {
+          "properties": {
+            "run_ids": {"maxItems": 0},
+            "reason": {"minLength": 1}
+          }
+        }
+      ],
+      "additionalProperties": true
+    },
+    "budget": {
+      "type": "object",
+      "required": [
+        "max_planned_points",
+        "max_materialized_runs",
+        "max_active_runs",
+        "max_core_hours",
+        "max_unreviewed_runs",
+        "expires_at"
+      ],
+      "properties": {
+        "max_planned_points": {"type": "integer", "minimum": 1},
+        "max_materialized_runs": {"type": "integer", "minimum": 1},
+        "max_active_runs": {"type": "integer", "minimum": 1},
+        "max_core_hours": {"type": "number", "exclusiveMinimum": 0},
+        "max_unreviewed_runs": {"type": "integer", "minimum": 0},
+        "expires_at": {"type": "string", "format": "date-time"}
+      },
+      "additionalProperties": true
+    },
+    "exit": {
+      "type": "object",
+      "required": ["criteria"],
+      "properties": {
+        "criteria": {
+          "type": "array",
+          "minItems": 1,
+          "items": {"type": "string", "minLength": 1}
+        },
+        "review_due": {"type": "string"}
+      },
+      "additionalProperties": true
+    },
+    "review": {
+      "type": "object",
+      "properties": {
+        "reason": {"type": "string"},
+        "reviewed_at": {"type": "string"},
+        "successor": {"type": "string"}
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

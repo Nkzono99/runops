@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -170,6 +171,530 @@ class TestArchive:
         assert status.exit_code == 0, status.output
         assert "archived" in status.output
 
+    def test_archive_same_cli_command_resumes_after_move_interruption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            "R20260327-0010",
+            status="completed",
+        )
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / run_dir.name
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        command = ["runs", "archive", "--yes", "runs/scan/R20260327-0010"]
+
+        interrupted = runner.invoke(app, command)
+
+        assert interrupted.exit_code != 0
+        assert not run_dir.exists()
+        assert archived_dir.is_dir()
+        assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert "Archived run R20260327-0010" in resumed.output
+        assert _read_manifest(archived_dir)["run"]["status"] == "archived"
+        assert not list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    def test_archive_run_id_resumes_after_move_interruption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0015"
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            run_id,
+            status="completed",
+        )
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / run_id
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        command = ["runs", "archive", "--yes", run_id]
+
+        interrupted = runner.invoke(app, command)
+
+        assert interrupted.exit_code != 0
+        assert not run_dir.exists()
+        assert archived_dir.is_dir()
+        assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert "Archived run R20260327-0015" in resumed.output
+        assert _read_manifest(archived_dir)["run"]["status"] == "archived"
+        assert not list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    @pytest.mark.parametrize("selection", ["directory", "all"])
+    def test_archive_bulk_resumes_moved_run_before_archiving_remaining_runs(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        selection: str,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        survey_dir = tmp_path / "runs" / "scan"
+        first = _create_run(survey_dir, "R20260327-0016", status="completed")
+        second = _create_run(survey_dir, "R20260327-0017", status="completed")
+        first_archived = tmp_path / "runs" / "_archive" / "scan" / first.name
+        second_archived = tmp_path / "runs" / "_archive" / "scan" / second.name
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+        interrupted_once = False
+
+        def interrupt_after_first_move(source: Path, destination: Path) -> Any:
+            nonlocal interrupted_once
+            real_move(source, destination)
+            if not interrupted_once:
+                interrupted_once = True
+                raise KeyboardInterrupt("injected after first archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_first_move,
+        )
+        command = (
+            ["runs", "archive", "--yes", "runs/scan"]
+            if selection == "directory"
+            else ["runs", "archive", "--yes", "--all"]
+        )
+
+        interrupted = runner.invoke(app, command)
+
+        assert interrupted.exit_code != 0
+        assert first_archived.is_dir()
+        assert second.is_dir()
+        assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert not first.exists()
+        assert not second.exists()
+        assert first_archived.is_dir()
+        assert second_archived.is_dir()
+        assert _read_manifest(first_archived)["run"]["status"] == "archived"
+        assert _read_manifest(second_archived)["run"]["status"] == "archived"
+        assert not list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    def test_archive_all_uses_only_canonical_active_run_tree(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        active = _create_run(
+            tmp_path / "runs" / "scan",
+            "R20260327-0025",
+            status="completed",
+        )
+        result_dir = tmp_path / "research" / "results" / "R0001-summary"
+        result_dir.mkdir(parents=True)
+        with (result_dir / "manifest.toml").open("wb") as stream:
+            tomli_w.dump(
+                {
+                    "result": {
+                        "id": "R0001-summary",
+                        "status": "draft",
+                        "title": "Not a formal Run",
+                    }
+                },
+                stream,
+            )
+        cold_bundle = tmp_path / "runs" / "_archive" / "old-scan"
+        cold = _create_run(
+            cold_bundle,
+            "R20260327-0026",
+            status="completed",
+        )
+        with (cold_bundle / ".runops-archive.toml").open("wb") as stream:
+            tomli_w.dump(
+                {
+                    "bundle": {
+                        "format_version": 1,
+                        "archived_from": str(tmp_path / "runs" / "old-scan"),
+                        "run_count": 1,
+                    }
+                },
+                stream,
+            )
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["runs", "archive", "--yes", "--all"])
+
+        assert result.exit_code == 0, result.output
+        archived = tmp_path / "runs" / "_archive" / "scan" / active.name
+        assert archived.is_dir()
+        assert _read_manifest(archived)["run"]["status"] == "archived"
+        assert cold.is_dir()
+        assert _read_manifest(cold)["run"]["status"] == "completed"
+        assert (result_dir / "manifest.toml").is_file()
+
+    def test_archive_rejects_explicit_completed_child_inside_cold_bundle(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        cold_bundle = tmp_path / "runs" / "_archive" / "old-scan"
+        cold = _create_run(
+            cold_bundle,
+            "R20260327-0027",
+            status="completed",
+        )
+        with (cold_bundle / ".runops-archive.toml").open("wb") as stream:
+            tomli_w.dump(
+                {
+                    "bundle": {
+                        "format_version": 1,
+                        "archived_from": str(tmp_path / "runs" / "old-scan"),
+                        "run_count": 1,
+                    }
+                },
+                stream,
+            )
+        monkeypatch.chdir(tmp_path)
+
+        result = runner.invoke(app, ["runs", "archive", "--yes", str(cold)])
+
+        assert result.exit_code == 1
+        assert "not a unique active formal Run" in result.output
+        assert _read_manifest(cold)["run"]["status"] == "completed"
+
+    def test_archive_run_id_recovery_fails_closed_on_tampered_receipt(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        import json
+
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0018"
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            run_id,
+            status="completed",
+        )
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / run_id
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        interrupted = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+        assert interrupted.exit_code != 0
+        receipt = next((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+        payload = json.loads(receipt.read_text())
+        payload["run_id"] = "R20260327-9999"
+        receipt.write_text(json.dumps(payload) + "\n")
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+
+        assert resumed.exit_code == 1
+        assert "cannot inspect archive recovery" in resumed.output
+        assert not run_dir.exists()
+        assert archived_dir.is_dir()
+        assert receipt.is_file()
+
+    def test_archive_run_id_recovery_rejects_ambiguous_receipts(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0019"
+        first = _create_run(
+            tmp_path / "runs" / "scan-a",
+            run_id,
+            status="completed",
+        )
+        second = _create_run(
+            tmp_path / "runs" / "scan-b",
+            run_id,
+            status="completed",
+        )
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        for run_dir in (first, second):
+            interrupted = runner.invoke(
+                app,
+                ["runs", "archive", "--yes", str(run_dir)],
+            )
+            assert interrupted.exit_code != 0
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+
+        assert resumed.exit_code == 1
+        assert "multiple pending archive recoveries" in resumed.output
+        assert (
+            len(list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json")))
+            == 2
+        )
+
+    def test_archive_run_id_recovery_rejects_duplicate_live_run_id(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0024"
+        source = _create_run(
+            tmp_path / "runs" / "scan-a",
+            run_id,
+            status="completed",
+        )
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(move_source: Path, destination: Path) -> Any:
+            real_move(move_source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        interrupted = runner.invoke(
+            app,
+            ["runs", "archive", "--yes", str(source)],
+        )
+        assert interrupted.exit_code != 0
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+        _create_run(
+            tmp_path / "runs" / "scan-b",
+            run_id,
+            status="completed",
+        )
+
+        resumed = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+
+        assert resumed.exit_code == 1
+        assert "Duplicate Run ID" in resumed.output
+        assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    def test_archive_run_id_recovery_rejects_ambiguous_topology(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0021"
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            run_id,
+            status="completed",
+        )
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / run_id
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        interrupted = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+        assert interrupted.exit_code != 0
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+        shutil.copytree(archived_dir, run_dir)
+
+        resumed = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+
+        assert resumed.exit_code == 1
+        assert "requires exactly one Run endpoint" in resumed.output
+        assert run_dir.is_dir()
+        assert archived_dir.is_dir()
+        assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    def test_archive_directory_recovery_keeps_other_scope_pending(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        first = _create_run(
+            tmp_path / "runs" / "scan-a",
+            "R20260327-0022",
+            status="completed",
+        )
+        second = _create_run(
+            tmp_path / "runs" / "scan-b",
+            "R20260327-0023",
+            status="completed",
+        )
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        for run_dir in (first, second):
+            interrupted = runner.invoke(
+                app,
+                ["runs", "archive", "--yes", str(run_dir)],
+            )
+            assert interrupted.exit_code != 0
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(
+            app,
+            ["runs", "archive", "--yes", "runs/scan-a"],
+        )
+
+        assert resumed.exit_code == 0, resumed.output
+        first_archived = tmp_path / "runs" / "_archive" / "scan-a" / first.name
+        second_archived = tmp_path / "runs" / "_archive" / "scan-b" / second.name
+        assert _read_manifest(first_archived)["path"]["archived_from"] == str(first)
+        assert "path" not in _read_manifest(second_archived)
+        receipts = list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+        assert len(receipts) == 1
+
+    def test_archive_recovery_requires_the_same_custom_archive_root(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            "R20260327-0011",
+            status="completed",
+        )
+        archive_root = tmp_path / "runs" / "_archive" / "cold"
+        archived_dir = archive_root / "scan" / run_dir.name
+        monkeypatch.chdir(tmp_path)
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after archive move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        command = [
+            "runs",
+            "archive",
+            "--yes",
+            "--move-to",
+            str(archive_root),
+            "runs/scan/R20260327-0011",
+        ]
+        interrupted = runner.invoke(app, command)
+        assert interrupted.exit_code != 0
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        wrong_root = runner.invoke(
+            app,
+            [
+                "runs",
+                "archive",
+                "--yes",
+                "--move-to",
+                "runs/_archive/wrong",
+                "runs/scan/R20260327-0011",
+            ],
+        )
+
+        assert wrong_root.exit_code == 1
+        assert "destination does not match" in wrong_root.output
+        assert archived_dir.is_dir()
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert _read_manifest(archived_dir)["run"]["status"] == "archived"
+
     def test_archive_directory_archives_completed_runs_and_skips_others(
         self, tmp_path: Path
     ) -> None:
@@ -271,6 +796,94 @@ class TestArchive:
         assert (archive_root / "R20260327-0001").is_dir()
         assert (archive_root / "R20260327-0002").is_dir()
 
+    @pytest.mark.parametrize("interrupt_phase", ["move", "transaction_removed"])
+    def test_archive_bundle_same_cli_command_resumes_adoption_interruption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        interrupt_phase: str,
+    ) -> None:
+        from runops.application.actions import bundle_archive as bundle_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        survey_dir = tmp_path / "runs" / "scan"
+        survey_dir.mkdir(parents=True)
+        (survey_dir / "survey.toml").write_text("[survey]\n")
+        adopted = _create_run(
+            survey_dir,
+            "R20260327-0013",
+            status="completed",
+        )
+        _create_run(survey_dir, "R20260327-0014", status="cancelled")
+        monkeypatch.chdir(tmp_path)
+        individual = runner.invoke(
+            app,
+            ["runs", "archive", "--yes", str(adopted)],
+        )
+        assert individual.exit_code == 0, individual.output
+        destination = tmp_path / "runs" / "_archive" / "scan"
+
+        if interrupt_phase == "move":
+            real_move = bundle_module.move_directory_noreplace
+
+            def interrupt_after_move(source: Path, target: Path) -> Any:
+                real_move(source, target)
+                raise KeyboardInterrupt("injected after adoption move")
+
+            monkeypatch.setattr(
+                bundle_module,
+                "move_directory_noreplace",
+                interrupt_after_move,
+            )
+        else:
+            real_fsync = bundle_module._fsync_directory
+            interrupted = False
+
+            def interrupt_after_transaction_removal(path: Path) -> None:
+                nonlocal interrupted
+                transactions = list(
+                    destination.parent.glob(f".tmp-adopt-{destination.name}-*")
+                )
+                if path == destination.parent and not transactions and not interrupted:
+                    interrupted = True
+                    raise KeyboardInterrupt("injected after transaction removal")
+                real_fsync(path)
+
+            monkeypatch.setattr(
+                bundle_module,
+                "_fsync_directory",
+                interrupt_after_transaction_removal,
+            )
+
+        command = [
+            "runs",
+            "archive",
+            "--bundle",
+            "--adopt-archived",
+            "--yes",
+            "runs/scan",
+        ]
+        first = runner.invoke(app, command)
+
+        assert first.exit_code != 0
+        if interrupt_phase == "transaction_removed":
+            assert not survey_dir.exists()
+            assert destination.is_dir()
+            assert not list(destination.parent.glob(f".tmp-adopt-{destination.name}-*"))
+        else:
+            assert list(destination.parent.glob(f".tmp-adopt-{destination.name}-*"))
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert "Archived bundle scan (2 runs)." in resumed.output
+        assert not survey_dir.exists()
+        assert (destination / "R20260327-0013").is_dir()
+        assert (destination / "R20260327-0014").is_dir()
+        assert not list(destination.parent.glob(f".tmp-adopt-{destination.name}-*"))
+
     def test_adopt_archived_requires_bundle(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
 
@@ -309,6 +922,106 @@ class TestRestore:
         assert output.read_text() == "preserved\n"
         assert _read_manifest(run_dir)["run"]["status"] == "completed"
 
+    def test_restore_same_cli_command_resumes_after_move_interruption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            "R20260327-0012",
+            status="completed",
+        )
+        monkeypatch.chdir(tmp_path)
+        archived = runner.invoke(
+            app,
+            ["runs", "archive", "--yes", "runs/scan/R20260327-0012"],
+        )
+        assert archived.exit_code == 0, archived.output
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / run_dir.name
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after restore move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        command = [
+            "runs",
+            "restore",
+            "runs/_archive/scan/R20260327-0012",
+        ]
+
+        interrupted = runner.invoke(app, command)
+
+        assert interrupted.exit_code != 0
+        assert run_dir.is_dir()
+        assert not archived_dir.exists()
+        assert list((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert "Restored run R20260327-0012" in resumed.output
+        assert _read_manifest(run_dir)["run"]["status"] == "completed"
+        assert not list((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+
+    def test_restore_run_id_resumes_after_move_interruption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        from runops.application.actions import admin as admin_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0020"
+        run_dir = _create_run(
+            tmp_path / "runs" / "scan",
+            run_id,
+            status="completed",
+        )
+        monkeypatch.chdir(tmp_path)
+        archived = runner.invoke(app, ["runs", "archive", "--yes", run_id])
+        assert archived.exit_code == 0, archived.output
+        archived_dir = tmp_path / "runs" / "_archive" / "scan" / run_id
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> Any:
+            real_move(source, destination)
+            raise KeyboardInterrupt("injected after restore move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+        command = ["runs", "restore", run_id]
+
+        interrupted = runner.invoke(app, command)
+
+        assert interrupted.exit_code != 0
+        assert run_dir.is_dir()
+        assert not archived_dir.exists()
+        assert list((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+        monkeypatch.undo()
+        monkeypatch.chdir(tmp_path)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert "Restored run R20260327-0020" in resumed.output
+        assert _read_manifest(run_dir)["run"]["status"] == "completed"
+        assert not list((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+
     def test_restore_rejects_non_archived_run(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001", status="completed")
 
@@ -344,6 +1057,94 @@ class TestRestore:
 
 
 class TestPurgeWork:
+    @pytest.mark.parametrize("selector", ["path", "run_id"])
+    def test_purge_same_cli_command_resumes_after_manifest_commit_interruption(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        selector: str,
+    ) -> None:
+        from runops.core import manifest as manifest_module
+
+        (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+        run_id = "R20260327-0020"
+        run_dir = _create_run(
+            tmp_path / "runs" / "_archive" / "scan",
+            run_id,
+            status="archived",
+        )
+        output = run_dir / "work" / "outputs" / "data.bin"
+        output.parent.mkdir()
+        output.write_bytes(b"committed purge")
+        monkeypatch.chdir(tmp_path)
+        real_write = manifest_module.write_manifest
+        interrupted = False
+
+        def interrupt_after_manifest(path: Path, manifest: Any, **kwargs: Any) -> Any:
+            nonlocal interrupted
+            result = real_write(path, manifest, **kwargs)
+            if not interrupted and manifest.run.get("status") == "purged":
+                interrupted = True
+                raise KeyboardInterrupt("injected after purge manifest")
+            return result
+
+        monkeypatch.setattr(
+            manifest_module,
+            "write_manifest",
+            interrupt_after_manifest,
+        )
+        target = str(run_dir) if selector == "path" else run_id
+        command = [
+            "runs",
+            "purge-work",
+            "--yes",
+            "--discard-incomplete",
+            "--reason",
+            "CLI durable purge recovery fixture.",
+            target,
+        ]
+
+        first = runner.invoke(app, command)
+
+        assert first.exit_code != 0
+        assert interrupted
+        assert _read_manifest(run_dir)["run"]["status"] == "purged"
+        receipt = run_dir / "status" / ".purge-pending.json"
+        assert receipt.is_file()
+        monkeypatch.setattr(manifest_module, "write_manifest", real_write)
+
+        resumed = runner.invoke(app, command)
+
+        assert resumed.exit_code == 0, resumed.output
+        assert "Purged work files" in resumed.output
+        assert not receipt.exists()
+        assert not output.exists()
+
+    def test_purge_rejects_purged_run_without_pending_receipt(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0021", status="purged")
+
+        result = runner.invoke(app, ["runs", "purge-work", "--yes", str(run_dir)])
+
+        assert result.exit_code == 1
+        assert "can only purge 'archived' runs" in result.output
+
+    def test_purge_rejects_tampered_pending_receipt(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        run_dir = _create_run(tmp_path, "R20260327-0022", status="purged")
+        receipt = run_dir / "status" / ".purge-pending.json"
+        receipt.write_text('{"schema_version": 1, "run_id": 7}\n')
+
+        result = runner.invoke(app, ["runs", "purge-work", "--yes", str(run_dir)])
+
+        assert result.exit_code == 1
+        assert "cannot inspect purge recovery" in result.output
+        assert receipt.is_file()
+
     def test_purge_archived_run(self, tmp_path: Path) -> None:
         run_dir = _create_run(tmp_path, "R20260327-0001", status="archived")
 
@@ -353,7 +1154,18 @@ class TestPurgeWork:
             d.mkdir()
             (d / "data.bin").write_bytes(b"x" * 1024)
 
-        result = runner.invoke(app, ["runs", "purge-work", "--yes", str(run_dir)])
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "purge-work",
+                "--yes",
+                "--discard-incomplete",
+                "--reason",
+                "CLI purge fixture has no readiness evidence.",
+                str(run_dir),
+            ],
+        )
         assert result.exit_code == 0
         assert "Purged work files" in result.output
         assert "Freed" in result.output
@@ -375,7 +1187,18 @@ class TestPurgeWork:
 
         run_dir = _create_run(tmp_path, "R20260327-0001", status="archived")
 
-        result = runner.invoke(app, ["runs", "purge-work", "--yes", str(run_dir)])
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "purge-work",
+                "--yes",
+                "--discard-incomplete",
+                "--reason",
+                "CLI purge fixture has no readiness evidence.",
+                str(run_dir),
+            ],
+        )
         assert result.exit_code == 0
 
         with open(run_dir / "manifest.toml", "rb") as f:
@@ -419,7 +1242,18 @@ class TestPurgeWork:
         """Purge succeeds even if work subdirectories don't exist."""
         run_dir = _create_run(tmp_path, "R20260327-0001", status="archived")
 
-        result = runner.invoke(app, ["runs", "purge-work", "--yes", str(run_dir)])
+        result = runner.invoke(
+            app,
+            [
+                "runs",
+                "purge-work",
+                "--yes",
+                "--discard-incomplete",
+                "--reason",
+                "CLI purge fixture has no readiness evidence.",
+                str(run_dir),
+            ],
+        )
         assert result.exit_code == 0
         assert "Freed: 0.0 B" in result.output
 

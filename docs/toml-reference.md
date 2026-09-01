@@ -11,10 +11,11 @@ runops が読み書きする設定、manifest、解析 metadata の field リフ
 |---|---|
 | project | [runops.toml](#runopstoml) |
 | simulator / launcher / site | [simulators.toml](#simulatorstoml)、[launchers.toml](#launcherstoml)、[site.toml](#sitetoml) |
-| case / survey | [case.toml](#casetoml)、[survey.toml](#surveytoml) |
+| experiment / case / survey | [experiment TOML](#experiment-toml)、[case.toml](#casetoml)、[survey.toml](#surveytoml) |
 | run state | [manifest.toml](#manifesttoml)、[Run Directory Structure](#run-directory-structure) |
+| smoke / debug | [test-receipt.toml](#test-receipttoml) |
 | analysis / publication | [analysis outputs](#analysissummaryjson)、[survey summary](#survey-summary-outputs)、[publication export](#publication-export-outputs) |
-| research design / environment | [campaign.toml](#campaigntoml)、[environment.toml](#runopsenvironmenttoml) |
+| research result / design / environment | [Result manifest](#canonical-result-manifest)、[campaign.toml](#campaigntoml)、[environment.toml](#runopsenvironmenttoml) |
 
 利用手順は [AI エージェントではじめる](get-started-with-agent.md)、内部責務は
 [アーキテクチャ](architecture.md) を参照してください。
@@ -37,6 +38,12 @@ visibility = "private-or-gated"
 reason = "Project-specific analysis and handoff workflow guidance."
 capabilities = ["analysis-workflow", "handoff"]
 install_hint = "codex plugin add analysis-context@project"
+
+[experiments.policy]
+require_experiment = true
+max_active_experiments = 5
+default_max_materialized_runs = 3
+max_unreviewed_completed_runs = 12
 ```
 
 | Field | Type | Required | Description |
@@ -86,6 +93,24 @@ active research memory の量と `CURRENT.md` の compact guidance を設定す�
 
 compact guidance は普段の作業を止めない。`runo lint --strict` を選んだ場合だけ
 warning を gate として扱う。
+
+### `[experiments.policy]` section (optional)
+
+formal Run materialization の project-wide admission / WIP policy。
+
+| Field | Type | Legacy default | New scaffold | Description |
+|-------|------|----------------|--------------|-------------|
+| `require_experiment` | boolean | `false` | `true` | standalone Run と Survey materialization に active Experiment を要求 |
+| `max_active_experiments` | integer >= 1 | `5` | `5` | 同時に active にできる Experiment 数 |
+| `default_max_materialized_runs` | integer >= 1 | `3` | `3` | Survey-local cap 未指定時の directory 上限 |
+| `max_unreviewed_completed_runs` | integer >= 0 | `12` | `12` | 全 Experiment と未所属を横断して formal Run を数える、未 review completed Run の project 上限 |
+
+section がない既存 project は互換性のため `require_experiment = false`。`runo init` が作る
+新規 project は section を明示し、`true` にする。policy を有効化する前に active な問いを
+Experiment として作り、今後生成する Survey へ `experiment_id` を追加する。
+`max_unreviewed_completed_runs` は `require_experiment` と独立した project gate であり、
+Experiment 未所属の create / Survey materialization / clone / extend / retry にも適用する。
+このときも `runs/` の strict scan が不完全なら件数を 0 とみなさず admission を拒否する。
 
 ### `[knowledge]` section (optional)
 
@@ -344,6 +369,74 @@ activation_hint = "Start a new Codex thread after installing."
 
 ---
 
+## Experiment TOML
+
+`experiments/EYYYYMMDD-NNNN--slug.toml` は、一つの問いを formal Run の生成対象として
+admit する single-file contract。`runo experiments create` が atomic に作成し、ID と
+filename prefix は不変である。
+
+```toml
+schema_version = 1
+
+[experiment]
+id = "E20260901-0001"
+title = "incidence-angle pilot"
+question = "At which angle does the surface-potential trend change?"
+lifecycle = "active"
+intent = "explore"
+decision = "pending"
+outcome = "unknown"
+created_at = "2026-09-01T00:00:00+00:00"
+created_by = "human"
+
+[baseline]
+run_ids = ["R20260831-0001"]
+reason = ""
+
+[budget]
+max_planned_points = 30
+max_materialized_runs = 6
+max_active_runs = 3
+max_core_hours = 100.0
+max_unreviewed_runs = 6
+expires_at = "2099-10-01T00:00:00+00:00"
+
+[exit]
+criteria = ["pilot の安定性と trend を判定できる"]
+review_due = ""
+
+[review]
+reason = ""
+reviewed_at = ""
+successor = ""
+```
+
+| Field | Type | Rule |
+|-------|------|------|
+| `schema_version` | integer | `1` |
+| `experiment.id` | string | `EYYYYMMDD-NNNN`; file basename はこの ID で始める |
+| `experiment.lifecycle` | enum | `draft`, `active`, `closed`。CLI create は active を作る |
+| `experiment.intent` | enum | `explore`, `confirm`, `validate`, `reproduce` |
+| `experiment.decision` | enum | `pending`, `expand`, `revise`, `stop`, `accept` |
+| `experiment.outcome` | enum | `unknown`, `supported`, `refuted`, `inconclusive`, `invalid` |
+| `baseline.run_ids` | string[] | canonical Run ID の unique list |
+| `baseline.reason` | string | baseline Run を使わない理由 |
+| `budget.max_planned_points` | integer >= 1 | lazy plan の候補数上限 |
+| `budget.max_materialized_runs` | integer >= 1 | この Experiment が所有する Run directory 数上限 |
+| `budget.max_active_runs` | integer >= 1 | `created|submitted|running` の WIP 上限 |
+| `budget.max_core_hours` | number > 0 | 宣言 resource による累積上限 |
+| `budget.max_unreviewed_runs` | integer >= 0 | 当該 Experiment が所有する未 review completed Run の上限。完全な review record がない Run も数える |
+| `budget.expires_at` | timezone-aware ISO-8601 string | 必須の formal Run admission deadline。作成時は未来、到達後は review / close 以外の新規 Run 生成を拒否 |
+| `exit.criteria` | non-empty string[] | 観測可能な stop / decision criterion |
+| `exit.review_due` | string | 任意の ISO-8601 review deadline |
+
+`baseline.run_ids` と `baseline.reason` は exactly one を non-empty にする。
+`max_materialized_runs <= max_planned_points`、`max_active_runs <= max_materialized_runs`
+でなければならない。`review` / `close` は同じ file を更新するが、所属 Run の lifecycle や
+path は変更しない。
+
+---
+
 ## case.toml
 
 Case template definition. Recommended location: `cases/<simulator>/<case_name>/case.toml`.
@@ -425,7 +518,7 @@ Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
 | `qos` | string | No | Slurm QOS name. Emits `#SBATCH --qos=<value>`. Can be overridden with `runo runs submit --qos <name>`. Note: camphor では使用不可 (partition 経由で暗黙決定) |
 | `nodes` | integer | No | Number of nodes |
 | `ntasks` | integer | No | Number of MPI tasks |
-| `walltime` | string | Yes | Wall time limit (HH:MM:SS) |
+| `walltime` | string | Yes | 正の wall time (`H+:MM:SS` または `D-H+:MM:SS`; minute / second は `00..59`) |
 
 #### RSC mode (`resource_style = "rsc"`, camphor 等)
 
@@ -440,7 +533,7 @@ Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
 | `cores` | integer | No | プロセスあたりコア数 (`--rsc c=C`, ≥ threads) |
 | `memory` | string | No | プロセスあたりメモリ (`--rsc m=MEM`, e.g. `"8G"`) |
 | `gpus` | integer | No | GPU 数 (`--rsc g=N`) |
-| `walltime` | string | Yes | Wall time limit (HH:MM:SS) |
+| `walltime` | string | Yes | 正の wall time (`H+:MM:SS` または `D-H+:MM:SS`; minute / second は `00..59`) |
 
 > **RSC モードのフィールド名について (>= 0.1.10)**
 >
@@ -452,6 +545,10 @@ Slurm job parameters. These become `#SBATCH` directives in `job.sh`.
 >
 > - 標準 Slurm site (`resource_style = "standard"`): `nodes`, `ntasks`, `walltime`
 > - RSC site (`resource_style = "rsc"`): `processes`, `threads`, `cores`, `walltime`
+>
+> `120:00:00` と `5-00:00:00` はどちらも有効です。負値、`00:00:00`、minute / second が
+> `60` 以上の値は core-hour を 0 または過小評価し得るため、planning、materialization、
+> clone / extend / retry、job.sh 生成のすべてで拒否されます。
 >
 > 0.1.9 以前は `processes` を書いてもレンダラに伝わらず、`--rsc p=1:t=1:c=1` が出る不具合がありました
 > ([Fix RSC mode field-name plumbing](https://github.com/Nkzono99/runops/commit/0f7aac3))。
@@ -482,7 +579,9 @@ Parameter overrides using dot-notation keys. These modify the simulator's input 
 
 ## survey.toml
 
-Parameter survey definition. Generates runs from the Cartesian product of parameter axes and co-varying (linked) parameter groups.
+Parameter survey definition. Cartesian product / linked groups は候補を表し、file を読んだだけでは
+Run を生成しない。`runo runs sweep` の既定 plan は read-only で、明示選択した点だけを
+materialize する。
 
 ```toml
 [survey]
@@ -491,6 +590,24 @@ name = "Magnetic field angle scan"
 base_case = "flat_surface"
 simulator = "emses"
 launcher = "srun"
+experiment_id = "E20260901-0001"
+phase = "pilot"
+
+[intent]
+purpose = "explore"
+information_gap = "Which angle range contains the transition?"
+baseline_run = "R20260831-0001"
+created_by = "human"
+goal_id = ""
+
+[budget]
+max_materialized_runs = 3
+max_core_hours = 36.0
+
+[retention]
+class = "exploratory"
+review_after = "2026-09-15"
+expire_after = ""
 
 [classification]
 model = "sheath"
@@ -521,11 +638,28 @@ walltime = "120:00:00"
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | string | No | Survey identifier |
+| `id` | string | Formal apply: Yes | Project 内で一意な Survey identifier。省略時の自動値は preview 用だけで、materialization gate は明示値を要求 |
 | `name` | string | No | Human-readable name |
 | `base_case` | string | Yes | Case name to use as template |
 | `simulator` | string | Yes | Simulator name |
 | `launcher` | string | No | Launcher profile name |
+| `experiment_id` | string | Policy dependent | Owning `EYYYYMMDD-NNNN`; 新規 scaffold では必須 |
+| `phase` | enum | Formal apply: Yes | `pilot`, `main`, `followup`。main/followup は Experiment `decision=expand` が必要 |
+
+### `[intent]`, `[budget]`, `[retention]`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `intent.purpose` | enum | `explore`, `confirm`, `validate`, `reproduce`; owning Experiment intent と一致必須 |
+| `intent.information_gap` | string | この Survey が解消する不確実性 |
+| `intent.baseline_run` | string | 任意の `RYYYYMMDD-NNNN` baseline |
+| `intent.created_by` | string | materialized Run に freeze する actor |
+| `intent.goal_id` | string | 任意の Agent goal / workflow identity |
+| `budget.max_materialized_runs` | integer >= 1 | Survey-local directory hard cap。省略時は project default |
+| `budget.max_core_hours` | number > 0 | Survey-local core-hour hard cap |
+| `retention.class` | string | storage / review classification hint |
+| `retention.review_after` | string | review hint。自動 archive/delete authority ではない |
+| `retention.expire_after` | string | expiry hint。自動 purge/delete authority ではない |
 
 ### `[axes]`
 
@@ -606,6 +740,22 @@ R20260717-0003--size-x3-dt-x0-5/
 LLM/agent は survey 設計時に aliases と groups を提案できるが、`runs sweep` は
 model API を呼ばず、保存済み規則をローカルで決定的に適用する。
 
+### Plan / apply contract
+
+```bash
+# lazy read-only preview。directory 0、Run ID 消費 0
+runo runs sweep runs/mag-angle --offset 0 --limit 50
+
+# preview の ref と hash を明示して selected point だけ materialize
+runo runs sweep runs/mag-angle \
+  --apply --point p0001 --point p0003 --expect-plan sha256:...
+```
+
+`--apply` は `--point`（repeatable）または `--all` の exactly one と、現在の plan hash に
+一致する `--expect-plan` を要求する。同じ `survey.id + point_id` は existing Run を reuse し、
+同じ条件の再 apply で directory を増やさない。plan hash は survey、base case、case tree、
+simulator / launcher / site config の内容に依存する。
+
 ### `[job]`
 
 Same as `case.toml [job]`. Shared across all generated runs.
@@ -673,6 +823,7 @@ executable = "mpiemses3D"
 exe_hash = "sha256:..."
 git_commit = "abc1234"
 git_dirty = false
+git_state_observed = false
 source_repo = ""
 build_command = ""
 package_version = "1.2.3"
@@ -694,6 +845,36 @@ changed_keys = ["plasma.wc", "plasma.phiz"]
 "tmgrid.nz" = 800
 "plasma.wc" = 0.147
 "plasma.phiz" = 45.0
+
+[intent]
+experiment_id = "E20260901-0001"
+survey_id = "S20260329-sheath-wc"
+phase = "pilot"
+purpose = "explore"
+created_by = "human"
+
+[identity]
+point_id = "sha256:..."
+condition_hash = "sha256:..."
+input_hash = "sha256:..."
+execution_hash = "sha256:..."
+provenance_hash = "sha256:..."
+plan_hash = "sha256:..."
+
+[curation]
+review_status = "unreviewed"
+reviewed_at = ""
+reviewed_by = ""
+reason = ""
+
+[storage]
+tier = "hot"
+form = "full"
+retention_class = "exploratory"
+review_after = ""
+expire_after = ""
+pinned = false
+pin_reason = ""
 
 [files]
 input_dir = "input"
@@ -759,6 +940,34 @@ Git 管理可能な小さな provenance file であり、配下 run の lifecycl
 `runs/_archive/` 自体は `.gitignore` 対象にしない。ただし `runs/**/work/`、
 `runs/**/status/`、analysis cache / scratch、生成済み input の除外規則は archive 配下にも
 適用される。
+
+### `.runops-bundle-{archive,restore}-*.receipt.toml`
+
+通常の `--bundle` archive / restore が source parent へ move 前に作る durable transaction
+receipt。現行 `transaction.format_version = 1` は action、canonical source/destination、時刻、
+root directory device/inode、Run subtree を除く scaffold identity、marker の exact pre/postimage を
+固定する。各 `[[runs]]` は Run ID/state/相対 path、manifest exact pre/postimage（base64 と
+SHA-256）、Run directory device/inode、manifest を除く tree identity を持つ。
+
+再開時は source/destination の一方だけに同じ root directory が存在し、scaffold、各 Run tree、
+manifest、marker が receipt の許可する phase と完全一致する必要がある。不一致時は receipt と
+live data を変更せず、自動 rollback もしない。全 child と marker の commit postimage を再検証した
+後だけ receipt を削除する。
+
+### `.tmp-adopt-*/receipt.toml`
+
+`--bundle --adopt-archived` が最初の move より前に archive destination の親へ作る durable
+transaction receipt。現行 format は `adoption.format_version = 2` で、source / destination、
+件数、時刻に加え source directory device/inode と scaffold identity digest を持つ。各
+`[[runs]]` item は Run ID、相対 path、元 path、state、adopted flag、manifest の preimage /
+expected postimage SHA-256、Run directory device/inode、manifest を除く tree identity digest を
+固定する。tree identity は path と filesystem metadata を対象とし、大容量 artifact 本文を
+再 hash しない。
+
+再開は manifest が固定した preimage または runops が生成する postimage と一致し、directory
+と tree/scaffold identity も一致する場合だけ許可する。不一致時は receipt、staging、live tree を
+変更しない。v1 以前の pending receipt は inode/tree binding を証明できないため自動変換・自動
+cleanup せず、`runo triage` と手動確認の対象にする。
 
 ### State Machine
 
@@ -839,9 +1048,52 @@ Frozen parameter snapshot at run creation time.
 | `exe_hash` | string | SHA256 hash of executable |
 | `git_commit` | string | Git commit hash |
 | `git_dirty` | boolean | Whether working tree had uncommitted changes |
+| `git_state_observed` | boolean | Whether both commit and clean/dirty Git queries succeeded |
 | `source_repo` | string | Source repository path |
 | `build_command` | string | Command used to build the simulator |
 | `package_version` | string | Installed simulator package version |
+
+### `[intent]`
+
+Experiment / Survey の研究意図を Run 作成時に freeze する。`experiment_id`, `survey_id`,
+`phase`, `purpose`, `created_by`, `goal_id`, `information_gap`, `baseline_run` を持てる。
+standalone Run でも新規 project policy が有効なら active Experiment が必要で、purpose は
+Experiment intent と一致する。
+
+### `[identity]`
+
+| Field | Meaning |
+|-------|---------|
+| `point_id` | Survey point の full effective params hash |
+| `condition_hash` | `params_snapshot` の canonical hash |
+| `input_hash` | frozen `input/` tree の content hash |
+| `execution_hash` | launcher / job / simulator configuration hash |
+| `provenance_hash` | simulator source provenance hash |
+| `plan_hash` | materialization を承認した Survey plan hash |
+
+### `[curation]`
+
+`review_status = "unreviewed"|"reviewed"`, `reviewed_at`, `reviewed_by`, `reason` を持つ。
+`reviewed` として扱うには `reviewed_by` と `reason` が non-empty で、`reviewed_at` が
+timezone-aware ISO-8601 timestamp でなければならない。欠落・不正値は未 review として
+Experiment/project backlog に数え、Result evidence の quality gate も通さない。
+`runo runs review RUN --reason ...` は terminal Run の確認を記録するだけで、Result evidence
+への採否を決めない。
+
+### `[storage]`
+
+| Field | Values / meaning |
+|-------|------------------|
+| `tier` | `hot` / `cold`; 物理的な active storage class |
+| `form` | `full` / `compacted` / `metadata_only`; artifact representation |
+| `retention_class` | Survey から freeze した分類 hint |
+| `review_after`, `expire_after` | review hint。自動削除 authority ではない |
+| `pinned`, `pin_reason` | retention 対象から守る明示情報 |
+| `protected_by_results` | purge 対象 path evidence を include する sealed Result ID。purge 時に reverse scan して更新 |
+
+生成時は `hot/full`、individual archive は `cold`、restore は `hot`、purge-work は
+`cold/compacted` へ更新する。lifecycle、curation、storage、Result evidence selection は
+直交するため、`archived == cold` や `reviewed == selected` と解釈しない。
 
 ### Required contract and extensions
 
@@ -850,6 +1102,10 @@ The required top-level tables are `[run]`, `[origin]`, `[simulator]`,
 Within them, `run.id`, `run.status`, `origin.case`, `simulator.name`,
 `launcher.name`, `job.scheduler`, `job.job_id`, and `job.submitted_at` are
 required. A parameter-less run still records an empty `[params_snapshot]`.
+
+Newly generated canonical manifests additionally include `[path]`,
+`[classification]`, `[variation]`, `[files]`, `[intent]`, `[identity]`,
+`[curation]`, and `[storage]`. They remain optional on legacy v0 reads.
 
 runops preserves parsed values in unknown top-level tables and unknown fields in
 canonical tables across read/write and update cycles. Third-party metadata should
@@ -877,6 +1133,41 @@ R20260329-0001/
     summary.json       # Key metrics (generated by runo analyze summarize)
     figures/            # Plots and visualizations
 ```
+
+---
+
+## test-receipt.toml
+
+smoke / debug は `.runops/test-runs/TYYYYMMDD-NNNN/` に置き、通常 Run の
+`manifest.toml` と区別する。
+
+```toml
+schema_version = 1
+
+[test]
+id = "T20260901-0001"
+kind = "smoke" # smoke | debug
+state = "prepared" # prepared | submitted | passed | failed | skipped
+case = "flat_surface"
+profile = "smoke"
+source_commit = "abc123"
+executable_hash = "sha256:..."
+input_hash = "sha256:..."
+adapter = "emses"
+adapter_version = "1.2.3"
+cache_key = "sha256:..."
+created_at = "2026-09-01T00:00:00+00:00"
+updated_at = "2026-09-01T00:00:00+00:00"
+started_at = ""
+finished_at = ""
+observation = ""
+cached_from = ""
+```
+
+`source_commit`, `executable_hash`, `adapter_version` がすべて non-empty のときだけ cache
+reuse が可能。TTL 内に同じ key の `passed` receipt があれば既存 attempt を返し、新しい
+T ID / directory / receipt は作らない。TestAttempt は `runo runs list` に現れず、T ID や
+`.runops/test-runs/**` は canonical Result evidence として拒否される。
 
 ---
 
@@ -1102,7 +1393,85 @@ runo analyze plot runs/sheath/angle_scan --x param.angle --y ion_flux --group pa
 
 ---
 
-## retained comparison result
+## Canonical Result manifest
+
+`runo research new-result NAME` は `research/results/RNNNN-topic/` に README 1 枚、
+`manifest.toml`、`artifacts/` を作る。draft を編集した後、明示 evidence と claim を指定して
+seal する。
+
+```toml
+[result]
+schema_version = 1
+id = "R0001-angle-transition"
+status = "sealed" # draft | sealed
+title = "angle transition"
+claim = "The transition occurs between 40 and 60 degrees."
+outcome = "supported" # supported | refuted | inconclusive | invalid
+
+[[evidence]]
+kind = "run"
+run_id = "R20260831-0001"
+disposition = "include" # include | exclude
+role = "baseline"
+reason = ""
+source_path = "runs/scan/R20260831-0001/manifest.toml"
+receipt_kind = "run-scientific-snapshot-v1"
+sha256 = "...64 lowercase hex..."
+bytes = 1234
+
+[[evidence]]
+kind = "path"
+path = "runs/scan/R20260831-0001/analysis/summary.json"
+disposition = "include"
+role = "metric"
+reason = ""
+source_path = "runs/scan/R20260831-0001/analysis/summary.json"
+owner_kind = "run"
+owner_id = "R20260831-0001"
+owner_relative_path = "analysis/summary.json"
+receipt_kind = "file-bytes-v1"
+sha256 = "...64 lowercase hex..."
+bytes = 567
+
+[seal]
+sealed_at = "2026-09-01T00:00:00+00:00"
+content_sha256 = "...64 lowercase hex..."
+readme_sha256 = "...64 lowercase hex..."
+readme_bytes = 2048
+```
+
+Result は少なくとも一つの `disposition = "include"` evidence を要求する。exclude edge は
+non-empty `reason` が必須。Run evidence は project 内の canonical `RYYYYMMDD-NNNN` を
+manifest から解決し、運用 state を除いた scientific snapshot を hash する。path evidence は
+Run 配下または Result `artifacts/` 配下の regular file に限定し、owner-relative path と
+file receipt を記録する。
+
+```bash
+runo research check-result R0001-angle-transition
+runo research seal R0001-angle-transition \
+  --claim "The transition occurs between 40 and 60 degrees." \
+  --outcome supported \
+  --selection-reason "Selected reviewed evidence for this claim." \
+  --evidence-run R20260831-0001 \
+  --evidence-path runs/scan/R20260831-0001/analysis/summary.json
+```
+
+T ID と `.runops/test-runs/**` は scientific evidence ではないため常に拒否する。seal 後は
+README、evidence source、claim、outcome、selection の変化を `check-result` が検出する。
+同一内容の reseal は no-op、異なる内容の reseal は拒否される。
+
+included Run evidence と Run-owned path evidence には seal 前の source quality gate がある。
+owner Run は `completed|archived|purged`、理由付き `reviewed` でなければならず、
+`condition_hash`, `input_hash`, `execution_hash`, `provenance_hash`、source commit、
+executable hash、simulator version、baseline Run、non-empty input snapshot が必要である。
+dirty source の場合は diff 参照も必須となる。これは Run review と evidence selection を
+同一化するものではなく、review は evidence 候補になるための前提にすぎない。
+Run-owned path が `work/outputs`, `work/restart`, `work/tmp` 配下にある場合、sealed Result の
+include edge が存在する間は `runo runs purge-work` が削除を拒否する。reverse scan は
+`seal.content_sha256` と README/evidence receipt を同時に検証し、sealed content の改竄時は
+参照なしとみなさず fail closed で拒否する。
+
+## retained comparison result (legacy / analysis workspace)
 
 複数 run / survey をまたぐ比較・可視化では、比較単位の成果物を
 `research/results/RNNN-<comparison_id>/` にまとめる。
@@ -1155,6 +1524,10 @@ figures = []
 `runo analyze collect` / `plot` が作る survey-local な `summary/` とは別に、
 cross-run comparison workspace は複数 survey や手書き script を束ねるための
 project-level analysis layer として使う。
+
+`[comparison]` layout は read-only inspection のため引き続き認識するが、canonical seal の
+対象ではない。残す claim は `runo research new-result` で canonical Result を作り、必要な
+artifact / Run を evidence として明示する。
 
 ---
 
@@ -1272,7 +1645,8 @@ All TOML files support schema validation via `#:schema` comments:
 
 Schema files: `schemas/runops.json`, `schemas/simulators.json`,
 `schemas/launchers.json`, `schemas/site.json`, `schemas/case.json`,
-`schemas/survey.json`, `schemas/manifest.json`, `schemas/campaign.json`.
+`schemas/survey.json`, `schemas/experiment.json`, `schemas/manifest.json`,
+`schemas/result.json`, `schemas/campaign.json`.
 Codex plugin 推薦 metadata は共通 sub-schema
 `schemas/codex-plugin-recommendation.json` を参照する。
 `runo plugins --json` / MCP `runops.project.plugins` の JSON 出力 contract は

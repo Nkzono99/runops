@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import runops
+from runops.application.run_query import query_runs
 from runops.core.codex_plugin import (
     CODEX_PLUGIN_CHECK_RESULT_SCHEMA_PATH,
     CODEX_PLUGIN_INVENTORY_SCHEMA_PATH,
@@ -20,6 +21,7 @@ from runops.core.codex_plugin import (
     codex_plugin_management_policy,
 )
 from runops.core.exceptions import SimctlError
+from runops.core.run.curation import has_valid_run_review
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,58 @@ def _record_diagnostic(
         }
     )
     section_status[section] = level
+
+
+def _reconcile_run_derived_context(
+    ctx: dict[str, Any],
+    diagnostics: list[dict[str, str]],
+    section_status: dict[str, str],
+) -> None:
+    """Make independently collected Run-derived sections fail closed together."""
+    runs = ctx.get("runs", {})
+    experiments = ctx.get("experiments", {})
+    run_stats_unavailable = (
+        not isinstance(runs, dict) or runs.get("namespace_available") is False
+    )
+    experiment_runs_unavailable = (
+        isinstance(experiments, dict)
+        and experiments.get("run_namespace_available") is False
+    )
+    recent_failures_unavailable = ctx.get("recent_failures") is None
+    if not (
+        run_stats_unavailable
+        or experiment_runs_unavailable
+        or recent_failures_unavailable
+    ):
+        return
+
+    if not any(item.get("section") == "runs" for item in diagnostics):
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="runs",
+            message=(
+                "Run-derived context is unavailable because a required "
+                "Run namespace scan failed."
+            ),
+        )
+    section_status["runs"] = "error"
+    section_status["experiments"] = "error"
+    section_status["recent_failures"] = "error"
+
+    ctx["runs"] = {"namespace_available": False, "total": None}
+    ctx["recent_failures"] = None
+    if not isinstance(experiments, dict):
+        return
+    experiments["run_namespace_available"] = False
+    items = experiments.get("items", [])
+    if not isinstance(items, list):
+        return
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        item["runs"] = None
+        item["unreviewed_completed"] = None
 
 
 def build_project_context(project_root: Path) -> dict[str, Any]:
@@ -70,6 +124,14 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
         project_root, diagnostics, section_status
     )
 
+    # -- Bounded Experiment and ephemeral verification work --
+    ctx["experiments"] = _collect_experiment_summary(
+        project_root, diagnostics, section_status
+    )
+    ctx["test_attempts"] = _collect_test_attempt_summary(
+        project_root, diagnostics, section_status
+    )
+
     # -- Simulators & Launchers --
     ctx["simulators"] = _load_simulator_names(project_root, diagnostics, section_status)
     ctx["launchers"] = _load_launcher_names(project_root, diagnostics, section_status)
@@ -81,6 +143,7 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
     ctx["recent_failures"] = _collect_recent_failures(
         project_root, diagnostics, section_status
     )
+    _reconcile_run_derived_context(ctx, diagnostics, section_status)
 
     # -- Facts --
     ctx["facts"] = _collect_facts_summary(project_root, diagnostics, section_status)
@@ -117,6 +180,8 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
             "project",
             "campaign",
             "research",
+            "experiments",
+            "test_attempts",
             "simulators",
             "launchers",
             "runs",
@@ -134,6 +199,118 @@ def build_project_context(project_root: Path) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Section builders
 # ---------------------------------------------------------------------------
+
+
+def _collect_experiment_summary(
+    root: Path,
+    diagnostics: list[dict[str, str]],
+    section_status: dict[str, str],
+) -> dict[str, Any]:
+    from runops.core.experiment import discover_experiments
+
+    try:
+        experiments = discover_experiments(root)
+    except SimctlError as exc:
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="experiments",
+            message=f"Failed to inspect Experiments: {exc}",
+        )
+        return {
+            "total": None,
+            "active": None,
+            "run_namespace_available": None,
+            "items": [],
+        }
+
+    active = [item for item in experiments if item.lifecycle == "active"]
+    run_counts: dict[str, int] | None
+    unreviewed: dict[str, int] | None
+    try:
+        collected_run_counts: dict[str, int] = {}
+        collected_unreviewed: dict[str, int] = {}
+        all_entries = query_runs(root, view="all", strict_manifests=True)
+        active_entries = query_runs(root, view="active", strict_manifests=True)
+        for entry in active_entries:
+            if entry.manifest is None:
+                continue
+            experiment_id = entry.experiment_id
+            if not experiment_id:
+                continue
+            collected_run_counts[experiment_id] = (
+                collected_run_counts.get(experiment_id, 0) + 1
+            )
+        for entry in all_entries:
+            if entry.manifest is None:
+                continue
+            experiment_id = entry.experiment_id
+            if not experiment_id:
+                continue
+            if entry.status in {
+                "completed",
+                "archived",
+                "purged",
+            } and not has_valid_run_review(entry.manifest.curation):
+                collected_unreviewed[experiment_id] = (
+                    collected_unreviewed.get(experiment_id, 0) + 1
+                )
+    except SimctlError as exc:
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="experiments",
+            message=f"Failed to inspect Experiment Run associations: {exc}",
+        )
+        run_counts = None
+        unreviewed = None
+    else:
+        run_counts = collected_run_counts
+        unreviewed = collected_unreviewed
+
+    return {
+        "total": len(experiments),
+        "active": len(active),
+        "run_namespace_available": run_counts is not None,
+        "items": [
+            {
+                "id": item.id,
+                "title": item.title,
+                "intent": item.intent,
+                "decision": item.decision,
+                "runs": run_counts.get(item.id, 0) if run_counts is not None else None,
+                "unreviewed_completed": (
+                    unreviewed.get(item.id, 0) if unreviewed is not None else None
+                ),
+                "max_materialized_runs": item.budget.max_materialized_runs,
+                "max_active_runs": item.budget.max_active_runs,
+            }
+            for item in active
+        ],
+    }
+
+
+def _collect_test_attempt_summary(
+    root: Path,
+    diagnostics: list[dict[str, str]],
+    section_status: dict[str, str],
+) -> dict[str, Any]:
+    try:
+        from runops.application.test_attempts import list_test_attempts
+
+        attempts = list_test_attempts(root)
+        states: dict[str, int] = {}
+        for attempt in attempts:
+            states[attempt.state] = states.get(attempt.state, 0) + 1
+        return {"total": len(attempts), "states": states}
+    except SimctlError as exc:
+        _record_diagnostic(
+            diagnostics,
+            section_status,
+            section="test_attempts",
+            message=f"Failed to inspect TestAttempts: {exc}",
+        )
+        return {"total": 0, "states": {}}
 
 
 def _load_project_info(
@@ -281,24 +458,25 @@ def _collect_run_stats(
 ) -> dict[str, Any]:
     from runops.core.state import RunState
 
-    runs_dir = root / "runs"
-    if not runs_dir.is_dir():
-        return {"total": 0}
-
     try:
         from runops.application.execution.readiness import resolve_run_readiness
-        from runops.core.discovery import discover_runs
-        from runops.core.manifest import read_manifest
 
-        run_dirs = discover_runs(runs_dir)
+        # Validate the exhaustive namespace before publishing active-view counts.
+        # Otherwise an unsafe archived subtree could be hidden behind a normal zero.
+        query_runs(root, view="all", strict_manifests=True)
+        entries = query_runs(root, view="active", strict_manifests=True)
         counts: dict[str, int] = {s.value: 0 for s in RunState}
         analysis_ready = 0
         analysis_incomplete = 0
         analysis_unknown = 0
         analysis_problems: list[dict[str, Any]] = []
-        for rd in run_dirs:
+        for entry in entries:
+            rd = entry.run_dir
             try:
-                m = read_manifest(rd)
+                m = entry.manifest
+                if m is None:
+                    counts["unknown"] = counts.get("unknown", 0) + 1
+                    continue
                 state = m.run.get("status", "unknown")
                 counts[state] = counts.get(state, 0) + 1
                 if state == RunState.COMPLETED.value:
@@ -337,7 +515,8 @@ def _collect_run_stats(
             non_zero["analysis_unknown"] = analysis_unknown
         if analysis_problems:
             non_zero["analysis_problems"] = analysis_problems[:10]
-        non_zero["total"] = len(run_dirs)
+        non_zero["namespace_available"] = True
+        non_zero["total"] = len(entries)
         return non_zero
     except Exception as exc:
         _record_diagnostic(
@@ -346,7 +525,7 @@ def _collect_run_stats(
             section="runs",
             message=f"Failed to summarize run states: {exc}",
         )
-        return {"total": 0}
+        return {"namespace_available": False, "total": None}
 
 
 def _collect_recent_failures(
@@ -355,19 +534,15 @@ def _collect_recent_failures(
     section_status: dict[str, str],
     *,
     limit: int = 10,
-) -> list[dict[str, Any]]:
-    runs_dir = root / "runs"
-    if not runs_dir.is_dir():
-        return []
-
+) -> list[dict[str, Any]] | None:
     try:
-        from runops.core.discovery import discover_runs
-        from runops.core.manifest import read_manifest
-
+        query_runs(root, view="all", strict_manifests=True)
         failures: list[dict[str, Any]] = []
-        for rd in discover_runs(runs_dir):
+        for entry in query_runs(root, view="active", strict_manifests=True):
             try:
-                m = read_manifest(rd)
+                m = entry.manifest
+                if m is None:
+                    continue
                 if m.run.get("status") == "failed":
                     partial_outputs = m.run.get("partial_outputs", {})
                     partial_outputs_data = (
@@ -392,7 +567,7 @@ def _collect_recent_failures(
             section="recent_failures",
             message=f"Failed to collect recent failures: {exc}",
         )
-        return []
+        return None
 
 
 def _collect_facts_summary(

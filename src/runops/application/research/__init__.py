@@ -1,5 +1,15 @@
 """Quantity-bounded research workspace application services."""
 
+from runops.application.research.results import (
+    EvidenceRequest,
+    ResultCheck,
+    ResultCheckIssue,
+    ResultSeal,
+    check_result,
+    protected_results_for_run_paths,
+    result_mutation_guard,
+    seal_result,
+)
 from runops.application.research.workspace import (
     JournalAppendResult,
     LegacyMigration,
@@ -19,19 +29,27 @@ from runops.application.research.workspace import (
 )
 
 __all__ = [
+    "EvidenceRequest",
     "JournalAppendResult",
     "LegacyMigration",
     "ResearchWorkspaceError",
     "ResearchWorkspaceStatus",
+    "ResultCheck",
+    "ResultCheckIssue",
+    "ResultSeal",
     "ResultWorkspace",
     "WorkspaceIssue",
     "append_journal",
     "archive_result",
+    "check_result",
     "create_result",
     "inspect_workspace",
     "migrate_legacy_workspace",
     "plan_legacy_migration",
+    "protected_results_for_run_paths",
     "restore_legacy_workspace",
     "restore_result",
+    "result_mutation_guard",
     "rotate_journal",
+    "seal_result",
 ]

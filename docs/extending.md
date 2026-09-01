@@ -339,6 +339,7 @@ def collect_provenance(
         "exe_hash": "",
         "git_commit": "",
         "git_dirty": False,
+        "git_state_observed": False,
         "source_repo": runtime_info.get("source_repo", ""),
         "build_command": runtime_info.get("build_command", ""),
         "package_version": "",
@@ -365,11 +366,22 @@ def collect_provenance(
                     cwd=repo, check=True,
                 )
                 provenance["git_commit"] = result.stdout.strip()
-            except (subprocess.CalledProcessError, FileNotFoundError):
+                result = subprocess.run(
+                    ["git", "status", "--porcelain"],
+                    capture_output=True, text=True,
+                    cwd=repo, check=True,
+                )
+                provenance["git_dirty"] = bool(result.stdout.strip())
+                provenance["git_state_observed"] = True
+            except (subprocess.CalledProcessError, OSError):
                 pass
 
     return provenance
 ```
+
+`local_source` の hard reuse は `exe_hash`, `git_commit` に加え、commit と
+clean/dirty の両 query が成功した `git_state_observed = true` の場合だけ許可されます。
+command 失敗時に既定値の `git_dirty = false` を clean の証拠として扱わないでください。
 
 ### ステップ 3: Registry への登録
 

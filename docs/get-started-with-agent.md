@@ -35,7 +35,8 @@ uvx --from runops runo doctor
 uvx --from runops runo plugins --check
 ```
 
-`runo init` は project 構造と Agent harness を生成します。`manifest.toml`、`input/`、
+`runo init` は project 構造と Agent harness を生成し、新規 project では
+`experiments.policy.require_experiment = true` を設定します。`manifest.toml`、`input/`、
 `submit/job.sh` などの生成物は直接編集せず、元になる case や survey を変更します。
 
 ### 推奨 plugin
@@ -68,8 +69,9 @@ Agent が project context と環境を確認し、研究テーマ、simulator、
 cases/emses/flat_surface/plasma.toml を base input にする。
 主な独立変数は照射角、観測量は表面電位とシース厚。
 
-まず project を確認し、campaign と pilot survey の案を作って。
-run 数と概算 cost を示し、submit は確認するまで行わないで。
+まず project を確認し、一つの問い・baseline・budget・有効期限・exit criteria を持つ Experiment と
+pilot survey の案を作って。`runo runs sweep` の read-only plan で候補 point と概算 cost を
+示し、Run directory の生成と submit は確認するまで行わないで。
 ```
 
 base input が未定なら、候補の比較も依頼に含めます。
@@ -87,27 +89,45 @@ Agent は依頼から Goal、Done、Budget、Invariant を組み立てます。�
 | やりたいこと | 依頼例 |
 |---|---|
 | campaign を作る | `仮説、独立変数、観測量、単位、理由が揃ったら完了。` |
-| survey を設計する | `pilot 点、run 数、概算 cost を dry-run で確認して。` |
-| run を生成する | `created run ID、件数、由来を報告して。` |
+| Experiment を作る | `問い、baseline、最大候補数、最大 Run 数、core-hour、UTC offset 付き有効期限、exit criteria を明示して。` |
+| survey を設計する | `pilot point、候補数、plan hash、概算 cost を read-only preview して。` |
+| run を生成する | `preview の p0001 と p0003 だけを hash 照合後に作り、Run ID と由来を報告して。` |
+| smoke test | `正式 Run は作らず TestAttempt に分離し、cache hit なら新規 directory を作らないで。` |
 | submit する | `対象と job ID の記録まで。初動待機はしない。` |
 | 初動を確認する | `step が2回進むまで、最大10分確認して。` |
 | 失敗を診断する | `log と failure reason を整理し、retry 方針を提案して。` |
 | 比較図を作る | `図、source run、再現 command を残して。` |
 
 再利用する変更は、run の生成済み input ではなく
-`campaign.toml` → `case.toml` → `survey.toml` の適切な段階へ戻します。
+`campaign.toml` → Experiment → `case.toml` → `survey.toml` の適切な段階へ戻します。
+
+候補確認と directory 生成は別操作です。
+
+```bash
+runo runs sweep runs/angle-pilot
+runo runs sweep runs/angle-pilot \
+  --apply --point p0001 --point p0003 --expect-plan sha256:...
+```
+
+最初の command は `--dry-run` なしでも read-only で、Run ID を消費しません。apply には
+`--point` または `--all` と、preview の exact plan hash が必要です。
 
 ## 5. 人が確認する操作
 
 Agent 中心の運用でも、次の操作は確認を挟みます。
 
 - 新しい survey の初回 bulk submit
+- Survey の `--all` materialization と Experiment の `decision=expand`
 - walltime、memory、node 数などを増やす retry
 - `cancel`、`archive`、`purge-work`、`delete`
 - 研究仮説や campaign の意味を変える編集
 - migration と harness 更新
 
 submit 前には、対象 run、queue、QOS、資源量、概算 cost を確認してください。
+
+既存 project に `[experiments.policy]` がなければ互換既定値は
+`require_experiment = false` です。新規運用へ移すときは Experiment と Survey の所有関係を
+整えてから `true` を明示します。
 
 ## 6. 完了 run を整理する
 

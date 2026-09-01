@@ -8,10 +8,12 @@ from runops.cli.research import (
     append,
     archive,
     check,
+    check_result,
     migrate_legacy,
     new_result,
     restore,
     rotate,
+    seal,
     status,
 )
 
@@ -24,6 +26,8 @@ research_app.command("check")(check)
 research_app.command("append")(append)
 research_app.command("rotate")(rotate)
 research_app.command("new-result")(new_result)
+research_app.command("check-result")(check_result)
+research_app.command("seal")(seal)
 research_app.command("archive")(archive)
 research_app.command("restore")(restore)
 research_app.command("migrate-legacy")(migrate_legacy)

@@ -7,6 +7,7 @@ from runops.mcp._tools.analysis import (
     analysis_plot_columns,
     survey_summary,
 )
+from runops.mcp._tools.experiments import experiment_list, survey_plan
 from runops.mcp._tools.project import (
     project_doctor,
     project_inspect,
@@ -30,6 +31,7 @@ __all__ = [
     "analysis_artifacts",
     "analysis_plot_columns",
     "capabilities",
+    "experiment_list",
     "health",
     "job_plan_submit",
     "project_doctor",
@@ -45,5 +47,6 @@ __all__ = [
     "run_logs",
     "slurm_job_inspect",
     "slurm_queue",
+    "survey_plan",
     "survey_summary",
 ]

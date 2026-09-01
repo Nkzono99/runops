@@ -8,20 +8,29 @@ import pytest
 import tomli_w
 
 from runops.core.discovery import (
+    RunDiscoveryError,
     check_run_id_uniqueness,
     collect_existing_run_ids,
+    discover_active_runs,
+    discover_active_runs_checked,
     discover_runs,
+    discover_runs_checked,
     resolve_run,
     validate_uniqueness,
 )
 from runops.core.exceptions import DuplicateRunIdError, RunNotFoundError
 
 
-def _make_run(runs_dir: Path, *path_parts: str, run_id: str = "R20260327-0001") -> Path:
+def _make_run(
+    runs_dir: Path,
+    *path_parts: str,
+    run_id: str = "R20260327-0001",
+    status: str = "created",
+) -> Path:
     """Helper to create a run directory with manifest.toml."""
     run_dir = runs_dir.joinpath(*path_parts)
     run_dir.mkdir(parents=True, exist_ok=True)
-    manifest = {"run": {"id": run_id, "status": "created"}}
+    manifest = {"run": {"id": run_id, "status": status}}
     with open(run_dir / "manifest.toml", "wb") as f:
         tomli_w.dump(manifest, f)
     return run_dir
@@ -67,6 +76,103 @@ class TestDiscoverRuns:
         _make_run(runs_dir, "a", "R1", run_id="R1")
         result = discover_runs(runs_dir)
         assert result == sorted(result)
+
+    def test_unpublished_staging_directories_are_never_discovered(
+        self, tmp_path: Path
+    ) -> None:
+        runs_dir = tmp_path / "runs"
+        published = _make_run(runs_dir, "survey", "R1", run_id="R1")
+        _make_run(runs_dir, "survey", ".tmp-R2", run_id="R2")
+        _make_run(runs_dir, "survey", ".delete-R3", run_id="R3")
+
+        assert discover_runs(runs_dir) == [published.resolve()]
+        assert discover_active_runs(runs_dir) == [published.resolve()]
+        assert collect_existing_run_ids(runs_dir) == {"R1"}
+
+    def test_active_discovery_prunes_archive_roots_and_bundle_markers(
+        self, tmp_path: Path
+    ) -> None:
+        runs_dir = tmp_path / "runs"
+        active = _make_run(runs_dir, "survey", "active", run_id="R20260327-0001")
+        archived = _make_run(
+            runs_dir,
+            "_archive",
+            "old-survey",
+            "archived",
+            run_id="R20260327-0002",
+        )
+        bundle = runs_dir / "moved-bundle"
+        bundled = _make_run(bundle, "failed", run_id="R20260327-0003")
+        (bundle / ".runops-archive.toml").write_text(
+            '[bundle]\narchived_from = "runs/survey"\n', encoding="utf-8"
+        )
+
+        assert discover_active_runs(runs_dir) == [active.resolve()]
+        assert discover_runs(runs_dir) == sorted(
+            [active.resolve(), archived.resolve(), bundled.resolve()]
+        )
+
+    def test_active_discovery_excludes_in_place_inactive_states(
+        self, tmp_path: Path
+    ) -> None:
+        runs_dir = tmp_path / "runs"
+        active = _make_run(runs_dir, "active", run_id="R20260327-0001")
+        _make_run(
+            runs_dir,
+            "archived",
+            run_id="R20260327-0002",
+            status="archived",
+        )
+        _make_run(
+            runs_dir,
+            "purged",
+            run_id="R20260327-0003",
+            status="purged",
+        )
+
+        assert discover_active_runs(runs_dir) == [active.resolve()]
+
+    def test_checked_discovery_rejects_symlink_namespace_subtree(
+        self, tmp_path: Path
+    ) -> None:
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+        outside = tmp_path / "outside"
+        outside.mkdir()
+        (runs_dir / "hidden").symlink_to(outside, target_is_directory=True)
+
+        with pytest.raises(RunDiscoveryError, match="symbolic link"):
+            discover_runs_checked(runs_dir)
+
+    def test_checked_discovery_surfaces_walk_errors(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from runops.core import discovery as discovery_module
+
+        runs_dir = tmp_path / "runs"
+        runs_dir.mkdir()
+
+        def fail_walk(*args: object, **kwargs: object) -> list[object]:
+            onerror = kwargs["onerror"]
+            assert callable(onerror)
+            onerror(OSError("unreadable subtree"))
+            return []
+
+        monkeypatch.setattr(discovery_module.os, "walk", fail_walk)
+
+        with pytest.raises(RunDiscoveryError, match="unreadable subtree"):
+            discover_runs_checked(runs_dir)
+
+    def test_checked_active_discovery_rejects_corrupt_archive_marker(
+        self, tmp_path: Path
+    ) -> None:
+        runs_dir = tmp_path / "runs"
+        bundle = runs_dir / "bundle"
+        _make_run(bundle, "R20260327-0001")
+        (bundle / ".runops-archive.toml").write_text("[bundle\n", encoding="utf-8")
+
+        with pytest.raises(RunDiscoveryError, match="Invalid archive marker"):
+            discover_active_runs_checked(runs_dir)
 
 
 class TestCheckRunIdUniqueness:
@@ -151,3 +257,23 @@ class TestCollectExistingRunIds:
         runs_dir = tmp_path / "runs"
         runs_dir.mkdir()
         assert collect_existing_run_ids(runs_dir) == set()
+
+    def test_identity_operations_still_include_archived_runs(
+        self, tmp_path: Path
+    ) -> None:
+        runs_dir = tmp_path / "runs"
+        _make_run(runs_dir, "active", run_id="R20260327-0001")
+        archived = _make_run(
+            runs_dir,
+            "_archive",
+            "old-survey",
+            "archived",
+            run_id="R20260327-0002",
+            status="archived",
+        )
+
+        assert collect_existing_run_ids(runs_dir) == {
+            "R20260327-0001",
+            "R20260327-0002",
+        }
+        assert resolve_run("R20260327-0002", runs_dir) == archived.resolve()

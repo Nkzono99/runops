@@ -20,5 +20,17 @@
 export/source index に置く。compact 指標の超過は普段の作業を止めない warning であり、
 `runo lint --strict` を選んだ場合だけ gate になる。
 
-旧構成は `runo research migrate-legacy` で内容を変更せず recovery archive へ移す。
-移行は `--restore` で戻せる。削除・purge はこの workflow に含めない。
+```bash
+runo research status
+runo research append "<title>" "<body>"
+runo research rotate --force
+runo research new-result <topic>
+runo research archive R0001-topic
+runo research restore R0001-topic
+runo research migrate-legacy --dry-run
+runo research check
+```
+
+旧 `notes/`、`analysis/cross_run/`、分散 Markdown、HarnessOps metadata は
+`runo research migrate-legacy` で内容を変更せず recovery archive へ移す。移行は
+`--restore` で戻せる。削除・purge はこの workflow に含めない。

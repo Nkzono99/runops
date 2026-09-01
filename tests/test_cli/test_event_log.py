@@ -95,6 +95,8 @@ def test_runs_create_writes_event_log_from_global_options(
             "runs",
             "create",
             "my_case",
+            "--dest",
+            str(tmp_path / "runs"),
         ],
     )
 

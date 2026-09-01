@@ -37,6 +37,10 @@ _KNOWN_MANIFEST_SECTIONS = (
     "variation",
     "params_snapshot",
     "files",
+    "intent",
+    "identity",
+    "curation",
+    "storage",
 )
 
 
@@ -58,6 +62,10 @@ class ManifestData:
         variation: Changed keys from survey expansion.
         params_snapshot: Full parameter snapshot.
         files: Standard directory names.
+        intent: Frozen Experiment/Survey scientific intent.
+        identity: Canonical condition/input/provenance hashes.
+        curation: Review metadata; evidence selection lives in Result links.
+        storage: Orthogonal storage tier and representation form.
         extra_sections: Unrecognized top-level sections preserved losslessly.
     """
 
@@ -72,6 +80,10 @@ class ManifestData:
     variation: dict[str, Any] = field(default_factory=dict)
     params_snapshot: dict[str, Any] = field(default_factory=dict)
     files: dict[str, Any] = field(default_factory=dict)
+    intent: dict[str, Any] = field(default_factory=dict)
+    identity: dict[str, Any] = field(default_factory=dict)
+    curation: dict[str, Any] = field(default_factory=dict)
+    storage: dict[str, Any] = field(default_factory=dict)
     extra_sections: dict[str, Any] = field(default_factory=dict, repr=False)
     _present_sections: set[str] = field(
         default_factory=set,
@@ -109,6 +121,14 @@ class ManifestData:
         result["params_snapshot"] = copy.deepcopy(self.params_snapshot)
         if self.files or "files" in self._present_sections:
             result["files"] = copy.deepcopy(self.files)
+        if self.intent or "intent" in self._present_sections:
+            result["intent"] = copy.deepcopy(self.intent)
+        if self.identity or "identity" in self._present_sections:
+            result["identity"] = copy.deepcopy(self.identity)
+        if self.curation or "curation" in self._present_sections:
+            result["curation"] = copy.deepcopy(self.curation)
+        if self.storage or "storage" in self._present_sections:
+            result["storage"] = copy.deepcopy(self.storage)
         return result
 
     @classmethod
@@ -133,6 +153,10 @@ class ManifestData:
             variation=_copy_manifest_section(data, "variation"),
             params_snapshot=_copy_manifest_section(data, "params_snapshot"),
             files=_copy_manifest_section(data, "files"),
+            intent=_copy_manifest_section(data, "intent"),
+            identity=_copy_manifest_section(data, "identity"),
+            curation=_copy_manifest_section(data, "curation"),
+            storage=_copy_manifest_section(data, "storage"),
             extra_sections={
                 key: copy.deepcopy(value)
                 for key, value in data.items()

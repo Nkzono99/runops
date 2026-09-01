@@ -8,7 +8,7 @@
 ![runops project layers](../figures/layers/overview.png)
 
 ```text
-研究意図 -> 探索設計 -> 実行 -> 解析 -> 判断・再利用知識
+研究意図 -> bounded Experiment -> lazy候補 -> selected Run -> 解析 -> Result / 判断
 ```
 
 各 Layer は、正本、生成物、更新方法が異なる project 運用上の境界です。
@@ -16,8 +16,8 @@
 | Layer | 正本・主な対象 | 文書 |
 |---|---|---|
 | Interface | CLI、action、MCP、human gate | [interface.md](interface.md) |
-| Experiment | `campaign.toml`、`case.toml`、`survey.toml` | [experiment.md](experiment.md) |
-| Execution Kernel | run、`manifest.toml`、submit、sync、provenance | [execution-kernel.md](execution-kernel.md) |
+| Experiment | `campaign.toml`、`experiments/*.toml`、`case.toml`、lazy `survey.toml` | [experiment.md](experiment.md) |
+| Execution Kernel | Run、TestAttempt、`manifest.toml`、submit、sync、provenance | [execution-kernel.md](execution-kernel.md) |
 | Analysis | run-local 解析、survey 集計、cross-run 比較 | [analysis.md](analysis.md) |
 | Research | `CURRENT.md`、journal、残す result | [research.md](research.md) |
 | Knowledge | plugin、materials、facts、insights、refs | [knowledge.md](knowledge.md) |
@@ -26,7 +26,8 @@
 
 ## 迷ったときの判断
 
-- 実験条件を再利用するなら Experiment。
+- 一つの問い・budget・exitなら Experiment、実験条件を再利用するなら Case / Survey。
+- smoke / debugなら正式 Run ではなく TestAttempt。
 - 1 回の実行状態や由来なら Execution Kernel。
 - 計算から直接得た図や集計なら Analysis。
 - 複数の evidence から得た判断なら Research。

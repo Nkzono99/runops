@@ -287,6 +287,7 @@ def test_contract_validation_and_provenance_return_expected_types(
         "exe_hash",
         "git_commit",
         "git_dirty",
+        "git_state_observed",
         "source_repo",
         "build_command",
     ):

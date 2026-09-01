@@ -335,7 +335,7 @@ def _generate_survey_stub(
     project_root: Path | None = None,
     resource_style: str = "standard",
 ) -> None:
-    """Generate a survey.toml stub under runs/<case_name>/.
+    """Generate a provisional survey stub under .runops/work/surveys/.
 
     Args:
         case_name: Name of the base case.
@@ -348,7 +348,7 @@ def _generate_survey_stub(
         typer.echo("  Warning: Could not find project root; skipping survey.toml.")
         return
 
-    survey_dir = project_root / "runs" / case_name
+    survey_dir = project_root / ".runops" / "work" / "surveys" / case_name
     survey_dir.mkdir(parents=True, exist_ok=True)
 
     # Build the case reference path: <sim>/<case_name> for multi-sim layout
@@ -385,4 +385,8 @@ def _generate_survey_stub(
     survey_file.write_text(content, encoding="utf-8")
     typer.echo("\nCreated survey stub:")
     typer.echo(f"  Path: {survey_dir / 'survey.toml'}")
-    typer.echo(f"  Edit axes and naming, then run: cd {survey_dir} && runo runs sweep")
+    typer.echo(
+        "  This is provisional and ignored by formal Run discovery. "
+        "After assigning an Experiment and finite budget, move it under runs/ "
+        "and preview with `runo runs sweep`."
+    )

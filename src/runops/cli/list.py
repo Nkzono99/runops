@@ -8,9 +8,12 @@ from typing import Annotated, Optional
 import typer
 
 from runops.application.execution.readiness import readiness_for_bulk_view
-from runops.core.discovery import discover_runs, find_archived_bundle
+from runops.application.run_query import (
+    filter_run_query,
+    query_runs,
+    resolve_run_query_view,
+)
 from runops.core.exceptions import SimctlError
-from runops.core.manifest import read_manifest
 
 
 def list_runs(
@@ -27,6 +30,27 @@ def list_runs(
     tag: Optional[str] = typer.Option(
         None, "--tag", help="Filter by classification tag."
     ),
+    experiment: Optional[str] = typer.Option(
+        None, "--experiment", help="Filter by immutable Experiment ID."
+    ),
+    purpose: Optional[str] = typer.Option(
+        None,
+        "--purpose",
+        help="Filter by research purpose (explore/confirm/validate/reproduce).",
+    ),
+    review_status: Optional[str] = typer.Option(
+        None,
+        "--review-status",
+        help="Filter by curation review status (unreviewed/reviewed).",
+    ),
+    storage_tier: Optional[str] = typer.Option(
+        None, "--storage-tier", help="Filter by storage tier (hot/cold)."
+    ),
+    storage_form: Optional[str] = typer.Option(
+        None,
+        "--storage-form",
+        help="Filter by storage form (full/compacted/metadata_only).",
+    ),
     include_archived: Annotated[
         bool,
         typer.Option(
@@ -38,54 +62,50 @@ def list_runs(
     """List runs under one or more paths."""
     search_dirs = list(paths) if paths else [Path.cwd()]
 
-    run_dirs: list[Path] = []
-    seen: set[Path] = set()
     for search_dir in search_dirs:
         if not search_dir.is_dir():
             typer.echo(f"Error: directory not found: {search_dir}", err=True)
             raise typer.Exit(code=1)
 
-        try:
-            for rd in discover_runs(search_dir):
-                resolved = rd.resolve()
-                if resolved not in seen:
-                    seen.add(resolved)
-                    run_dirs.append(rd)
-        except SimctlError as e:
-            typer.echo(f"Error discovering runs in {search_dir}: {e}", err=True)
-            raise typer.Exit(code=1) from None
+    try:
+        queried = query_runs(
+            search_dirs,
+            view=resolve_run_query_view(
+                include_archived=include_archived,
+                status_filter=status_filter,
+                storage_tier=storage_tier,
+                storage_form=storage_form,
+            ),
+        )
+    except SimctlError as e:
+        typer.echo(f"Error discovering runs: {e}", err=True)
+        raise typer.Exit(code=1) from None
 
-    if not run_dirs:
+    if not queried:
         typer.echo("No runs found.")
         raise typer.Exit(code=0)
 
     # Collect manifest data for each run
     rows: list[tuple[str, str, str, str, str, str]] = []
-    for run_dir in run_dirs:
-        try:
-            manifest = read_manifest(run_dir)
-        except SimctlError:
+    for entry in filter_run_query(
+        queried,
+        status_filter=status_filter,
+        tag=tag,
+        experiment_id=experiment,
+        purpose=purpose,
+        review_status=review_status,
+        storage_tier=storage_tier,
+        storage_form=storage_form,
+    ):
+        manifest = entry.manifest
+        run_dir = entry.run_dir
+        if manifest is None:
+            rows.append(("???", "", "unknown", "-", "inspect_manifest", str(run_dir)))
             continue
 
         run_id = manifest.run.get("id", "???")
         display_name = manifest.run.get("display_name", "")
         run_status = manifest.run.get("status", "unknown")
-        tags: list[str] = manifest.classification.get("tags", [])
-
-        # Apply filters
-        if status_filter and run_status != status_filter:
-            continue
-        if (
-            not status_filter
-            and not include_archived
-            and (
-                run_status in {"archived", "purged"}
-                or find_archived_bundle(run_dir) is not None
-            )
-        ):
-            continue
-        if tag and tag not in tags:
-            continue
 
         readiness = readiness_for_bulk_view(run_dir, manifest=manifest)
         analysis_status = readiness.analysis_status if readiness is not None else "-"

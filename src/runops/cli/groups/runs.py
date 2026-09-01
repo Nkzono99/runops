@@ -16,6 +16,7 @@ from runops.cli.manage import archive, cancel, delete, purge_work, restore
 from runops.cli.regenerate import regenerate
 from runops.cli.relabel import relabel
 from runops.cli.retry import retry
+from runops.cli.review import review
 from runops.cli.status import status, sync
 from runops.cli.submit import run_cmd
 
@@ -41,6 +42,7 @@ runs_app.command("purge-work")(purge_work)
 runs_app.command("cancel")(cancel)
 runs_app.command("delete")(delete)
 runs_app.command("retry")(retry)
+runs_app.command("review")(review)
 runs_app.command("regenerate")(regenerate)
 runs_app.command("relabel")(relabel)
 

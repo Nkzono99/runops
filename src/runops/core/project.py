@@ -26,6 +26,16 @@ _LAUNCHERS_FILE = "launchers.toml"
 
 
 @dataclass(frozen=True)
+class ExperimentPolicy:
+    """Project-wide admission and work-in-progress limits for Experiments."""
+
+    require_experiment: bool = False
+    max_active_experiments: int = 5
+    default_max_materialized_runs: int = 3
+    max_unreviewed_completed_runs: int = 12
+
+
+@dataclass(frozen=True)
 class ProjectConfig:
     """Immutable representation of a runops project configuration.
 
@@ -45,6 +55,7 @@ class ProjectConfig:
     launchers: dict[str, dict[str, Any]] = field(default_factory=dict)
     knowledge: KnowledgeConfig | None = None
     research_budget: ResearchBudget = field(default_factory=ResearchBudget)
+    experiment_policy: ExperimentPolicy = field(default_factory=ExperimentPolicy)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -137,8 +148,87 @@ def load_project(project_dir: Path) -> ProjectConfig:
         launchers=launchers,
         knowledge=knowledge,
         research_budget=research_budget_from_raw(raw),
+        experiment_policy=_parse_experiment_policy(raw, project_file),
         raw=raw,
     )
+
+
+def _parse_experiment_policy(raw: dict[str, Any], path: Path) -> ExperimentPolicy:
+    """Parse optional ``[experiments.policy]`` without breaking legacy projects."""
+    experiments = raw.get("experiments")
+    if experiments is None:
+        return ExperimentPolicy()
+    if not isinstance(experiments, dict):
+        raise ProjectConfigError(f"[experiments] must be a table in {path}")
+
+    policy = experiments.get("policy")
+    if policy is None:
+        return ExperimentPolicy()
+    if not isinstance(policy, dict):
+        raise ProjectConfigError(f"[experiments.policy] must be a table in {path}")
+
+    defaults = ExperimentPolicy()
+    require_experiment = policy.get(
+        "require_experiment",
+        defaults.require_experiment,
+    )
+    if not isinstance(require_experiment, bool):
+        raise ProjectConfigError(
+            f"experiments.policy.require_experiment must be a boolean in {path}"
+        )
+
+    max_active_experiments = _parse_positive_policy_int(
+        policy,
+        "max_active_experiments",
+        defaults.max_active_experiments,
+        path,
+    )
+    default_max_materialized_runs = _parse_positive_policy_int(
+        policy,
+        "default_max_materialized_runs",
+        defaults.default_max_materialized_runs,
+        path,
+    )
+    max_unreviewed_completed_runs = _parse_non_negative_policy_int(
+        policy,
+        "max_unreviewed_completed_runs",
+        defaults.max_unreviewed_completed_runs,
+        path,
+    )
+    return ExperimentPolicy(
+        require_experiment=require_experiment,
+        max_active_experiments=max_active_experiments,
+        default_max_materialized_runs=default_max_materialized_runs,
+        max_unreviewed_completed_runs=max_unreviewed_completed_runs,
+    )
+
+
+def _parse_positive_policy_int(
+    policy: dict[str, Any],
+    key: str,
+    default: int,
+    path: Path,
+) -> int:
+    value = policy.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ProjectConfigError(
+            f"experiments.policy.{key} must be a positive integer in {path}"
+        )
+    return value
+
+
+def _parse_non_negative_policy_int(
+    policy: dict[str, Any],
+    key: str,
+    default: int,
+    path: Path,
+) -> int:
+    value = policy.get(key, default)
+    if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+        raise ProjectConfigError(
+            f"experiments.policy.{key} must be a non-negative integer in {path}"
+        )
+    return value
 
 
 def find_project_root(start: Path) -> Path:

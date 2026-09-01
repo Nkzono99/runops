@@ -24,8 +24,8 @@ research/
 ```
 
 - `CURRENT.md`: active question、現在判断、次の一手だけを置く mutable な入口。既定 50 行を目安に保つ。
-- `journal/active.md`: append-only。文字数上限に達したら原文のまま numbered segment へ移す。
-- `results/`: 人が残すと決めた解析だけ。説明は result ごとに `README.md` 1 枚。
+- `journal/active.md`: append-only。`--kind` / `--subject` で Experiment / Survey / Run に軽く紐付け、文字数上限に達したら原文のまま numbered segment へ移す。
+- `results/`: 人が残すと決めた解析だけ。説明は Result ごとに `README.md` 1 枚、claim と evidence edge は `manifest.toml`。
 - `artifacts/`: CSV、JSON、画像、script 等の実体。Markdown は禁止。
 - `.runops/work/`: goal 実行中の一時出力。Git 管理せず、active research memory に数えない。
 
@@ -56,11 +56,22 @@ artifact 内 Markdown、symlink、論理名が同じ複数形式を検査しま�
 runo research append "observation" "..."
 runo research rotate --force
 runo research new-result dust-release
+runo research seal R0001-dust-release \
+  --claim "..." --outcome supported \
+  --selection-reason "Why this source supports the claim" \
+  --evidence-run R2026...
+runo research check-result R0001-dust-release
 runo research archive R0001-dust-release
 runo research restore R0001-dust-release
 ```
 
 archive/restore は rename による可逆操作です。自動削除は行いません。
+
+evidence の採否は Result が所有し、Run に project-global な selected flag を置きません。
+TestAttempt の T ID と `.runops/test-runs/**` は scientific Result evidence にできません。
+case / survey の `notes.md` と Run `analysis/notes.md` は legacy な分散 narrative として
+`runo lint` が warning を出します。provisional prose は `.runops/work/`、時系列は journal、
+現在判断は CURRENT、残す説明は Result README に集約します。
 
 ## 旧 project の移行
 

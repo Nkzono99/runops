@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from runops.core.case import load_case, resolve_case
+from runops.core.case import load_case, parse_walltime_hours, resolve_case
 from runops.core.exceptions import CaseConfigError, CaseNotFoundError
 
 FIXTURES_DIR = Path(__file__).parent.parent / "fixtures"
@@ -64,6 +64,51 @@ class TestLoadCase:
         )
         case = load_case(tmp_path)
         assert case.params == {}
+
+    @pytest.mark.parametrize(
+        "walltime",
+        [
+            "",
+            "-01:00:00",
+            "00:00:00",
+            "01:60:00",
+            "01:00:60",
+            "1:00",
+        ],
+    )
+    def test_rejects_invalid_or_non_positive_walltime(
+        self,
+        tmp_path: Path,
+        walltime: str,
+    ) -> None:
+        (tmp_path / "case.toml").write_text(
+            "[case]\n"
+            'name = "test"\n'
+            'simulator = "sim"\n'
+            'launcher = "srun"\n\n'
+            "[job]\n"
+            f'walltime = "{walltime}"\n',
+            encoding="utf-8",
+        )
+
+        with pytest.raises(CaseConfigError, match="Invalid walltime"):
+            load_case(tmp_path)
+
+
+@pytest.mark.parametrize(
+    ("walltime", "expected_hours"),
+    [
+        ("0:00:01", 1 / 3600),
+        ("12:34:56", 12 + 34 / 60 + 56 / 3600),
+        ("120:00:00", 120.0),
+        ("5-00:00:00", 120.0),
+    ],
+)
+def test_parse_walltime_hours_preserves_supported_formats(
+    walltime: str,
+    expected_hours: float,
+) -> None:
+    assert parse_walltime_hours(walltime) == pytest.approx(expected_hours)
 
 
 class TestResolveCase:

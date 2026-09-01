@@ -214,6 +214,22 @@ class TestGenerateJobScript:
                 "srun ./solver",
             )
 
+    @pytest.mark.parametrize(
+        "walltime",
+        ["", "00:00:00", "-01:00:00", "01:60:00", "01:00:60"],
+    )
+    def test_invalid_or_non_positive_walltime_raises(
+        self,
+        run_dir: Path,
+        walltime: str,
+    ) -> None:
+        with pytest.raises(JobScriptError, match="Invalid walltime"):
+            generate_job_script(
+                run_dir,
+                {"partition": "debug", "ntasks": 4, "walltime": walltime},
+                "srun ./solver",
+            )
+
     def test_no_partition_omits_directive(self, run_dir: Path) -> None:
         """Partition is optional (can be set at submit time with -qn)."""
         path = generate_job_script(

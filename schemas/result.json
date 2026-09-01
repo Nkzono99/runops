@@ -1,0 +1,146 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "research Result manifest.toml",
+  "description": "Canonical claim, Result-local evidence selection, and immutable seal receipt",
+  "type": "object",
+  "required": ["result"],
+  "properties": {
+    "result": {
+      "type": "object",
+      "required": ["schema_version", "id", "status", "title", "claim", "outcome"],
+      "properties": {
+        "schema_version": {"type": "integer", "const": 1},
+        "id": {
+          "type": "string",
+          "pattern": "^R[0-9]{4}-[a-z0-9][a-z0-9-]*$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "sealed"]
+        },
+        "title": {"type": "string", "minLength": 1},
+        "claim": {"type": "string"},
+        "outcome": {
+          "type": "string",
+          "enum": ["", "supported", "refuted", "inconclusive", "invalid"]
+        }
+      },
+      "additionalProperties": true
+    },
+    "evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["kind", "disposition", "role", "reason"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["run", "path"]},
+          "run_id": {
+            "type": "string",
+            "pattern": "^R[0-9]{8}-[0-9]{4}$"
+          },
+          "path": {"type": "string"},
+          "disposition": {
+            "type": "string",
+            "enum": ["include", "exclude"]
+          },
+          "role": {"type": "string", "minLength": 1},
+          "reason": {"type": "string"},
+          "source_path": {"type": "string", "minLength": 1},
+          "owner_kind": {
+            "type": "string",
+            "enum": ["run", "result"]
+          },
+          "owner_id": {"type": "string", "minLength": 1},
+          "owner_relative_path": {"type": "string", "minLength": 1},
+          "receipt_kind": {
+            "type": "string",
+            "enum": ["run-scientific-snapshot-v1", "file-bytes-v1"]
+          },
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "bytes": {"type": "integer", "minimum": 0}
+        },
+        "allOf": [
+          {
+            "if": {"properties": {"kind": {"const": "run"}}},
+            "then": {"required": ["run_id"]}
+          },
+          {
+            "if": {"properties": {"kind": {"const": "path"}}},
+            "then": {"required": ["path"]}
+          },
+          {
+            "if": {"properties": {"disposition": {"const": "exclude"}}},
+            "then": {"properties": {"reason": {"minLength": 1}}}
+          },
+          {
+            "if": {"properties": {"disposition": {"const": "include"}}},
+            "then": {"properties": {"reason": {"minLength": 1}}}
+          }
+        ],
+        "additionalProperties": true
+      }
+    },
+    "seal": {
+      "type": "object",
+      "required": [
+        "sealed_at",
+        "content_sha256",
+        "readme_sha256",
+        "readme_bytes"
+      ],
+      "properties": {
+        "sealed_at": {"type": "string", "format": "date-time"},
+        "content_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "readme_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+        "readme_bytes": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "result": {
+            "properties": {"status": {"const": "sealed"}}
+          }
+        }
+      },
+      "then": {
+        "required": ["evidence", "seal"],
+        "properties": {
+          "result": {
+            "properties": {
+              "claim": {"minLength": 1},
+              "outcome": {
+                "enum": ["supported", "refuted", "inconclusive", "invalid"]
+              }
+            }
+          },
+          "evidence": {
+            "minItems": 1,
+            "contains": {
+              "type": "object",
+              "properties": {
+                "disposition": {"const": "include"}
+              },
+              "required": ["disposition"]
+            },
+            "items": {
+              "required": ["source_path", "receipt_kind", "sha256", "bytes"],
+              "allOf": [
+                {
+                  "if": {"properties": {"kind": {"const": "path"}}},
+                  "then": {
+                    "required": ["owner_kind", "owner_id", "owner_relative_path"]
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
+  "additionalProperties": true
+}

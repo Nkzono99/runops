@@ -52,6 +52,9 @@ class TestInit:
         assert (tmp_path / "campaign.toml").exists()
         assert (tmp_path / "cases").is_dir()
         assert (tmp_path / "runs").is_dir()
+        assert (tmp_path / "experiments").is_dir()
+        assert (tmp_path / ".runops/test-runs").is_dir()
+        assert (tmp_path / ".runops/cache").is_dir()
         assert (tmp_path / ".gitignore").exists()
 
     def test_new_project_scaffolds_bounded_research_workspace(
@@ -97,6 +100,8 @@ class TestInit:
         assert "current_lines = 50" in config
         assert "current_path_references = 10" in config
         assert "current_chronological_headings = 3" in config
+        assert "[experiments.policy]" in config
+        assert "require_experiment = true" in config
 
     def test_init_creates_research_workspace_skill(self, tmp_path: Path) -> None:
         runner.invoke(app, ["init", "-y", "--path", str(tmp_path)])
@@ -211,6 +216,9 @@ class TestInit:
         assert "materials/**/*.zip" in content
         assert "!materials/README.md" in content
         assert "!materials/index.toml" in content
+        assert ".runops/test-runs/" in content
+        assert ".runops/cache/" in content
+        assert ".runops/*.lock" in content
         assert "AGENTS.override.md" in content
 
     def test_init_vscode_settings_keep_run_artifacts_visible(
@@ -470,7 +478,8 @@ class TestInit:
         assert "## 実行契約" in analyze_content
         assert "**Invariant**" in analyze_content
         assert "--list-recipes" in analyze_content
-        assert "analysis/scratch/" in analyze_content
+        assert ".runops/work/" in analyze_content
+        assert "analysis/scratch/" not in analyze_content
         assert "research/results/" in analyze_content
         summarize_content = (skills_dir / "summarize-script" / "SKILL.md").read_text(
             encoding="utf-8"
@@ -554,7 +563,8 @@ class TestInit:
         workflow = (rules_dir / "runops-workflow.md").read_text(encoding="utf-8")
         assert "manifest.toml" in workflow
         assert "SITE.md" in workflow
-        assert "analysis/scratch/" in workflow
+        assert ".runops/work/" in workflow
+        assert "analysis/scratch/" not in workflow
         assert "promote-fact" in workflow
         # Behavioural rules that used to live in PreToolUse hooks must now be
         # documented in this rule file.
@@ -572,7 +582,8 @@ class TestInit:
         assert "case.toml" in cases_content
         runs_content = (tmp_path / "runs" / "CLAUDE.md").read_text(encoding="utf-8")
         assert "manifest.toml" in runs_content
-        assert "analysis/scratch/" in runs_content
+        assert ".runops/work/" in runs_content
+        assert "analysis/scratch/" not in runs_content
         assert (tmp_path / "cases" / "AGENTS.md").read_text(
             encoding="utf-8"
         ) == cases_content

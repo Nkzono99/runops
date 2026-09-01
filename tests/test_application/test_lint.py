@@ -376,6 +376,93 @@ def test_project_lint_warns_when_current_state_exceeds_line_guidance(
     assert report.status == "warning"
 
 
+def test_project_lint_warns_for_dispersed_experiment_narratives(
+    tmp_path: Path,
+) -> None:
+    _write_project(tmp_path)
+    case = tmp_path / "cases" / "base"
+    case.mkdir(parents=True)
+    (case / "case.toml").write_text("[case]\nname = 'base'\n", encoding="utf-8")
+    (case / "notes.md").write_text("trial notes\n", encoding="utf-8")
+    (case / "idea.md").write_text("another trial\n", encoding="utf-8")
+    (case / "AGENTS.md").write_text("policy\n", encoding="utf-8")
+
+    survey = tmp_path / "runs" / "scan"
+    survey.mkdir(parents=True)
+    (survey / "survey.toml").write_text("[survey]\nid = 'scan'\n", encoding="utf-8")
+    (survey / "notes.md").write_text("survey notes\n", encoding="utf-8")
+    (survey / "summary").mkdir()
+    (survey / "summary" / "survey_summary.md").write_text(
+        "generated report\n", encoding="utf-8"
+    )
+
+    run_dir = survey / "R20260801-0001"
+    (run_dir / "analysis").mkdir(parents=True)
+    (run_dir / "manifest.toml").write_text(
+        '[run]\nid = "R20260801-0001"\nstatus = "created"\n',
+        encoding="utf-8",
+    )
+    (run_dir / "analysis" / "notes.md").write_text(
+        "run analysis notes\n", encoding="utf-8"
+    )
+    (run_dir / "analysis" / "tmp-summary-v2.md").write_text(
+        "temporary summary\n", encoding="utf-8"
+    )
+
+    top_notes = tmp_path / "notes" / "experiment-alpha.md"
+    top_notes.parent.mkdir()
+    top_notes.write_text("old experiment note\n", encoding="utf-8")
+    top_analysis = tmp_path / "analysis" / "analysis-notes.md"
+    top_analysis.parent.mkdir()
+    top_analysis.write_text("cross-run narrative\n", encoding="utf-8")
+    experiment_note = tmp_path / "experiments" / "E20260801-0001-notes.md"
+    experiment_note.parent.mkdir()
+    experiment_note.write_text("experiment prose\n", encoding="utf-8")
+    scratch_note = tmp_path / "scratch" / "renamed-observation.md"
+    scratch_note.parent.mkdir()
+    scratch_note.write_text("scratch prose\n", encoding="utf-8")
+    (tmp_path / "idea.md").write_text("root idea\n", encoding="utf-8")
+    disguised = tmp_path / "scratch" / "README.md"
+    disguised.write_text("disguised experiment prose\n", encoding="utf-8")
+    nested_journal = tmp_path / "research" / "journal" / "topic" / "note.md"
+    nested_journal.parent.mkdir(parents=True)
+    nested_journal.write_text("unbounded journal branch\n", encoding="utf-8")
+
+    for path in (
+        tmp_path / "docs" / "notes.md",
+        tmp_path / "_handoff" / "new_rules.md",
+        tmp_path / "materials" / "README.md",
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("allowed markdown\n", encoding="utf-8")
+
+    report = run_project_lint(tmp_path, scopes=("knowledge",))
+    narrative_issues = [
+        issue
+        for issue in report.issues
+        if issue.issue_id == "knowledge.dispersed_experiment_narrative"
+    ]
+
+    actual_paths = {
+        issue.path.relative_to(tmp_path).as_posix() for issue in narrative_issues
+    }
+    assert actual_paths == {
+        "analysis/analysis-notes.md",
+        "cases/base/idea.md",
+        "cases/base/notes.md",
+        "experiments/E20260801-0001-notes.md",
+        "idea.md",
+        "notes/experiment-alpha.md",
+        "research/journal/topic/note.md",
+        "runs/scan/notes.md",
+        "runs/scan/R20260801-0001/analysis/notes.md",
+        "runs/scan/R20260801-0001/analysis/tmp-summary-v2.md",
+        "scratch/renamed-observation.md",
+        "scratch/README.md",
+    }
+    assert all(issue.severity == "warning" for issue in narrative_issues)
+
+
 def test_project_lint_reports_incomplete_codex_plugin_metadata(
     tmp_path: Path,
 ) -> None:

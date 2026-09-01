@@ -50,6 +50,10 @@ def _create_runops_skeleton(project_dir: Path, created: list[str]) -> None:
         created.append(".runops/")
     if _mkdir_if_missing(runops_dir / "work"):
         created.append(".runops/work/")
+    if _mkdir_if_missing(runops_dir / "test-runs"):
+        created.append(".runops/test-runs/")
+    if _mkdir_if_missing(runops_dir / "cache"):
+        created.append(".runops/cache/")
     # Knowledge integration directories
     if _mkdir_if_missing(runops_dir / "knowledge"):
         created.append(".runops/knowledge/")

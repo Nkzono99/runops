@@ -22,8 +22,79 @@ class CliOperationBinding:
 
 
 CLI_OPERATION_BINDINGS: tuple[CliOperationBinding, ...] = (
+    CliOperationBinding(
+        ("experiments", "create"),
+        ("create_experiment",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("experiments", "review"),
+        ("review_experiment",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("experiments", "close"),
+        ("close_experiment",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("test", "smoke"),
+        ("prepare_test_attempt",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("test", "debug"),
+        ("prepare_test_attempt",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("test", "record"),
+        ("record_test_result",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("test", "clean"),
+        ("clean_test_attempts",),
+        "destructive",
+    ),
+    CliOperationBinding(
+        ("research", "new-result"),
+        ("create_result",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("research", "check-result"),
+        ("check_result",),
+        "read",
+    ),
+    CliOperationBinding(
+        ("research", "seal"),
+        ("seal_result",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("research", "archive"),
+        ("archive_result",),
+        "write",
+    ),
+    CliOperationBinding(
+        ("research", "restore"),
+        ("restore_result",),
+        "write",
+    ),
     CliOperationBinding(("runs", "create"), ("create_run",), "write"),
-    CliOperationBinding(("runs", "sweep"), ("create_survey",), "write"),
+    CliOperationBinding(("runs", "clone"), ("clone_run",), "write"),
+    CliOperationBinding(("runs", "extend"), ("extend_run",), "external"),
+    CliOperationBinding(
+        ("runs", "regenerate"),
+        ("inspect_regeneration",),
+        "read",
+    ),
+    CliOperationBinding(
+        ("runs", "sweep"),
+        ("plan_survey", "create_survey"),
+        "write",
+    ),
     CliOperationBinding(("runs", "submit"), ("submit_run",), "external"),
     CliOperationBinding(("runs", "sync"), ("sync_run",), "external"),
     CliOperationBinding(("runs", "log"), ("show_log",), "read"),
@@ -53,6 +124,7 @@ CLI_OPERATION_BINDINGS: tuple[CliOperationBinding, ...] = (
     ),
     CliOperationBinding(("runs", "cancel"), ("cancel_run",), "destructive"),
     CliOperationBinding(("runs", "delete"), ("delete_run",), "destructive"),
+    CliOperationBinding(("runs", "review"), ("review_run",), "write"),
     CliOperationBinding(("knowledge", "save"), ("save_insight",), "write"),
     CliOperationBinding(("knowledge", "add-fact"), ("add_fact",), "write"),
     CliOperationBinding(

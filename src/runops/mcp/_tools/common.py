@@ -8,7 +8,7 @@ from pathlib import Path
 from time import perf_counter
 from typing import Any
 
-from runops.core.discovery import discover_runs, resolve_run
+from runops.core.discovery import discover_runs, require_run_directory, resolve_run
 from runops.core.exceptions import SimctlError
 from runops.core.manifest import ManifestData
 from runops.core.project import ProjectConfig, find_project_root
@@ -38,14 +38,25 @@ def _resolve_project_root(project_root: str | None) -> Path:
 def _resolve_run_dir(run: str, project_root: Path) -> Path:
     candidate = Path(run).expanduser()
     if candidate.is_absolute() and (candidate / "manifest.toml").exists():
-        return candidate.resolve()
+        return _require_project_run(candidate, project_root)
     relative = (project_root / candidate).resolve()
     if (relative / "manifest.toml").exists():
-        return relative
+        return _require_project_run(relative, project_root)
     cwd_relative = (Path.cwd() / candidate).resolve()
     if (cwd_relative / "manifest.toml").exists():
-        return cwd_relative
+        return _require_project_run(cwd_relative, project_root)
     return resolve_run(run, project_root / "runs")
+
+
+def _require_project_run(candidate: Path, project_root: Path) -> Path:
+    resolved = require_run_directory(candidate)
+    try:
+        resolved.relative_to((project_root / "runs").resolve())
+    except ValueError as exc:
+        raise SimctlError(
+            f"Run path is outside the project runs/ namespace: {resolved}"
+        ) from exc
+    return resolved
 
 
 def _run_summary(

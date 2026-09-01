@@ -120,6 +120,11 @@ schema contract:
 error / blocked も JSON-RPC protocol error ではなく、通常の tool result envelope として
 返す。protocol request 自体が壊れている場合だけ JSON-RPC error になる。
 
+`runops.project.status` と `runops.project.inspect` は canonical `runs/` namespace を
+完全走査できない場合に正常な 0 件を返さない。`status="warning"`、
+`runs.namespace_available=false`、nullable count と `run_namespace_unavailable` warning を
+返し、inspect では Run 由来件数を `null` にしたまま既知の Experiment metadata を保持する。
+
 ## Exposed Tools
 
 ### Common provider tools
@@ -134,12 +139,14 @@ error / blocked も JSON-RPC protocol error ではなく、通常の tool result
 | `runops.project.inspect` | inspect | `runo context` 相当の詳細 context。推奨 Codex plugins も含む |
 | `runops.project.plugins` | read | 推奨 Codex plugins と推薦メタデータ検査結果 |
 | `runops.project.doctor` | read | project diagnostics。環境保存などの mutation はしない |
+| `runops.experiment.list` | read | bounded Experiment の question / lifecycle / decision / budget を一覧する |
+| `runops.survey.plan` | plan | lazy candidate page、plan hash、cost、admission issue を返す。directory / Run ID は作らない |
 
 ### run / Slurm tools
 
 | Tool | Safety | 内容 |
 |------|--------|------|
-| `runops.run.list` | read | manifest と cached readiness、次 command、readiness 集計を bulk で返す。deep evaluation は起動しない |
+| `runops.run.list` | read | manifest と cached readiness、次 command、readiness 集計を bulk で返す。既定 active view、`include_archived=true` で all view。deep evaluation は起動しない |
 | `runops.run.inspect` | inspect | run manifest と cached/deep readiness、reason code、次 command を返す |
 | `runops.run.logs` | inspect | 最新 stdout/stderr log の tail を返す |
 | `runops.slurm.queue` | inspect | manifest に記録された job 情報を一覧する |
@@ -215,6 +222,8 @@ enabled_tools = [
   "runops.project.inspect",
   "runops.project.plugins",
   "runops.project.doctor",
+  "runops.experiment.list",
+  "runops.survey.plan",
   "runops.publication.exports.list",
   "runops.publication.export.inspect",
   "runops.analysis.artifacts",

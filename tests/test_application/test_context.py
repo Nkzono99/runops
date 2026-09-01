@@ -21,13 +21,321 @@ from runops.application.context import (
     _load_simulator_names,
     build_project_context,
 )
+from runops.core.discovery import RunDiscoveryError
 from runops.core.exceptions import SimctlError
+from runops.core.manifest import ManifestData, write_manifest
 
 
 def _write_toml(path: Path, data: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as f:
         tomli_w.dump(data, f)
+
+
+def _write_known_experiment(root: Path) -> str:
+    experiment_id = "E20260901-0001"
+    _write_toml(
+        root / "experiments" / f"{experiment_id}--question.toml",
+        {
+            "schema_version": 1,
+            "experiment": {
+                "id": experiment_id,
+                "title": "Known question",
+                "question": "Can the Run namespace be inspected?",
+                "lifecycle": "active",
+                "intent": "explore",
+                "decision": "pending",
+                "outcome": "unknown",
+                "created_at": "2026-09-01T00:00:00+00:00",
+                "created_by": "human",
+            },
+            "baseline": {"run_ids": [], "reason": "No baseline is needed."},
+            "budget": {
+                "max_planned_points": 3,
+                "max_materialized_runs": 3,
+                "max_active_runs": 2,
+                "max_core_hours": 10.0,
+                "max_unreviewed_runs": 2,
+                "expires_at": "2099-01-01T00:00:00+00:00",
+            },
+            "exit": {"criteria": ["Stop after resolving the response."]},
+        },
+    )
+    return experiment_id
+
+
+def test_context_keeps_cold_unreviewed_runs_in_experiment_backlog(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    experiment_id = "E20260901-0001"
+    _write_toml(
+        tmp_path / "experiments" / f"{experiment_id}--question.toml",
+        {
+            "schema_version": 1,
+            "experiment": {
+                "id": experiment_id,
+                "title": "Bounded question",
+                "question": "Does the response change?",
+                "lifecycle": "active",
+                "intent": "explore",
+                "decision": "pending",
+                "outcome": "unknown",
+                "created_at": "2026-09-01T00:00:00+00:00",
+                "created_by": "human",
+            },
+            "baseline": {"run_ids": [], "reason": "No baseline is needed."},
+            "budget": {
+                "max_planned_points": 3,
+                "max_materialized_runs": 3,
+                "max_active_runs": 2,
+                "max_core_hours": 10.0,
+                "max_unreviewed_runs": 2,
+                "expires_at": "2099-01-01T00:00:00+00:00",
+            },
+            "exit": {"criteria": ["Stop after resolving the response."]},
+        },
+    )
+    for sequence, status in enumerate(("completed", "archived", "purged"), start=1):
+        write_manifest(
+            tmp_path / "runs" / f"R20260901-{sequence:04d}",
+            ManifestData(
+                run={"id": f"R20260901-{sequence:04d}", "status": status},
+                intent={"experiment_id": experiment_id, "purpose": "explore"},
+                curation={"review_status": "unreviewed"},
+            ),
+        )
+
+    context = build_project_context(tmp_path)
+    experiment = context["experiments"]["items"][0]
+
+    assert experiment["runs"] == 1
+    assert experiment["unreviewed_completed"] == 3
+
+
+def test_context_counts_incomplete_review_record_as_unreviewed(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    experiment_id = _write_known_experiment(tmp_path)
+    write_manifest(
+        tmp_path / "runs" / "R20260901-0001",
+        ManifestData(
+            run={"id": "R20260901-0001", "status": "completed"},
+            intent={"experiment_id": experiment_id, "purpose": "explore"},
+            curation={
+                "review_status": "reviewed",
+                "reviewed_at": "2026-09-01T00:00:00+00:00",
+                "reviewed_by": "human",
+                "reason": "",
+            },
+        ),
+    )
+
+    context = build_project_context(tmp_path)
+
+    assert context["experiments"]["items"][0]["unreviewed_completed"] == 1
+
+
+def test_context_preserves_experiments_when_run_namespace_has_symlink(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    experiment_id = "E20260901-0001"
+    _write_toml(
+        tmp_path / "experiments" / f"{experiment_id}--question.toml",
+        {
+            "schema_version": 1,
+            "experiment": {
+                "id": experiment_id,
+                "title": "Known question",
+                "question": "Can the Run namespace be inspected?",
+                "lifecycle": "active",
+                "intent": "explore",
+                "decision": "pending",
+                "outcome": "unknown",
+                "created_at": "2026-09-01T00:00:00+00:00",
+                "created_by": "human",
+            },
+            "baseline": {"run_ids": [], "reason": "No baseline is needed."},
+            "budget": {
+                "max_planned_points": 3,
+                "max_materialized_runs": 3,
+                "max_active_runs": 2,
+                "max_core_hours": 10.0,
+                "max_unreviewed_runs": 2,
+                "expires_at": "2099-01-01T00:00:00+00:00",
+            },
+            "exit": {"criteria": ["Stop after resolving the response."]},
+        },
+    )
+    runs_dir = tmp_path / "runs"
+    runs_dir.mkdir()
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    (runs_dir / "unsafe").symlink_to(outside, target_is_directory=True)
+
+    context = build_project_context(tmp_path)
+
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert context["experiments"]["total"] == 1
+    assert context["experiments"]["active"] == 1
+    assert context["experiments"]["run_namespace_available"] is False
+    assert context["experiments"]["items"] == [
+        {
+            "id": experiment_id,
+            "title": "Known question",
+            "intent": "explore",
+            "decision": "pending",
+            "runs": None,
+            "unreviewed_completed": None,
+            "max_materialized_runs": 3,
+            "max_active_runs": 2,
+        }
+    ]
+    assert context["status"] == "degraded"
+    assert context["section_status"]["runs"] == "error"
+    assert any(
+        diagnostic["section"] == "runs" and "symbolic link" in diagnostic["message"]
+        for diagnostic in context["diagnostics"]
+    )
+
+
+def test_context_marks_every_run_derived_field_unavailable_for_corrupt_manifest(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    experiment_id = _write_known_experiment(tmp_path)
+    broken = tmp_path / "runs" / "broken"
+    broken.mkdir(parents=True)
+    (broken / "manifest.toml").write_text("[run\n", encoding="utf-8")
+
+    context = build_project_context(tmp_path)
+
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert context["experiments"]["total"] == 1
+    assert context["experiments"]["active"] == 1
+    assert context["experiments"]["run_namespace_available"] is False
+    experiment = context["experiments"]["items"][0]
+    assert experiment["id"] == experiment_id
+    assert experiment["runs"] is None
+    assert experiment["unreviewed_completed"] is None
+    assert context["status"] == "degraded"
+    assert any(
+        diagnostic["section"] == "runs"
+        and "manifest is invalid" in diagnostic["message"]
+        for diagnostic in context["diagnostics"]
+    )
+
+
+def test_context_marks_run_counts_unavailable_for_duplicate_run_id(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    run_id = "R20260901-0001"
+    write_manifest(
+        tmp_path / "runs" / "active" / run_id,
+        ManifestData(run={"id": run_id, "status": "running"}),
+    )
+    write_manifest(
+        tmp_path / "runs" / "_archive" / "old" / run_id,
+        ManifestData(run={"id": run_id, "status": "archived"}),
+    )
+
+    context = build_project_context(tmp_path)
+
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert context["experiments"]["run_namespace_available"] is False
+    assert context["status"] == "degraded"
+    assert any(
+        diagnostic["section"] == "runs"
+        and run_id in diagnostic["message"]
+        and "duplicated" in diagnostic["message"]
+        for diagnostic in context["diagnostics"]
+    )
+
+
+def test_context_marks_walk_error_counts_unavailable(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    (tmp_path / "runs").mkdir()
+
+    with patch(
+        "runops.application.run_query.discover_runs_checked",
+        side_effect=RunDiscoveryError("unreadable subtree"),
+    ):
+        context = build_project_context(tmp_path)
+
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert context["status"] == "degraded"
+    assert any(
+        diagnostic["section"] == "runs"
+        and "unreadable subtree" in diagnostic["message"]
+        for diagnostic in context["diagnostics"]
+    )
+
+
+def test_context_reconciles_stats_only_scan_failure_across_run_derived_sections(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    experiment_id = _write_known_experiment(tmp_path)
+    (tmp_path / "runs").mkdir()
+
+    with patch(
+        "runops.application.context.query_runs",
+        side_effect=[
+            [],
+            [],
+            RunDiscoveryError("stats scan failed"),
+            [],
+            [],
+        ],
+    ) as query:
+        context = build_project_context(tmp_path)
+
+    assert query.call_count == 5
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert context["experiments"]["run_namespace_available"] is False
+    experiment = context["experiments"]["items"][0]
+    assert experiment["id"] == experiment_id
+    assert experiment["runs"] is None
+    assert experiment["unreviewed_completed"] is None
+
+
+def test_context_reconciles_experiment_only_scan_failure_across_run_sections(
+    tmp_path: Path,
+) -> None:
+    _write_toml(tmp_path / "runops.toml", {"project": {"name": "context"}})
+    experiment_id = _write_known_experiment(tmp_path)
+    (tmp_path / "runs").mkdir()
+
+    with patch(
+        "runops.application.context.query_runs",
+        side_effect=[
+            RunDiscoveryError("experiment scan failed"),
+            [],
+            [],
+            [],
+            [],
+        ],
+    ) as query:
+        context = build_project_context(tmp_path)
+
+    assert query.call_count == 5
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert context["experiments"]["run_namespace_available"] is False
+    experiment = context["experiments"]["items"][0]
+    assert experiment["id"] == experiment_id
+    assert experiment["runs"] is None
+    assert experiment["unreviewed_completed"] is None
 
 
 def test_context_includes_knowledge_integration_details(tmp_path: Path) -> None:
@@ -376,7 +684,7 @@ def test_context_research_helper_reports_missing_state(
     assert section_status == {}
 
 
-def test_collect_run_stats_counts_states_and_broken_manifests(tmp_path: Path) -> None:
+def test_collect_run_stats_fails_closed_for_one_broken_manifest(tmp_path: Path) -> None:
     runs_dir = tmp_path / "runs"
     _write_toml(
         runs_dir / "R20260409-0001" / "manifest.toml",
@@ -395,11 +703,11 @@ def test_collect_run_stats_counts_states_and_broken_manifests(tmp_path: Path) ->
 
     stats = _collect_run_stats(tmp_path, diagnostics, section_status)
 
-    assert stats["running"] == 1
-    assert stats["failed"] == 1
-    assert stats["unknown"] == 1
-    assert stats["total"] == 3
-    assert diagnostics == []
+    assert stats == {"namespace_available": False, "total": None}
+    assert section_status == {"runs": "error"}
+    assert len(diagnostics) == 1
+    assert diagnostics[0]["section"] == "runs"
+    assert "manifest is invalid" in diagnostics[0]["message"]
 
 
 def test_collect_run_stats_includes_completed_readiness_problems(
@@ -477,6 +785,46 @@ def test_collect_recent_failures_returns_only_failed_runs(tmp_path: Path) -> Non
             "partial_outputs": {},
         }
     ]
+
+
+def test_context_run_views_exclude_inactive_and_archived_bundle_runs(
+    tmp_path: Path,
+) -> None:
+    runs_dir = tmp_path / "runs"
+    _write_toml(
+        runs_dir / "R20260409-0001" / "manifest.toml",
+        {
+            "run": {
+                "id": "R20260409-0001",
+                "status": "failed",
+                "failure_reason": "active failure",
+            }
+        },
+    )
+    _write_toml(
+        runs_dir / "R20260409-0002" / "manifest.toml",
+        {"run": {"id": "R20260409-0002", "status": "archived"}},
+    )
+    bundle = runs_dir / "_archive" / "old-survey"
+    _write_toml(
+        bundle / "R20260409-0003" / "manifest.toml",
+        {
+            "run": {
+                "id": "R20260409-0003",
+                "status": "failed",
+                "failure_reason": "inactive failure",
+            }
+        },
+    )
+    (bundle / ".runops-archive.toml").write_text(
+        '[bundle]\narchived_from = "runs/old-survey"\n', encoding="utf-8"
+    )
+
+    stats = _collect_run_stats(tmp_path, [], {})
+    failures = _collect_recent_failures(tmp_path, [], {})
+
+    assert stats == {"failed": 1, "namespace_available": True, "total": 1}
+    assert [failure["run_id"] for failure in failures] == ["R20260409-0001"]
 
 
 def test_collect_facts_summary_serializes_local_and_candidate_fields(

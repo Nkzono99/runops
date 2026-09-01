@@ -11,10 +11,13 @@ from runops.core.exceptions import SurveyConfigError
 from runops.core.survey import (
     NamingConfig,
     NamingGroup,
+    canonical_data_hash,
+    count_survey_points,
     expand_axes,
     expand_survey,
     generate_display_name,
     generate_semantic_label,
+    iter_survey_points,
     load_survey,
     render_run_directory_name,
 )
@@ -81,6 +84,78 @@ class TestLoadSurvey:
         assert len(survey.linked) == 1
         assert survey.linked[0]["nx"] == [32, 64]
         assert survey.linked[0]["ny"] == [32, 64]
+
+    def test_load_bounded_experiment_metadata(self, tmp_path: Path) -> None:
+        (tmp_path / "survey.toml").write_text(
+            '[survey]\nid = "S1"\nbase_case = "c"\nsimulator = "s"\n'
+            'launcher = "l"\nexperiment_id = "E20260901-0001"\nphase = "pilot"\n\n'
+            '[intent]\npurpose = "explore"\n'
+            'information_gap = "The response shape is unknown"\n'
+            'baseline_run = "R20260820-0012"\ncreated_by = "agent"\n'
+            'goal_id = "G20260901-0041"\n\n'
+            "[budget]\nmax_materialized_runs = 3\nmax_core_hours = 100.0\n\n"
+            '[retention]\nclass = "working"\nreview_after = "2026-09-15"\n'
+            'expire_after = "2026-10-01"\n\n'
+            "[axes]\nx = [1, 2]\n"
+        )
+
+        survey = load_survey(tmp_path)
+
+        assert survey.experiment_id == "E20260901-0001"
+        assert survey.phase == "pilot"
+        assert survey.intent.purpose == "explore"
+        assert survey.intent.information_gap == "The response shape is unknown"
+        assert survey.intent.baseline_run == "R20260820-0012"
+        assert survey.intent.created_by == "agent"
+        assert survey.intent.goal_id == "G20260901-0041"
+        assert survey.budget.max_materialized_runs == 3
+        assert survey.budget.max_core_hours == 100.0
+        assert survey.retention.classification == "working"
+        assert survey.retention.review_after == "2026-09-15"
+        assert survey.retention.expire_after == "2026-10-01"
+
+    def test_rejects_symlinked_survey_definition(self, tmp_path: Path) -> None:
+        external = tmp_path / "external-survey.toml"
+        external.write_text(
+            '[survey]\nid = "S1"\nbase_case = "c"\nsimulator = "s"\n'
+            'launcher = "l"\n\n[axes]\nx = [1]\n',
+            encoding="utf-8",
+        )
+        survey_dir = tmp_path / "survey"
+        survey_dir.mkdir()
+        (survey_dir / "survey.toml").symlink_to(external)
+
+        with pytest.raises(SurveyConfigError, match="single-link regular file"):
+            load_survey(survey_dir)
+
+    @pytest.mark.parametrize(
+        ("section", "message"),
+        [
+            ('experiment_id = "bad"\n', "experiment_id"),
+            ('phase = "validation"\n', "phase"),
+            ('\n[intent]\npurpose = "smoke"\n', "intent.purpose"),
+            ("\n[budget]\nmax_materialized_runs = 0\n", "max_materialized_runs"),
+            ("\n[budget]\nmax_core_hours = true\n", "max_core_hours"),
+            ("\n[budget]\nmax_core_hours = nan\n", "max_core_hours"),
+            ("\n[budget]\nmax_core_hours = inf\n", "max_core_hours"),
+            ("\n[budget]\nmax_core_hours = -inf\n", "max_core_hours"),
+        ],
+    )
+    def test_rejects_invalid_bounded_metadata(
+        self,
+        tmp_path: Path,
+        section: str,
+        message: str,
+    ) -> None:
+        (tmp_path / "survey.toml").write_text(
+            '[survey]\nid = "S1"\nbase_case = "c"\nsimulator = "s"\n'
+            'launcher = "l"\n'
+            f"{section}"
+            "\n[axes]\nx = [1]\n"
+        )
+
+        with pytest.raises(SurveyConfigError, match=message):
+            load_survey(tmp_path)
 
     def test_load_semantic_naming_config(self, tmp_path: Path) -> None:
         (tmp_path / "survey.toml").write_text(
@@ -280,6 +355,54 @@ class TestExpandSurvey:
         assert result[0] == {"seed": 1, "nx": 32, "ny": 32}
         assert result[1] == {"seed": 1, "nx": 64, "ny": 64}
         assert result[2] == {"seed": 1, "nx": 128, "ny": 128}
+
+
+class TestLazySurveyPoints:
+    def test_count_does_not_expand_cartesian_product(self) -> None:
+        assert (
+            count_survey_points(
+                {"seed": list(range(1000)), "angle": list(range(2000))},
+                [{"nx": [32, 64], "ny": [32, 64]}],
+            )
+            == 4_000_000
+        )
+        assert count_survey_points({}, []) == 0
+
+    def test_iter_points_is_lazy_deterministic_and_uses_full_params(self) -> None:
+        iterator = iter_survey_points(
+            {"seed": [1, 2]},
+            [{"nx": [32, 64], "ny": [32, 64]}],
+            base_params={"dt": 0.1, "seed": 0},
+        )
+
+        first = next(iterator)
+        second = next(iterator)
+
+        assert first.ordinal == 1
+        assert first.params == {"dt": 0.1, "seed": 1, "nx": 32, "ny": 32}
+        assert second.ordinal == 2
+        assert second.params == {"dt": 0.1, "seed": 1, "nx": 64, "ny": 64}
+        assert first.point_id.startswith("sha256:")
+        assert first.point_id == canonical_data_hash(first.params)
+        assert first.point_id != second.point_id
+
+    def test_point_hash_is_mapping_order_independent(self) -> None:
+        assert canonical_data_hash({"a": 1, "b": [2, 3]}) == canonical_data_hash(
+            {"b": [2, 3], "a": 1}
+        )
+
+    def test_duplicate_effective_params_keep_same_id_for_caller_detection(self) -> None:
+        points = list(
+            iter_survey_points(
+                {"seed": [1, 1]},
+                [],
+                base_params={"nx": 32},
+            )
+        )
+
+        assert len(points) == 2
+        assert points[0].ordinal != points[1].ordinal
+        assert points[0].point_id == points[1].point_id
 
 
 class TestGenerateDisplayName:

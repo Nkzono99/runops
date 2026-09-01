@@ -3,7 +3,7 @@
 import fcntl  # noqa: F401 - compatibility patch point
 import os  # noqa: F401 - compatibility patch point
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import TypeVar
 
@@ -54,10 +54,19 @@ def submission_guard(run_dir: Path) -> Iterator[SubmissionGuard]:
 
 
 def reset_retry_under_submission_lock(
-    run_dir: Path, resetter: Callable[[], _ResetResult]
+    run_dir: Path,
+    resetter: Callable[[], _ResetResult],
+    *,
+    mutation_guard: AbstractContextManager[None] | None = None,
+    preflight: Callable[[], None] | None = None,
 ) -> _ResetResult:
     _sync_patch_points()
-    return _claim.reset_retry_under_submission_lock(run_dir, resetter)
+    return _claim.reset_retry_under_submission_lock(
+        run_dir,
+        resetter,
+        mutation_guard=mutation_guard,
+        preflight=preflight,
+    )
 
 
 __all__ = [

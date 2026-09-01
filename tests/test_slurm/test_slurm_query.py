@@ -295,6 +295,13 @@ class TestParseTimelimit:
     def test_na(self) -> None:
         assert _parse_timelimit("n/a") == float("inf")
 
+    @pytest.mark.parametrize(
+        "timelimit",
+        ["00:00:00", "01:60:00", "01:00:60", "-01:00:00"],
+    )
+    def test_invalid_or_non_positive_limit_is_unknown(self, timelimit: str) -> None:
+        assert _parse_timelimit(timelimit) == float("inf")
+
 
 # ---------------------------------------------------------------------------
 # sinfo_partitions

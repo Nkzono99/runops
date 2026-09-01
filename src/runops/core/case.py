@@ -6,6 +6,8 @@ A Case is a reusable base definition from which runs or surveys are generated.
 
 from __future__ import annotations
 
+import math
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,6 +21,9 @@ else:
 from runops.core.exceptions import CaseConfigError, CaseNotFoundError
 
 _CASE_FILE = "case.toml"
+_WALLTIME_RE = re.compile(
+    r"^(?:(?P<days>\d+)-)?(?P<hours>\d+):(?P<minutes>\d{2}):(?P<seconds>\d{2})$"
+)
 
 
 @dataclass(frozen=True)
@@ -163,11 +168,34 @@ def _parse_job(data: dict[str, Any]) -> JobData:
 
 
 def _is_valid_walltime(walltime: str) -> bool:
-    """Check if a walltime string has valid HH:MM:SS or D-HH:MM:SS format."""
-    import re
+    """Check for a positive ``H+:MM:SS`` or ``D-H+:MM:SS`` duration."""
+    return parse_walltime_hours(walltime) is not None
 
-    # D-HH:MM:SS or HH:MM:SS or H:MM:SS or MM:SS
-    return bool(re.match(r"^(\d+-)?(\d{1,3}:)?\d{1,2}:\d{2}$", walltime))
+
+def parse_walltime_hours(walltime: str) -> float | None:
+    """Parse one positive formal-Run walltime into hours.
+
+    Hours may exceed 23 so values such as ``120:00:00`` remain compatible.
+    Minutes and seconds are always bounded to 0..59.  A zero duration is not
+    a schedulable resource envelope and therefore is rejected.
+    """
+    match = _WALLTIME_RE.fullmatch(walltime)
+    if match is None:
+        return None
+    days = int(match.group("days") or 0)
+    hours = int(match.group("hours"))
+    minutes = int(match.group("minutes"))
+    seconds = int(match.group("seconds"))
+    if minutes > 59 or seconds > 59:
+        return None
+    total_seconds = ((days * 24 + hours) * 60 + minutes) * 60 + seconds
+    if total_seconds <= 0:
+        return None
+    try:
+        duration = total_seconds / 3600
+    except OverflowError:
+        return None
+    return duration if math.isfinite(duration) else None
 
 
 def load_case(case_dir: Path) -> CaseData:
@@ -218,7 +246,7 @@ def load_case(case_dir: Path) -> CaseData:
     params = dict(raw.get("params", {}))
 
     # Validate walltime format
-    if job.walltime and not _is_valid_walltime(job.walltime):
+    if not _is_valid_walltime(job.walltime):
         raise CaseConfigError(
             f"Invalid walltime format '{job.walltime}' in {case_file}. "
             f"Expected HH:MM:SS or D-HH:MM:SS."

@@ -15,8 +15,10 @@ from runops.cli.demo import demo_app
 from runops.cli.groups import (
     analyze_app,
     case_app,
+    experiments_app,
     research_app,
     runs_app,
+    tests_app,
 )
 from runops.cli.init import doctor, init
 from runops.cli.knowledge import knowledge_app
@@ -25,6 +27,7 @@ from runops.cli.mcp import mcp_app
 from runops.cli.migrate import migrate_app
 from runops.cli.plugins import plugins
 from runops.cli.setup import setup
+from runops.cli.triage import triage
 from runops.cli.update import update
 from runops.cli.update_harness import update_harness
 from runops.cli.update_notice import maybe_emit_update_notice
@@ -113,8 +116,11 @@ def _build_app(name: str) -> typer.Typer:
     cli_app.command("context")(context)
     cli_app.command("plugins")(plugins)
     cli_app.command("lint")(lint)
+    cli_app.command("triage")(triage)
     cli_app.add_typer(case_app, name="case")
+    cli_app.add_typer(experiments_app, name="experiments")
     cli_app.add_typer(runs_app, name="runs")
+    cli_app.add_typer(tests_app, name="test")
     cli_app.add_typer(analyze_app, name="analyze")
     cli_app.add_typer(demo_app, name="demo")
     cli_app.add_typer(research_app, name="research")

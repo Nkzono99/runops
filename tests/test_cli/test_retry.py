@@ -39,6 +39,8 @@ def _create_run(
             "scheduler": "slurm",
             "job_id": "old-job-id",
             "attempt": attempt,
+            "walltime": "01:00:00",
+            "ntasks": 1,
         },
     }
     with open(run_dir / "manifest.toml", "wb") as f:
@@ -104,6 +106,27 @@ def test_retry_exit_error_with_reviewed_log_succeeds(tmp_path: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert "Reset to created" in result.output
+
+
+def test_retry_ownerless_run_obeys_required_experiment_policy(tmp_path: Path) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "test"\n\n[experiments.policy]\nrequire_experiment = true\n',
+        encoding="utf-8",
+    )
+    runs = tmp_path / "runs"
+    runs.mkdir()
+    run_dir = _create_run(runs, "R20260418-0007", status="failed", attempt=1)
+    claim = run_dir / ".runops-submit.lock"
+    claim.write_text("accepted:old-job-id\n", encoding="utf-8")
+    manifest_before = (run_dir / "manifest.toml").read_bytes()
+    claim_before = claim.read_bytes()
+
+    result = runner.invoke(app, ["runs", "retry", str(run_dir)])
+
+    assert result.exit_code == 1
+    assert "requires --experiment" in result.output
+    assert (run_dir / "manifest.toml").read_bytes() == manifest_before
+    assert claim.read_bytes() == claim_before
 
 
 def test_retry_adjustments_parse_key_value(tmp_path: Path) -> None:

@@ -7,10 +7,10 @@ runops ``RunState`` values.  All subprocess calls go through an injectable
 
 from __future__ import annotations
 
-import re
 from collections import OrderedDict
 from dataclasses import dataclass
 
+from runops.core.case import parse_walltime_hours
 from runops.core.state import RunState
 from runops.slurm.submit import (
     CommandResult,
@@ -131,8 +131,6 @@ def map_slurm_state(slurm_state: str) -> RunState:
 # sinfo (partition queries)
 # ---------------------------------------------------------------------------
 
-_TIMELIMIT_RE = re.compile(r"(?:(\d+)-)?(\d+):(\d+):(\d+)")
-
 
 def _parse_timelimit(timelimit: str) -> float:
     """Parse a Slurm time limit string to hours.
@@ -147,15 +145,8 @@ def _parse_timelimit(timelimit: str) -> float:
     """
     if timelimit.lower() in ("infinite", "n/a"):
         return float("inf")
-    m = _TIMELIMIT_RE.match(timelimit.strip())
-    if not m:
-        return float("inf")
-    day_str, hour_str, min_str, sec_str = m.groups()
-    day = int(day_str) if day_str else 0
-    hour = int(hour_str)
-    minutes = int(min_str)
-    sec = int(sec_str)
-    return 24.0 * day + hour + minutes / 60.0 + sec / 3600.0
+    parsed = parse_walltime_hours(timelimit.strip())
+    return parsed if parsed is not None else float("inf")
 
 
 def sinfo_partitions(

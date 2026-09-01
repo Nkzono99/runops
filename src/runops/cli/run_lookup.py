@@ -6,7 +6,7 @@ from pathlib import Path
 
 import typer
 
-from runops.core.discovery import discover_runs, resolve_run
+from runops.core.discovery import discover_runs, require_run_directory, resolve_run
 from runops.core.exceptions import ProjectNotFoundError, RunNotFoundError, SimctlError
 from runops.core.project import find_project_root
 
@@ -36,7 +36,11 @@ def resolve_run_or_cwd(run: str | None, *, search_dir: Path | None = None) -> Pa
     cwd = (search_dir or Path.cwd()).resolve()
     if run is None:
         if (cwd / "manifest.toml").exists():
-            return cwd
+            try:
+                return require_run_directory(cwd)
+            except SimctlError as e:
+                typer.echo(f"Error: {e}", err=True)
+                raise typer.Exit(code=1) from None
         typer.echo("Error: No manifest.toml in cwd. Specify a run.", err=True)
         raise typer.Exit(code=1)
 
@@ -66,7 +70,7 @@ def _resolve_run_argument(identifier: str, *, search_dir: Path) -> Path:
         resolved = (search_dir / candidate).resolve()
 
     if (resolved / "manifest.toml").exists():
-        return resolved
+        return require_run_directory(resolved)
 
     runs_dir = find_project_runs_dir(search_dir)
     return resolve_run(identifier, runs_dir)
@@ -103,7 +107,11 @@ def resolve_run_targets(
     # Empty arglist → use cwd as either a run dir or a discovery root.
     if not args:
         if (cwd / "manifest.toml").exists():
-            return [cwd]
+            try:
+                return [require_run_directory(cwd)]
+            except SimctlError as e:
+                typer.echo(f"Error: {e}", err=True)
+                raise typer.Exit(code=1) from None
         try:
             return _discover_or_error(cwd)
         except typer.Exit:
@@ -121,7 +129,11 @@ def resolve_run_targets(
         if candidate.exists():
             resolved = candidate.resolve()
             if (resolved / "manifest.toml").exists():
-                seen.setdefault(resolved, None)
+                try:
+                    seen.setdefault(require_run_directory(resolved), None)
+                except SimctlError as e:
+                    typer.echo(f"Error resolving {arg!r}: {e}", err=True)
+                    raise typer.Exit(code=1) from None
                 continue
             # Directory containing runs.
             for rd in _discover_or_error(resolved):
@@ -142,7 +154,7 @@ def resolve_run_targets(
 def _discover_or_error(directory: Path) -> list[Path]:
     """Discover runs under a directory, exiting cleanly on error."""
     try:
-        return discover_runs(directory)
+        return [require_run_directory(path) for path in discover_runs(directory)]
     except SimctlError as e:
         typer.echo(f"Error discovering runs under {directory}: {e}", err=True)
         raise typer.Exit(code=1) from None

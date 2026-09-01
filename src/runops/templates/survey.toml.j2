@@ -4,6 +4,21 @@ name = "{{ case_name }} sweep"
 base_case = "{{ base_case_ref }}"
 simulator = "{{ simulator }}"
 launcher = "{{ launcher }}"
+# A formal survey should belong to one bounded Experiment.  Set both before
+# materialization; planning remains read-only while they are absent.
+# experiment_id = "EYYYYMMDD-NNNN"
+# phase = "pilot" # pilot | main | followup
+
+[intent]
+# purpose = "explore" # explore | confirm | validate | reproduce
+# information_gap = "What uncertainty will these points resolve?"
+# baseline_run = "RYYYYMMDD-NNNN"
+# created_by = "human"
+
+[budget]
+# This limits directories, independently of the number of candidate points.
+max_materialized_runs = 3
+# max_core_hours = 100.0
 
 [axes]
 # Define parameter axes for cartesian product expansion.

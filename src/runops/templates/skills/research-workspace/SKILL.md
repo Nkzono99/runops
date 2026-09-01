@@ -17,8 +17,8 @@ description: Use when the requested outcome is one bounded research-memory trans
 | memory | canonical location / command |
 |---|---|
 | 現在の問い・判断・次の一手 | `research/CURRENT.md`（50 行目安。時系列やartifact 一覧を置かない） |
-| 時系列の作業記録 | `runo research append` → `research/journal/` |
-| durable result | `runo research new-result` → `research/results/RNNNN-*/` |
+| 時系列の作業記録 | `runo research append --kind ... --subject ...` → `research/journal/` |
+| durable Result | `runo research new-result` → edit → `runo research seal` |
 | inactive result | `runo research archive RNNNN` |
 | temporary work | `.runops/work/<goal-id>/` |
 
@@ -26,5 +26,16 @@ description: Use when the requested outcome is one bounded research-memory trans
 `runo research check`でDoneを検証する。journal rotationはCLIの自動処理を優先し、必要時だけ
 `runo research rotate --force`を使う。
 
-resultの人向け説明は`README.md`一枚、実体は`artifacts/`に置く。`artifacts/` に Markdown を作らない。
+Resultの人向け説明は`README.md`一枚、実体は`artifacts/`に置く。`artifacts/` に Markdown を作らない。
 同じ論理データのCSV / JSON / Markdown重複も作らない。
+
+Resultはclaimごとのevidence inclusion / exclusion edgeを所有する。Runの`review_status`を
+evidence selectionとして使わない。seal前に`runo research check-result`、seal後にも同commandで
+source receiptを検証する。included Run / Run-owned artifactはcompleted相当、理由付きreview、
+identity hashes、source commit / executable hash / version、baseline、input snapshotを要求し、
+dirty sourceはdiff参照も確認する。T IDと`.runops/test-runs/**`はscientific evidenceとして指定しない。
+sealには`--selection-reason`を必須とし、includeしたRun-owned outputを`purge-work`で削除しない。
+
+永続的な研究 prose は `research/CURRENT.md`、`research/journal/*.md`、各 Result
+の `README.md` だけに置く。別名の note も新規作成しない。provisional prose は
+`.runops/work/`、時系列はjournal、現在判断はCURRENT、durable narrativeはResult READMEへ置く。

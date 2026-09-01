@@ -24,6 +24,44 @@ class TestLoadProject:
         assert config.root_dir == tmp_path.resolve()
         assert config.simulators == {}
         assert config.launchers == {}
+        assert config.experiment_policy.require_experiment is False
+        assert config.experiment_policy.max_active_experiments == 5
+        assert config.experiment_policy.default_max_materialized_runs == 3
+        assert config.experiment_policy.max_unreviewed_completed_runs == 12
+
+    def test_load_experiment_policy(self, tmp_path: Path) -> None:
+        (tmp_path / "runops.toml").write_text(
+            '[project]\nname = "proj"\n\n'
+            "[experiments.policy]\n"
+            "require_experiment = true\n"
+            "max_active_experiments = 2\n"
+            "default_max_materialized_runs = 4\n"
+            "max_unreviewed_completed_runs = 8\n"
+        )
+
+        policy = load_project(tmp_path).experiment_policy
+
+        assert policy.require_experiment is True
+        assert policy.max_active_experiments == 2
+        assert policy.default_max_materialized_runs == 4
+        assert policy.max_unreviewed_completed_runs == 8
+
+    @pytest.mark.parametrize(
+        "policy",
+        [
+            "require_experiment = 1\n",
+            "max_active_experiments = 0\n",
+            "default_max_materialized_runs = true\n",
+            "max_unreviewed_completed_runs = -1\n",
+        ],
+    )
+    def test_invalid_experiment_policy(self, tmp_path: Path, policy: str) -> None:
+        (tmp_path / "runops.toml").write_text(
+            '[project]\nname = "proj"\n\n[experiments.policy]\n' + policy
+        )
+
+        with pytest.raises(ProjectConfigError, match=r"experiments\.policy"):
+            load_project(tmp_path)
 
     def test_load_with_description(self, tmp_path: Path) -> None:
         (tmp_path / "runops.toml").write_text(

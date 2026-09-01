@@ -14,12 +14,22 @@ refs/
 # Provisional Goal/agent work. Durable results must be promoted explicitly.
 .runops/work/
 
+# Ephemeral verification attempts and reusable derived caches.  TestAttempt
+# receipts are operational state, not research evidence; promote by creating
+# a fresh formal Run from the same Case/parameters.
+.runops/test-runs/
+.runops/cache/
+
+# Persistent coordination files are local project state.
+.runops/*.lock
+
 # Run work directory (simulator outputs, restart, logs, status snapshots)
 # Everything under work/ is regenerable from input/, so we exclude it whole
 # rather than trying to enumerate per-simulator output filenames.
 runs/**/work/
 runs/**/status/
 **/.runops-submit.lock
+**/.runops-review.lock
 
 # Preprocessor-generated input files (created by EMSES preinp from plasma.toml)
 runs/**/input/plasma.inp

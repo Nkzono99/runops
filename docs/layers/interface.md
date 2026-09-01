@@ -141,21 +141,28 @@ MCP provider は Agent / host 向けの edge interface です。read / inspect /
 
 | コマンド | 説明 |
 |---------|------|
+| `runo experiments create/list/inspect/review/close` | bounded question の admission、WIP、decision を管理 |
 | `runo case new CASE [--minimal] [--survey]` | 新規 case のスキャフォールド生成 |
-| `runo runs create CASE [--label LABEL]` | case から human-readable label 付き単一 run を生成 |
-| `runo runs sweep [DIR] [--dry-run]` | `survey.toml` から semantic label 付き run を一括生成 |
+| `runo runs create CASE [--label LABEL] [--experiment E...]` | active Experiment 内で単一 Run を生成 |
+| `runo runs sweep [DIR] [--offset N] [--limit N]` | lazy candidate と plan hash を read-only preview。`--dry-run` は同じ挙動 |
+| `runo runs sweep DIR --apply --point REF... --expect-plan HASH` | selected point だけを materialize |
+| `runo runs sweep DIR --apply --all --expect-plan HASH` | 全点を明示選択。hard budget 超過は拒否 |
 | `runo runs submit [RUN]` | run を sbatch で投入 (`-qn`, `--qos`, `--afterok` 対応) |
 | `runo runs submit --all [DIR] [--yes]` | ready plan の run を確認付きで一括投入 (`--yes` で確認省略) |
-| `runo runs clone [RUN] [--dest DIR] [--set key=value]` | run 複製・派生。`--set` 使用時は source case から input/job を再生成 |
-| `runo runs extend` | スナップショットから継続 run を生成 |
+| `runo runs clone [RUN] [--dest DIR] [--set key=value] [--experiment E...] [--purpose PURPOSE]` | completed 相当の source から immutable Run を複製・派生。`--set` 使用時は source case から input/job を再生成 |
+| `runo runs extend [RUN] [--dest DIR] [--nstep N] [--experiment E...] [--purpose PURPOSE] [--run]` | completed 相当の snapshot から継続 Run を生成。`--run` は新規作成時だけ submit |
 | `runo runs retry [RUN] [--plan]` | failed / cancelled run の retry 準備 |
-| `runo runs regenerate [RUN] [--dry-run]` | run の `input/` を記録済み case + params から再生成 |
+| `runo runs regenerate [RUN] --dry-run` | frozen input と現在の case の差分を read-only 表示。変更は clone で新しい Run にする |
+| `runo test smoke|debug CASE` | smoke/debug を T ID namespace に prepare。Run / submit ではない |
 
 `runo runs submit --all` は HPC 資源・queue・quota に影響する高コスト操作です。
 Agent との会話上で対象 run、queue、資源量を確認済みの場合だけ `--yes` を使います。
 production / large survey では、`--yes` は研究上の確認を省略しません。対象、概算資源量、
-根拠となる pilot result を人が確認し、その判断を `research/CURRENT.md` に反映してから
+根拠となる pilot Result を人が確認し、owning Experiment を `decision=expand` にしてから
 remaining run を full submit します。
+
+candidate preview は directory budget を消費しません。materialize は `--apply`、
+`--point|--all`、exact `--expect-plan` の gate を必須とし、`--all` を推測して選びません。
 
 ### Monitoring
 
@@ -167,7 +174,9 @@ remaining run を full submit します。
 | `runo runs jobs [PATH] [--watch SECS]` | プロジェクト内の実行中ジョブ一覧 |
 | `runo runs dashboard [TARGETS...] [--watch SECS] [--all]` | 複数 run の進捗を表示。`--all` では cached analysis / next action も表示 |
 | `runo runs history [PATH]` | 投入履歴表示 |
-| `runo runs list [PATHS...] [--include-archived]` | run と cached analysis / next action の一覧。既定では archived / purged を除外 |
+| `runo runs list [PATHS...] [--status S] [--experiment E] [--purpose P] [--review-status R] [--storage-tier T] [--storage-form F] [--include-archived]` | run と cached analysis / next action の一覧。既定では archived / purged を除外 |
+| `runo runs review [RUN] --reason WHY` | terminal outcome の確認。Result evidence selection とは独立 |
+| `runo triage [PATH] [--json]` | active work、review/cleanup backlog、壊れた state、古い staging を read-only 点検 |
 
 `runo runs status` は表示用で、正本更新は `runo runs sync` が行います。
 bulk sync では created run と terminal state の run は silent skip されます。
@@ -176,7 +185,8 @@ sync が completed transition で返した readiness は current attempt の
 定型的に全実行せず、sync result の `recommended_command` へ直接進めます。
 `runs list`、`runs dashboard --all`、MCP `runops.run.list` は cache-only の bulk view
 です。cache miss は `unknown / deep_validate` として見せますが、一覧取得中に run ごとの
-deep evaluation は起動しません。
+deep evaluation は起動しません。`--status archived|purged`、storage filter、
+`--include-archived` は all discovery を選び、それ以外は active traversal を維持します。
 `runs jobs --watch` / `runs dashboard --watch` は CLI が一定間隔で問い合わせ直す
 polling view です。常駐 Web/API と push 配信を持つ persistent real-time dashboard
 service ではありません。
@@ -193,7 +203,7 @@ service ではありません。
 | `runo analyze new-story NAME [--id ID] [--title TITLE] [--source PATH]` | strict source/schema の story acceptance workspace を作成 |
 | `runo analyze audit-story [STORY_DIR]` | source artifact を照合し `audit.json` / `audit.md` を生成 |
 | `runo runs cancel [RUN]` | submitted/running な run を `scancel` + `sync` で停止 |
-| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR] [--bundle] [--adopt-archived]` | 通常は completed run を archived にする。`--bundle` は親と全内容を移動し、各 run state を保持。`--adopt-archived` は一致する個別 archive 済み run を検証して採用 |
+| `runo runs archive [RUNS...] [--keep-in-place] [--move-to DIR] [--bundle] [--adopt-archived]` | 通常は completed run を archived にする。managed project の `--move-to` は同一 filesystem の `runs/_archive/**` 内だけを許可する。`--bundle` は親と全内容を移動し、各 run state を保持。`--adopt-archived` は一致する個別 archive 済み run を検証して採用 |
 | `runo runs restore RUN [--bundle]` | 通常は archived run を completed に戻す。`--bundle` は親と全内容を元のパスへ戻す |
 | `runo runs purge-work [RUN] [--discard-incomplete --reason WHY]` | archived run の work 削除。既知 non-ready output の破棄は理由必須 |
 | `runo runs delete [RUN]` | created / cancelled / failed run を削除 |
@@ -213,11 +223,16 @@ archived / purged run を採用します。所有不明 path や source 側の�
 | `runo research append TITLE BODY` | bounded journal に timestamped entry を追記 |
 | `runo research rotate [--force]` | journal を原文のまま numbered archive へ移動 |
 | `runo research new-result NAME` | durable result workspace を作成 |
+| `runo research check-result RESULT` | Result evidence / seal integrity を read-only 検査 |
+| `runo research seal RESULT --claim ... --outcome ... --selection-reason WHY --evidence-* ...` | 理由付き Result-local evidence と immutable receipt を固定 |
 | `runo research archive/restore ID` | result を可逆移動 |
 | `runo research migrate-legacy` | 旧 workspace を preview 付きで可逆移行 |
 | `runo knowledge save NAME` | 知見を `.runops/insights/` に保存 |
 | `runo knowledge list` | 知見一覧表示 |
 | `runo knowledge show NAME` | 知見の詳細表示 |
+
+T ID と `.runops/test-runs/**` は scientific Result evidence にできません。case / survey
+`notes.md` と Run `analysis/notes.md` は legacy narrative slot として lint warning の対象です。
 | `runo knowledge add-fact CLAIM` | 構造化された知識を `facts.toml` に追加 |
 | `runo knowledge facts` | local facts と imported candidate facts の一覧表示 |
 | `runo knowledge source list` | 外部知識ソース一覧表示 |

@@ -62,8 +62,14 @@ def context(
             typer.echo(f"Simulators: {', '.join(sims)}")
 
         runs = ctx.get("runs", {})
-        if runs.get("total", 0) > 0:
-            parts = [f"{k}={v}" for k, v in runs.items() if k != "analysis_problems"]
+        if runs.get("namespace_available") is False or runs.get("total") is None:
+            typer.echo("Runs: unavailable")
+        elif runs.get("total", 0) > 0:
+            parts = [
+                f"{key}={value}"
+                for key, value in runs.items()
+                if key not in {"analysis_problems", "namespace_available"}
+            ]
             typer.echo(f"Runs: {', '.join(parts)}")
             analysis_problems = runs.get("analysis_problems", [])
             if analysis_problems:

@@ -17,6 +17,14 @@ else:
 runner = CliRunner()
 
 
+def test_regenerate_help_states_immutable_read_only_contract() -> None:
+    result = runner.invoke(app, ["runs", "regenerate", "--help"])
+
+    assert result.exit_code == 0, result.output
+    assert "in-place regeneration is disabled" in result.output
+    assert "--dry-run" in result.output
+
+
 def _make_project(tmp_path: Path) -> Path:
     (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
     (tmp_path / "simulators.toml").write_text(
@@ -70,8 +78,10 @@ def _create_one_run(project_dir: Path, case_name: str) -> Path:
     return run_dirs[0]
 
 
-def test_regenerate_detects_case_template_change(tmp_path: Path) -> None:
-    """After editing the case template, regenerate updates input/ in place."""
+def test_regenerate_rejects_in_place_change_to_preserve_identity(
+    tmp_path: Path,
+) -> None:
+    """A changed case is reported without rewriting a Run's frozen input."""
     project_dir = _make_project(tmp_path)
     _make_case(project_dir, "cA", input_text="modeww = -2\n")
     run_dir = _create_one_run(project_dir, "cA")
@@ -84,19 +94,17 @@ def test_regenerate_detects_case_template_change(tmp_path: Path) -> None:
     (project_dir / "cases" / "cA" / "input" / "plasma.toml").write_text(
         "modeww = -5\n", encoding="utf-8"
     )
+    manifest_before = (run_dir / "manifest.toml").read_bytes()
 
-    # Run regenerate
     result = runner.invoke(app, ["runs", "regenerate", str(run_dir)])
-    assert result.exit_code == 0, result.output
-    assert "Regenerated input" in result.output
-    assert "plasma.toml" in result.output
 
-    # Input file now reflects the new template
-    new_input = (run_dir / "input" / "plasma.toml").read_text(encoding="utf-8")
-    assert "modeww = -5" in new_input
-
-    # manifest and analysis/ preserved
-    assert (run_dir / "manifest.toml").is_file()
+    assert result.exit_code == 1
+    assert "input/scientific identity is immutable" in result.output
+    assert "runo runs clone --set" in result.output
+    assert (run_dir / "input" / "plasma.toml").read_text(
+        encoding="utf-8"
+    ) == original_input
+    assert (run_dir / "manifest.toml").read_bytes() == manifest_before
     assert (run_dir / "analysis").is_dir()
 
 
@@ -152,6 +160,11 @@ def test_regenerate_warns_when_work_exists(tmp_path: Path) -> None:
         "x=2\n", encoding="utf-8"
     )
 
-    result = runner.invoke(app, ["runs", "regenerate", str(run_dir)])
+    result = runner.invoke(
+        app,
+        ["runs", "regenerate", str(run_dir), "--dry-run"],
+    )
     assert result.exit_code == 0, result.output
+    assert "[dry-run]" in result.output
     assert "work/" in result.output  # warning printed to stderr
+    assert (run_dir / "input" / "plasma.toml").read_text(encoding="utf-8") == "x=1\n"

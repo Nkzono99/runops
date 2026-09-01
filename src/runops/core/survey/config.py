@@ -6,12 +6,20 @@ Supports both Cartesian product (axes) and co-varying (linked) parameters.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
+import json
+import math
+import os
+import re
+import stat
 import string
 import sys
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
+from datetime import date, datetime, time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, cast
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -32,6 +40,50 @@ from runops.core.survey.naming import (
 )
 
 _SURVEY_FILE = "survey.toml"
+_EXPERIMENT_ID_RE = re.compile(r"^E\d{8}-\d{4}$")
+_RUN_ID_RE = re.compile(r"^R\d{8}-\d{4}$")
+_SURVEY_PHASES = frozenset({"pilot", "main", "followup"})
+_SURVEY_PURPOSES = frozenset({"explore", "confirm", "validate", "reproduce"})
+
+SurveyPhase = Literal["pilot", "main", "followup"]
+SurveyPurpose = Literal["explore", "confirm", "validate", "reproduce"]
+
+
+@dataclass(frozen=True)
+class SurveyIntent:
+    """Scientific intent inherited by materialized runs."""
+
+    purpose: SurveyPurpose | None = None
+    information_gap: str = ""
+    baseline_run: str = ""
+    created_by: str = ""
+    goal_id: str = ""
+
+
+@dataclass(frozen=True)
+class SurveyBudget:
+    """Optional materialization envelope narrower than its Experiment budget."""
+
+    max_materialized_runs: int | None = None
+    max_core_hours: float | None = None
+
+
+@dataclass(frozen=True)
+class SurveyRetention:
+    """Review metadata; dates never grant automatic deletion authority."""
+
+    classification: str = ""
+    review_after: str = ""
+    expire_after: str = ""
+
+
+@dataclass(frozen=True)
+class SurveyPoint:
+    """One deterministic candidate with a hash of its full effective params."""
+
+    point_id: str
+    ordinal: int
+    params: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -60,6 +112,11 @@ class SurveyData:
     base_case: str
     simulator: str
     launcher: str
+    experiment_id: str = ""
+    phase: SurveyPhase | None = None
+    intent: SurveyIntent = field(default_factory=SurveyIntent)
+    budget: SurveyBudget = field(default_factory=SurveyBudget)
+    retention: SurveyRetention = field(default_factory=SurveyRetention)
     classification: ClassificationData = field(default_factory=ClassificationData)
     axes: dict[str, list[Any]] = field(default_factory=dict)
     linked: list[dict[str, list[Any]]] = field(default_factory=list)
@@ -87,11 +144,32 @@ def load_survey(survey_dir: Path) -> SurveyData:
         SurveyConfigError: If survey.toml is missing, invalid, or lacks
             required fields.
     """
-    survey_dir = survey_dir.resolve()
+    survey_dir = Path(os.path.abspath(survey_dir.expanduser()))
+    try:
+        directory_metadata = survey_dir.lstat()
+    except OSError as exc:
+        raise SurveyConfigError(
+            f"Cannot inspect survey directory {survey_dir}: {exc}"
+        ) from exc
+    if stat.S_ISLNK(directory_metadata.st_mode) or not stat.S_ISDIR(
+        directory_metadata.st_mode
+    ):
+        raise SurveyConfigError(
+            f"Survey directory must be a real directory: {survey_dir}"
+        )
+    survey_dir = survey_dir.resolve(strict=True)
     survey_file = survey_dir / _SURVEY_FILE
 
-    if not survey_file.exists():
-        raise SurveyConfigError(f"{_SURVEY_FILE} not found in {survey_dir}")
+    try:
+        file_metadata = survey_file.lstat()
+    except FileNotFoundError as exc:
+        raise SurveyConfigError(f"{_SURVEY_FILE} not found in {survey_dir}") from exc
+    except OSError as exc:
+        raise SurveyConfigError(f"Cannot inspect {survey_file}: {exc}") from exc
+    if not stat.S_ISREG(file_metadata.st_mode) or file_metadata.st_nlink != 1:
+        raise SurveyConfigError(
+            f"{_SURVEY_FILE} must be a single-link regular file: {survey_file}"
+        )
 
     try:
         with open(survey_file, "rb") as f:
@@ -133,6 +211,30 @@ def load_survey(survey_dir: Path) -> SurveyData:
         raise SurveyConfigError(
             f"Missing or empty required fields in {survey_file}: {missing}"
         )
+
+    experiment_id = _parse_optional_string(
+        survey_section,
+        "experiment_id",
+        "survey.experiment_id",
+        survey_file,
+    )
+    if experiment_id and _EXPERIMENT_ID_RE.fullmatch(experiment_id) is None:
+        raise SurveyConfigError(
+            f"survey.experiment_id must match EYYYYMMDD-NNNN in {survey_file}"
+        )
+
+    phase_value = survey_section.get("phase")
+    phase: SurveyPhase | None = None
+    if phase_value is not None:
+        if not isinstance(phase_value, str) or phase_value not in _SURVEY_PHASES:
+            raise SurveyConfigError(
+                f"survey.phase must be one of {sorted(_SURVEY_PHASES)} in {survey_file}"
+            )
+        phase = cast("SurveyPhase", phase_value)
+
+    intent = _parse_intent(raw.get("intent"), survey_file)
+    budget = _parse_budget(raw.get("budget"), survey_file)
+    retention = _parse_retention(raw.get("retention"), survey_file)
 
     classification = _parse_classification(raw.get("classification", {}))
 
@@ -213,6 +315,11 @@ def load_survey(survey_dir: Path) -> SurveyData:
         base_case=str(base_case),
         simulator=str(simulator),
         launcher=str(launcher),
+        experiment_id=experiment_id,
+        phase=phase,
+        intent=intent,
+        budget=budget,
+        retention=retention,
         classification=classification,
         axes=axes,
         linked=linked,
@@ -221,6 +328,156 @@ def load_survey(survey_dir: Path) -> SurveyData:
         survey_dir=survey_dir,
         raw=raw,
     )
+
+
+def _parse_intent(raw: Any, survey_file: Path) -> SurveyIntent:
+    if raw is None:
+        return SurveyIntent()
+    if not isinstance(raw, dict):
+        raise SurveyConfigError(f"Invalid [intent] section in {survey_file}")
+    purpose_value = raw.get("purpose")
+    purpose: SurveyPurpose | None = None
+    if purpose_value is not None:
+        if not isinstance(purpose_value, str) or purpose_value not in _SURVEY_PURPOSES:
+            raise SurveyConfigError(
+                f"intent.purpose must be one of {sorted(_SURVEY_PURPOSES)}"
+                f" in {survey_file}"
+            )
+        purpose = cast("SurveyPurpose", purpose_value)
+
+    baseline_run = _parse_optional_string(
+        raw,
+        "baseline_run",
+        "intent.baseline_run",
+        survey_file,
+    )
+    if baseline_run and _RUN_ID_RE.fullmatch(baseline_run) is None:
+        raise SurveyConfigError(
+            f"intent.baseline_run must match RYYYYMMDD-NNNN in {survey_file}"
+        )
+    return SurveyIntent(
+        purpose=purpose,
+        information_gap=_parse_optional_string(
+            raw,
+            "information_gap",
+            "intent.information_gap",
+            survey_file,
+        ),
+        baseline_run=baseline_run,
+        created_by=_parse_optional_string(
+            raw,
+            "created_by",
+            "intent.created_by",
+            survey_file,
+        ),
+        goal_id=_parse_optional_string(
+            raw,
+            "goal_id",
+            "intent.goal_id",
+            survey_file,
+        ),
+    )
+
+
+def _parse_budget(raw: Any, survey_file: Path) -> SurveyBudget:
+    if raw is None:
+        return SurveyBudget()
+    if not isinstance(raw, dict):
+        raise SurveyConfigError(f"Invalid [budget] section in {survey_file}")
+
+    max_materialized_runs = _parse_optional_positive_int(
+        raw,
+        "max_materialized_runs",
+        "budget.max_materialized_runs",
+        survey_file,
+    )
+    max_core_hours = _parse_optional_positive_number(
+        raw,
+        "max_core_hours",
+        "budget.max_core_hours",
+        survey_file,
+    )
+    return SurveyBudget(
+        max_materialized_runs=max_materialized_runs,
+        max_core_hours=max_core_hours,
+    )
+
+
+def _parse_retention(raw: Any, survey_file: Path) -> SurveyRetention:
+    if raw is None:
+        return SurveyRetention()
+    if not isinstance(raw, dict):
+        raise SurveyConfigError(f"Invalid [retention] section in {survey_file}")
+    return SurveyRetention(
+        classification=_parse_optional_string(
+            raw,
+            "class",
+            "retention.class",
+            survey_file,
+        ),
+        review_after=_parse_optional_string(
+            raw,
+            "review_after",
+            "retention.review_after",
+            survey_file,
+        ),
+        expire_after=_parse_optional_string(
+            raw,
+            "expire_after",
+            "retention.expire_after",
+            survey_file,
+        ),
+    )
+
+
+def _parse_optional_string(
+    section: dict[str, Any],
+    key: str,
+    label: str,
+    path: Path,
+) -> str:
+    value = section.get(key)
+    if value is None:
+        return ""
+    if not isinstance(value, str) or not value.strip():
+        raise SurveyConfigError(f"{label} must be a non-empty string in {path}")
+    return value.strip()
+
+
+def _parse_optional_positive_int(
+    section: dict[str, Any],
+    key: str,
+    label: str,
+    path: Path,
+) -> int | None:
+    value = section.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise SurveyConfigError(f"{label} must be a positive integer in {path}")
+    return value
+
+
+def _parse_optional_positive_number(
+    section: dict[str, Any],
+    key: str,
+    label: str,
+    path: Path,
+) -> float | None:
+    value = section.get(key)
+    if value is None:
+        return None
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise SurveyConfigError(f"{label} must be a positive number in {path}")
+    try:
+        parsed = float(value)
+    except OverflowError as exc:
+        raise SurveyConfigError(
+            f"{label} must be a finite positive number in {path}"
+        ) from exc
+    if not math.isfinite(parsed) or parsed <= 0:
+        raise SurveyConfigError(f"{label} must be a finite positive number in {path}")
+    return parsed
 
 
 def _parse_naming(raw: Any, survey_file: Path) -> NamingConfig:
@@ -444,6 +701,105 @@ def expand_survey(
     for axes_dict, linked_dict in itertools.product(axes_combos, linked_combos):
         result.append({**axes_dict, **linked_dict})
     return result
+
+
+def count_survey_points(
+    axes: Mapping[str, list[Any]],
+    linked: list[dict[str, list[Any]]],
+) -> int:
+    """Count a sweep without constructing its Cartesian product."""
+    if not axes and not linked:
+        return 0
+
+    count = 1
+    for values in axes.values():
+        count *= len(values)
+    for group in linked:
+        if not group:
+            continue
+        first_values = next(iter(group.values()))
+        count *= len(first_values)
+    return count
+
+
+def iter_survey_points(
+    axes: Mapping[str, list[Any]],
+    linked: list[dict[str, list[Any]]],
+    *,
+    base_params: Mapping[str, Any] | None = None,
+) -> Iterator[SurveyPoint]:
+    """Yield deterministic candidate points without materializing the sweep.
+
+    ``point_id`` hashes the full effective parameter mapping, including
+    ``base_params``.  Duplicate effective conditions intentionally receive the
+    same ID so an application-level materialization gate can reject or reuse
+    them; ``ordinal`` still identifies their positions in the declared plan.
+    """
+    if not axes and not linked:
+        return
+
+    axis_items = list(axes.items())
+    linked_groups = [group for group in linked if group]
+    dimensions: list[Iterable[Any]] = [values for _, values in axis_items]
+    dimensions.extend(range(len(next(iter(group.values())))) for group in linked_groups)
+
+    for ordinal, choices in enumerate(itertools.product(*dimensions), start=1):
+        params = dict(base_params or {})
+        cursor = 0
+        for key, _ in axis_items:
+            params[key] = choices[cursor]
+            cursor += 1
+        for group in linked_groups:
+            linked_index = cast("int", choices[cursor])
+            cursor += 1
+            for key, values in group.items():
+                params[key] = values[linked_index]
+        yield SurveyPoint(
+            point_id=canonical_data_hash(params),
+            ordinal=ordinal,
+            params=params,
+        )
+
+
+def canonical_data_hash(value: Any) -> str:
+    """Return a stable SHA-256 identity for TOML-compatible structured data."""
+    normalized = _normalize_for_hash(value)
+    encoded = json.dumps(
+        normalized,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    return f"sha256:{hashlib.sha256(encoded).hexdigest()}"
+
+
+def _normalize_for_hash(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        normalized: dict[str, Any] = {}
+        keys = list(value.keys())
+        if not all(isinstance(key, str) for key in keys):
+            raise SurveyConfigError(
+                "Canonical survey hashes require string mapping keys"
+            )
+        for key in sorted(cast("list[str]", keys)):
+            normalized[key] = _normalize_for_hash(value[key])
+        return normalized
+    if isinstance(value, (list, tuple)):
+        return [_normalize_for_hash(item) for item in value]
+    if isinstance(value, datetime):
+        return {"$runops_type": "datetime", "value": value.isoformat()}
+    if isinstance(value, date):
+        return {"$runops_type": "date", "value": value.isoformat()}
+    if isinstance(value, time):
+        return {"$runops_type": "time", "value": value.isoformat()}
+    if isinstance(value, float) and not math.isfinite(value):
+        return {"$runops_type": "float", "value": repr(value)}
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    raise SurveyConfigError(
+        f"Unsupported value type in canonical survey hash: {type(value).__name__}"
+    )
 
 
 def generate_display_name(template: str, params: dict[str, Any]) -> str:

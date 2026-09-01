@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import os
+import re
 import sys
+from collections.abc import Iterator
+from pathlib import Path
 from typing import Any
 
 if sys.version_info >= (3, 11):
@@ -19,6 +23,7 @@ def check_knowledge(context: LintContext) -> list[LintIssue]:
     """Check curated knowledge and the bounded research workspace."""
     issues: list[LintIssue] = []
     issues.extend(_check_research_workspace(context))
+    issues.extend(_check_dispersed_experiment_narratives(context))
     issues.extend(_check_facts(context))
     return issues
 
@@ -52,6 +57,119 @@ def _research_recommendation(code: str) -> str:
             "research/results/, and exhaustive provenance to export/source indexes."
         )
     return "Run `runo research status` and archive or rotate intact."
+
+
+def _check_dispersed_experiment_narratives(
+    context: LintContext,
+) -> list[LintIssue]:
+    """Warn on narrative Markdown outside the bounded research workspace.
+
+    Project documentation and harness policy remain valid Markdown.  The
+    experiment-producing roots are intentionally stricter: prose under cases,
+    runs, top-level notes, or top-level analysis should move to work, journal,
+    CURRENT, or one Result README.  Known generated reports and harness files
+    are excluded.
+    """
+    candidates: set[Path] = set()
+    for directory, filenames in _walk_metadata(context.project_root):
+        for filename in filenames:
+            if not filename.casefold().endswith(".md"):
+                continue
+            path = directory / filename
+            relative = path.relative_to(context.project_root)
+            if _is_allowed_research_or_project_markdown(relative):
+                continue
+            candidates.add(path)
+
+    return [
+        LintIssue(
+            severity="warning",
+            issue_id="knowledge.dispersed_experiment_narrative",
+            path=path,
+            message=("persistent research Markdown is outside the bounded allowlist"),
+            recommendation=(
+                "Keep provisional prose in .runops/work, decisions in the Experiment "
+                "record/journal, and durable evidence narrative in one Result README."
+            ),
+        )
+        for path in sorted(candidates)
+    ]
+
+
+def _is_allowed_research_or_project_markdown(relative: Path) -> bool:
+    """Keep project documentation distinct from persistent research prose."""
+    if not relative.parts:
+        return True
+    if relative.parts[0] in {
+        ".agents",
+        ".claude",
+        ".codex",
+        ".git",
+        ".github",
+        ".venv",
+        "_handoff",
+        "docs",
+        "refs",
+        "src",
+        "tests",
+    }:
+        return True
+    if relative.name in {"AGENTS.md", "CLAUDE.md"}:
+        return True
+    if len(relative.parts) == 1 and relative.name.casefold() in {
+        "readme.md",
+        "changelog.md",
+        "contributing.md",
+        "code_of_conduct.md",
+    }:
+        return True
+    if relative == Path("materials/README.md"):
+        return True
+    if relative.name == "survey_summary.md" and "summary" in relative.parts:
+        return True
+    if relative.name == "audit.md" and "stories" in relative.parts:
+        return True
+    if relative == Path("research/CURRENT.md"):
+        return True
+    if relative == Path("research/journal/active.md"):
+        return True
+    if (
+        len(relative.parts) == 4
+        and relative.parts[:3] == ("research", "journal", "archive")
+        and re.fullmatch(r"J\d{4}\.md", relative.name) is not None
+    ):
+        return True
+    if (
+        len(relative.parts) == 4
+        and relative.parts[:2] == ("research", "results")
+        and relative.name == "README.md"
+    ):
+        return True
+    if (
+        len(relative.parts) == 5
+        and relative.parts[:3] == ("research", "archive", "results")
+        and relative.name == "README.md"
+    ):
+        return True
+    return relative.parts[:2] in {
+        (".runops", "work"),
+        (".runops", "knowledge"),
+        (".runops", "insights"),
+    }
+
+
+def _walk_metadata(root: Path) -> Iterator[tuple[Path, frozenset[str]]]:
+    if not root.is_dir() or root.is_symlink():
+        return
+    for directory, dirnames, filenames in os.walk(root, followlinks=False):
+        current = Path(directory)
+        dirnames[:] = [
+            name
+            for name in dirnames
+            if not (current / name).is_symlink()
+            and name not in {".git", ".venv", "__pycache__", ".pytest_cache"}
+        ]
+        yield current, frozenset(filenames)
 
 
 def _check_facts(context: LintContext) -> list[LintIssue]:

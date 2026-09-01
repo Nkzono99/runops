@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -229,6 +230,104 @@ def test_action_specs_advertise_existing_mcp_tools() -> None:
     assert missing_tools == {}
 
 
+def test_experiment_test_and_result_actions_are_private_gateway_contracts() -> None:
+    """The new local workflows must dispatch without inventing MCP exposure."""
+    expected_cli = {
+        "create_experiment": (("experiments", "create"),),
+        "review_experiment": (("experiments", "review"),),
+        "close_experiment": (("experiments", "close"),),
+        "prepare_test_attempt": (("test", "smoke"), ("test", "debug")),
+        "record_test_result": (("test", "record"),),
+        "clean_test_attempts": (("test", "clean"),),
+        "create_result": (("research", "new-result"),),
+        "check_result": (("research", "check-result"),),
+        "seal_result": (("research", "seal"),),
+        "archive_result": (("research", "archive"),),
+        "restore_result": (("research", "restore"),),
+        "clone_run": (("runs", "clone"),),
+        "extend_run": (("runs", "extend"),),
+        "inspect_regeneration": (("runs", "regenerate"),),
+    }
+
+    for action_name, cli_commands in expected_cli.items():
+        assert action_name in actions._DISPATCH
+        spec = actions.ACTION_SPECS[action_name]
+        assert spec.cli_commands == cli_commands
+        assert spec.mcp_tools == ()
+
+
+@pytest.mark.parametrize(
+    "action_name, kwargs",
+    [
+        (
+            "create_experiment",
+            {
+                "title": "Missing project",
+                "question": "Can admission proceed?",
+                "intent": "explore",
+                "baseline_reason": "No baseline exists.",
+                "max_planned_points": 1,
+                "max_materialized_runs": 1,
+                "max_active_runs": 1,
+                "max_core_hours": 1.0,
+                "max_unreviewed_runs": 1,
+                "expires_at": "2099-01-01T00:00:00+00:00",
+                "exit_criteria": ("Stop after one point.",),
+            },
+        ),
+        (
+            "prepare_test_attempt",
+            {"case": "missing", "kind": "smoke"},
+        ),
+        (
+            "check_result",
+            {"result": "R0001-missing"},
+        ),
+    ],
+)
+def test_gateway_workflow_rejections_are_structured_preconditions(
+    tmp_path: Path,
+    action_name: str,
+    kwargs: dict[str, Any],
+) -> None:
+    """Expected domain rejection must not escape as an unstructured exception."""
+    result = actions.execute_action(
+        action_name,
+        project_root=tmp_path,
+        **kwargs,
+    )
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert result.message
+
+
+@pytest.mark.parametrize(
+    "action_name, kwargs",
+    [
+        ("clone_run", {"source_dir": Path("missing-clone")}),
+        ("extend_run", {"source_dir": Path("missing-extend")}),
+        (
+            "inspect_regeneration",
+            {"run_dir": Path("missing-regeneration"), "dry_run": True},
+        ),
+    ],
+)
+def test_derivation_rejections_are_structured_preconditions(
+    tmp_path: Path,
+    action_name: str,
+    kwargs: dict[str, Any],
+) -> None:
+    resolved = {
+        name: (tmp_path / value if isinstance(value, Path) else value)
+        for name, value in kwargs.items()
+    }
+
+    result = actions.execute_action(action_name, **resolved)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert result.message
+
+
 def test_mcp_tool_bindings_round_trip_action_specs() -> None:
     """ActionSpec and ToolSpec metadata should agree in both directions."""
     specs = {spec.name: spec for spec in all_tool_specs()}
@@ -238,6 +337,7 @@ def test_mcp_tool_bindings_round_trip_action_specs() -> None:
         "runops.job.cancel": "cancel_run",
         "runops.run.delete": "delete_run",
         "runops.run.logs": "show_log",
+        "runops.survey.plan": "plan_survey",
     }
 
     assert {

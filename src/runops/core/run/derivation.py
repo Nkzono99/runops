@@ -24,6 +24,7 @@ _TRANSIENT_JOB_KEYS = frozenset(
         "afterok",
         "attempt",
         "attempts",
+        "budget_attempts",
         "dependency_afterok",
         "job_id",
         "next_attempt",
@@ -80,6 +81,23 @@ def sanitize_derived_manifest(
     new_manifest.origin = dict(new_manifest.origin)
     new_manifest.origin["survey"] = ""
     new_manifest.origin["parent_run"] = parent_run_id
+
+    # Experiment/Survey intent and every identity hash belong to the new Run.
+    # Keeping any source field here can create a hybrid cross-Experiment record
+    # when the target has an explicit baseline-not-required reason.
+    new_manifest.intent = {"created_by": "human:derived"}
+    new_manifest.identity = {}
+
+    new_manifest.curation = {
+        "review_status": "unreviewed",
+        "reviewed_at": "",
+        "reviewed_by": "",
+        "reason": "",
+    }
+    new_manifest.storage = {
+        "tier": "hot",
+        "form": "full",
+    }
 
     job = {
         key: value

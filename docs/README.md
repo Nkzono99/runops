@@ -18,11 +18,11 @@ runops の文書は、最初から順番に読むマニュアルではありま�
 
 | 対象 | 文書 |
 |---|---|
-| campaign / case / survey | [Experiment Layer](layers/experiment.md) |
-| run / manifest / submit / sync | [Execution Kernel](layers/execution-kernel.md) |
+| campaign / bounded Experiment / case / lazy survey | [Experiment Layer](layers/experiment.md) |
+| Run / TestAttempt / manifest / submit / sync | [Execution Kernel](layers/execution-kernel.md) |
 | CLI / action / human gate | [Interface Layer](layers/interface.md) |
 | 解析・可視化成果物 | [Analysis Layer](layers/analysis.md) |
-| current / journal / retained result | [Research Layer](layers/research.md) |
+| current / journal / sealed Result evidence | [Research Layer](layers/research.md) |
 | plugin / materials / reusable knowledge | [Knowledge Layer](layers/knowledge.md) |
 | Agent harness / skills / rules | [Harness Layer](layers/harness.md) |
 | feedback / local patch / upstream | [Upstream Integration](layers/upstream.md) |

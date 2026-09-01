@@ -1,6 +1,6 @@
 ---
 name: setup-runops
-description: Use when a generated runops project needs orientation and progress toward its first campaign, case, survey, or created-run milestone.
+description: Use when a generated runops project needs orientation and progress toward its first campaign, Experiment, case, survey plan, or created-Run milestone.
 ---
 
 # 生成済み project を最初の研究状態へ進める
@@ -11,7 +11,7 @@ description: Use when a generated runops project needs orientation and progress 
 - **Done**: project health と現在状態が分かり、milestone の artifact と次の依頼候補を示せる
 - **Budget**: context / doctor は各1回。plugin確認は Goal が推薦 capability に依存するとき1回
 - **Invariant**: requested milestoneで閉じ、後続phaseとproject外変更を自動で連鎖しない
-- **Default milestone**: campaign、case、survey、created run のうち依頼に最も近い段階
+- **Default milestone**: campaign、bounded Experiment、case、survey plan、created Run のうち依頼に最も近い段階
 
 この skill は `runo init` / `runo setup` / `runo update-harness` 後の project を入口にする。
 project は生成済みとみなし、診断結果を Goal への routing に使う。
@@ -44,9 +44,10 @@ Goalがplugin capabilityに依存する場合だけ`runo plugins --json`と
 | milestone | 必要な入力 | 委譲先 |
 |---|---|---|
 | campaign | 研究目的、仮説、観測量 | `{{ skill_prefix }}setup-campaign` |
+| Experiment | 一つの問い、baseline、finite budget、有効期限、exit criteria | `runo experiments create` |
 | case | simulator、base input、固定 parameter | `{{ skill_prefix }}new-case` |
-| survey | independent variables、範囲、点数、cost ceiling | `{{ skill_prefix }}survey-design` |
-| created run | case / survey、生成先、件数 | `{{ skill_prefix }}create-run` |
+| survey plan | owning Experiment、independent variables、範囲、点数、cost ceiling | `{{ skill_prefix }}survey-design` |
+| created Run | active Experiment、caseまたはselected survey point、生成先 | `{{ skill_prefix }}create-run` |
 
 site / launcher / 資源条件は該当 milestone の判断に使う。仮置き可能な値は仮定と根拠を示し、
 研究の意味や計算規模を変える不足情報は質問する。
@@ -55,7 +56,8 @@ site / launcher / 資源条件は該当 milestone の判断に使う。仮置き
 
 ```text
 emses project で、flat_surface の campaign と survey 雛形まで作って。
-Done は survey の lint が通り、run 数と概算 core-hour が分かること。
+Done は bounded Experiment と survey の lint が通り、read-only planのcandidate数、point ref、
+plan hash、概算 core-hour が分かること。Run directoryはまだ作らない。
 ```
 
 ## Baseline と研究記録
@@ -75,6 +77,6 @@ git commit -m "chore: scaffold runops project"
 ## Done report
 
 - project root、simulator、site / launcher、doctor の結果
-- 作成・更新した campaign / case / survey / run と検証結果
+- 作成・更新した campaign / Experiment / case / survey / Run と検証結果
 - baseline commit の状態
 - 次に自然な 2-4 個の依頼例

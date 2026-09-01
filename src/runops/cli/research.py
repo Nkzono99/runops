@@ -8,16 +8,15 @@ from typing import Annotated
 
 import typer
 
+from runops.application.actions import ActionResult, ActionStatus, execute_action
+from runops.application.research.results import EvidenceRequest
 from runops.application.research.workspace import (
     ResearchWorkspaceError,
     append_journal,
-    archive_result,
-    create_result,
     inspect_workspace,
     migrate_legacy_workspace,
     plan_legacy_migration,
     restore_legacy_workspace,
-    restore_result,
     rotate_journal,
 )
 from runops.core.exceptions import ProjectConfigError, ProjectNotFoundError
@@ -68,6 +67,14 @@ def check(
 def append(
     title: Annotated[str, typer.Argument(help="Short journal entry title.")],
     body: Annotated[str, typer.Argument(help="Journal entry body.")],
+    kind: Annotated[
+        str | None,
+        typer.Option("--kind", help="Optional entry kind, such as decision."),
+    ] = None,
+    subject: Annotated[
+        str | None,
+        typer.Option("--subject", help="Optional Experiment, Survey, or Run ID."),
+    ] = None,
     path: Annotated[
         Path,
         typer.Option("--path", help="Project root or a path inside the project."),
@@ -76,7 +83,14 @@ def append(
     """Append to the active journal, rotating first when its character limit hits."""
     root, budget = _load_workspace(path)
     try:
-        result = append_journal(root, title=title, body=body, budget=budget)
+        result = append_journal(
+            root,
+            title=title,
+            body=body,
+            kind=kind,
+            subject=subject,
+            budget=budget,
+        )
     except ResearchWorkspaceError as exc:
         _workspace_error(exc)
     if result.rotated_to is not None:
@@ -114,12 +128,111 @@ def new_result(
     ] = Path("."),
 ) -> None:
     """Create one result workspace with one README and an artifact directory."""
+    root, budget = _load_workspace(path)
+    result = execute_action(
+        "create_result",
+        project_root=root,
+        name=name,
+        budget=budget,
+    )
+    _require_success(result)
+    typer.echo(
+        f"Created {result.data['result_id']}: "
+        f"{_relative(Path(str(result.data['path'])), root)}"
+    )
+
+
+def check_result(
+    result: Annotated[
+        str,
+        typer.Argument(help="Result ID or project-relative Result directory."),
+    ],
+    path: Annotated[
+        Path,
+        typer.Option("--path", help="Project root or a path inside the project."),
+    ] = Path("."),
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit the stable JSON check shape."),
+    ] = False,
+) -> None:
+    """Check Result evidence and seal integrity without modifying it."""
     root, _budget = _load_workspace(path)
-    try:
-        result = create_result(root, name)
-    except ResearchWorkspaceError as exc:
-        _workspace_error(exc)
-    typer.echo(f"Created {result.result_id}: {_relative(result.path, root)}")
+    checked = execute_action("check_result", project_root=root, result=result)
+    if not checked.data:
+        _require_success(checked)
+    payload = checked.data
+    if json_output:
+        typer.echo(json.dumps(payload, ensure_ascii=False, indent=2))
+    else:
+        _render_result_check(payload, root=root)
+    if checked.status is not ActionStatus.SUCCESS:
+        raise typer.Exit(code=1)
+
+
+def seal(
+    result: Annotated[
+        str,
+        typer.Argument(help="Canonical draft Result ID or directory."),
+    ],
+    claim: Annotated[
+        str,
+        typer.Option(
+            "--claim",
+            help="Scoped scientific claim supported by the Result.",
+        ),
+    ],
+    outcome: Annotated[
+        str,
+        typer.Option(
+            "--outcome",
+            help="supported, refuted, inconclusive, or invalid.",
+        ),
+    ],
+    evidence_run: list[str] | None = typer.Option(
+        None,
+        "--evidence-run",
+        help="Project run_id to include as evidence; repeat for multiple runs.",
+    ),
+    evidence_path: list[Path] | None = typer.Option(
+        None,
+        "--evidence-path",
+        help="Project-relative artifact file to include; repeat for multiple files.",
+    ),
+    selection_reason: str = typer.Option(
+        ...,
+        "--selection-reason",
+        help="Why the included sources support this Result.",
+    ),
+    path: Path = typer.Option(
+        Path("."),
+        "--path",
+        help="Project root or a path inside the project.",
+    ),
+) -> None:
+    """Seal a Result with immutable source hashes after all gates pass."""
+    root, _budget = _load_workspace(path)
+    run_evidence = tuple(
+        EvidenceRequest.run(run_id, reason=selection_reason)
+        for run_id in evidence_run or []
+    )
+    path_evidence = tuple(
+        EvidenceRequest.path(item, reason=selection_reason)
+        for item in evidence_path or []
+    )
+    requested = run_evidence + path_evidence
+    sealed = execute_action(
+        "seal_result",
+        project_root=root,
+        result=result,
+        claim=claim,
+        outcome=outcome,
+        evidence=requested,
+    )
+    _require_success(sealed)
+    verb = "Sealed" if sealed.data["changed"] else "Already sealed"
+    typer.echo(f"{verb}: {sealed.data['result_id']}")
+    typer.echo(f"Receipt: sha256:{sealed.data['content_sha256']}")
 
 
 def archive(
@@ -131,11 +244,13 @@ def archive(
 ) -> None:
     """Move a result intact out of the active set."""
     root, _budget = _load_workspace(path)
-    try:
-        destination = archive_result(root, result_id)
-    except ResearchWorkspaceError as exc:
-        _workspace_error(exc)
-    typer.echo(f"Archived: {_relative(destination, root)}")
+    result = execute_action(
+        "archive_result",
+        project_root=root,
+        result_id=result_id,
+    )
+    _require_success(result)
+    typer.echo(f"Archived: {_relative(Path(str(result.data['path'])), root)}")
 
 
 def restore(
@@ -146,12 +261,15 @@ def restore(
     ] = Path("."),
 ) -> None:
     """Restore an archived result to the active set."""
-    root, _budget = _load_workspace(path)
-    try:
-        destination = restore_result(root, result_id)
-    except ResearchWorkspaceError as exc:
-        _workspace_error(exc)
-    typer.echo(f"Restored: {_relative(destination, root)}")
+    root, budget = _load_workspace(path)
+    result = execute_action(
+        "restore_result",
+        project_root=root,
+        result_id=result_id,
+        budget=budget,
+    )
+    _require_success(result)
+    typer.echo(f"Restored: {_relative(Path(str(result.data['path'])), root)}")
 
 
 def migrate_legacy(
@@ -218,6 +336,11 @@ def _workspace_error(exc: ResearchWorkspaceError) -> None:
     raise typer.Exit(code=2) from exc
 
 
+def _require_success(result: ActionResult) -> None:
+    if result.status is not ActionStatus.SUCCESS:
+        _workspace_error(ResearchWorkspaceError(result.message))
+
+
 def _render_status(payload: dict[str, object]) -> None:
     typer.echo(f"Research workspace: {payload['root']}")
     typer.echo(
@@ -238,6 +361,26 @@ def _render_status(payload: dict[str, object]) -> None:
             typer.echo(
                 f"[{issue.get('severity', 'error')}] {issue.get('code', '')}: "
                 f"{issue.get('path', '')} — {issue.get('message', '')}"
+            )
+
+
+def _render_result_check(payload: dict[str, object], *, root: Path) -> None:
+    result_path = Path(str(payload["path"]))
+    typer.echo(f"Result: {payload['result_id']} ({_relative(result_path, root)})")
+    typer.echo(
+        f"Layout: {payload['layout']}; status={payload['status']}; "
+        f"sealed={str(payload['sealed']).lower()}; "
+        f"ready_to_seal={str(payload['ready_to_seal']).lower()}"
+    )
+    issues = payload["issues"]
+    if not isinstance(issues, list) or not issues:
+        typer.echo("Status: OK")
+        return
+    for issue in issues:
+        if isinstance(issue, dict):
+            typer.echo(
+                f"[{issue.get('severity', 'error')}] {issue.get('code', '')}: "
+                f"{issue.get('message', '')}"
             )
 
 

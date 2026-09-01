@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from runops.core.exceptions import InvalidStateTransitionError
-from runops.core.manifest import ManifestData, write_manifest
+from runops.core.manifest import ManifestData, read_manifest, write_manifest
 from runops.core.state import (
     RunState,
     reset_state_for_retry,
@@ -215,3 +215,26 @@ class TestResetStateForRetry:
 
         assert exc_info.value.current == "created"
         assert exc_info.value.target == "created"
+
+    def test_retry_reset_invalidates_prior_review(self, tmp_path: Path) -> None:
+        data = ManifestData(
+            run={"id": "R20260327-0004", "status": "failed"},
+            job={"job_id": "12", "submitted_at": "before"},
+            curation={
+                "review_status": "reviewed",
+                "reviewed_at": "2026-03-27T12:00:00+00:00",
+                "reviewed_by": "human",
+                "reason": "accepted before retry",
+            },
+        )
+        write_manifest(tmp_path, data)
+
+        reset_state_for_retry(tmp_path)
+
+        manifest = read_manifest(tmp_path)
+        assert manifest.curation == {
+            "review_status": "unreviewed",
+            "reviewed_at": "",
+            "reviewed_by": "",
+            "reason": "",
+        }

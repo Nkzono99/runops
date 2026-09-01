@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeoutError
 from pathlib import Path
 from threading import Event
 from typing import Any
@@ -24,6 +26,7 @@ from runops.application.actions import (
     export_publication,
     plan_bundle_archive,
     plan_retry,
+    plan_survey,
     promote_fact,
     purge_work,
     restore_bundle,
@@ -40,7 +43,15 @@ from runops.application.execution.readiness import (
     probe_run_readiness,
     write_readiness_cache,
 )
-from runops.core.exceptions import ManifestError
+from runops.application.experiments import create_experiment
+from runops.application.research import (
+    EvidenceRequest,
+    create_result,
+    result_mutation_guard,
+    seal_result,
+)
+from runops.application.run_creation.workflow import directory_content_hash
+from runops.core.exceptions import ManifestError, SimctlError
 from runops.core.knowledge import list_insights, load_facts
 from runops.core.manifest import read_manifest, update_manifest
 from runops.core.state import RunState
@@ -60,6 +71,69 @@ def _write_manifest(run_dir: Path, data: dict[str, Any]) -> None:
     run_dir.mkdir(parents=True, exist_ok=True)
     with open(run_dir / "manifest.toml", "wb") as f:
         tomli_w.dump(data, f)
+
+
+def _write_sealable_archived_run(root: Path, run_id: str) -> Path:
+    """Create reviewed, reproducible Run evidence for purge protection tests."""
+    run_dir = root / "runs" / run_id
+    input_dir = run_dir / "input"
+    input_dir.mkdir(parents=True)
+    (input_dir / "params.toml").write_text("nx = 64\n", encoding="utf-8")
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_id, "status": "archived"},
+            "origin": {"case": "base"},
+            "simulator": {"name": "generic"},
+            "launcher": {"name": "srun"},
+            "simulator_source": {
+                "git_commit": "abc123",
+                "git_dirty": False,
+                "git_state_observed": True,
+                "exe_hash": "sha256:" + "a" * 64,
+                "package_version": "1.0.0",
+            },
+            "job": {"scheduler": "slurm"},
+            "params_snapshot": {},
+            "files": {"input_dir": "input"},
+            "intent": {
+                "experiment_id": "E20260901-0001",
+                "baseline_reason": "standalone purge protection fixture",
+            },
+            "identity": {
+                "condition_hash": "sha256:" + "b" * 64,
+                "input_hash": directory_content_hash(input_dir),
+                "execution_hash": "sha256:" + "c" * 64,
+                "provenance_hash": "sha256:" + "d" * 64,
+            },
+            "curation": {
+                "review_status": "reviewed",
+                "reviewed_at": "2026-09-01T00:00:00+00:00",
+                "reviewed_by": "human",
+                "reason": "accepted for Result evidence",
+            },
+            "storage": {"tier": "cold", "form": "full"},
+        },
+    )
+    return run_dir
+
+
+def _seal_run_output_result(root: Path, output: Path) -> Path:
+    created = create_result(root, "Protected output")
+    seal_result(
+        root,
+        created.result_id,
+        claim="The selected output supports the claim.",
+        outcome="supported",
+        evidence=(
+            EvidenceRequest.path(
+                output.relative_to(root).as_posix(),
+                role="evidence",
+                reason="Selected quantitative evidence.",
+            ),
+        ),
+    )
+    return created.path
 
 
 def _create_project_with_case(project_root: Path) -> None:
@@ -143,7 +217,28 @@ def test_create_run_action_generates_full_run_artifacts(tmp_path: Path) -> None:
     assert params["ny"] == 64
 
 
-def test_create_survey_action_expands_all_combinations(tmp_path: Path) -> None:
+def test_create_run_action_reports_completed_duplicate_as_reused(
+    tmp_path: Path,
+) -> None:
+    _create_project_with_case(tmp_path)
+    first = create_run_action(tmp_path, "my_case")
+    update_manifest(Path(first.data["run_dir"]), {"run": {"status": "completed"}})
+    ledger = tmp_path / ".runops" / "run-id-sequence.toml"
+    sequence_before = ledger.read_bytes()
+
+    second = create_run_action(tmp_path, "my_case")
+
+    assert second.status is ActionStatus.SUCCESS
+    assert second.data["reused"] is True
+    assert second.data["run_id"] == first.data["run_id"]
+    assert second.state_after == ""
+    assert second.message.startswith("Reused equivalent Run")
+    assert ledger.read_bytes() == sequence_before
+
+
+def test_plan_survey_is_read_only_and_create_survey_requires_selection(
+    tmp_path: Path,
+) -> None:
     _create_project_with_case(tmp_path)
     survey_dir = tmp_path / "runs" / "scan"
     survey_dir.mkdir(parents=True)
@@ -154,6 +249,14 @@ def test_create_survey_action_expands_all_combinations(tmp_path: Path) -> None:
         'base_case = "my_case"\n'
         'simulator = "test_sim"\n'
         'launcher = "slurm_srun"\n'
+        'phase = "pilot"\n'
+        "\n"
+        "[intent]\n"
+        'purpose = "explore"\n'
+        "\n"
+        "[budget]\n"
+        "max_materialized_runs = 2\n"
+        "max_core_hours = 10.0\n"
         "\n"
         "[axes]\n"
         "nx = [32, 64]\n"
@@ -164,12 +267,26 @@ def test_create_survey_action_expands_all_combinations(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    result = create_survey(tmp_path, survey_dir)
+    planned = plan_survey(tmp_path, survey_dir, limit=2)
+
+    assert planned.status is ActionStatus.SUCCESS
+    assert planned.data["candidate_count"] == 4
+    assert len(planned.data["points"]) == 2
+    assert list(survey_dir.glob("*/manifest.toml")) == []
+    assert not (tmp_path / ".runops" / "run-id-sequence.toml").exists()
+
+    result = create_survey(
+        tmp_path,
+        survey_dir,
+        expected_plan_hash=str(planned.data["plan_hash"]),
+        point_refs=("p0002",),
+    )
 
     assert result.status is ActionStatus.SUCCESS
     assert result.state_after == "created"
-    assert result.data["created_count"] == 4
-    assert len(result.data["runs"]) == 4
+    assert result.data["created_count"] == 1
+    assert result.data["reused_count"] == 0
+    assert [run["ref"] for run in result.data["runs"]] == ["p0002"]
 
 
 def test_collect_survey_writes_aggregate_artifacts(tmp_path: Path) -> None:
@@ -552,7 +669,18 @@ def test_purge_work_removes_work_artifacts_and_updates_state(tmp_path: Path) -> 
         target.mkdir(parents=True, exist_ok=True)
         (target / "data.bin").write_bytes(b"x" * 128)
 
-    result = purge_work(run_dir)
+    blocked = purge_work(run_dir)
+
+    assert blocked.status is ActionStatus.PRECONDITION_FAILED
+    assert blocked.data["readiness"] is None
+    assert blocked.data["recommended_action"] == "analyze_outputs"
+    assert (run_dir / "work" / "outputs").is_dir()
+
+    result = purge_work(
+        run_dir,
+        discard_incomplete=True,
+        review_reason="No readiness record exists; outputs are disposable scratch.",
+    )
 
     assert result.status is ActionStatus.SUCCESS
     assert result.state_before == "archived"
@@ -561,6 +689,64 @@ def test_purge_work_removes_work_artifacts_and_updates_state(tmp_path: Path) -> 
     assert result.data["bytes_removed"] == 384
     assert not (run_dir / "work" / "outputs").exists()
     assert (run_dir / "status" / "state.json").exists()
+    updated = read_manifest(run_dir)
+    assert updated.run["readiness_disposition"] == "discarded_incomplete"
+
+
+@pytest.mark.parametrize("failure_phase", ["staging", "metadata"])
+def test_purge_discard_review_rolls_back_with_data_on_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    failure_phase: str,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    run_dir = tmp_path / "R20260330-0009"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"evidence")
+    manifest_before = (run_dir / "manifest.toml").read_bytes()
+
+    if failure_phase == "staging":
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            lambda *_args, **_kwargs: (_ for _ in ()).throw(
+                OSError("injected staging failure")
+            ),
+        )
+    else:
+        from runops.core import manifest as manifest_module
+
+        real_write_manifest = manifest_module.write_manifest
+        write_calls = 0
+
+        def fail_metadata_once(path: Path, manifest: Any, **kwargs: Any) -> Any:
+            nonlocal write_calls
+            write_calls += 1
+            if write_calls == 1:
+                raise OSError("injected metadata failure")
+            return real_write_manifest(path, manifest, **kwargs)
+
+        monkeypatch.setattr(
+            manifest_module,
+            "write_manifest",
+            fail_metadata_once,
+        )
+
+    result = purge_work(
+        run_dir,
+        discard_incomplete=True,
+        review_reason="Explicitly discard unknown readiness for test.",
+    )
+
+    assert result.status is ActionStatus.ERROR
+    assert output.read_bytes() == b"evidence"
+    assert (run_dir / "manifest.toml").read_bytes() == manifest_before
 
 
 def test_purge_work_gates_known_incomplete_readiness(tmp_path: Path) -> None:
@@ -607,6 +793,878 @@ def test_purge_work_gates_known_incomplete_readiness(tmp_path: Path) -> None:
     )
 
 
+def test_purge_work_blocks_run_paths_included_by_a_sealed_result(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "result-protection"\n',
+        encoding="utf-8",
+    )
+    run_id = "R20260330-0003"
+    run_dir = _write_sealable_archived_run(tmp_path, run_id)
+    output = run_dir / "work" / "outputs" / "summary.csv"
+    output.parent.mkdir(parents=True)
+    output.write_text("value\n1\n", encoding="utf-8")
+    result_dir = _seal_run_output_result(tmp_path, output)
+
+    blocked = purge_work(run_dir)
+
+    assert blocked.status is ActionStatus.PRECONDITION_FAILED
+    assert blocked.data["protected_by_results"] == [result_dir.name]
+    assert output.is_file()
+    assert read_manifest(run_dir).storage["protected_by_results"] == [result_dir.name]
+
+
+def test_purge_work_fails_closed_when_sealed_result_selection_is_tampered(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "tampered-result-protection"\n',
+        encoding="utf-8",
+    )
+    run_id = "R20260330-0005"
+    run_dir = _write_sealable_archived_run(tmp_path, run_id)
+    output = run_dir / "work" / "outputs" / "summary.csv"
+    output.parent.mkdir(parents=True)
+    output.write_text("value\n1\n", encoding="utf-8")
+    result_dir = _seal_run_output_result(tmp_path, output)
+    manifest_path = result_dir / "manifest.toml"
+    sealed = manifest_path.read_text(encoding="utf-8")
+    tampered = sealed.replace('disposition = "include"', 'disposition = "exclude"')
+    assert tampered != sealed
+    manifest_path.write_text(tampered, encoding="utf-8")
+
+    blocked = purge_work(
+        run_dir,
+        discard_incomplete=True,
+        review_reason="Tampered Result must not permit deletion.",
+    )
+
+    assert blocked.status is ActionStatus.PRECONDITION_FAILED
+    assert "cannot verify sealed Result protections" in blocked.message
+    assert "sealed_content_changed" in blocked.message
+    assert output.is_file()
+    assert read_manifest(run_dir).run["status"] == "archived"
+
+
+def test_purge_work_serializes_with_result_sealing(tmp_path: Path) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "result-race"\n',
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "runs" / "R20260330-0004"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": "R20260330-0004", "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "summary.csv"
+    output.parent.mkdir(parents=True)
+    output.write_text("value\n1\n", encoding="utf-8")
+    entered = Event()
+
+    from runops.application.actions import admin as admin_module
+
+    real_find_project = admin_module._find_project_root_or_none
+
+    def signalled_find_project(path: Path) -> Path | None:
+        entered.set()
+        return real_find_project(path)
+
+    with patch.object(  # noqa: SIM117 - Result guard must release before future.result
+        admin_module,
+        "_find_project_root_or_none",
+        side_effect=signalled_find_project,
+    ):
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with result_mutation_guard(tmp_path):
+                future = pool.submit(
+                    purge_work,
+                    run_dir,
+                    discard_incomplete=True,
+                    review_reason="Result-lock serialization test.",
+                )
+                assert entered.wait(timeout=2)
+                with pytest.raises(FutureTimeoutError):
+                    future.result(timeout=0.1)
+                assert output.is_file()
+
+            purged = future.result(timeout=2)
+
+    assert purged.status is ActionStatus.SUCCESS
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "hardlink"])
+def test_purge_work_fails_closed_on_unsafe_result_registry_manifest(
+    tmp_path: Path,
+    unsafe_kind: str,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "unsafe-result-registry"\n',
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "runs" / "R20260330-0006"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "summary.csv"
+    output.parent.mkdir(parents=True)
+    output.write_text("value\n1\n", encoding="utf-8")
+    external = tmp_path / "external-result.toml"
+    external.write_text("[result]\nid = 'R0001-unsafe'\n", encoding="utf-8")
+    result_dir = tmp_path / "research" / "results" / "R0001-unsafe"
+    result_dir.mkdir(parents=True)
+    manifest_path = result_dir / "manifest.toml"
+    if unsafe_kind == "symlink":
+        manifest_path.symlink_to(external)
+    else:
+        os.link(external, manifest_path)
+
+    result = purge_work(run_dir)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "cannot verify sealed Result protections" in result.message
+    assert output.is_file()
+
+
+def test_purge_work_fails_closed_on_result_directory_without_manifest(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "missing-result-manifest"\n',
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "runs" / "R20260330-0007"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "summary.csv"
+    output.parent.mkdir(parents=True)
+    output.write_text("value\n1\n", encoding="utf-8")
+    (tmp_path / "research" / "results" / "R0001-missing").mkdir(parents=True)
+
+    result = purge_work(run_dir)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "cannot verify sealed Result protections" in result.message
+    assert "missing or unreadable" in result.message
+    assert output.is_file()
+
+
+def test_purge_work_rolls_back_all_targets_when_staging_fails(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0007"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    for dirname in ("outputs", "restart"):
+        target = run_dir / "work" / dirname
+        target.mkdir(parents=True)
+        (target / "data.bin").write_bytes(dirname.encode())
+
+    from runops.application.actions import admin as admin_module
+
+    real_move = admin_module.move_directory_noreplace
+    calls = 0
+
+    def fail_second_move(source: Path, destination: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("injected staging failure")
+        real_move(source, destination)
+
+    with patch.object(
+        admin_module,
+        "move_directory_noreplace",
+        side_effect=fail_second_move,
+    ):
+        result = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Injected staging failure test.",
+        )
+
+    assert result.status is ActionStatus.ERROR
+    assert "injected staging failure" in result.message
+    assert read_manifest(run_dir).run["status"] == "archived"
+    assert (run_dir / "work" / "outputs" / "data.bin").read_bytes() == b"outputs"
+    assert (run_dir / "work" / "restart" / "data.bin").read_bytes() == b"restart"
+    assert not list((run_dir / "work").glob(".delete-purge-*"))
+
+
+def test_purge_work_rolls_back_data_and_metadata_when_commit_fails(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0008"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_dir.name, "status": "archived"},
+            "storage": {"tier": "cold", "form": "full"},
+        },
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"preserve")
+
+    from runops.core import manifest as manifest_module
+
+    real_write = manifest_module.write_manifest
+    calls = 0
+
+    def fail_commit_once(path: Path, manifest: Any, **kwargs: Any) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise ManifestError("injected metadata failure")
+        return real_write(path, manifest, **kwargs)
+
+    with patch.object(
+        manifest_module,
+        "write_manifest",
+        side_effect=fail_commit_once,
+    ):
+        result = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Injected metadata failure test.",
+        )
+
+    assert result.status is ActionStatus.ERROR
+    assert "injected metadata failure" in result.message
+    assert output.read_bytes() == b"preserve"
+    manifest = read_manifest(run_dir)
+    assert manifest.run["status"] == "archived"
+    assert manifest.storage == {"tier": "cold", "form": "full"}
+    assert not (run_dir / "status" / "state.json").exists()
+    assert not list((run_dir / "work").glob(".delete-purge-*"))
+
+
+def test_purge_work_refuses_synchronous_rollback_after_staged_tree_drift(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0026"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    for dirname in ("outputs", "restart"):
+        target = run_dir / "work" / dirname
+        target.mkdir(parents=True)
+        (target / "data.bin").write_bytes(dirname.encode())
+
+    from runops.application.actions import admin as admin_module
+
+    real_move = admin_module.move_directory_noreplace
+    calls = 0
+
+    def drift_then_fail(source: Path, destination: Path) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            staged = destination.parent / "outputs" / "data.bin"
+            staged.write_bytes(b"replacement after receipt")
+            raise OSError("injected staging failure after drift")
+        real_move(source, destination)
+
+    with patch.object(
+        admin_module,
+        "move_directory_noreplace",
+        side_effect=drift_then_fail,
+    ):
+        result = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise synchronous staged digest gate.",
+        )
+
+    assert result.status is ActionStatus.ERROR
+    assert "rollback failed" in result.message
+    assert "digest" in result.message
+    tombstone = next((run_dir / "work").glob(".delete-purge-*"))
+    assert (tombstone / "outputs" / "data.bin").read_bytes() == (
+        b"replacement after receipt"
+    )
+    assert (run_dir / "work" / "restart" / "data.bin").read_bytes() == b"restart"
+    assert (run_dir / "status" / ".purge-pending.json").is_file()
+
+
+def test_purge_work_refuses_synchronous_rollback_after_manifest_drift(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0027"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"preserve in tombstone")
+
+    from runops.core import manifest as manifest_module
+
+    real_write = manifest_module.write_manifest
+
+    def drift_then_fail(path: Path, manifest: Any, **kwargs: Any) -> Any:
+        current = read_manifest(path)
+        current.run["display_name"] = "changed after purge receipt"
+        real_write(path, current, **kwargs)
+        raise ManifestError("injected commit failure after manifest drift")
+
+    with patch.object(
+        manifest_module,
+        "write_manifest",
+        side_effect=drift_then_fail,
+    ):
+        result = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise synchronous manifest digest gate.",
+        )
+
+    assert result.status is ActionStatus.ERROR
+    assert "automatic rollback was not completed" in result.message
+    assert "manifest digest" in result.message
+    manifest = read_manifest(run_dir)
+    assert manifest.run["status"] == "archived"
+    assert manifest.run["display_name"] == "changed after purge receipt"
+    tombstone = next((run_dir / "work").glob(".delete-purge-*"))
+    assert (tombstone / "outputs" / "data.bin").read_bytes() == (
+        b"preserve in tombstone"
+    )
+    assert (run_dir / "status" / ".purge-pending.json").is_file()
+
+
+def test_purge_work_commits_when_tombstone_cleanup_fails(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0009"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"staged")
+
+    from runops.application.actions import admin as admin_module
+
+    with patch.object(
+        admin_module.shutil,
+        "rmtree",
+        side_effect=OSError("injected cleanup failure"),
+    ):
+        result = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Injected cleanup failure test.",
+        )
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_after == "purged"
+    assert result.data["bytes_removed"] == 0
+    assert result.data["cleanup_pending"]
+    assert not output.exists()
+    tombstone = Path(str(result.data["cleanup_pending"]))
+    assert (tombstone / "outputs" / "data.bin").read_bytes() == b"staged"
+    manifest = read_manifest(run_dir)
+    assert manifest.run["status"] == "purged"
+    assert manifest.storage["form"] == "compacted"
+
+
+def test_purge_work_resumes_after_partial_tombstone_cleanup_failure(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0028"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output_dir = run_dir / "work" / "outputs"
+    output_dir.mkdir(parents=True)
+    (output_dir / "removed-before-error.bin").write_bytes(b"first")
+    (output_dir / "retained-after-error.bin").write_bytes(b"second")
+
+    from runops.application.actions import admin as admin_module
+
+    def partially_remove_then_fail(path: Path, *args: Any, **kwargs: Any) -> None:
+        del args, kwargs
+        tombstone = Path(path)
+        (tombstone / "outputs" / "removed-before-error.bin").unlink()
+        raise OSError("injected failure after partial cleanup")
+
+    with patch.object(
+        admin_module.shutil,
+        "rmtree",
+        side_effect=partially_remove_then_fail,
+    ):
+        first = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise partial cleanup recovery.",
+        )
+
+    assert first.status is ActionStatus.SUCCESS
+    assert first.data["cleanup_pending"]
+    receipt = run_dir / "status" / ".purge-pending.json"
+    tombstone = next((run_dir / "work").glob(".delete-purge-*"))
+    assert not (tombstone / "outputs" / "removed-before-error.bin").exists()
+    assert (tombstone / "outputs" / "retained-after-error.bin").is_file()
+
+    resumed = purge_work(run_dir)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert resumed.state_after == "purged"
+    assert not receipt.exists()
+    assert not tombstone.exists()
+
+
+def test_purge_work_rejects_replaced_target_after_partial_cleanup(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0029"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output_dir = run_dir / "work" / "outputs"
+    output_dir.mkdir(parents=True)
+    (output_dir / "removed-before-error.bin").write_bytes(b"first")
+    (output_dir / "retained-after-error.bin").write_bytes(b"second")
+
+    from runops.application.actions import admin as admin_module
+
+    def partially_remove_then_fail(path: Path, *args: Any, **kwargs: Any) -> None:
+        del args, kwargs
+        tombstone = Path(path)
+        (tombstone / "outputs" / "removed-before-error.bin").unlink()
+        raise OSError("injected failure after partial cleanup")
+
+    with patch.object(
+        admin_module.shutil,
+        "rmtree",
+        side_effect=partially_remove_then_fail,
+    ):
+        first = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise replacement-safe cleanup recovery.",
+        )
+
+    assert first.status is ActionStatus.SUCCESS
+    tombstone = next((run_dir / "work").glob(".delete-purge-*"))
+    original = tombstone / "outputs"
+    preserved = tmp_path / "preserved-original-output"
+    original.rename(preserved)
+    original.mkdir()
+    (original / "retained-after-error.bin").write_bytes(b"second")
+
+    blocked = purge_work(run_dir)
+
+    assert blocked.status is ActionStatus.ERROR
+    assert "target identity" in blocked.message
+    assert (run_dir / "status" / ".purge-pending.json").is_file()
+    assert original.is_dir()
+    assert (preserved / "retained-after-error.bin").is_file()
+
+
+def test_purge_work_continues_from_committed_move_after_fsync_failure(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.run_creation import staging as staging_module
+
+    run_dir = tmp_path / "R20260330-0010"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"staged")
+    real_rename = staging_module._rename_noreplace
+    rename_calls = 0
+
+    def fail_fsync(_path: Path) -> None:
+        raise OSError("injected parent fsync failure")
+
+    def fail_rollback(source: Path, destination: Path) -> None:
+        nonlocal rename_calls
+        rename_calls += 1
+        if rename_calls == 2:
+            raise OSError("injected rollback failure")
+        real_rename(source, destination)
+
+    monkeypatch.setattr(staging_module, "_fsync_directory", fail_fsync)
+    monkeypatch.setattr(staging_module, "_rename_noreplace", fail_rollback)
+
+    with pytest.warns(staging_module.MoveDurabilityWarning):
+        result = purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Injected fsync recovery test.",
+        )
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.state_after == "purged"
+    assert not output.exists()
+    assert not list((run_dir / "work").glob(".delete-purge-*"))
+    assert read_manifest(run_dir).run["status"] == "purged"
+
+
+@pytest.mark.parametrize("interrupt_phase", ["move", "manifest", "cleanup"])
+def test_purge_work_resumes_after_process_interruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_phase: str,
+) -> None:
+    from runops.application.actions import admin as admin_module
+    from runops.core import manifest as manifest_module
+
+    suffix = {"move": "0011", "manifest": "0012", "cleanup": "0013"}[interrupt_phase]
+    run_dir = tmp_path / f"R20260330-{suffix}"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"durable purge")
+    interrupted = False
+
+    if interrupt_phase == "move":
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(source: Path, destination: Path) -> None:
+            nonlocal interrupted
+            real_move(source, destination)
+            if not interrupted and source.name == "outputs":
+                interrupted = True
+                raise KeyboardInterrupt("injected after purge move")
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+    elif interrupt_phase == "manifest":
+        real_write = manifest_module.write_manifest
+
+        def interrupt_after_manifest(path: Path, manifest: Any, **kwargs: Any) -> Any:
+            nonlocal interrupted
+            result = real_write(path, manifest, **kwargs)
+            if not interrupted and manifest.run.get("status") == RunState.PURGED.value:
+                interrupted = True
+                raise KeyboardInterrupt("injected after purge manifest")
+            return result
+
+        monkeypatch.setattr(
+            manifest_module,
+            "write_manifest",
+            interrupt_after_manifest,
+        )
+    else:
+        real_rmtree = admin_module.shutil.rmtree
+
+        def interrupt_before_cleanup(path: Path, *args: Any, **kwargs: Any) -> None:
+            nonlocal interrupted
+            if not interrupted and Path(path).name.startswith(".delete-purge-"):
+                interrupted = True
+                raise KeyboardInterrupt("injected before purge cleanup")
+            real_rmtree(path, *args, **kwargs)
+
+        monkeypatch.setattr(admin_module.shutil, "rmtree", interrupt_before_cleanup)
+
+    with pytest.raises(KeyboardInterrupt, match="injected"):
+        purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise durable purge recovery.",
+        )
+
+    receipt = run_dir / "status" / ".purge-pending.json"
+    assert receipt.is_file()
+
+    resumed = purge_work(
+        run_dir,
+        discard_incomplete=True,
+        review_reason="Exercise durable purge recovery.",
+    )
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert read_manifest(run_dir).run["status"] == "purged"
+    assert not output.exists()
+    assert not receipt.exists()
+    assert not list((run_dir / "work").glob(".delete-purge-*"))
+
+
+def test_purge_work_rejects_staged_data_changed_before_retry(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    run_dir = tmp_path / "R20260330-0018"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"original staged bytes")
+    real_move = admin_module.move_directory_noreplace
+    interrupted = False
+
+    def interrupt_after_move(source: Path, destination: Path) -> None:
+        nonlocal interrupted
+        real_move(source, destination)
+        if not interrupted and source.name == "outputs":
+            interrupted = True
+            raise KeyboardInterrupt("injected after purge move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        interrupt_after_move,
+    )
+    with pytest.raises(KeyboardInterrupt, match="injected"):
+        purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise staged digest validation.",
+        )
+    monkeypatch.setattr(admin_module, "move_directory_noreplace", real_move)
+    tombstone = next((run_dir / "work").glob(".delete-purge-*"))
+    staged = tombstone / "outputs" / "data.bin"
+    staged.write_bytes(b"replacement with same transaction topology")
+
+    blocked = purge_work(run_dir)
+
+    assert blocked.status is ActionStatus.ERROR
+    assert "digest" in blocked.message
+    assert read_manifest(run_dir).run["status"] == "archived"
+    assert staged.is_file()
+    assert (run_dir / "status" / ".purge-pending.json").is_file()
+
+
+def test_purge_work_rejects_live_manifest_changed_after_commit_before_retry(
+    tmp_path: Path,
+) -> None:
+    from runops.core import manifest as manifest_module
+
+    run_dir = tmp_path / "R20260330-0019"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"committed staged bytes")
+    real_write = manifest_module.write_manifest
+    interrupted = False
+
+    def interrupt_after_manifest(path: Path, manifest: Any, **kwargs: Any) -> Any:
+        nonlocal interrupted
+        result = real_write(path, manifest, **kwargs)
+        if not interrupted and manifest.run.get("status") == RunState.PURGED.value:
+            interrupted = True
+            raise KeyboardInterrupt("injected after purge manifest")
+        return result
+
+    with (
+        patch.object(
+            manifest_module,
+            "write_manifest",
+            side_effect=interrupt_after_manifest,
+        ),
+        pytest.raises(KeyboardInterrupt, match="injected"),
+    ):
+        purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise live manifest digest validation.",
+        )
+    update_manifest(run_dir, {"run": {"display_name": "tampered after commit"}})
+
+    blocked = purge_work(run_dir)
+
+    assert blocked.status is ActionStatus.ERROR
+    assert "manifest digest" in blocked.message
+    assert read_manifest(run_dir).run["status"] == "purged"
+    assert (run_dir / "status" / ".purge-pending.json").is_file()
+    assert list((run_dir / "work").glob(".delete-purge-*"))
+
+
+@pytest.mark.parametrize("parent_name", ["work", "status"])
+def test_purge_work_rejects_redirected_parent_directories(
+    tmp_path: Path,
+    parent_name: str,
+) -> None:
+    run_dir = tmp_path / "R20260330-0014"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    outside = tmp_path / f"outside-{parent_name}"
+    outside.mkdir()
+    (run_dir / parent_name).symlink_to(outside, target_is_directory=True)
+    if parent_name == "work":
+        output = outside / "outputs" / "data.bin"
+        output.parent.mkdir()
+        output.write_bytes(b"must survive")
+
+    result = purge_work(
+        run_dir,
+        discard_incomplete=True,
+        review_reason="Unsafe parent must be rejected.",
+    )
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "Purge parent must be a real directory" in result.message
+    if parent_name == "work":
+        assert (outside / "outputs" / "data.bin").read_bytes() == b"must survive"
+    else:
+        assert list(outside.iterdir()) == []
+
+
+def test_purge_work_rejects_receipt_with_missing_tombstone_identity(
+    tmp_path: Path,
+) -> None:
+    run_dir = tmp_path / "R20260330-0015"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    status_dir = run_dir / "status"
+    status_dir.mkdir()
+    receipt = status_dir / ".purge-pending.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "run_id": run_dir.name,
+                "tombstone": "",
+                "targets": ["outputs"],
+                "bytes_staged": 1,
+                "compacted_at": "2026-09-01T00:00:00+00:00",
+                "review_updates": {},
+                "manifest_before_sha256": "a" * 64,
+                "manifest_after_sha256": "b" * 64,
+                "target_sha256": {"outputs": "sha256:" + "c" * 64},
+                "tombstone_identity": None,
+                "target_identity": {"outputs": [1, 2]},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = purge_work(run_dir)
+
+    assert result.status is ActionStatus.ERROR
+    assert "receipt topology" in result.message
+    assert receipt.is_file()
+
+
+def test_purge_work_rejects_symlinked_pending_tombstone(tmp_path: Path) -> None:
+    run_dir = tmp_path / "R20260330-0017"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"preserve")
+    outside = tmp_path / "outside-tombstone"
+    outside.mkdir()
+    (outside / "unrelated.bin").write_bytes(b"keep")
+    tombstone_name = ".delete-purge-deadbeef"
+    (run_dir / "work" / tombstone_name).symlink_to(
+        outside,
+        target_is_directory=True,
+    )
+    status_dir = run_dir / "status"
+    status_dir.mkdir()
+    (status_dir / ".purge-pending.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 2,
+                "run_id": run_dir.name,
+                "tombstone": tombstone_name,
+                "targets": ["outputs"],
+                "bytes_staged": output.stat().st_size,
+                "compacted_at": "2026-09-01T00:00:00+00:00",
+                "review_updates": {},
+                "manifest_before_sha256": "a" * 64,
+                "manifest_after_sha256": "b" * 64,
+                "target_sha256": {"outputs": "sha256:" + "c" * 64},
+                "tombstone_identity": [1, 2],
+                "target_identity": {"outputs": [3, 4]},
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    result = purge_work(run_dir)
+
+    assert result.status is ActionStatus.ERROR
+    assert "tombstone must be a real directory" in result.message
+    assert output.read_bytes() == b"preserve"
+    assert (outside / "unrelated.bin").read_bytes() == b"keep"
+
+
+def test_purge_work_is_idempotent_after_receipt_unlink_interruption(
+    tmp_path: Path,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    run_dir = tmp_path / "R20260330-0016"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "archived"}},
+    )
+    output = run_dir / "work" / "outputs" / "data.bin"
+    output.parent.mkdir(parents=True)
+    output.write_bytes(b"remove")
+    interrupted = False
+
+    def interrupt_after_receipt_unlink(target: Path) -> None:
+        nonlocal interrupted
+        receipt = target / "status" / ".purge-pending.json"
+        receipt.unlink()
+        interrupted = True
+        raise KeyboardInterrupt("injected after receipt unlink")
+
+    with (
+        patch.object(
+            admin_module,
+            "_remove_purge_receipt",
+            side_effect=interrupt_after_receipt_unlink,
+        ),
+        pytest.raises(KeyboardInterrupt, match="receipt unlink"),
+    ):
+        purge_work(
+            run_dir,
+            discard_incomplete=True,
+            review_reason="Exercise post-unlink idempotence.",
+        )
+
+    assert interrupted
+    assert read_manifest(run_dir).run["status"] == "purged"
+    assert not output.exists()
+    assert not (run_dir / "status" / ".purge-pending.json").exists()
+
+    resumed = purge_work(run_dir)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert resumed.state_before == "purged"
+    assert resumed.state_after == "purged"
+
+
 def test_archive_run_moves_directory_and_updates_manifest_path(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "scan" / "R20260330-0001"
     _write_manifest(
@@ -642,6 +1700,55 @@ def test_archive_run_moves_directory_and_updates_manifest_path(tmp_path: Path) -
     assert manifest.path["run_dir"] == str(destination.resolve())
     assert manifest.path["archived_from"] == str(run_dir.resolve())
     assert "archived_at" in manifest.path
+
+
+def test_archive_run_rejects_destination_outside_managed_project_namespace(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "managed"\n',
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "runs" / "R20260330-0005"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "completed"}},
+    )
+    destination = tmp_path / "external-cold" / run_dir.name
+
+    result = archive_run(run_dir, move_to=destination)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "external --move-to would bypass Result and budget gates" in result.message
+    assert run_dir.is_dir()
+    assert not destination.exists()
+    assert read_manifest(run_dir).run["status"] == "completed"
+
+
+def test_archive_run_rejects_symlinked_managed_archive_root(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text(
+        '[project]\nname = "managed"\n',
+        encoding="utf-8",
+    )
+    run_dir = tmp_path / "runs" / "R20260330-0006"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "completed"}},
+    )
+    outside = tmp_path / "external-cold"
+    outside.mkdir()
+    archive_entry = tmp_path / "runs" / "_archive"
+    archive_entry.symlink_to(outside, target_is_directory=True)
+
+    result = archive_run(run_dir, move_to=archive_entry / run_dir.name)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "archive root must not be a symlink" in result.message
+    assert run_dir.is_dir()
+    assert not (outside / run_dir.name).exists()
+    assert read_manifest(run_dir).run["status"] == "completed"
 
 
 def test_archive_bundle_moves_parent_and_preserves_run_states(tmp_path: Path) -> None:
@@ -1012,6 +2119,91 @@ def test_restore_run_moves_directory_back_without_deleting_outputs(
     assert manifest.extra_sections["extensions"] == {"example": {"preserved": True}}
 
 
+def test_restore_run_rolls_back_state_when_second_metadata_write_fails(
+    tmp_path: Path,
+) -> None:
+    original = tmp_path / "runs" / "scan" / "R20260330-0010"
+    archived = tmp_path / "runs" / "_archive" / "scan" / original.name
+    output = archived / "work" / "outputs" / "result.dat"
+    output.parent.mkdir(parents=True)
+    output.write_text("preserved\n")
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": original.name, "status": "archived"},
+            "path": {
+                "run_dir": str(archived),
+                "created_at_path": str(original),
+                "archived_from": str(original),
+            },
+            "storage": {"tier": "cold", "form": "full"},
+        },
+    )
+
+    from runops.core import manifest as manifest_module
+
+    real_update = manifest_module.update_manifest
+    calls = 0
+
+    def fail_second_update(path: Path, updates: dict[str, Any]) -> Any:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise ManifestError("injected restore metadata failure")
+        return real_update(path, updates)
+
+    with patch.object(
+        manifest_module,
+        "update_manifest",
+        side_effect=fail_second_update,
+    ):
+        failed = restore_run(archived)
+
+    assert failed.status is ActionStatus.ERROR
+    assert "injected restore metadata failure" in failed.message
+    assert archived.is_dir()
+    assert not original.exists()
+    rolled_back = read_manifest(archived)
+    assert rolled_back.run["status"] == "archived"
+    assert rolled_back.storage == {"tier": "cold", "form": "full"}
+    assert (archived / "work" / "outputs" / "result.dat").is_file()
+
+    restored = restore_run(archived)
+
+    assert restored.status is ActionStatus.SUCCESS
+    assert read_manifest(original).run["status"] == "completed"
+    assert (original / "work" / "outputs" / "result.dat").is_file()
+
+
+def test_restore_run_rejects_symlink_ancestor_escape_from_managed_runs(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "runops.toml").write_text('[project]\nname = "restore-safe"\n')
+    archived = tmp_path / "runs" / "_archive" / "R20260330-0011"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "runs" / "link").parent.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "runs" / "link").symlink_to(outside, target_is_directory=True)
+    escaped = tmp_path / "runs" / "link" / archived.name
+    _write_manifest(
+        archived,
+        {
+            "run": {"id": archived.name, "status": "archived"},
+            "path": {
+                "run_dir": str(archived),
+                "archived_from": str(escaped),
+            },
+        },
+    )
+
+    result = restore_run(archived)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "restored inside" in result.message
+    assert archived.is_dir()
+    assert not (outside / archived.name).exists()
+
+
 def test_restore_run_in_place_changes_state_without_moving(tmp_path: Path) -> None:
     run_dir = tmp_path / "runs" / "R20260330-0001"
     _write_manifest(
@@ -1073,6 +2265,867 @@ def test_restore_run_rejects_dangling_symlink_destination(tmp_path: Path) -> Non
     assert result.status is ActionStatus.PRECONDITION_FAILED
     assert original.is_symlink()
     assert archived.exists()
+
+
+@pytest.mark.parametrize("interrupt_phase", ["move", "manifest", "cleanup"])
+def test_archive_run_resumes_durable_transaction_after_process_interruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_phase: str,
+) -> None:
+    from runops.application.actions import admin as admin_module
+    from runops.core import manifest as manifest_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0020"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "completed"},
+            "path": {"run_dir": str(source)},
+            "extensions": {"exact": {"preserved": True}},
+        },
+    )
+    interrupted = False
+
+    if interrupt_phase == "move":
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(move_source: Path, move_destination: Path) -> Any:
+            nonlocal interrupted
+            outcome = real_move(move_source, move_destination)
+            if move_source == source and move_destination == destination:
+                interrupted = True
+                raise KeyboardInterrupt("injected after archive move")
+            return outcome
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+    elif interrupt_phase == "manifest":
+        real_write = manifest_module.write_manifest
+        write_calls = 0
+
+        def interrupt_after_manifest(*args: Any, **kwargs: Any) -> Any:
+            nonlocal interrupted, write_calls
+            write_calls += 1
+            result = real_write(*args, **kwargs)
+            if write_calls == 2:
+                interrupted = True
+                raise KeyboardInterrupt("injected after archive manifest")
+            return result
+
+        monkeypatch.setattr(
+            manifest_module,
+            "write_manifest",
+            interrupt_after_manifest,
+        )
+    else:
+        real_remove = admin_module._remove_lifecycle_receipt
+
+        def interrupt_after_cleanup(receipt: Any) -> None:
+            nonlocal interrupted
+            real_remove(receipt)
+            interrupted = True
+            raise KeyboardInterrupt("injected after archive receipt cleanup")
+
+        monkeypatch.setattr(
+            admin_module,
+            "_remove_lifecycle_receipt",
+            interrupt_after_cleanup,
+        )
+
+    with pytest.raises(KeyboardInterrupt, match="injected after archive"):
+        archive_run(source, move_to=destination)
+
+    assert interrupted
+    receipt_dir = tmp_path / ".runops" / "lifecycle"
+    receipts = list(receipt_dir.glob("archive_run-*.json"))
+    assert len(receipts) == (0 if interrupt_phase == "cleanup" else 1)
+    monkeypatch.undo()
+
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert not source.exists()
+    assert destination.is_dir()
+    assert not list(receipt_dir.glob("archive_run-*.json"))
+    manifest = read_manifest(destination)
+    assert manifest.run["status"] == "archived"
+    assert manifest.path["archived_from"] == str(source)
+    assert manifest.extra_sections["extensions"] == {"exact": {"preserved": True}}
+
+
+@pytest.mark.parametrize("interrupt_phase", ["move", "manifest", "cleanup"])
+def test_restore_run_resumes_durable_transaction_after_process_interruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    interrupt_phase: str,
+) -> None:
+    from runops.application.actions import admin as admin_module
+    from runops.core import manifest as manifest_module
+
+    destination = tmp_path / "runs" / "scan" / "R20260330-0021"
+    source = tmp_path / "runs" / "_archive" / "scan" / destination.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "archived"},
+            "path": {
+                "run_dir": str(source),
+                "archived_from": str(destination),
+            },
+            "storage": {"tier": "cold", "form": "full"},
+            "extensions": {"exact": {"preserved": True}},
+        },
+    )
+    interrupted = False
+
+    if interrupt_phase == "move":
+        real_move = admin_module.move_directory_noreplace
+
+        def interrupt_after_move(move_source: Path, move_destination: Path) -> Any:
+            nonlocal interrupted
+            outcome = real_move(move_source, move_destination)
+            if move_source == source and move_destination == destination:
+                interrupted = True
+                raise KeyboardInterrupt("injected after restore move")
+            return outcome
+
+        monkeypatch.setattr(
+            admin_module,
+            "move_directory_noreplace",
+            interrupt_after_move,
+        )
+    elif interrupt_phase == "manifest":
+        real_write = manifest_module.write_manifest
+        write_calls = 0
+
+        def interrupt_after_manifest(*args: Any, **kwargs: Any) -> Any:
+            nonlocal interrupted, write_calls
+            write_calls += 1
+            result = real_write(*args, **kwargs)
+            if write_calls == 2:
+                interrupted = True
+                raise KeyboardInterrupt("injected after restore manifest")
+            return result
+
+        monkeypatch.setattr(
+            manifest_module,
+            "write_manifest",
+            interrupt_after_manifest,
+        )
+    else:
+        real_remove = admin_module._remove_lifecycle_receipt
+
+        def interrupt_after_cleanup(receipt: Any) -> None:
+            nonlocal interrupted
+            real_remove(receipt)
+            interrupted = True
+            raise KeyboardInterrupt("injected after restore receipt cleanup")
+
+        monkeypatch.setattr(
+            admin_module,
+            "_remove_lifecycle_receipt",
+            interrupt_after_cleanup,
+        )
+
+    with pytest.raises(KeyboardInterrupt, match="injected after restore"):
+        restore_run(source)
+
+    assert interrupted
+    receipt_dir = tmp_path / ".runops" / "lifecycle"
+    receipts = list(receipt_dir.glob("restore_run-*.json"))
+    assert len(receipts) == (0 if interrupt_phase == "cleanup" else 1)
+    monkeypatch.undo()
+
+    resumed = restore_run(source)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert not source.exists()
+    assert destination.is_dir()
+    assert not list(receipt_dir.glob("restore_run-*.json"))
+    manifest = read_manifest(destination)
+    assert manifest.run["status"] == "completed"
+    assert manifest.path["restored_from"] == str(source)
+    assert manifest.extra_sections["extensions"] == {"exact": {"preserved": True}}
+
+
+def test_archive_run_resumes_after_manifest_transition_before_state_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.core import state as state_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0028"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(source, {"run": {"id": source.name, "status": "completed"}})
+
+    def interrupt_before_state(*args: Any, **kwargs: Any) -> None:
+        raise KeyboardInterrupt("injected before archive state write")
+
+    monkeypatch.setattr(state_module, "_write_state_json", interrupt_before_state)
+    with pytest.raises(KeyboardInterrupt, match="archive state write"):
+        archive_run(source, move_to=destination)
+    monkeypatch.undo()
+
+    assert read_manifest(source).run["status"] == "archived"
+    assert not (source / "status" / "state.json").exists()
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert not source.exists()
+    assert read_manifest(destination).run["status"] == "archived"
+    assert not list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+
+def test_restore_run_resumes_after_manifest_transition_before_state_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.core import state as state_module
+
+    destination = tmp_path / "runs" / "scan" / "R20260330-0029"
+    source = tmp_path / "runs" / "_archive" / "scan" / destination.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "archived"},
+            "path": {
+                "run_dir": str(source),
+                "archived_from": str(destination),
+            },
+            "storage": {"tier": "cold", "form": "full"},
+        },
+    )
+
+    def interrupt_before_state(*args: Any, **kwargs: Any) -> None:
+        raise KeyboardInterrupt("injected before restore state write")
+
+    monkeypatch.setattr(state_module, "_write_state_json", interrupt_before_state)
+    with pytest.raises(KeyboardInterrupt, match="restore state write"):
+        restore_run(source)
+    monkeypatch.undo()
+
+    assert not source.exists()
+    assert read_manifest(destination).run["status"] == "completed"
+    assert not (destination / "status" / "state.json").exists()
+    resumed = restore_run(source)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert read_manifest(destination).run["status"] == "completed"
+    assert not list((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+
+
+@pytest.mark.parametrize(
+    ("action", "before_state", "after_state"),
+    [
+        ("archive", RunState.COMPLETED, RunState.ARCHIVED),
+        ("restore", RunState.ARCHIVED, RunState.COMPLETED),
+    ],
+)
+def test_lifecycle_retry_recovers_after_rollback_manifest_restore_interruption(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    action: str,
+    before_state: RunState,
+    after_state: RunState,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    suffix = "1" if action == "restore" else "0"
+    active = tmp_path / "runs" / "scan" / f"R20260330-004{suffix}"
+    cold = tmp_path / "runs" / "_archive" / "scan" / active.name
+    source = cold if action == "restore" else active
+    destination = active if action == "restore" else cold
+    manifest_data: dict[str, Any] = {
+        "run": {"id": source.name, "status": before_state.value},
+        "path": {"run_dir": str(source)},
+        "extensions": {"rollback_boundary": "preserve"},
+    }
+    if action == "restore":
+        manifest_data["path"]["archived_from"] = str(destination)
+        manifest_data["storage"] = {"tier": "cold", "form": "full"}
+    _write_manifest(source, manifest_data)
+    state_path = source / "status" / "state.json"
+    state_path.parent.mkdir()
+    state_path.write_text(
+        json.dumps(
+            {
+                "state": before_state.value,
+                "previous_state": "running",
+                "changed_at": "2026-03-30T00:00:00+00:00",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    manifest_preimage = (source / "manifest.toml").read_bytes()
+    state_preimage = state_path.read_bytes()
+
+    if action == "archive":
+        real_completed = admin_module._completed_archive_matches
+        completed_checks = 0
+
+        def fail_after_archive_commit(*args: Any, **kwargs: Any) -> bool:
+            nonlocal completed_checks
+            completed_checks += 1
+            if completed_checks == 2:
+                raise OSError("injected archive commit verification failure")
+            return real_completed(*args, **kwargs)
+
+        monkeypatch.setattr(
+            admin_module,
+            "_completed_archive_matches",
+            fail_after_archive_commit,
+        )
+    else:
+
+        def fail_after_restore_commit(*args: Any, **kwargs: Any) -> bool:
+            raise OSError("injected restore commit verification failure")
+
+        monkeypatch.setattr(
+            admin_module,
+            "_completed_restore_matches",
+            fail_after_restore_commit,
+        )
+
+    real_restore = admin_module._restore_file_snapshot
+    manifest_restored = False
+
+    def interrupt_between_rollback_snapshots(
+        path: Path,
+        payload: bytes | None,
+    ) -> None:
+        nonlocal manifest_restored
+        if path == destination / "manifest.toml" and payload == manifest_preimage:
+            real_restore(path, payload)
+            manifest_restored = True
+            return
+        if (
+            manifest_restored
+            and path == destination / "status" / "state.json"
+            and payload == state_preimage
+        ):
+            raise KeyboardInterrupt("injected between rollback snapshots")
+        real_restore(path, payload)
+
+    monkeypatch.setattr(
+        admin_module,
+        "_restore_file_snapshot",
+        interrupt_between_rollback_snapshots,
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="between rollback snapshots"):
+        if action == "archive":
+            archive_run(source, move_to=destination)
+        else:
+            restore_run(source)
+
+    assert manifest_restored
+    assert not source.exists()
+    assert (destination / "manifest.toml").read_bytes() == manifest_preimage
+    assert (destination / "status" / "state.json").read_bytes() != state_preimage
+    receipt_dir = tmp_path / ".runops" / "lifecycle"
+    assert list(receipt_dir.glob(f"{action}_run-*.json"))
+    monkeypatch.undo()
+
+    resumed = (
+        archive_run(source, move_to=destination)
+        if action == "archive"
+        else restore_run(source)
+    )
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert not source.exists()
+    assert read_manifest(destination).run["status"] == after_state.value
+    assert read_manifest(destination).extra_sections["extensions"] == {
+        "rollback_boundary": "preserve"
+    }
+    assert not list(receipt_dir.glob(f"{action}_run-*.json"))
+
+
+def test_archive_retry_recovers_after_interrupted_rollback_move(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0042"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "completed"},
+            "extensions": {"rollback_move": "preserve"},
+        },
+    )
+    manifest_preimage = (source / "manifest.toml").read_bytes()
+    real_move = admin_module.move_directory_noreplace
+
+    def interrupt_after_rollback_move(
+        move_source: Path,
+        move_destination: Path,
+    ) -> None:
+        real_move(move_source, move_destination)
+        if move_source == source and move_destination == destination:
+            raise OSError("injected forward archive failure")
+        if move_source == destination and move_destination == source:
+            raise KeyboardInterrupt("injected after rollback move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        interrupt_after_rollback_move,
+    )
+
+    with pytest.raises(KeyboardInterrupt, match="after rollback move"):
+        archive_run(source, move_to=destination)
+
+    assert source.is_dir()
+    assert not destination.exists()
+    assert (source / "manifest.toml").read_bytes() == manifest_preimage
+    receipt_dir = tmp_path / ".runops" / "lifecycle"
+    assert list(receipt_dir.glob("archive_run-*.json"))
+    monkeypatch.undo()
+
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert not source.exists()
+    assert read_manifest(destination).run["status"] == "archived"
+    assert read_manifest(destination).extra_sections["extensions"] == {
+        "rollback_move": "preserve"
+    }
+    assert not list(receipt_dir.glob("archive_run-*.json"))
+
+
+def test_archive_run_resumes_in_place_pending_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    run_dir = tmp_path / "runs" / "R20260330-0043"
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_dir.name, "status": "completed"},
+            "extensions": {"in_place": "preserve"},
+        },
+    )
+    real_write_receipt = admin_module._write_lifecycle_receipt
+
+    def interrupt_after_receipt(**kwargs: Any) -> Any:
+        real_write_receipt(**kwargs)
+        raise KeyboardInterrupt("injected after in-place archive receipt")
+
+    monkeypatch.setattr(
+        admin_module,
+        "_write_lifecycle_receipt",
+        interrupt_after_receipt,
+    )
+    with pytest.raises(KeyboardInterrupt, match="in-place archive receipt"):
+        archive_run(run_dir)
+    receipt_dir = tmp_path / ".runops" / "lifecycle"
+    assert list(receipt_dir.glob("archive_run-*.json"))
+    assert read_manifest(run_dir).run["status"] == "completed"
+    monkeypatch.undo()
+
+    resumed = archive_run(run_dir)
+
+    assert resumed.status is ActionStatus.SUCCESS
+    assert resumed.data["moved"] is False
+    assert read_manifest(run_dir).run["status"] == "archived"
+    assert read_manifest(run_dir).extra_sections["extensions"] == {
+        "in_place": "preserve"
+    }
+    assert not list(receipt_dir.glob("archive_run-*.json"))
+
+
+def test_archive_run_refuses_changed_live_manifest_after_receipt_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0030"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "completed"},
+            "params_snapshot": {"nx": 64},
+        },
+    )
+    real_write_receipt = admin_module._write_lifecycle_receipt
+
+    def interrupt_after_receipt(**kwargs: Any) -> Any:
+        real_write_receipt(**kwargs)
+        raise KeyboardInterrupt("injected after archive receipt")
+
+    monkeypatch.setattr(
+        admin_module,
+        "_write_lifecycle_receipt",
+        interrupt_after_receipt,
+    )
+    with pytest.raises(KeyboardInterrupt, match="archive receipt"):
+        archive_run(source, move_to=destination)
+    monkeypatch.undo()
+    update_manifest(source, {"params_snapshot": {"nx": 128}})
+    changed = (source / "manifest.toml").read_bytes()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "live manifest digest mismatch" in resumed.message
+    assert (source / "manifest.toml").read_bytes() == changed
+    assert source.is_dir()
+    assert not destination.exists()
+    assert receipt.is_file()
+
+
+def test_restore_run_refuses_changed_live_manifest_after_receipt_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    destination = tmp_path / "runs" / "scan" / "R20260330-0031"
+    source = tmp_path / "runs" / "_archive" / "scan" / destination.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "archived"},
+            "path": {
+                "run_dir": str(source),
+                "archived_from": str(destination),
+            },
+            "params_snapshot": {"nx": 64},
+            "storage": {"tier": "cold", "form": "full"},
+        },
+    )
+    real_write_receipt = admin_module._write_lifecycle_receipt
+
+    def interrupt_after_receipt(**kwargs: Any) -> Any:
+        real_write_receipt(**kwargs)
+        raise KeyboardInterrupt("injected after restore receipt")
+
+    monkeypatch.setattr(
+        admin_module,
+        "_write_lifecycle_receipt",
+        interrupt_after_receipt,
+    )
+    with pytest.raises(KeyboardInterrupt, match="restore receipt"):
+        restore_run(source)
+    monkeypatch.undo()
+    update_manifest(source, {"params_snapshot": {"nx": 128}})
+    changed = (source / "manifest.toml").read_bytes()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+
+    resumed = restore_run(source)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "live manifest digest mismatch" in resumed.message
+    assert (source / "manifest.toml").read_bytes() == changed
+    assert source.is_dir()
+    assert not destination.exists()
+    assert receipt.is_file()
+
+
+def test_archive_run_refuses_changed_live_state_after_receipt_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0033"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(source, {"run": {"id": source.name, "status": "completed"}})
+    state_file = source / "status" / "state.json"
+    state_file.parent.mkdir()
+    state_file.write_text(
+        json.dumps(
+            {
+                "state": "completed",
+                "previous_state": "running",
+                "changed_at": "2026-03-30T00:00:00+00:00",
+            },
+            indent=2,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    real_write_receipt = admin_module._write_lifecycle_receipt
+
+    def interrupt_after_receipt(**kwargs: Any) -> Any:
+        real_write_receipt(**kwargs)
+        raise KeyboardInterrupt("injected after archive state receipt")
+
+    monkeypatch.setattr(
+        admin_module,
+        "_write_lifecycle_receipt",
+        interrupt_after_receipt,
+    )
+    with pytest.raises(KeyboardInterrupt, match="archive state receipt"):
+        archive_run(source, move_to=destination)
+    monkeypatch.undo()
+    changed_state = json.loads(state_file.read_text(encoding="utf-8"))
+    changed_state["unexpected"] = "replacement"
+    state_file.write_text(
+        json.dumps(changed_state, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    changed = state_file.read_bytes()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "live state digest mismatch" in resumed.message
+    assert state_file.read_bytes() == changed
+    assert source.is_dir()
+    assert not destination.exists()
+    assert receipt.is_file()
+
+
+def test_archive_run_refuses_rollback_over_changed_live_manifest(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0032"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "completed"},
+            "params_snapshot": {"nx": 64},
+        },
+    )
+    real_move = admin_module.move_directory_noreplace
+
+    def change_after_move(move_source: Path, move_destination: Path) -> Any:
+        real_move(move_source, move_destination)
+        update_manifest(move_destination, {"params_snapshot": {"nx": 128}})
+        raise OSError("injected after changed archive move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        change_after_move,
+    )
+
+    failed = archive_run(source, move_to=destination)
+
+    assert failed.status is ActionStatus.ERROR
+    assert "rollback refused without an exact trusted live image" in failed.message
+    assert not source.exists()
+    assert destination.is_dir()
+    assert read_manifest(destination).params_snapshot == {"nx": 128}
+    assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+
+def test_archive_run_keeps_receipt_when_live_image_changes_before_cleanup(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0034"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "completed"},
+            "params_snapshot": {"nx": 64},
+        },
+    )
+    real_completed = admin_module._completed_archive_matches
+    changed = False
+
+    def change_after_completed_check(*args: Any, **kwargs: Any) -> bool:
+        nonlocal changed
+        matches = real_completed(*args, **kwargs)
+        run_dir = args[0]
+        if matches and not changed:
+            changed = True
+            update_manifest(run_dir, {"params_snapshot": {"nx": 128}})
+        return matches
+
+    monkeypatch.setattr(
+        admin_module,
+        "_completed_archive_matches",
+        change_after_completed_check,
+    )
+
+    result = archive_run(source, move_to=destination)
+
+    assert result.status is ActionStatus.SUCCESS
+    assert result.data["cleanup_pending"]
+    assert read_manifest(destination).params_snapshot == {"nx": 128}
+    assert list((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+
+
+def test_archive_run_fails_closed_on_tampered_lifecycle_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0022"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(source, {"run": {"id": source.name, "status": "completed"}})
+    real_move = admin_module.move_directory_noreplace
+
+    def interrupt_after_move(move_source: Path, move_destination: Path) -> Any:
+        real_move(move_source, move_destination)
+        raise KeyboardInterrupt("injected after archive move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        interrupt_after_move,
+    )
+    with pytest.raises(KeyboardInterrupt, match="archive move"):
+        archive_run(source, move_to=destination)
+    monkeypatch.undo()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    payload["run_id"] = "R20260330-9999"
+    receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "manifest snapshot does not match" in resumed.message
+    assert destination.is_dir()
+    assert not source.exists()
+    assert receipt.is_file()
+
+
+def test_archive_run_fails_closed_on_symlinked_lifecycle_receipt(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    source = tmp_path / "runs" / "scan" / "R20260330-0023"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(source, {"run": {"id": source.name, "status": "completed"}})
+    real_move = admin_module.move_directory_noreplace
+
+    def interrupt_after_move(move_source: Path, move_destination: Path) -> Any:
+        real_move(move_source, move_destination)
+        raise KeyboardInterrupt("injected after archive move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        interrupt_after_move,
+    )
+    with pytest.raises(KeyboardInterrupt, match="archive move"):
+        archive_run(source, move_to=destination)
+    monkeypatch.undo()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+    outside = tmp_path / "outside-receipt.json"
+    receipt.replace(outside)
+    receipt.symlink_to(outside)
+
+    resumed = archive_run(source, move_to=destination)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "single-link regular file" in resumed.message
+    assert destination.is_dir()
+    assert not source.exists()
+    assert outside.is_file()
+
+
+def test_archive_run_revalidates_pending_receipt_managed_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    source = tmp_path / "runs" / "scan" / "R20260330-0024"
+    destination = tmp_path / "runs" / "_archive" / "scan" / source.name
+    _write_manifest(source, {"run": {"id": source.name, "status": "completed"}})
+    real_move = admin_module.move_directory_noreplace
+
+    def interrupt_after_move(move_source: Path, move_destination: Path) -> Any:
+        real_move(move_source, move_destination)
+        raise KeyboardInterrupt("injected after archive move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        interrupt_after_move,
+    )
+    with pytest.raises(KeyboardInterrupt, match="archive move"):
+        archive_run(source, move_to=destination)
+    monkeypatch.undo()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("archive_run-*.json"))
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    outside = tmp_path / "outside" / source.name
+    payload["destination"] = str(outside)
+    receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    resumed = archive_run(source, move_to=outside)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "archived inside" in resumed.message
+    assert destination.is_dir()
+    assert not outside.exists()
+
+
+def test_restore_run_revalidates_pending_receipt_managed_destination(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from runops.application.actions import admin as admin_module
+
+    (tmp_path / "runops.toml").write_text('[project]\nname = "test"\n')
+    destination = tmp_path / "runs" / "scan" / "R20260330-0025"
+    source = tmp_path / "runs" / "_archive" / "scan" / destination.name
+    _write_manifest(
+        source,
+        {
+            "run": {"id": source.name, "status": "archived"},
+            "path": {"archived_from": str(destination)},
+        },
+    )
+    real_move = admin_module.move_directory_noreplace
+
+    def interrupt_after_move(move_source: Path, move_destination: Path) -> Any:
+        real_move(move_source, move_destination)
+        raise KeyboardInterrupt("injected after restore move")
+
+    monkeypatch.setattr(
+        admin_module,
+        "move_directory_noreplace",
+        interrupt_after_move,
+    )
+    with pytest.raises(KeyboardInterrupt, match="restore move"):
+        restore_run(source)
+    monkeypatch.undo()
+    receipt = next((tmp_path / ".runops" / "lifecycle").glob("restore_run-*.json"))
+    payload = json.loads(receipt.read_text(encoding="utf-8"))
+    outside = tmp_path / "outside" / destination.name
+    payload["destination"] = str(outside)
+    receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    resumed = restore_run(source)
+
+    assert resumed.status is ActionStatus.PRECONDITION_FAILED
+    assert "restored inside" in resumed.message
+    assert destination.is_dir()
+    assert not outside.exists()
 
 
 def test_submit_run_updates_manifest_and_state_file(tmp_path: Path) -> None:
@@ -1468,6 +3521,121 @@ def test_execute_action_delete_run_removes_directory(tmp_path: Path) -> None:
     assert result.data["run_id"] == "R20260330-0001"
     assert result.data["bytes_removed"] >= 256
     assert not run_dir.exists()
+
+
+@pytest.mark.parametrize("status", ["created", "failed"])
+def test_delete_durably_backfills_run_and_retry_budget_charges(
+    tmp_path: Path,
+    status: str,
+) -> None:
+    _create_project_with_case(tmp_path)
+    experiment = create_experiment(
+        tmp_path,
+        title="Deletion accounting",
+        question="Does deletion preserve consumed capacity?",
+        intent="explore",
+        baseline_reason="No compatible baseline exists.",
+        max_planned_points=2,
+        max_materialized_runs=1,
+        max_active_runs=1,
+        max_core_hours=4.0,
+        max_unreviewed_runs=1,
+        expires_at="2099-01-01T00:00:00+00:00",
+        exit_criteria=("Account for every materialized Run.",),
+    )
+    run_id = "R20260901-0001"
+    run_dir = tmp_path / "runs" / "case" / run_id
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_id, "status": status},
+            "job": {
+                "walltime": "01:00:00",
+                "ntasks": 1,
+                "budget_attempts": [2],
+            },
+            "intent": {"experiment_id": experiment.experiment.id},
+            "identity": {"budget_reservation": f"run:{run_id}"},
+        },
+    )
+
+    result = execute_action("delete_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.SUCCESS
+    with (tmp_path / ".runops/experiment-usage.toml").open("rb") as stream:
+        usage = tomllib.load(stream)
+    reservations = usage["experiments"][experiment.experiment.id]["reservations"]
+    assert reservations == [
+        {"token": f"run:{run_id}", "core_hours": 1.0, "kind": "run"},
+        {"token": f"attempt:{run_id}:2", "core_hours": 1.0, "kind": "attempt"},
+    ]
+    assert not run_dir.exists()
+
+
+def test_delete_fails_before_rename_when_budget_backfill_cannot_commit(
+    tmp_path: Path,
+) -> None:
+    _create_project_with_case(tmp_path)
+    experiment = create_experiment(
+        tmp_path,
+        title="Deletion failure",
+        question="Does accounting failure preserve the Run?",
+        intent="explore",
+        baseline_reason="No compatible baseline exists.",
+        max_planned_points=2,
+        max_materialized_runs=1,
+        max_active_runs=1,
+        max_core_hours=2.0,
+        max_unreviewed_runs=1,
+        expires_at="2099-01-01T00:00:00+00:00",
+        exit_criteria=("Preserve the Run until accounting commits.",),
+    )
+    run_id = "R20260901-0001"
+    run_dir = tmp_path / "runs" / "case" / run_id
+    _write_manifest(
+        run_dir,
+        {
+            "run": {"id": run_id, "status": "failed"},
+            "job": {"walltime": "01:00:00", "ntasks": 1},
+            "intent": {"experiment_id": experiment.experiment.id},
+            "identity": {"budget_reservation": f"run:{run_id}"},
+        },
+    )
+
+    with patch(
+        "runops.application.run_budget._write_usage_ledger",
+        side_effect=SimctlError("injected ledger failure"),
+    ):
+        result = execute_action("delete_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.PRECONDITION_FAILED
+    assert "injected ledger failure" in result.message
+    assert run_dir.is_dir()
+    assert not list(run_dir.parent.glob(".delete-*"))
+
+
+def test_delete_cleanup_failure_retains_hidden_discoverable_tombstone(
+    tmp_path: Path,
+) -> None:
+    from runops.core.discovery import discover_runs
+
+    run_dir = tmp_path / "runs" / "R20260330-0007"
+    _write_manifest(
+        run_dir,
+        {"run": {"id": run_dir.name, "status": "failed"}},
+    )
+
+    with patch(
+        "runops.application.actions.admin.shutil.rmtree",
+        side_effect=OSError("injected cleanup failure"),
+    ):
+        result = execute_action("delete_run", run_dir=run_dir)
+
+    assert result.status is ActionStatus.ERROR
+    tombstones = list((tmp_path / "runs").glob(".delete-*"))
+    assert len(tombstones) == 1
+    assert "staged path retained" in result.message
+    assert discover_runs(tmp_path / "runs") == []
 
 
 def test_delete_run_rejects_nonempty_submission_claim(tmp_path: Path) -> None:

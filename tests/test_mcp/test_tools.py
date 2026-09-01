@@ -3,12 +3,20 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+import pytest
+import tomli_w
+
 from runops.application.execution.readiness import RunReadiness, write_readiness_cache
 from runops.application.execution.submission import SubmitRequest, plan_submit
+from runops.application.experiments import create_experiment
+from runops.application.survey_materialization import preview_survey_plan
+from runops.core.discovery import RunDiscoveryError
 from runops.core.manifest import ManifestData, write_manifest
+from runops.core.project import load_project
 from runops.mcp import tools
 from runops.mcp._tools import project as project_tools
 
@@ -27,10 +35,17 @@ def _make_project(tmp_path: Path) -> Path:
 def _make_run(
     project_root: Path,
     *,
+    run_id: str = "R20260512-0001",
     status: str = "created",
     job_id: str = "12345",
+    parent: Path | None = None,
+    experiment_id: str = "",
+    purpose: str = "",
+    review_status: str = "",
+    storage_tier: str = "",
+    storage_form: str = "",
 ) -> Path:
-    run_dir = project_root / "runs" / "R20260512-0001"
+    run_dir = (parent or project_root / "runs") / run_id
     (run_dir / "submit").mkdir(parents=True)
     (run_dir / "input").mkdir()
     (run_dir / "input" / "params.toml").write_text("x = 1\n", encoding="utf-8")
@@ -43,7 +58,7 @@ def _make_run(
         run_dir,
         ManifestData(
             run={
-                "id": "R20260512-0001",
+                "id": run_id,
                 "display_name": "demo-run",
                 "status": status,
             },
@@ -56,6 +71,27 @@ def _make_run(
                 "walltime": "00:10:00",
             },
             classification={"tags": ["smoke"]},
+            intent={
+                "experiment_id": experiment_id,
+                "purpose": purpose,
+            },
+            curation=(
+                {
+                    "review_status": "reviewed",
+                    "reviewed_at": "2026-09-01T00:00:00+00:00",
+                    "reviewed_by": "human",
+                    "reason": "checked for MCP filtering",
+                }
+                if review_status == "reviewed"
+                else {"review_status": review_status}
+                if review_status
+                else {}
+            ),
+            storage=(
+                {"tier": storage_tier, "form": storage_form}
+                if storage_tier or storage_form
+                else {}
+            ),
         ),
         log_event=False,
     )
@@ -141,6 +177,214 @@ def test_project_status_summarizes_project(tmp_path: Path) -> None:
     assert result["status"] == "ok"
     assert result["project"]["id"] == "mcp-demo"
     assert result["data"]["runs"]["total"] == 1
+
+
+def _project_context_from_envelope(result: dict[str, Any]) -> dict[str, Any]:
+    if result["tool"] == "runops.project.inspect":
+        context = result["data"]["context"]
+        assert isinstance(context, dict)
+        return context
+    return result["data"]
+
+
+@pytest.mark.parametrize("tool_name", ["project_status", "project_inspect"])
+def test_project_context_tools_warn_when_run_namespace_has_symlink(
+    tmp_path: Path,
+    tool_name: str,
+) -> None:
+    project_root = _make_project(tmp_path)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    (project_root / "runs" / "unsafe").symlink_to(
+        outside,
+        target_is_directory=True,
+    )
+
+    result = getattr(tools, tool_name)(project_root=str(project_root))
+    context = _project_context_from_envelope(result)
+
+    assert result["status"] == "warning"
+    assert context["runs"]["namespace_available"] is False
+    assert context["runs"]["total"] is None
+    assert any(
+        item["code"] == "run_namespace_unavailable" for item in result["warnings"]
+    )
+    assert "0 run(s)" not in result["summary"]
+
+
+@pytest.mark.parametrize("tool_name", ["project_status", "project_inspect"])
+def test_project_context_tools_warn_when_run_namespace_walk_fails(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    tool_name: str,
+) -> None:
+    from runops.application import run_query as run_query_module
+
+    project_root = _make_project(tmp_path)
+
+    def fail_discovery(_runs_dir: Path) -> list[Path]:
+        raise RunDiscoveryError("unreadable subtree")
+
+    monkeypatch.setattr(
+        run_query_module,
+        "discover_runs_checked",
+        fail_discovery,
+    )
+
+    result = getattr(tools, tool_name)(project_root=str(project_root))
+    context = _project_context_from_envelope(result)
+
+    assert result["status"] == "warning"
+    assert context["runs"]["namespace_available"] is False
+    assert context["runs"]["total"] is None
+    assert any("unreadable subtree" in item["message"] for item in result["warnings"])
+    assert "0 run(s)" not in result["summary"]
+
+
+@pytest.mark.parametrize("tool_name", ["project_status", "project_inspect"])
+def test_project_context_tools_warn_when_run_id_is_duplicated(
+    tmp_path: Path,
+    tool_name: str,
+) -> None:
+    project_root = _make_project(tmp_path)
+    run_id = "R20260512-0001"
+    _make_run(
+        project_root,
+        run_id=run_id,
+        status="running",
+        parent=project_root / "runs" / "active",
+    )
+    _make_run(
+        project_root,
+        run_id=run_id,
+        status="archived",
+        parent=project_root / "runs" / "_archive" / "old",
+    )
+
+    result = getattr(tools, tool_name)(project_root=str(project_root))
+    context = _project_context_from_envelope(result)
+
+    assert result["status"] == "warning"
+    assert context["runs"] == {"namespace_available": False, "total": None}
+    assert context["recent_failures"] is None
+    assert any(
+        item["code"] == "run_namespace_unavailable"
+        and run_id in item["message"]
+        and "duplicated" in item["message"]
+        for item in result["warnings"]
+    )
+    assert "0 run(s)" not in result["summary"]
+
+
+def test_experiment_list_uses_real_read_only_tool_implementation(
+    tmp_path: Path,
+) -> None:
+    project_root = _make_project(tmp_path)
+    created = create_experiment(
+        project_root,
+        title="Bounded MCP question",
+        question="Does the bounded candidate change the response?",
+        intent="explore",
+        baseline_reason="No compatible baseline exists.",
+        max_planned_points=4,
+        max_materialized_runs=2,
+        max_active_runs=1,
+        max_core_hours=4.0,
+        max_unreviewed_runs=1,
+        expires_at="2099-01-01T00:00:00+00:00",
+        exit_criteria=("Stop after the response is resolved.",),
+        now=datetime(2026, 9, 1, tzinfo=timezone.utc),
+    )
+    before = created.path.read_bytes()
+
+    result = tools.experiment_list(
+        project_root=str(project_root),
+        lifecycle="active",
+        limit=10,
+    )
+
+    assert result["status"] == "ok"
+    assert result["data"]["matched_count"] == 1
+    assert result["data"]["experiments"][0]["id"] == created.experiment.id
+    assert (
+        result["data"]["experiments"][0]["budget"]["expires_at"]
+        == "2099-01-01T00:00:00+00:00"
+    )
+    assert created.path.read_bytes() == before
+
+
+def test_survey_plan_real_tool_matches_shared_plan_and_creates_no_run(
+    tmp_path: Path,
+) -> None:
+    project_root = _make_project(tmp_path)
+    (project_root / "simulators.toml").write_text(
+        "[simulators.generic]\n"
+        'adapter = "generic"\n'
+        'executable = "echo"\n'
+        'resolver_mode = "package"\n',
+        encoding="utf-8",
+    )
+    (project_root / "launchers.toml").write_text(
+        '[launchers.srun]\nkind = "srun"\ncommand = "srun"\nuse_slurm_ntasks = true\n',
+        encoding="utf-8",
+    )
+    case_dir = project_root / "cases" / "base"
+    case_dir.mkdir(parents=True)
+    (case_dir / "case.toml").write_text(
+        "[case]\n"
+        'name = "base"\n'
+        'simulator = "generic"\n'
+        'launcher = "srun"\n\n'
+        "[job]\n"
+        'walltime = "00:10:00"\n'
+        "ntasks = 1\n\n"
+        "[params]\n"
+        "nx = 16\n",
+        encoding="utf-8",
+    )
+    survey_dir = project_root / "runs" / "angle_scan"
+    survey_dir.mkdir()
+    with (survey_dir / "survey.toml").open("wb") as stream:
+        tomli_w.dump(
+            {
+                "survey": {
+                    "id": "S20260901-angle",
+                    "name": "angle_scan",
+                    "base_case": "base",
+                    "simulator": "generic",
+                    "launcher": "srun",
+                    "phase": "pilot",
+                },
+                "intent": {
+                    "purpose": "explore",
+                    "information_gap": "The useful angle is unknown.",
+                    "created_by": "agent",
+                },
+                "budget": {
+                    "max_materialized_runs": 2,
+                    "max_core_hours": 1.0,
+                },
+                "axes": {"angle": [0, 15, 30]},
+            },
+            stream,
+        )
+    before = (survey_dir / "survey.toml").read_bytes()
+
+    result = tools.survey_plan(
+        "angle_scan",
+        project_root=str(project_root),
+        offset=0,
+        limit=2,
+    )
+    shared = preview_survey_plan(load_project(project_root), survey_dir, limit=2)
+
+    assert result["status"] == "ok"
+    assert result["data"]["plan_hash"] == shared.plan.plan_hash
+    assert result["data"]["admission_issues"] == list(shared.admission_issues)
+    assert len(result["data"]["points"]) == 2
+    assert (survey_dir / "survey.toml").read_bytes() == before
+    assert not list(survey_dir.glob("*/manifest.toml"))
+    assert not (project_root / ".runops" / "run-id-sequence.toml").exists()
 
 
 def test_project_inspect_includes_codex_plugin_context(tmp_path: Path) -> None:
@@ -335,6 +579,169 @@ def test_run_list_includes_cached_readiness_and_aggregate(tmp_path: Path) -> Non
     assert row["readiness"]["analysis_status"] == "incomplete"
     assert row["readiness"]["recommended_command"] == ("runo runs log R20260512-0001")
     assert result["data"]["readiness_counts"] == {"incomplete": 1}
+
+
+def test_run_list_active_and_all_views_match_cli_semantics(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    _make_run(project_root, run_id="R20260512-0001", status="failed")
+    _make_run(project_root, run_id="R20260512-0002", status="archived")
+    bundle = project_root / "runs" / "_archive" / "old-survey"
+    _make_run(
+        project_root,
+        run_id="R20260512-0003",
+        status="failed",
+        parent=bundle,
+    )
+    (bundle / ".runops-archive.toml").write_text(
+        '[bundle]\narchived_from = "runs/old-survey"\n', encoding="utf-8"
+    )
+
+    active_failed = tools.run_list(
+        project_root=str(project_root), status_filter="failed"
+    )
+    archived = tools.run_list(project_root=str(project_root), status_filter="archived")
+    all_runs = tools.run_list(project_root=str(project_root), include_archived=True)
+
+    assert [row["run_id"] for row in active_failed["data"]["runs"]] == [
+        "R20260512-0001"
+    ]
+    assert [row["run_id"] for row in archived["data"]["runs"]] == ["R20260512-0002"]
+    assert {row["run_id"] for row in all_runs["data"]["runs"]} == {
+        "R20260512-0001",
+        "R20260512-0002",
+        "R20260512-0003",
+    }
+
+
+def test_run_list_project_root_does_not_scan_research_results(
+    tmp_path: Path,
+) -> None:
+    project_root = _make_project(tmp_path)
+    _make_run(project_root)
+    _make_run(
+        project_root,
+        run_id="R0001-not-a-run",
+        parent=project_root / "research" / "results",
+    )
+
+    result = tools.run_list(project_root=str(project_root))
+
+    assert result["status"] == "ok"
+    assert [row["run_id"] for row in result["data"]["runs"]] == ["R20260512-0001"]
+
+
+def test_run_list_surfaces_malformed_formal_run_as_unknown(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    broken = project_root / "runs" / "scan" / "broken"
+    broken.mkdir(parents=True)
+    (broken / "manifest.toml").write_text("[run\ninvalid", encoding="utf-8")
+
+    unfiltered = tools.run_list(project_root=str(project_root))
+    filtered = tools.run_list(
+        project_root=str(project_root),
+        status_filter="created",
+    )
+
+    assert unfiltered["status"] == "ok"
+    assert unfiltered["data"]["total_count"] == 1
+    assert unfiltered["data"]["state_counts"] == {"unknown": 1}
+    assert unfiltered["data"]["runs"] == [
+        {
+            "run_id": "???",
+            "display_name": "",
+            "status": "unknown",
+            "path": str(broken),
+            "relative_path": "runs/scan/broken",
+            "origin_case": "",
+            "origin_survey": "",
+            "job_id": "",
+            "tags": [],
+            "manifest_error": True,
+        }
+    ]
+    assert filtered["data"]["matched_count"] == 0
+    assert filtered["data"]["runs"] == []
+
+
+def test_run_list_blocks_when_formal_run_namespace_is_incomplete(
+    tmp_path: Path,
+) -> None:
+    project_root = _make_project(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (project_root / "runs" / "hidden").symlink_to(
+        outside,
+        target_is_directory=True,
+    )
+
+    result = tools.run_list(project_root=str(project_root))
+
+    assert result["status"] == "blocked"
+    assert result["errors"][0]["code"] == "run_list_failed"
+    assert "symbolic link" in result["errors"][0]["message"]
+
+
+def test_run_list_combines_experiment_and_evidence_storage_filters(
+    tmp_path: Path,
+) -> None:
+    project_root = _make_project(tmp_path)
+    common = {
+        "experiment_id": "E20260901-0001",
+        "purpose": "validate",
+        "review_status": "reviewed",
+        "storage_tier": "cold",
+    }
+    _make_run(
+        project_root,
+        run_id="R20260512-0001",
+        **common,
+        storage_form="compacted",
+    )
+    _make_run(
+        project_root,
+        run_id="R20260512-0002",
+        **common,
+        storage_form="full",
+    )
+    _make_run(
+        project_root,
+        run_id="R20260512-0003",
+        experiment_id="E20260901-0002",
+        purpose="validate",
+        review_status="reviewed",
+        storage_tier="cold",
+        storage_form="compacted",
+    )
+
+    result = tools.run_list(
+        project_root=str(project_root),
+        experiment_id="E20260901-0001",
+        purpose="validate",
+        review_status="reviewed",
+        storage_tier="cold",
+        storage_form="compacted",
+    )
+
+    assert result["status"] == "ok"
+    assert [row["run_id"] for row in result["data"]["runs"]] == ["R20260512-0001"]
+
+
+def test_run_list_storage_form_filter_includes_inactive_runs(tmp_path: Path) -> None:
+    project_root = _make_project(tmp_path)
+    _make_run(
+        project_root,
+        run_id="R20260512-0001",
+        status="purged",
+        storage_form="metadata_only",
+    )
+
+    result = tools.run_list(
+        project_root=str(project_root),
+        storage_form="metadata_only",
+    )
+
+    assert result["status"] == "ok"
+    assert [row["run_id"] for row in result["data"]["runs"]] == ["R20260512-0001"]
 
 
 def test_run_logs_returns_latest_log_tail(tmp_path: Path) -> None:

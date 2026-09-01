@@ -35,6 +35,15 @@ contract の明示的な legacy exception とし、新しい依存を増やさ�
 - Python は MPI rank ごとのラッパにならず、job script が `srun` / `mpirun` /
   `mpiexec` を直接実行する。
 - 外部実行や filesystem mutation は plan/apply に分け、apply 前に stale 条件を確認する。
+- formal Run の staged-directory 公開は project-wide namespace guard 内で親 namespace を
+  直前再検証し、preflight 後に生じた ancestor Run への nested publication を拒否する。
+- clone の admission owner は source ではなく managed destination project で決める。
+  managed clone / extend は Experiment metadata と expiry / budget を公開前後に CAS する。
+- managed Run の Slurm sync が completed backlog を増やす場合も、Experiment → per-Run
+  submission → Run namespace の順で lock を取り、formal admission の budget snapshot と
+  直列化する。scheduler query 後の manifest 再読込で stale identity / state を拒否する。
+- canonical context / triage の Run 集計は strict snapshot とし、manifest が一つでも
+  malformed / unreadable、または Run ID が重複していれば部分集計を正常値として公開しない。
 
 責務が大きい use case は公開 facade と capability module に分ける。submission は
 planning / claim / apply、notebook は access / archive、plugin gateway は discovery /

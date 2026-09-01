@@ -29,6 +29,10 @@ class SurveyConfigError(SimctlError):
     """Raised when survey.toml is invalid or missing required fields."""
 
 
+class ExperimentConfigError(SimctlError):
+    """Raised when an Experiment definition is missing or invalid."""
+
+
 class ManifestNotFoundError(SimctlError):
     """Raised when manifest.toml cannot be found in a run directory."""
 

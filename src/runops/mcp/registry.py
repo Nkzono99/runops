@@ -94,6 +94,11 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         READ,
     ),
     ToolSpec(
+        "runops.experiment.list",
+        "List bounded Experiment admission units.",
+        READ,
+    ),
+    ToolSpec(
         "runops.publication.exports.list",
         "List paper-facing publication exports without mutating files.",
         READ,
@@ -114,11 +119,21 @@ TOOL_SPECS: tuple[ToolSpec, ...] = (
         INSPECT,
     ),
     ToolSpec(
+        "runops.survey.plan",
+        "Preview lazy Survey candidates without materializing Run directories.",
+        PLAN,
+        action_name="plan_survey",
+    ),
+    ToolSpec(
         "runops.analysis.plot_columns",
         "List survey plot columns from an existing summary aggregate.",
         INSPECT,
     ),
-    ToolSpec("runops.run.list", "List run directories and manifest states.", READ),
+    ToolSpec(
+        "runops.run.list",
+        "List active run directories by default, with optional archived runs.",
+        READ,
+    ),
     ToolSpec("runops.run.inspect", "Inspect one run manifest and readiness.", INSPECT),
     ToolSpec(
         "runops.run.logs",
@@ -231,12 +246,14 @@ REQUIRED_RUNOPS_TOOLS = REQUIRED_COMMON_TOOLS | {
     "runops.analysis.artifacts",
     "runops.analysis.plot_columns",
     "runops.project.plugins",
+    "runops.experiment.list",
     "runops.publication.export.inspect",
     "runops.publication.exports.list",
     "runops.run.list",
     "runops.run.inspect",
     "runops.run.logs",
     "runops.survey.summary",
+    "runops.survey.plan",
     "runops.slurm.queue",
     "runops.job.plan_submit",
 }

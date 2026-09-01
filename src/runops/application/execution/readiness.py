@@ -469,7 +469,8 @@ def read_cached_run_readiness(
         payload = json.loads(cache_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if payload.get("schema_version") != 1:
+    version = payload.get("schema_version")
+    if type(version) is not int or version != 1:
         return None
     if payload.get("attempt") != _attempt_identity(manifest_data):
         return None

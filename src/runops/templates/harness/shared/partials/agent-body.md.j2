@@ -20,7 +20,7 @@ CLI は `uvx --from runops runo ...` を標準経路として使う。`runops` �
 - **Invariant** — 状態整合性、安全性、provenance のため破らない境界
 
 次の状態遷移はこの4項目と現在のevidenceから導出する。現在地が不明な場合だけ
-`uvx --from runops runo context --json`を一度使い、情報gapを解消する最も近いsource、
+`uvx --from runops runo context --json`と、stateを増やす前の`runo triage`を使い、情報gapを解消する最も近いsource、
 該当skill、最短のcommand chainを選ぶ。Doneに到達したら返し、未到達なら次の一遷移か
 blockerを返す。一般的な作業手順を最初から展開しない。
 
@@ -28,8 +28,11 @@ blockerを返す。一般的な作業手順を最初から展開しない。
 
 | 依頼 | Done の既定値 |
 |---|---|
+| Experiment をadmit | 一つの問い、baseline、finite budget、有効期限、exit criteriaを持つactive Experimentになる |
 | case / survey を設計 | 設定、根拠、検証結果が揃う |
-| run を生成 | 対象 run が `created` になり、件数と由来を報告できる |
+| surveyをpreview | candidate count、point ref、plan hash、概算costをread-onlyで報告できる |
+| run を生成 | 明示選択した対象 run だけが`created`になり、件数と由来を報告できる |
+| smoke / debug | T ID receiptと観測、cache reuseの有無を報告できる |
 | job を投入 | job_id と投入対象を記録・報告できる |
 | 初動を確認 | 指定した step / progress evidence、または観測期限時点の状態を報告できる |
 | 状態を確認 | manifest を同期し、状態要約と推奨する次アクションを報告できる |
@@ -66,11 +69,13 @@ command family の選択は `runops-reference`、正確な option は選んだ c
 |---|---|
 | reversible かつ予算内 | Goal / Done に向けて進める |
 | 初回 bulk submit、`submit --all`、資源増加 retry | 対象、queue、資源量、cost、command を示し承認を得る |
-| production / large survey | result README の pilot evidence、`Decision: EXPAND`、承認を揃える |
+| Survey materialize | `--apply`、`--point`または`--all`、previewの`--expect-plan`を揃える |
+| production / large survey | Resultのpilot evidence、Experiment `decision=expand`、承認を揃える |
 | purge / delete、実行バイナリ・module・launcher 変更 | 対象と影響を示し承認を得る |
 | cancel | 対象と理由を報告して実行する |
 
-Goalに含まれるbounded pilotは、exact runと資源がcost ceiling内なら通常のsubmit
+`runo runs sweep`は`--dry-run`なしでもread-only planであり、directoryやRun IDを作らない。
+`--all`を旧「全生成」の代替として自動選択しない。Goalに含まれるbounded pilotは、exact runと資源がcost ceiling内なら通常のsubmit
 preconditionを通して投入する。pilot submit は job_id と成功条件を返して handoff し、
 startup validationはそれ自体がGoalに含まれる場合だけbounded observationへ進む。
 
@@ -82,6 +87,8 @@ startup validationはそれ自体がGoalに含まれる場合だけbounded obser
 | 対象 | 正規の更新経路 |
 |---|---|
 | run identity / state / provenance | `runo runs create|sweep|submit|sync|archive|restore|purge-work|delete` |
+| Experiment admission / decision | `runo experiments create|review|close` |
+| smoke / debug | `runo test smoke|debug|record|clean` (`.runops/test-runs/T...`) |
 | `manifest.toml`, generated input, `job.sh` | runops が case / survey から生成する |
 | simulator 入力の再利用可能な変更 | 上流の `case.toml` / input template / `survey.toml` に反映する |
 | runtime output | `work/` を evidence として保持し、整理は runops command で行う |
@@ -99,11 +106,19 @@ startup validationはそれ自体がGoalに含まれる場合だけbounded obser
 |---|---|
 | 現在の問い・判断・次の一手 | `research/CURRENT.md` |
 | 時系列の作業記録 | `research/journal/` (`runo research append`) |
-| 残す解析結果 | `research/results/RNNNN-*/README.md` と `artifacts/` |
+| 残す解析結果 | `research/results/RNNNN-*/README.md`, `manifest.toml`, `artifacts/` |
 | 論文・manual・図・snippet | `materials/` |
 | 機械的に再利用する知見 | `.runops/insights/`, `.runops/facts.toml` (`{{ skill_prefix }}learn`) |
 
-準備・解析の判断根拠は journal、現在判断の変更は CURRENT、精製した evidence は result に置く。
+準備・解析の判断根拠は journal（`--kind` / `--subject`で対象を紐付ける）、現在判断の変更は
+CURRENT、精製した evidence は Result に置く。永続的な研究 prose は
+`research/CURRENT.md`、`research/journal/*.md`、各 Result の `README.md` 以外に
+作らない。ファイル名を変えた任意 note も同じ扱いとし、provisional prose は
+`.runops/work/` に置く。
+Resultのevidence selectionはclaim-localであり、Run reviewと同一視しない。T IDと
+`.runops/test-runs/**`はscientific Result evidenceにしない。Run evidenceをsealする前に、
+completed相当、理由付きreview、identity / source / baseline / input snapshotを確認する。
+sealにはselection reasonを記録し、includeしたRun-owned outputをpurgeしない。
 詳細な予算・rotation・昇格条件は `{{ skill_prefix }}research-workspace` と
 `{{ skill_prefix }}learn` に委譲する。
 

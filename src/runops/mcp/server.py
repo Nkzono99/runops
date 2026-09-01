@@ -113,6 +113,22 @@ def _register_tools(mcp: FastMCP) -> None:
         return tools.project_doctor(project_root=project_root)
 
     @mcp.tool(
+        name="runops.experiment.list",
+        description="List bounded Experiment admission units.",
+        structured_output=True,
+    )
+    def experiment_list(
+        project_root: str | None = None,
+        lifecycle: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        return tools.experiment_list(
+            project_root=project_root,
+            lifecycle=lifecycle,
+            limit=limit,
+        )
+
+    @mcp.tool(
         name="runops.publication.exports.list",
         description="List paper-facing publication exports without mutating files.",
         structured_output=True,
@@ -185,6 +201,24 @@ def _register_tools(mcp: FastMCP) -> None:
         )
 
     @mcp.tool(
+        name="runops.survey.plan",
+        description="Preview Survey candidates without creating Run directories.",
+        structured_output=True,
+    )
+    def survey_plan(
+        survey: str,
+        project_root: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        return tools.survey_plan(
+            survey=survey,
+            project_root=project_root,
+            offset=offset,
+            limit=limit,
+        )
+
+    @mcp.tool(
         name="runops.analysis.plot_columns",
         description="List survey plot columns from an existing summary aggregate.",
         structured_output=True,
@@ -200,20 +234,34 @@ def _register_tools(mcp: FastMCP) -> None:
 
     @mcp.tool(
         name="runops.run.list",
-        description="List run directories and manifest states.",
+        description=(
+            "List active run directories by default, with optional archived runs."
+        ),
         structured_output=True,
     )
     def run_list(
         project_root: str | None = None,
         status_filter: str | None = None,
         tag: str | None = None,
+        experiment_id: str | None = None,
+        purpose: str | None = None,
+        review_status: str | None = None,
+        storage_tier: str | None = None,
+        storage_form: str | None = None,
         limit: int = 200,
+        include_archived: bool = False,
     ) -> dict[str, Any]:
         return tools.run_list(
             project_root=project_root,
             status_filter=status_filter,
             tag=tag,
+            experiment_id=experiment_id,
+            purpose=purpose,
+            review_status=review_status,
+            storage_tier=storage_tier,
+            storage_form=storage_form,
             limit=limit,
+            include_archived=include_archived,
         )
 
     @mcp.tool(

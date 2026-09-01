@@ -99,7 +99,43 @@ def _write_case(project_dir: Path, case_name: str) -> None:
     )
 
 
-def _write_survey(project_dir: Path, case_name: str) -> Path:
+def _create_experiment(project_dir: Path) -> str:
+    result = runner.invoke(
+        app,
+        [
+            "experiments",
+            "create",
+            "Golden path convergence",
+            "--question",
+            "Does the baseline response converge?",
+            "--intent",
+            "explore",
+            "--baseline-reason",
+            "No compatible prior Run exists.",
+            "--exit",
+            "Stop after the two-point pilot resolves the trend.",
+            "--max-planned-points",
+            "2",
+            "--max-materialized-runs",
+            "2",
+            "--max-active-runs",
+            "2",
+            "--max-core-hours",
+            "2",
+            "--max-unreviewed-runs",
+            "2",
+            "--expires-at",
+            "2099-01-01T00:00:00+00:00",
+            "--path",
+            str(project_dir),
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    experiment_file = next((project_dir / "experiments").glob("*.toml"))
+    return experiment_file.name.split("--", maxsplit=1)[0]
+
+
+def _write_survey(project_dir: Path, case_name: str, experiment_id: str) -> Path:
     survey_dir = project_dir / "runs" / "golden_survey"
     survey_dir.mkdir(parents=True, exist_ok=True)
     (survey_dir / "survey.toml").write_text(
@@ -109,6 +145,17 @@ def _write_survey(project_dir: Path, case_name: str) -> Path:
         f'base_case = "{case_name}"\n'
         'simulator = "test_sim"\n'
         'launcher = "slurm_srun"\n'
+        'phase = "pilot"\n'
+        f'experiment_id = "{experiment_id}"\n'
+        "\n"
+        "[intent]\n"
+        'purpose = "explore"\n'
+        'information_gap = "The resolution trend is unknown."\n'
+        'created_by = "golden-path-test"\n'
+        "\n"
+        "[budget]\n"
+        "max_materialized_runs = 2\n"
+        "max_core_hours = 2.0\n"
         "\n"
         "[axes]\n"
         "nx = [32, 64]\n"
@@ -145,23 +192,42 @@ def test_e2e_agent_golden_path_from_context_to_collection(
     _init_project(monkeypatch, project_dir)
     _write_generic_simulator_config(project_dir)
     _write_case(project_dir, "baseline")
-    survey_dir = _write_survey(project_dir, "baseline")
+    experiment_id = _create_experiment(project_dir)
+    survey_dir = _write_survey(project_dir, "baseline", experiment_id)
 
     context = runner.invoke(app, ["context", str(project_dir), "--json"])
     assert context.exit_code == 0, context.output
     payload = json.loads(context.output)
     assert payload["project"]["name"] == "golden-project"
 
-    dry_run = runner.invoke(app, ["runs", "sweep", "--dry-run", str(survey_dir)])
+    dry_run = runner.invoke(
+        app,
+        ["runs", "sweep", "--dry-run", "--json", str(survey_dir)],
+    )
     assert dry_run.exit_code == 0, dry_run.output
-    assert "2 runs would be created" in dry_run.output
+    plan = json.loads(dry_run.output)
+    assert plan["candidate_count"] == 2
+    assert plan["experiment_id"] == experiment_id
+    assert discover_runs(survey_dir) == []
 
-    sweep = runner.invoke(app, ["runs", "sweep", str(survey_dir)])
+    sweep = runner.invoke(
+        app,
+        [
+            "runs",
+            "sweep",
+            "--apply",
+            "--all",
+            "--expect-plan",
+            str(plan["plan_hash"]),
+            str(survey_dir),
+        ],
+    )
     assert sweep.exit_code == 0, sweep.output
-    assert "Created 2 runs" in sweep.output
+    assert "created=2, reused=0" in sweep.output
 
     run_dirs = discover_runs(survey_dir)
     assert len(run_dirs) == 2
+    assert read_manifest(run_dirs[0]).intent["experiment_id"] == experiment_id
 
     status = runner.invoke(app, ["runs", "status", "--short", str(survey_dir)])
     assert status.exit_code == 0, status.output

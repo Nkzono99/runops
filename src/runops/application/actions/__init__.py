@@ -24,6 +24,7 @@ from runops.application.actions.admin import (
 from runops.application.actions.admin import (
     restore_run as restore_run,
 )
+from runops.application.actions.admin import review_run as review_run
 from runops.application.actions.analysis import (
     collect_survey as collect_survey,
 )
@@ -48,6 +49,11 @@ from runops.application.actions.bundle_archive import (
 from runops.application.actions.bundle_archive import (
     restore_bundle as restore_bundle,
 )
+from runops.application.actions.derivation import clone_run as clone_run
+from runops.application.actions.derivation import extend_run as extend_run
+from runops.application.actions.derivation import (
+    inspect_regeneration as inspect_regeneration,
+)
 from runops.application.actions.knowledge import (
     add_fact as add_fact,
 )
@@ -63,6 +69,39 @@ from runops.application.actions.relabel import (
     plan_run_relabel as plan_run_relabel,
 )
 from runops.application.actions.relabel import relabel_run as relabel_run
+from runops.application.actions.research_ops import (
+    archive_result as archive_result,
+)
+from runops.application.actions.research_ops import (
+    check_result as check_result,
+)
+from runops.application.actions.research_ops import (
+    clean_test_attempts as clean_test_attempts,
+)
+from runops.application.actions.research_ops import (
+    close_experiment as close_experiment,
+)
+from runops.application.actions.research_ops import (
+    create_experiment as create_experiment,
+)
+from runops.application.actions.research_ops import (
+    create_result as create_result,
+)
+from runops.application.actions.research_ops import (
+    prepare_test_attempt as prepare_test_attempt,
+)
+from runops.application.actions.research_ops import (
+    record_test_result as record_test_result,
+)
+from runops.application.actions.research_ops import (
+    restore_result as restore_result,
+)
+from runops.application.actions.research_ops import (
+    review_experiment as review_experiment,
+)
+from runops.application.actions.research_ops import (
+    seal_result as seal_result,
+)
 from runops.application.actions.result import (
     ActionResult as ActionResult,
 )
@@ -77,6 +116,9 @@ from runops.application.actions.run_lifecycle import (
 )
 from runops.application.actions.run_lifecycle import (
     plan_retry as plan_retry,
+)
+from runops.application.actions.run_lifecycle import (
+    plan_survey as plan_survey,
 )
 from runops.application.actions.run_lifecycle import (
     retry_run as retry_run,
@@ -110,9 +152,16 @@ __all__ = [
     "ActionStatus",
     "add_fact",
     "archive_bundle",
+    "archive_result",
     "archive_run",
     "cancel_run",
+    "check_result",
+    "clean_test_attempts",
+    "clone_run",
+    "close_experiment",
     "collect_survey",
+    "create_experiment",
+    "create_result",
     "create_run",
     "create_survey",
     "default_archive_destination",
@@ -120,18 +169,27 @@ __all__ = [
     "delete_run",
     "execute_action",
     "export_publication",
+    "extend_run",
     "get_action_spec",
+    "inspect_regeneration",
     "list_actions",
     "plan_bundle_archive",
     "plan_retry",
     "plan_run_relabel",
+    "plan_survey",
+    "prepare_test_attempt",
     "promote_fact",
     "purge_work",
+    "record_test_result",
     "relabel_run",
     "restore_bundle",
+    "restore_result",
     "restore_run",
     "retry_run",
+    "review_experiment",
+    "review_run",
     "save_insight",
+    "seal_result",
     "show_log",
     "submit_planned_run",
     "submit_run",

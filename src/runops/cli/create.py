@@ -2,21 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Annotated, Any, Optional
 
 import typer
 
 from runops.application.actions import ActionStatus, execute_action
-from runops.application.run_creation import plan_survey_runs
-from runops.core.case import JobData
+from runops.core.case import JobData, parse_walltime_hours
 from runops.core.exceptions import SimctlError
-from runops.core.project import find_project_root, load_project
-from runops.core.survey import (
-    generate_display_name,
-    generate_semantic_label,
-    preview_run_directory_name,
-)
+from runops.core.project import find_project_root
 
 
 def _echo_warnings(warnings: list[str], *, context: str = "") -> None:
@@ -44,6 +39,27 @@ def create(
             help="Human-readable run label used in the directory name.",
         ),
     ] = "",
+    experiment: Annotated[
+        str,
+        typer.Option(
+            "--experiment",
+            help="Active Experiment ID required by bounded project policy.",
+        ),
+    ] = "",
+    purpose: Annotated[
+        str,
+        typer.Option(
+            "--purpose",
+            help=(
+                "explore, confirm, validate, or reproduce; defaults to "
+                "Experiment intent."
+            ),
+        ),
+    ] = "",
+    created_by: Annotated[
+        str,
+        typer.Option("--created-by", help="Actor frozen in Run intent metadata."),
+    ] = "human",
 ) -> None:
     """Create a run in the current directory.
 
@@ -60,10 +76,25 @@ def create(
         )
         raise typer.Exit(code=1)
 
-    _create_single(case_name, target_dir, label=label)
+    _create_single(
+        case_name,
+        target_dir,
+        label=label,
+        experiment=experiment,
+        purpose=purpose,
+        created_by=created_by,
+    )
 
 
-def _create_single(case_name: str, target_dir: Path, *, label: str = "") -> None:
+def _create_single(
+    case_name: str,
+    target_dir: Path,
+    *,
+    label: str = "",
+    experiment: str = "",
+    purpose: str = "",
+    created_by: str = "human",
+) -> None:
     """Create a single run from a case template."""
     try:
         project_root = find_project_root(target_dir)
@@ -73,6 +104,9 @@ def _create_single(case_name: str, target_dir: Path, *, label: str = "") -> None
             case_name=case_name,
             dest_dir=target_dir,
             display_name=label,
+            experiment_id=experiment,
+            purpose=purpose,
+            created_by=created_by,
         )
     except SimctlError as exc:
         typer.echo(f"Error creating run: {exc}", err=True)
@@ -83,21 +117,32 @@ def _create_single(case_name: str, target_dir: Path, *, label: str = "") -> None
         raise typer.Exit(code=1)
 
     _echo_warnings(list(result.data.get("warnings", [])))
-    typer.echo(f"Created run: {result.data.get('run_id', '???')}")
+    verb = "Reused equivalent Run" if result.data.get("reused") else "Created run"
+    typer.echo(f"{verb}: {result.data.get('run_id', '???')}")
     display_name = str(result.data.get("display_name", ""))
     if display_name:
         typer.echo(f"  Label: {display_name}")
     typer.echo(f"  Path: {result.data.get('run_dir', target_dir)}")
 
 
-def _create_survey(survey_dir: Path) -> None:
-    """Expand survey.toml into multiple runs."""
+def _create_survey(
+    survey_dir: Path,
+    *,
+    expected_plan_hash: str,
+    point_refs: tuple[str, ...],
+    all_points: bool,
+    json_output: bool,
+) -> None:
+    """Materialize explicitly selected points from a reviewed plan."""
     try:
         project_root = find_project_root(survey_dir)
         result = execute_action(
             "create_survey",
             project_root=project_root,
             survey_dir=survey_dir,
+            expected_plan_hash=expected_plan_hash,
+            point_refs=point_refs,
+            all_points=all_points,
         )
     except SimctlError as exc:
         typer.echo(f"Error: {exc}", err=True)
@@ -107,22 +152,28 @@ def _create_survey(survey_dir: Path) -> None:
         typer.echo(f"Error: {result.message}", err=True)
         raise typer.Exit(code=1)
 
-    created_runs = list(result.data.get("runs", []))
-    if not created_runs:
-        typer.echo("No parameter combinations to expand.")
-        raise typer.Exit(code=0)
+    if json_output:
+        typer.echo(json.dumps(result.data, ensure_ascii=False, indent=2, default=str))
+        return
 
+    created_runs = list(result.data.get("runs", []))
     for created_run in created_runs:
         _echo_warnings(
             list(created_run.get("warnings", [])),
-            context=str(created_run.get("display_name", "")),
+            context=str(created_run.get("ref", "")),
         )
 
-    typer.echo(f"Created {len(created_runs)} runs in {survey_dir}")
+    typer.echo(
+        f"Applied plan {result.data.get('plan_hash', expected_plan_hash)}: "
+        f"created={result.data.get('created_count', 0)}, "
+        f"reused={result.data.get('reused_count', 0)}"
+    )
     for created_run in created_runs:
-        display_name = str(created_run.get("display_name", ""))
-        name_part = f" ({display_name})" if display_name else ""
-        typer.echo(f"  {created_run.get('run_id', '???')}{name_part}")
+        marker = "reused" if created_run.get("reused") else "created"
+        typer.echo(
+            f"  {created_run.get('ref', '?')} -> "
+            f"{created_run.get('run_id', '???')} ({marker})"
+        )
 
 
 def sweep(
@@ -142,22 +193,89 @@ def sweep(
             ),
         ),
     ] = False,
+    apply_changes: Annotated[
+        bool,
+        typer.Option(
+            "--apply",
+            help=(
+                "Materialize selected points; without this flag the command "
+                "is read-only."
+            ),
+        ),
+    ] = False,
+    points: Annotated[
+        Optional[list[str]],
+        typer.Option(
+            "--point",
+            help="Point ref (p0001) or point_id hash; repeat to select multiple.",
+        ),
+    ] = None,
+    all_points: Annotated[
+        bool,
+        typer.Option(
+            "--all",
+            help="Explicitly select all candidates (still subject to hard budgets).",
+        ),
+    ] = False,
+    expected_plan_hash: Annotated[
+        str,
+        typer.Option(
+            "--expect-plan",
+            help="Exact plan hash printed by the read-only preview.",
+        ),
+    ] = "",
+    offset: Annotated[
+        int,
+        typer.Option("--offset", min=0, help="First candidate offset for preview."),
+    ] = 0,
+    limit: Annotated[
+        int,
+        typer.Option("--limit", min=1, max=1000, help="Preview page size."),
+    ] = 50,
+    json_output: Annotated[
+        bool,
+        typer.Option("--json", help="Emit machine-readable plan/result JSON."),
+    ] = False,
 ) -> None:
-    """Generate all runs from a survey.toml parameter sweep.
+    """Plan a Survey, or explicitly materialize a bounded selection.
 
-    With ``--dry-run`` the survey is parsed and expanded but no run
-    directories are created — useful to verify the parameter combinations
-    and total resource cost before committing files / queue time.
+    Planning is always the default and never allocates Run IDs.  Applying a
+    plan requires both an unchanged hash and ``--point`` or ``--all``.
+    ``--dry-run`` remains as a compatibility alias for the default behavior.
     """
     target = (survey_dir or Path.cwd()).resolve()
-    if dry_run:
-        _sweep_dry_run(target)
-    else:
-        _create_survey(target)
+    if dry_run and apply_changes:
+        typer.echo("Error: --dry-run and --apply are mutually exclusive", err=True)
+        raise typer.Exit(code=2)
+    if not apply_changes:
+        if points or all_points or expected_plan_hash:
+            typer.echo(
+                "Error: --point, --all, and --expect-plan require --apply",
+                err=True,
+            )
+            raise typer.Exit(code=2)
+        _sweep_plan(target, offset=offset, limit=limit, json_output=json_output)
+        return
+    if offset or limit != 50:
+        typer.echo("Error: --offset/--limit only apply to plan preview", err=True)
+        raise typer.Exit(code=2)
+    _create_survey(
+        target,
+        expected_plan_hash=expected_plan_hash,
+        point_refs=tuple(points or ()),
+        all_points=all_points,
+        json_output=json_output,
+    )
 
 
-def _sweep_dry_run(survey_dir: Path) -> None:
-    """Print the planned runs without writing files."""
+def _sweep_plan(
+    survey_dir: Path,
+    *,
+    offset: int,
+    limit: int,
+    json_output: bool,
+) -> None:
+    """Print a bounded candidate page without writing any files."""
     try:
         project_root = find_project_root(survey_dir)
     except SimctlError as exc:
@@ -165,53 +283,56 @@ def _sweep_dry_run(survey_dir: Path) -> None:
         raise typer.Exit(code=1) from exc
 
     try:
-        project = load_project(project_root)
-        plan = plan_survey_runs(project, survey_dir)
+        result = execute_action(
+            "plan_survey",
+            project_root=project_root,
+            survey_dir=survey_dir,
+            offset=offset,
+            limit=limit,
+        )
     except SimctlError as exc:
         typer.echo(f"Error: {exc}", err=True)
         raise typer.Exit(code=1) from exc
+    if result.status is not ActionStatus.SUCCESS:
+        typer.echo(f"Error: {result.message}", err=True)
+        raise typer.Exit(code=1)
 
-    combinations = list(plan.combinations)
-    if not combinations:
-        typer.echo("No parameter combinations to expand.")
-        raise typer.Exit(code=0)
-
-    n = len(combinations)
-    typer.echo(f"[dry-run] {n} runs would be created in {survey_dir}")
-    typer.echo(f"  base case  : {plan.survey_data.base_case}")
-    typer.echo(f"  simulator  : {plan.effective_case.simulator}")
-    typer.echo(f"  launcher   : {plan.effective_case.launcher}")
-    if plan.survey_data.naming_template:
-        typer.echo(f"  display    : {plan.survey_data.naming_template}")
-    typer.echo(_format_job_summary(plan.effective_case.job))
-    typer.echo(_format_resource_estimate(plan.effective_case.job, n))
-
-    # Print one line per combination so the user can scan parameters.
-    typer.echo("")
-    typer.echo("Planned runs:")
-    for combo in combinations:
-        merged_params = {**plan.base_case.params, **combo}
-        if plan.survey_data.naming_template:
-            display_name = generate_display_name(
-                plan.survey_data.naming_template,
-                merged_params,
-            )
-        else:
-            display_name = generate_semantic_label(
-                plan.base_case.params,
-                merged_params,
-                list(plan.variation_keys),
-                plan.survey_data.naming,
-            )
-        directory_name = preview_run_directory_name(
-            display_name,
-            plan.survey_data.naming,
+    data = result.data
+    if json_output:
+        typer.echo(json.dumps(data, ensure_ascii=False, indent=2, default=str))
+        return
+    count = int(data.get("candidate_count", 0))
+    typer.echo(f"[plan only] {count} candidate points; 0 directories created")
+    typer.echo(f"  survey     : {data.get('survey_id', '')}")
+    typer.echo(f"  experiment : {data.get('experiment_id', '') or '(unset)'}")
+    typer.echo(f"  phase      : {data.get('phase', '') or '(unset)'}")
+    typer.echo(f"  purpose    : {data.get('purpose', '') or '(unset)'}")
+    typer.echo(f"  plan hash  : {data.get('plan_hash', '')}")
+    estimate = data.get("estimated_core_hours")
+    if estimate is not None:
+        typer.echo(
+            f"  estimate   : {float(estimate):,.1f} core-hours for all candidates"
         )
-        params_str = _format_combo(combo)
-        if display_name:
-            typer.echo(f"  {display_name:<24} {directory_name:<40} {params_str}")
-        else:
-            typer.echo(f"  {params_str}")
+    issues = list(data.get("admission_issues", []))
+    for issue in issues:
+        typer.echo(f"  BLOCKED    : {issue}", err=True)
+    typer.echo("")
+    typer.echo("Candidate page:")
+    for point in list(data.get("points", [])):
+        typer.echo(
+            f"  {point.get('ref', '?')}  {point.get('display_name', ''):<24} "
+            f"{_format_combo(dict(point.get('params', {})))}"
+        )
+    shown = len(list(data.get("points", [])))
+    if offset + shown < count:
+        typer.echo(
+            f"  ... {count - offset - shown} more; use --offset {offset + shown}"
+        )
+    typer.echo("")
+    typer.echo(
+        "Materialize explicitly: runo runs sweep --apply --point p0001 "
+        f"--expect-plan {data.get('plan_hash', '')} {survey_dir}"
+    )
 
 
 def _format_combo(combo: dict[str, Any]) -> str:
@@ -260,25 +381,4 @@ def _format_resource_estimate(job: JobData, n_runs: int) -> str:
 
 def _walltime_to_hours(walltime: str) -> float:
     """Parse a walltime string to hours.  Returns 0.0 on failure."""
-    if not walltime:
-        return 0.0
-    # Strip optional ``D-`` day prefix.
-    days = 0
-    rest = walltime
-    if "-" in walltime:
-        head, _, rest = walltime.partition("-")
-        try:
-            days = int(head)
-        except ValueError:
-            return 0.0
-    parts = rest.split(":")
-    try:
-        if len(parts) == 3:
-            h, m, s = (int(p) for p in parts)
-        elif len(parts) == 2:
-            h, m, s = 0, int(parts[0]), int(parts[1])
-        else:
-            return 0.0
-    except ValueError:
-        return 0.0
-    return days * 24 + h + m / 60 + s / 3600
+    return parse_walltime_hours(walltime) or 0.0

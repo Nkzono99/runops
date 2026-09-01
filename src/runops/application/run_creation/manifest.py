@@ -21,6 +21,16 @@ _SIMULATOR_SOURCE_STRING_FIELDS = (
     "package_version",
 )
 
+_OUTPUT_ONLY_LAUNCHER_FIELDS = frozenset({"stdout", "stderr"})
+_OUTPUT_ONLY_SBATCH_PREFIXES = (
+    "-o",
+    "-e",
+    "-J",
+    "--output",
+    "--error",
+    "--job-name",
+)
+
 
 def get_simulator_config(
     project: ProjectConfig,
@@ -88,6 +98,14 @@ def build_manifest_job(
     else:
         result["nodes"] = job.nodes
         result["ntasks"] = job.ntasks
+    if job.qos:
+        result["qos"] = job.qos
+    if job.modules:
+        result["modules"] = list(job.modules)
+    if job.pre_commands:
+        result["pre_commands"] = list(job.pre_commands)
+    if job.post_commands:
+        result["post_commands"] = list(job.post_commands)
     return result
 
 
@@ -133,9 +151,12 @@ def build_manifest(
             "adapter": sim_config.get("adapter", ""),
             "resolver_mode": sim_config.get("resolver_mode", "package"),
         },
-        launcher={
-            "name": case_data.launcher,
-        },
+        launcher=_build_manifest_launcher(
+            project,
+            case_data.launcher,
+            site,
+            case_data.simulator,
+        ),
         simulator_source=provenance,
         job=build_manifest_job(case_data.job, site),
         variation={
@@ -152,6 +173,56 @@ def build_manifest(
     )
 
 
+def _build_manifest_launcher(
+    project: ProjectConfig,
+    launcher_name: str,
+    site: SiteProfile | None,
+    simulator_name: str,
+) -> dict[str, Any]:
+    """Freeze path-independent launcher and site execution conditions."""
+    launcher: dict[str, Any] = {"name": launcher_name}
+    raw_config = project.launchers.get(launcher_name, {})
+    config = {
+        key: value
+        for key, value in raw_config.items()
+        if key not in _OUTPUT_ONLY_LAUNCHER_FIELDS
+    }
+    if config:
+        launcher["config"] = config
+    if site is not None:
+        launcher["site"] = _build_site_execution_context(site, simulator_name)
+    return launcher
+
+
+def _build_site_execution_context(
+    site: SiteProfile,
+    simulator_name: str,
+) -> dict[str, Any]:
+    """Return site settings that can affect execution, excluding log paths."""
+    return {
+        "name": site.name,
+        "resource_style": site.resource_style,
+        "modules": site.modules_for(simulator_name),
+        "extra_sbatch": [
+            directive
+            for directive in site.extra_sbatch
+            if not _is_output_only_sbatch_directive(directive)
+        ],
+        "env": dict(site.env),
+        "setup_commands": list(site.setup_commands),
+    }
+
+
+def _is_output_only_sbatch_directive(directive: str) -> bool:
+    stripped = directive.lstrip()
+    return any(
+        stripped == prefix
+        or stripped.startswith(f"{prefix}=")
+        or stripped.startswith(f"{prefix} ")
+        for prefix in _OUTPUT_ONLY_SBATCH_PREFIXES
+    )
+
+
 def _normalize_simulator_source(
     runtime_info: dict[str, Any],
     provenance: dict[str, Any],
@@ -162,6 +233,7 @@ def _normalize_simulator_source(
         "source_repo": runtime_info.get("source_repo", ""),
         "git_commit": runtime_info.get("git_commit", ""),
         "git_dirty": runtime_info.get("git_dirty", False),
+        "git_state_observed": runtime_info.get("git_state_observed", False),
         "build_command": runtime_info.get("build_command", ""),
         "executable": runtime_info.get("executable", ""),
         "exe_hash": runtime_info.get("exe_hash", ""),
@@ -174,6 +246,8 @@ def _normalize_simulator_source(
         source[field] = value if isinstance(value, str) else str(value or "")
     if not isinstance(source["git_dirty"], bool):
         source["git_dirty"] = False
+    if not isinstance(source["git_state_observed"], bool):
+        source["git_state_observed"] = False
     return source
 
 

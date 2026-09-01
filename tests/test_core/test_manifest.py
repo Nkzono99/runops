@@ -56,6 +56,29 @@ class TestManifestData:
         assert data.run == {}
         assert data.params_snapshot == {}
 
+    def test_new_canonical_sections_roundtrip_losslessly(self) -> None:
+        raw = {
+            "run": {"id": "R20260901-0001", "status": "created"},
+            "simulator_source": {},
+            "params_snapshot": {},
+            "intent": {
+                "experiment_id": "E20260901-0001",
+                "purpose": "explore",
+                "future_field": {"kept": True},
+            },
+            "identity": {"condition_hash": "sha256:abc"},
+            "curation": {"disposition": "unreviewed"},
+            "storage": {"tier": "cold", "form": "compacted"},
+        }
+
+        data = ManifestData.from_dict(raw)
+
+        assert data.intent["future_field"] == {"kept": True}
+        assert data.identity == {"condition_hash": "sha256:abc"}
+        assert data.curation == {"disposition": "unreviewed"}
+        assert data.storage == {"tier": "cold", "form": "compacted"}
+        assert data.to_dict() == raw
+
     def test_from_dict_deep_copies_extra_sections(self) -> None:
         raw = {
             "run": {"id": "R20260710-0001", "status": "created"},

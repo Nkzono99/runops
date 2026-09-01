@@ -73,14 +73,26 @@ def project_status(project_root: str | None = None) -> dict[str, Any]:
         )
 
     runs = context.get("runs", {})
-    total_runs = runs.get("total", 0) if isinstance(runs, dict) else 0
-    status: EnvelopeStatus = "warning" if context.get("diagnostics") else "ok"
-    summary = f"{total_runs} run(s); project status is {context.get('status', 'ok')}."
-    warnings = [
-        warning("diagnostic", str(item.get("message", "")))
-        for item in context.get("diagnostics", [])
-        if isinstance(item, dict)
-    ]
+    namespace_available = (
+        isinstance(runs, dict) and runs.get("namespace_available") is not False
+    )
+    total_runs = runs.get("total") if isinstance(runs, dict) else None
+    warnings = _project_context_warnings(context)
+    status: EnvelopeStatus = "warning" if warnings else "ok"
+    if not namespace_available:
+        summary = (
+            "Run namespace unavailable; "
+            f"project status is {context.get('status', 'degraded')}."
+        )
+    elif isinstance(total_runs, int):
+        summary = (
+            f"{total_runs} run(s); project status is {context.get('status', 'ok')}."
+        )
+    else:
+        summary = (
+            "Run counts unavailable; "
+            f"project status is {context.get('status', 'degraded')}."
+        )
     return envelope(
         tool=spec.name,
         safety=spec.safety,
@@ -119,20 +131,60 @@ def project_inspect(project_root: str | None = None) -> dict[str, Any]:
             inputs=inputs,
         )
 
+    warnings = _project_context_warnings(context)
+    runs = context.get("runs", {})
+    namespace_available = (
+        isinstance(runs, dict) and runs.get("namespace_available") is not False
+    )
+    status: EnvelopeStatus = "warning" if warnings else "ok"
+    if not namespace_available:
+        summary = f"Project {project.name!r} inspected; Run namespace unavailable."
+    elif warnings:
+        summary = f"Project {project.name!r} inspected with diagnostics."
+    else:
+        summary = f"Project {project.name!r} inspected."
+
     return envelope(
         tool=spec.name,
         safety=spec.safety,
-        status="ok",
-        summary=f"Project {project.name!r} inspected.",
+        status=status,
+        summary=summary,
         data={
             "project": _project_config_payload(project),
             "context": context,
         },
         project_root=root,
+        warnings=warnings,
         started_at=started_at,
         started_perf=started_perf,
         inputs=inputs,
     )
+
+
+def _project_context_warnings(context: dict[str, Any]) -> list[dict[str, Any]]:
+    """Translate context diagnostics into explicit MCP envelope warnings."""
+    diagnostics = context.get("diagnostics", [])
+    result = [
+        warning("diagnostic", str(item.get("message", "")))
+        for item in diagnostics
+        if isinstance(item, dict)
+    ]
+    runs = context.get("runs", {})
+    if not isinstance(runs, dict) or runs.get("namespace_available") is False:
+        message = "The canonical Run namespace could not be completely inspected."
+        for item in diagnostics:
+            if isinstance(item, dict) and item.get("section") == "runs":
+                message = str(item.get("message", message))
+                break
+        result.insert(
+            0,
+            warning(
+                "run_namespace_unavailable",
+                message,
+                severity="high",
+            ),
+        )
+    return result
 
 
 def project_plugins(

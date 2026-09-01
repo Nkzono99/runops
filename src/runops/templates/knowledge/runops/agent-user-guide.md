@@ -12,24 +12,32 @@ project-local skill を参照する。
 - run ディレクトリが主単位: すべての操作は run_id または run ディレクトリを基点にする
 - manifest.toml が正本: run の状態・由来・provenance は manifest に記録される
 - cwd ベース: 引数省略時はカレントディレクトリをデフォルトターゲットにする
-- case は `runo case new` で生成し、run は `runo runs create` / `runo runs sweep` で生成する
+- formal questionは`runo experiments create`、caseは`runo case new`で生成する
+- `runo runs sweep`の既定はread-only plan。Run生成には`--apply`、`--point|--all`、`--expect-plan`が必要
+- smoke / debugは`runo test smoke|debug`で`.runops/test-runs/T...`へ分離する
 - `runs/**/manifest.toml`, `input/`, `submit/`, `work/` は直接編集しない
 
 ## 最初に読むもの
 
 1. `uvx --from runops runo context --json`
-2. `uvx --from runops runo plugins --check` と `uvx --from runops runo plugins --json`
-3. `campaign.toml`
-4. `research/CURRENT.md` と `runo research status`
-5. 関連する `cases/**/case.toml` と `runs/**/survey.toml`
-6. `.runops/facts.toml` と `.runops/knowledge/candidates/facts/`
-7. 必要なら `runo runs status` / `runo runs log -e`
+2. `uvx --from runops runo triage --json`
+3. `uvx --from runops runo plugins --check` と `uvx --from runops runo plugins --json`
+4. `campaign.toml` と owning `experiments/E...toml`
+5. `research/CURRENT.md` と `runo research status`
+6. 関連する `cases/**/case.toml` と `runs/**/survey.toml`（まずread-only plan）
+7. `.runops/facts.toml` と `.runops/knowledge/candidates/facts/`
+8. 必要なら `runo runs status` / `runo runs log -e`
 
 ## 知識と記録
 
 - 時系列の作業ログは `runo research append` で bounded journal に残す
 - 現在の高レベルな研究判断は `research/CURRENT.md` に残す
 - 残す解析は `research/results/` に明示昇格し、説明を README 1 枚に集約する
+- Resultのclaim/evidenceをsealし、Run reviewとevidence selectionを同一視しない
+- Run evidenceはcompleted相当、理由付きreview、identity / source / baseline / input snapshotを確認する
+- sealed ResultがincludeしたRun-owned outputを`purge-work`で削除しない
+- T IDと`.runops/test-runs/**`をscientific Result evidenceにしない
+- case / survey `notes.md`とRun `analysis/notes.md`を新規作成せず、途中proseは`.runops/work/`へ置く
 - 整理済み知見は `runo knowledge save` / `runo knowledge add-fact` を使う
 - `.runops/knowledge/` は生成済み Agent context であり、手で整形しない
 - simulator cookbook や長文 workflow は推奨 Codex plugin / explicit knowledge

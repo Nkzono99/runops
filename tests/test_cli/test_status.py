@@ -195,10 +195,11 @@ def test_status_summary_aggregates_by_case(tmp_path: Path) -> None:
     for case, state, n in layout:
         for _ in range(n):
             counter += 1
-            run_dir = survey / case / f"R202604{counter:04d}"
+            run_id = f"R20260407-{counter:04d}"
+            run_dir = survey / case / run_id
             create_run_manifest(
                 run_dir,
-                run_id=f"R202604{counter:04d}",
+                run_id=run_id,
                 status=state,
                 display_name="x",
                 job_id="",
