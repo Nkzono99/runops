@@ -89,30 +89,50 @@ def scancel(job_id: str, *, runner: CommandRunner) -> None:
 
 
 def query(job_id: str, *, runner: CommandRunner) -> JobState | None:
-    """squeue first, then sacct. ``None`` when Slurm knows nothing of the job."""
-    result = runner(["squeue", "--job", job_id, "--noheader", "--format=%T"])
-    if result.returncode == 0 and result.stdout.strip():
-        raw = result.stdout.strip().splitlines()[0]
-        state = map_state(raw)
-        if state is not None:
-            return JobState(state, raw.split()[0])
+    """State of one job; ``None`` when Slurm knows nothing of it."""
+    return query_many([job_id], runner=runner).get(job_id)
+
+
+def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobState | None]:
+    """One ``squeue`` call and, for jobs it does not list, one ``sacct`` call.
+
+    Keeps scheduler load independent of the number of active runs. A job
+    missing from both is ``None``.
+    """
+    ids = [j for j in dict.fromkeys(job_ids) if j]
+    states: dict[str, JobState | None] = dict.fromkeys(ids)
+    if not ids:
+        return states
+    result = runner(["squeue", f"--jobs={','.join(ids)}", "--noheader", "--format=%i %T"])
+    if result.returncode == 0:
+        for line in result.stdout.splitlines():
+            parts = line.split()
+            if len(parts) >= 2 and parts[0] in states:
+                state = map_state(parts[1])
+                if state is not None:
+                    states[parts[0]] = JobState(state, parts[1].rstrip("+"))
+    pending = [j for j in ids if states[j] is None]
+    if not pending:
+        return states
     result = runner(
         [
             "sacct",
-            "--jobs",
-            job_id,
+            f"--jobs={','.join(pending)}",
             "--noheader",
             "--parsable2",
             "--format=JobID,State,ExitCode",
         ]
     )
     if result.returncode != 0:
-        raise RunError(f"sacct failed for job {job_id}: {result.stderr.strip()}")
+        raise RunError(f"sacct failed for jobs {','.join(pending)}: {result.stderr.strip()}")
     for line in result.stdout.splitlines():
         parts = line.split("|")
-        if len(parts) >= 3 and parts[0].strip() == job_id:
+        if len(parts) < 3:
+            continue
+        job_id = parts[0].strip()
+        if job_id in states and states[job_id] is None:
             state = map_state(parts[1])
             if state is None:
                 raise RunError(f"unknown Slurm state {parts[1]!r} for job {job_id}")
-            return JobState(state, parts[1].split()[0].rstrip("+"), parts[2].strip())
-    return None
+            states[job_id] = JobState(state, parts[1].split()[0].rstrip("+"), parts[2].strip())
+    return states

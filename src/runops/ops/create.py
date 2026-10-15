@@ -184,15 +184,14 @@ def plan_sweep(
     combos = list(itertools.product(*(axes[k] for k in keys)))
     if limit is not None:
         combos = combos[: max(limit, 0)]
+    base_parent = _dest_parent(project, case, dest, False)
     if not sweep_label:
         day = datetime.now().astimezone().strftime("%Y%m%d")
-        parent_base = project.runs_dir / case.name
         n = 1
-        while (parent_base / f"sweep-{day}-{n:02d}").exists():
+        while (base_parent / f"sweep-{day}-{n:02d}").exists():
             n += 1
         sweep_label = f"sweep-{day}-{n:02d}"
     sweep_label = slugify(sweep_label, 80)
-    base_parent = _dest_parent(project, case, dest, False)
     parent = base_parent / sweep_label
     points: list[SweepPoint] = []
     for i, combo in enumerate(combos, start=1):
@@ -249,6 +248,7 @@ def _materialize(
     warnings += runtime_warnings
     launcher = project.config.launcher(case.launcher)
     created: list[Manifest] = []
+    existing = _hash_index(project)
     with project.id_lock():
         ids = project.next_run_ids(len(specs))
         staged: list[tuple[Path, Path, Manifest]] = []
@@ -274,6 +274,7 @@ def _materialize(
                 )
                 manifest.data["launcher"] = {"name": launcher.name}
                 manifest.save()
+                warnings += _duplicate_warnings(manifest, existing)
                 staged.append((stage, final, manifest))
             for stage, final, _manifest in staged:
                 move_noreplace(stage, final)
@@ -287,6 +288,34 @@ def _materialize(
                     shutil.rmtree(leftover, ignore_errors=True)
             raise
     return CreateResult(created, warnings)
+
+
+def _hash_index(project: Project) -> dict[str, list[tuple[str, str]]]:
+    """input_hash -> [(run id, exe_hash)] over every run, archived included."""
+    index: dict[str, list[tuple[str, str]]] = {}
+    for m in project.iter_runs():
+        input_hash = str(m.section("identity").get("input_hash", ""))
+        if input_hash:
+            exe_hash = str(m.section("simulator").get("exe_hash", ""))
+            index.setdefault(input_hash, []).append((m.id, exe_hash))
+    return index
+
+
+def _duplicate_warnings(manifest: Manifest, index: dict[str, list[tuple[str, str]]]) -> list[str]:
+    """Inform (never refuse) when a run repeats the inputs of an existing one (SPEC §1.2 #2)."""
+    input_hash = str(manifest.section("identity").get("input_hash", ""))
+    exe_hash = str(manifest.section("simulator").get("exe_hash", ""))
+    same_exe = [rid for rid, h in index.get(input_hash, []) if h == exe_hash]
+    other_exe = [rid for rid, h in index.get(input_hash, []) if h != exe_hash]
+    out: list[str] = []
+    if same_exe:
+        out.append(
+            f"{manifest.id}: same inputs and executable as {', '.join(same_exe)}; "
+            "the result should be identical"
+        )
+    elif other_exe:
+        out.append(f"{manifest.id}: same inputs as {', '.join(other_exe)} (different executable)")
+    return out
 
 
 def _populate(

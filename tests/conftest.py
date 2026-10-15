@@ -54,22 +54,23 @@ class FakeSlurm:
         if tool == "scancel":
             self.states[cmd[1]] = "CANCELLED"
             return CommandResult(0, "", "")
-        if tool == "squeue":
-            job = cmd[cmd.index("--job") + 1]
-            state = self.states.get(job, "")
-            if job in self.unknown or state not in ("PENDING", "RUNNING"):
-                return CommandResult(0, "", "")
-            return CommandResult(0, state + "\n", "")
-        if tool == "sacct":
-            job = cmd[cmd.index("--jobs") + 1]
-            if job in self.unknown or job not in self.states:
-                return CommandResult(0, "", "")
-            return CommandResult(
-                0,
-                f"{job}|{self.states[job]}|0:0\n{job}.batch|{self.states[job]}|0:0\n",
-                "",
-            )
+        if tool in ("squeue", "sacct"):
+            jobs = next(a for a in cmd if a.startswith("--jobs=")).removeprefix("--jobs=")
+            lines = []
+            for job in jobs.split(","):
+                state = self.states.get(job, "")
+                if job in self.unknown or not state:
+                    continue
+                if tool == "squeue":
+                    if state in ("PENDING", "RUNNING"):
+                        lines.append(f"{job} {state}")
+                else:
+                    lines.append(f"{job}|{state}|0:0\n{job}.batch|{state}|0:0")
+            return CommandResult(0, "".join(line + "\n" for line in lines), "")
         raise AssertionError(f"unexpected command {cmd}")
+
+    def scheduler_calls(self) -> list[list[str]]:
+        return [c for c in self.commands if c[0] in ("squeue", "sacct")]
 
     @property
     def last_job(self) -> str:

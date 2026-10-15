@@ -183,4 +183,10 @@ class Manifest:
             "job_id": self.job_id,
             "run_dir": rel,
             "last_note": str(notes[-1].get("text", "")) if notes else "",
+            # Enough for an agent to compare runs without another command.
+            "params": self.params,
+            "changed_keys": list(self.section("variation").get("changed_keys", [])),
+            "parent_run": str(self.section("origin").get("parent_run", "")),
+            "exe_hash": str(self.section("simulator").get("exe_hash", "")),
+            "input_hash": str(self.section("identity").get("input_hash", "")),
         }

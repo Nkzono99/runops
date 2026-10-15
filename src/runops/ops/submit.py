@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from runops.adapters.base import exe_str
 from runops.adapters.registry import optional
 from runops.case import core_hours
 from runops.errors import RunError, UsageError
@@ -14,7 +15,7 @@ from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.common import SimContext, run_sim_context
 from runops.project import Project
 from runops.slurm import CommandRunner, default_runner, sbatch, scancel
-from runops.util import now_iso
+from runops.util import hash_file, now_iso
 
 
 def write_job_for(project: Project, manifest: Manifest, *, ctx: SimContext | None = None) -> Path:
@@ -85,7 +86,9 @@ def submit_run(
     options: SubmitOptions | None = None,
     *,
     runner: CommandRunner = default_runner,
+    warnings: list[str] | None = None,
 ) -> str:
+    """sbatch *manifest*; returns the job id. Warnings are appended to *warnings*."""
     options = options or SubmitOptions()
     if manifest.status != RunState.CREATED:
         raise UsageError(
@@ -119,20 +122,38 @@ def submit_run(
             "attempt": attempt,
         }
     )
+    manifest.job.pop("exit_code", None)
     attempts = manifest.job.setdefault("attempts", [])
-    attempts.append(
-        {
-            "attempt": attempt,
-            "job_id": job_id,
-            "partition": str(manifest.job.get("partition", "")),
-            "submitted_at": now,
-            "finished_at": "",
-            "slurm_state": "PENDING",
-        }
-    )
+    entry: dict[str, Any] = {
+        "attempt": attempt,
+        "job_id": job_id,
+        "partition": str(manifest.job.get("partition", "")),
+        "submitted_at": now,
+        "finished_at": "",
+        "slurm_state": "PENDING",
+    }
+    exe_hash = _current_exe_hash(manifest)
+    if exe_hash:
+        entry["exe_hash"] = exe_hash
+        recorded = str(manifest.section("simulator").get("exe_hash", ""))
+        if recorded and exe_hash != recorded and warnings is not None:
+            warnings.append(
+                f"{manifest.id}: executable changed since the run was created "
+                f"(hash recorded on attempt {attempt})"
+            )
+    attempts.append(entry)
     manifest.set_status(RunState.SUBMITTED)
     manifest.save()
     return job_id
+
+
+def _current_exe_hash(manifest: Manifest) -> str:
+    """Hash of the executable as it is now; ``""`` if it is not a file."""
+    exe = Path(str(manifest.section("simulator").get("executable", "")))
+    try:
+        return hash_file(exe) if exe_str(exe) and exe.is_file() else ""
+    except OSError:
+        return ""
 
 
 def cancel_run(

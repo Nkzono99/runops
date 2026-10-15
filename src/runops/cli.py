@@ -259,6 +259,17 @@ def _print_created(project: Project, manifests: list[Manifest]) -> None:
         out.print(f"created {m.id}  {project.rel(m.run_dir)}")
 
 
+def _submit_each(project: Project, manifests: list[Manifest], *, quiet: bool = False) -> None:
+    from runops.ops.submit import submit_run
+
+    warnings: list[str] = []
+    for m in manifests:
+        job_id = submit_run(project, m, runner=_runner(), warnings=warnings)
+        if not quiet:
+            out.print(f"submitted {m.id} as job {job_id}")
+    _warn(warnings)
+
+
 @app.command()
 def new(
     case: Optional[str] = typer.Argument(None, help="Case name (omit with --from)."),
@@ -274,10 +285,10 @@ def new(
     ),
     submit: bool = typer.Option(False, "--submit"),
     created_by: str = typer.Option("", "--created-by"),
+    as_json: bool = typer.Option(False, "--json", help="Print the created run as JSON."),
 ) -> None:
     """Create one run."""
     from runops.ops.create import CreateRequest, create_run, parse_sets
-    from runops.ops.submit import submit_run
 
     project = _project()
     if case and from_run:
@@ -298,11 +309,12 @@ def new(
     _warn(result.warnings)
     if not why:
         _warn(["no --why given; consider `runo note RUN` to record the purpose"])
-    _print_created(project, result.manifests)
+    if not as_json:
+        _print_created(project, result.manifests)
     if submit:
-        for m in result.manifests:
-            job_id = submit_run(project, m, runner=_runner())
-            out.print(f"submitted {m.id} as job {job_id}")
+        _submit_each(project, result.manifests, quiet=as_json)
+    if as_json:
+        _print_json([m.to_summary(project.root) for m in result.manifests])
 
 
 @app.command()
@@ -328,7 +340,6 @@ def sweep(
         parse_sweep_sets,
         plan_sweep,
     )
-    from runops.ops.submit import submit_run
 
     if submit and not apply:
         raise UsageError("--submit requires --apply")
@@ -347,19 +358,20 @@ def sweep(
             }
         )
         return
-    table = Table(
-        "point",
-        *(plan.points[0].values.keys() if plan.points else []),
-        "label",
-        box=None,
-    )
-    for p in plan.points:
-        table.add_row(p.ref, *(str(v) for v in p.values.values()), p.label)
-    out.print(table)
-    out.print(
-        f"{len(plan.points)} runs -> {project.rel(plan.parent)}/  "
-        f"(~{plan.core_hours:.1f} core-hours)"
-    )
+    if not as_json:
+        table = Table(
+            "point",
+            *(plan.points[0].values.keys() if plan.points else []),
+            "label",
+            box=None,
+        )
+        for p in plan.points:
+            table.add_row(p.ref, *(str(v) for v in p.values.values()), p.label)
+        out.print(table)
+        out.print(
+            f"{len(plan.points)} runs -> {project.rel(plan.parent)}/  "
+            f"(~{plan.core_hours:.1f} core-hours)"
+        )
     if not apply:
         out.print("preview only; add --apply to create")
         return
@@ -371,11 +383,12 @@ def sweep(
     request = CreateRequest(case=case, why=why, tags=tags or [], created_by=created_by or _actor())
     result = apply_sweep(project, plan, request)
     _warn(result.warnings)
-    _print_created(project, result.manifests)
+    if not as_json:
+        _print_created(project, result.manifests)
     if submit:
-        for m in result.manifests:
-            job_id = submit_run(project, m, runner=_runner())
-            out.print(f"submitted {m.id} as job {job_id}")
+        _submit_each(project, result.manifests, quiet=as_json)
+    if as_json:
+        _print_json([m.to_summary(project.root) for m in result.manifests])
 
 
 # ---------------------------------------------------------------------------
@@ -421,13 +434,15 @@ def submit_cmd(
             _confirm(f"Submit {len(targets)} runs (~{hours:.1f} core-hours)?", yes)
     options = SubmitOptions(partition=partition, qos=qos, afterok=afterok)
     failures = 0
+    warnings: list[str] = []
     for m in targets:
         try:
-            job_id = submit_run(project, m, options, runner=_runner())
+            job_id = submit_run(project, m, options, runner=_runner(), warnings=warnings)
             out.print(f"submitted {m.id} as job {job_id}")
         except RunopsError as exc:
             failures += 1
             err.print(f"[red]error:[/] {exc}")
+    _warn(warnings)
     if failures:
         raise typer.Exit(1)
 
@@ -454,15 +469,14 @@ def retry(
     submit: bool = typer.Option(False, "--submit"),
 ) -> None:
     """Reset a failed/cancelled run to created (work/ is kept)."""
-    from runops.ops.submit import retry_run, submit_run
+    from runops.ops.submit import retry_run
 
     project = _project()
     m = project.resolve_run(run)
     retry_run(project, m)
     out.print(f"{m.id} -> created")
     if submit:
-        job_id = submit_run(project, m, runner=_runner())
-        out.print(f"submitted {m.id} as job {job_id}")
+        _submit_each(project, [m])
 
 
 def _status_table(project: Project, manifests: list[Manifest]) -> Table:

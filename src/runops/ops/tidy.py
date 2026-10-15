@@ -14,7 +14,7 @@ from runops.manifest import ACTIVE_STATES, MANIFEST_FILE, Manifest, RunState
 from runops.ops.common import inside, run_sim_context
 from runops.ops.sync import sync_run
 from runops.project import ARCHIVE_DIR, Project
-from runops.slurm import CommandRunner, default_runner, query
+from runops.slurm import CommandRunner, JobState, default_runner, query_many
 from runops.util import move_noreplace, now_iso, parse_iso
 
 KINDS = (
@@ -58,7 +58,16 @@ def find_candidates(
         archive_after = timedelta(days=defaults.tidy_archive_days)
     out: list[Candidate] = []
     referenced: set[str] = set()
-    for m in project.iter_runs():
+    runs = list(project.iter_runs())
+    known: dict[str, JobState | None] = {}
+    if check_slurm:
+        try:
+            known = query_many(
+                [m.job_id for m in runs if m.status in ACTIVE_STATES and m.job_id], runner=runner
+            )
+        except RunopsError:
+            check_slurm = False
+    for m in runs:
         build_dir = str(m.section("simulator").get("build_dir", ""))
         if build_dir and m.status != RunState.ARCHIVED:
             referenced.add(Path(build_dir).name)
@@ -88,14 +97,8 @@ def find_candidates(
             )
         elif m.status == RunState.COMPLETED and not m.pinned and age > archive_after:
             out.append(Candidate("old-completed", m.id, rel, f"completed, {age.days}d old"))
-        elif m.status in ACTIVE_STATES and check_slurm and m.job_id:
-            try:
-                state = query(m.job_id, runner=runner)
-            except RunopsError:
-                state = None
-                continue
-            if state is None:
-                out.append(Candidate("orphan-job", m.id, rel, f"job {m.job_id} unknown to Slurm"))
+        elif m.status in ACTIVE_STATES and check_slurm and m.job_id and known.get(m.job_id) is None:
+            out.append(Candidate("orphan-job", m.id, rel, f"job {m.job_id} unknown to Slurm"))
     if project.build_dir.is_dir():
         for build in sorted(project.build_dir.iterdir()):
             if build.is_dir() and not build.name.startswith(".") and build.name not in referenced:

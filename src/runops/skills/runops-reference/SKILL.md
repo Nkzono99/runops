@@ -13,9 +13,9 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit> |
 | `runo context [--json]` | project summary for agents |
 | `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases |
-| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit]` | create a run |
+| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run |
 | `runo new --from RUN [--why] [--set k=v]... [--continue] [--submit]` | derive a run |
-| `runo sweep CASE --set k=v1,v2... [--label L] [--why] [--apply] [--submit] [--limit N]` | product of values |
+| `runo sweep CASE --set k=v1,v2... [--label L] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | sbatch created runs |
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
 | `runo cancel RUN... [-y]` | scancel |

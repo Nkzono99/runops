@@ -107,7 +107,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
 | `[origin]` | `case`、`sweep`、`parent_run`、`created_by` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
-| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`[[job.attempts]]` |
+| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`） |
 | `[params]` | case の params に `--set` を適用した最終値 |
 | `[variation]` | `changed_keys` |
 | `[identity]` | `input_hash` |
@@ -116,7 +116,14 @@ runops だけが書きます。手で編集しないでください。主な fie
 
 状態は `created → submitted → running → completed | failed | cancelled` と進み、
 終了した run は `archived` にできます。`sync` は Slurm が COMPLETED でも adapter が
-失敗と判定すれば `failed` にします。
+失敗と判定すれば `failed` にします。job.sh は終了時に `submit/exit.<job_id>`（exit code と
+開始・終了時刻）を書くので、Slurm の会計から消えた job もこの file で completed / failed が
+決まります。`sync` と `tidy` は対象 run の job id をまとめて 1 回の `squeue` と `sacct` で
+問い合わせます。
+
+`submit` は executable を hash し直して attempt に記録し、作成時と違えば警告します。
+`new` と `sweep --apply` は同じ入力（`input_hash`）の run が既にあれば警告します。
+どちらも作成や投入は拒否しません。
 
 ## command
 
@@ -131,9 +138,9 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `runo build SIM [--force]` | `local_source` の simulator を build |
 | `runo context [--json]` | agent 向けの現在地 |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
-| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit]` | run を 1 つ作る |
+| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る |
 | `runo new --from RUN [--set k=v]... [--continue]` | 既存 run の params から派生。`--continue` は adapter の restart 対応が必要 |
-| `runo sweep CASE --set k=v1,v2 ... [--label] [--limit N] [--apply] [--submit]` | 直積の候補表示。`--apply` で作成 |
+| `runo sweep CASE --set k=v1,v2 ... [--label] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
 | `runo cancel RUN... [-y]` / `runo retry RUN [--submit]` | scancel / failed・cancelled を created に戻す |
 | `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |

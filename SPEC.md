@@ -292,6 +292,7 @@ ntasks = 800
   submit/
     job.sh
     sbatch.log           # 投入時の stdout/stderr（追記）
+    exit.<job_id>        # job.sh が終了時に書く exit code と開始・終了時刻（TOML）
   work/                  # simulator の出力。cwd はここ
   analysis/
     summary.json         # runo summarize の出力
@@ -353,14 +354,18 @@ submitted_at = "2026-10-15T10:31:00+09:00"
 finished_at = ""
 last_slurm_state = "COMPLETED"
 attempt = 1                       # retry で +1
+exit_code = "0"                   # sacct の ExitCode、無ければ exit record の値
 
 [[job.attempts]]                  # submit のたびに追記。retry の履歴を残す
 attempt = 1
 job_id = "12345"
 partition = "gr20001a"
 submitted_at = "2026-10-15T10:31:00+09:00"
+started_at = ""                   # exit record から
 finished_at = ""
 slurm_state = "COMPLETED"
+exit_code = 0                     # exit record から
+exe_hash = "sha256:..."           # submit 時点の executable の hash
 
 [params]
 "tmgrid.nx" = 4000
@@ -410,6 +415,17 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 - `sync` が terminal 遷移（completed / failed）を確定するとき、adapter の
   `detect_status()` を呼ぶ。Slurm が `COMPLETED` でも adapter が `failed` を返せば
   `failed` にする。Slurm が `FAILED` なら adapter の結果にかかわらず `failed`。
+- `sync` は対象 run の job id をまとめて 1 回の `squeue --jobs=...` で問い合わせ、そこに無い
+  job だけを 1 回の `sacct --jobs=...` で引く。`tidy` の `orphan-job` 判定も同じ。
+  scheduler への問い合わせ回数は run 数に依存しない。
+- job.sh は program 終了時に `submit/exit.<job_id>`（`exit_code`、`started_at`、`finished_at`、
+  `hostname`）を書く。squeue にも sacct にも無い job は、この file があれば
+  `exit_code = 0` のとき adapter の判定（既定 completed）、それ以外は `failed` にする。
+  file が無ければ adapter の判定に従い、`unknown` なら `failed`。
+- `submit` は manifest に記録された executable を hash し直し、attempt に `exe_hash` を残す。
+  作成時の `[simulator].exe_hash` と違えば warning を出す（拒否しない）。
+- `new` / `sweep --apply` は `identity.input_hash` が既存 run と一致するとき warning を出す
+  （同じ executable なら「結果は同一のはず」、違えば「executable が違う」）。作成は拒否しない。
 - `purged` state は廃止。`work/` の削除は `[storage].work_purged_at` で表す。
 
 ---
@@ -424,7 +440,9 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   見つからなければ exit code 2 でエラー。
 - `RUN` 引数は run id、run directory path、または directory 名の一意な部分文字列を受け付ける。
   複数一致は exit code 2 でエラーにし候補を表示する。
-- 一覧系 command は `--json` を持ち、agent が機械可読に読める。
+- 一覧系 command は `--json` を持ち、agent が機械可読に読める。`new` と `sweep --apply` の
+  `--json` は作成した run の同じ summary を返す。summary には `params`、`changed_keys`、
+  `parent_run`、`exe_hash`、`input_hash` を含め、run 同士の比較に別 command を要らなくする。
 - 破壊的 command（`cancel`、`delete`、`tidy --apply`、`archive`）は対象を表示して
   確認を取る。`-y/--yes` で省略。
 - exit code: 0 成功、1 対象 run の実行時エラー（例: sbatch 失敗）、2 使用方法・設定エラー。
@@ -448,9 +466,9 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行 |
 | `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
 | `runo case list` | case 一覧 |
-| `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO]` | 単発 run を作る |
+| `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
 | `runo new --from RUN [--why] [--set k=v]... [--continue] [--submit]` | 既存 run の params から派生 run を作る。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
-| `runo sweep CASE --set k=v1,v2,... [--set ...] [--label L] [--why TEXT] [--apply] [--submit] [--limit N]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
+| `runo sweep CASE --set k=v1,v2,... [--set ...] [--label L] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否 |
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
 | `runo cancel RUN... [-y]` | scancel して sync |
@@ -888,4 +906,8 @@ v2 の `docs/` は次の 3 ファイルだけにする。
 | `.venv` の entry point 探索 | `site.addsitedir` で `.pth` も処理し、探索前に `importlib.invalidate_caches()` | editable install と、mtime が秒単位の Lustre 上での再インストール直後に対応 |
 | migrate の可逆性 | 削除せず `.runops/v1-backup/<stamp>/` と `manifest.v1.toml` に退避 | 実 project の v1 資料を失わない |
 | 依頼と操作範囲、観察方針 | AGENTS.md block と `runops-check-status` に記載 | runhand の work policy から取り込み |
+| scheduler 問い合わせの一括化 | `sync` / `tidy` は `squeue --jobs=` と `sacct --jobs=` を各 1 回 | run ごとの問い合わせは active run 数に比例して scheduler を叩く。agent は sync を繰り返すので回数を run 数から切り離す |
+| job 側の完了証拠 | job.sh が `submit/exit.<job_id>` を書き、`sync` は sacct より先にこれを見る | sacct の保持期間や会計の欠落で completed run が `failed` に倒れていた（row の products、Sumatra の status tag に相当） |
+| submit 時の executable hash | attempt ごとに `exe_hash` を記録し、作成時と違えば warning | `runo update` 後の retry が作成時の hash のまま別 binary で走っていた |
+| 同一入力の warning | `input_hash`（と `exe_hash`）が一致する既存 run を作成時に知らせる | §1.3 で観察した variation の重複を、ゲート無しで抑える |
 | 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |

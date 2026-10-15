@@ -1,7 +1,9 @@
 """job.sh generation (SPEC §5, §6.1).
 
 The script ``cd``s to the run directory; the program command from the
-adapter is relative to it.  Slurm stdout/stderr go to ``work/``.
+adapter is relative to it.  Slurm stdout/stderr go to ``work/``.  On exit
+the script writes ``submit/exit.<job_id>`` (exit code, start/end time) so
+``sync`` can settle the run without Slurm accounting.
 """
 
 from __future__ import annotations
@@ -18,6 +20,7 @@ from runops.errors import UsageError
 from runops.launchers import exec_line
 
 _ENV_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+EXIT_RECORD_DIR = "submit"
 
 
 def render_job_script(
@@ -93,13 +96,24 @@ def render_job_script(
         lines.append(f"source {shlex.quote(str(venv_activate))}")
     setup = [*site.setup_commands, *_list(job.get("pre_commands")), *(prelude or [])]
     lines.extend(setup)
-    lines.append('echo "runops: start $(date -Is) on $(hostname)"')
+    lines.append("runops_start=$(date -Is)")
+    lines.append('echo "runops: start ${runops_start} on $(hostname)"')
     lines.append(exec_line(launcher, program, job))
     lines.append("status=$?")
     lines.extend(_list(job.get("post_commands")))
     lines.append('echo "runops: end $(date -Is) exit=${status}"')
+    lines.append(
+        'printf \'exit_code = %s\\nstarted_at = "%s"\\nfinished_at = "%s"\\nhostname = "%s"\\n\' '
+        '"${status}" "${runops_start}" "$(date -Is)" "$(hostname)" '
+        f'> "{EXIT_RECORD_DIR}/exit.${{SLURM_JOB_ID:-local}}"'
+    )
     lines.append("exit ${status}")
     return "\n".join(lines) + "\n"
+
+
+def exit_record_path(run_dir: Path, job_id: str) -> Path:
+    """``submit/exit.<job_id>``, written by job.sh when the program exits."""
+    return run_dir / EXIT_RECORD_DIR / f"exit.{job_id}"
 
 
 def write_job_script(run_dir: Path, content: str) -> Path:

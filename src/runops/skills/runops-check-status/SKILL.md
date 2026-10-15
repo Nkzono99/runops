@@ -26,8 +26,9 @@ description: Check the progress or result of runops runs (sync, list, log, retry
   failures, then check near the expected end (walltime, progress in the log).
   With unknown timing start at ~1 min and lengthen to 2 and 5 min. Do other requested
   work in between; avoid `tail -f` and rapid status loops.
-- Leaving the queue is not success: confirm with `runo sync` (adapter verdict) and
-  the outputs. At the user's deadline, report the last state; do not cancel or
-  resubmit on your own.
+- Leaving the queue is not success: confirm with `runo sync` (exit record written by
+  job.sh, then adapter verdict) and the outputs. At the user's deadline, report the
+  last state; do not cancel or resubmit on your own.
+- `runo sync` queries Slurm once for all runs; call it instead of `squeue` yourself.
 
 Summarize conclusions that span several runs in `LOG.md` under a dated heading.

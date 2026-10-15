@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from runops.errors import RunopsError, UsageError
+from runops.jobgen import exit_record_path
 from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.common import run_sim_context
 from runops.project import Project
-from runops.slurm import CommandRunner, default_runner, query
-from runops.util import now_iso
+from runops.slurm import CommandRunner, JobState, default_runner, query, query_many
+from runops.util import load_toml, now_iso, tomllib
 
 
 @dataclass
@@ -28,19 +30,37 @@ def sync_run(
     *,
     runner: CommandRunner = default_runner,
 ) -> SyncResult:
+    if manifest.status not in ACTIVE_STATES or not manifest.job_id:
+        return _apply_state(project, manifest, None)
+    return _apply_state(project, manifest, query(manifest.job_id, runner=runner))
+
+
+def _apply_state(project: Project, manifest: Manifest, job: JobState | None) -> SyncResult:
+    """Settle *manifest* from the Slurm state *job* (``None`` = unknown to Slurm).
+
+    Precedence for a job Slurm no longer reports: the exit record job.sh wrote
+    (``submit/exit.<job_id>``), then the adapter's ``detect_status``, then failed.
+    """
     before = manifest.status
     if before not in ACTIVE_STATES:
         return SyncResult(manifest.id, before.value, before.value, "", "not active")
     if not manifest.job_id:
         return SyncResult(manifest.id, before.value, before.value, "", "no job id")
-    job = query(manifest.job_id, runner=runner)
+    record = read_exit_record(manifest.run_dir, manifest.job_id)
+    message = ""
     if job is None:
-        new_state = _adapter_verdict(project, manifest, RunState.COMPLETED, orphan=True)
-        message = "job not found in squeue/sacct; state decided from outputs"
         slurm_state = "UNKNOWN"
+        if record is None:
+            new_state = _adapter_verdict(project, manifest, RunState.COMPLETED, orphan=True)
+            message = "job not found in squeue/sacct; state decided from outputs"
+        elif record["exit_code"] == 0:
+            new_state = _adapter_verdict(project, manifest, RunState.COMPLETED)
+            message = "job not found in squeue/sacct; state from exit record"
+        else:
+            new_state = RunState.FAILED
+            message = f"job not found in squeue/sacct; exit record says exit={record['exit_code']}"
     else:
         slurm_state = job.slurm_state
-        message = ""
         new_state = job.state
         if new_state == RunState.COMPLETED:
             new_state = _adapter_verdict(project, manifest, RunState.COMPLETED)
@@ -48,18 +68,42 @@ def sync_run(
                 message = "Slurm COMPLETED but adapter reports failure"
         if job.exit_code:
             manifest.job["exit_code"] = job.exit_code
-    manifest.job["last_slurm_state"] = slurm_state
     attempts = manifest.job.get("attempts") or []
+    if record is not None:
+        manifest.job.setdefault("exit_code", str(record["exit_code"]))
+        if attempts:
+            attempts[-1]["exit_code"] = record["exit_code"]
+            attempts[-1]["started_at"] = record["started_at"]
+    manifest.job["last_slurm_state"] = slurm_state
     if attempts:
         attempts[-1]["slurm_state"] = slurm_state
     if new_state not in ACTIVE_STATES:
-        now = now_iso()
+        now = (record or {}).get("finished_at") or now_iso()
         manifest.job["finished_at"] = now
         if attempts:
             attempts[-1]["finished_at"] = now
     manifest.set_status(new_state)
     manifest.save()
     return SyncResult(manifest.id, before.value, new_state.value, slurm_state, message)
+
+
+def read_exit_record(run_dir: Path, job_id: str) -> dict[str, Any] | None:
+    """Parse ``submit/exit.<job_id>``; ``None`` if absent or unreadable."""
+    path = exit_record_path(run_dir, job_id)
+    try:
+        data = load_toml(path)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+    try:
+        code = int(data.get("exit_code", ""))
+    except (TypeError, ValueError):
+        return None
+    return {
+        "exit_code": code,
+        "started_at": str(data.get("started_at", "")),
+        "finished_at": str(data.get("finished_at", "")),
+        "hostname": str(data.get("hostname", "")),
+    }
 
 
 def _adapter_verdict(
@@ -88,7 +132,11 @@ def sync_all(
         if manifests is not None
         else [m for m in project.iter_runs() if m.status in ACTIVE_STATES]
     )
-    return [sync_run(project, m, runner=runner) for m in targets]
+    # One squeue + one sacct for every run, however many are active.
+    states = query_many(
+        [m.job_id for m in targets if m.status in ACTIVE_STATES and m.job_id], runner=runner
+    )
+    return [_apply_state(project, m, states.get(m.job_id)) for m in targets]
 
 
 def log_paths(manifest: Manifest) -> tuple[Path | None, Path | None]:
