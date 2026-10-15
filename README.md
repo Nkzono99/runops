@@ -47,6 +47,32 @@ runo init
 
 投入、削除、整理、移行の前には、エージェントが対象と資源量を示して確認を取ります。
 
+## project の中身
+
+```text
+lunar-sheath/
+├── runops.toml                  site・simulator・launcher の設定
+├── cases/
+│   └── flat/                    case.toml と base 入力ファイル
+├── runs/
+│   ├── flat/
+│   │   ├── R20261015-0002--wc0.147/
+│   │   │   ├── manifest.toml    状態・由来・params・ノート
+│   │   │   ├── input/           凍結した入力
+│   │   │   ├── submit/job.sh
+│   │   │   ├── work/            Slurm のログと出力
+│   │   │   └── analysis/
+│   │   └── wc-phiz-scan/        sweep はまとめて 1 階層
+│   ├── _scratch/                smoke / debug（期限付き）
+│   └── _archive/                archive した run
+├── LOG.md                       run をまたぐ結論と次の判断
+├── notes/                       再利用する知見
+└── AGENTS.md, .agents/skills/, .claude/skills/
+```
+
+run は ID が変わらないので、directory を移動してもエージェントは見つけられます。
+`work/` は Git の対象外で、`manifest.toml`、`input/`、`job.sh` は Git で追えます。
+
 ## 対応 simulator
 
 | simulator | package | 状態 |
