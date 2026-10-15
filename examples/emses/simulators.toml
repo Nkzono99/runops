@@ -1,5 +1,0 @@
-[simulators.emses]
-adapter = "emses"
-resolver_mode = "package"
-executable = "mpiemses3D"
-# pip install git+https://github.com/CS12-Laboratory/MPIEMSES3D.git

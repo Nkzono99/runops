@@ -1,6 +1,0 @@
-[simulators.lunar_pic]
-adapter = "lunar_pic_adapter"
-resolver_mode = "local_source"
-source_repo = "/home/user/work/lunar-pic"
-build_command = "make -j"
-executable = "/home/user/work/lunar-pic/build/solver"

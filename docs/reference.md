@@ -1,0 +1,160 @@
+# runops リファレンス
+
+`runops.toml`、`case.toml`、`manifest.toml` の field と、全 command の動作です。
+設計の背景は [SPEC.md](../SPEC.md) にあります。
+
+## runops.toml
+
+project root にあり、`runo` はここを上方向に探して project を特定します。
+
+```toml
+schema = 2
+
+[project]
+name = "lunar-sheath"
+
+[site]
+name = "camphor"
+resource_style = "rsc"            # "standard" | "rsc"
+modules = ["intel/2023.2", "intelmpi/2023.2"]
+stdout = "stdout.%J.log"          # 省略時は work/%j.out
+stderr = "stderr.%J.log"          # 省略時は work/%j.err
+extra_sbatch = []
+setup_commands = []
+
+[site.env]
+OMP_PROC_BIND = "spread"
+
+[simulators.emses]
+adapter = "emses"                 # adapter 名（entry point / adapters/<name>.py / generic）
+package = "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git"
+executable = "mpiemses3D"
+resolver_mode = "package"         # package | local_executable | local_source
+modules = ["hdf5/1.12.2_intel-2023.2-impi"]
+
+[simulators.beach_patched]        # 同じ adapter を複数の build で使い分けてよい
+adapter = "beach"
+resolver_mode = "local_source"
+source_repo = "../BEACH"
+build_command = "./build.sh"
+executable = "build/bin/beach"    # build directory からの相対 path
+
+[launchers.srun]
+kind = "srun"                     # srun | mpirun | mpiexec | none
+use_slurm_ntasks = true
+args = ""
+modules = []
+
+[defaults]
+launcher = "srun"
+scratch_ttl_days = 7
+list_since_days = 30
+```
+
+| resolver_mode | executable の解決 |
+|---|---|
+| `package` | `.venv/bin/<executable>`、無ければ PATH |
+| `local_executable` | 絶対 path、project 相対 path、PATH の順 |
+| `local_source` | `source_repo` の HEAD を `.runops/build/<sim>-<commit>/` にコピーし `build_command` を実行。dirty なら名前に `-dirty-<hash>` が付く |
+
+module は site、launcher、simulator、case の順に結合されます。`generic` adapter では
+`command`（`{executable}` を置換）と `success_marker`（`work/` 内の完了 marker）も使えます。
+未知の key は warning を出して無視します。
+
+## case.toml
+
+`cases/<name>/case.toml` と、同じ directory の base 入力ファイルで case になります。
+`cases/<name>/input/` の中身も run の `input/` にコピーされます。
+
+```toml
+[case]
+name = "flat"
+simulator = "emses"
+launcher = "srun"                 # 省略時は defaults.launcher
+description = "平板シース"
+tags = ["sheath"]
+
+[job]
+partition = "gr20001a"
+walltime = "120:00:00"            # [D-]H:MM:SS
+nodes = 1                         # standard: nodes / ntasks / cpus_per_task
+ntasks = 800
+# processes = 1                   # rsc: --rsc p=processes:t=threads:c=cores
+# threads = 112
+# cores = 112
+# qos, memory, gpus, job_name, extra_sbatch, pre_commands, post_commands, modules
+
+[params]
+"tmgrid.nx" = 4000                # dotted key で base 入力を上書き
+
+[naming.aliases]
+"plasma.phiz" = "angle"           # 自動 label の短縮名
+```
+
+dotted key は `a.b`、配列要素は `species.0.wp` または `species[0].wp` です。
+値の違いは case を増やさず、`runo new --set` や `runo sweep` で run として表します。
+
+## manifest.toml
+
+runops だけが書きます。手で編集しないでください。主な field は次の通りです。
+
+| section | field |
+|---|---|
+| `[run]` | `id`、`label`、`status`、`created_at`、`why`、`scratch`、`expires_at`、`pinned`、`tags`、`status_before_archive` |
+| `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
+| `[origin]` | `case`、`sweep`、`parent_run`、`created_by` |
+| `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
+| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`[[job.attempts]]` |
+| `[params]` | case の params に `--set` を適用した最終値 |
+| `[variation]` | `changed_keys` |
+| `[identity]` | `input_hash` |
+| `[storage]` | `work_purged_at` |
+| `[[notes]]` | `at`、`by`、`text` |
+
+状態は `created → submitted → running → completed | failed | cancelled` と進み、
+終了した run は `archived` にできます。`sync` は Slurm が COMPLETED でも adapter が
+失敗と判定すれば `failed` にします。
+
+## command
+
+全 command は `--help` で option を確認できます。`RUN` には run id、run directory、
+または directory 名の一意な部分文字列を渡せます。
+
+| command | 動作 |
+|---|---|
+| `runo init [SIM...] [--site camphor] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec` |
+| `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度を点検 |
+| `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
+| `runo build SIM [--force]` | `local_source` の simulator を build |
+| `runo context [--json]` | agent 向けの現在地 |
+| `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
+| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit]` | run を 1 つ作る |
+| `runo new --from RUN [--set k=v]... [--continue]` | 既存 run の params から派生。`--continue` は adapter の restart 対応が必要 |
+| `runo sweep CASE --set k=v1,v2 ... [--label] [--limit N] [--apply] [--submit]` | 直積の候補表示。`--apply` で作成 |
+| `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
+| `runo cancel RUN... [-y]` / `runo retry RUN [--submit]` | scancel / failed・cancelled を created に戻す |
+| `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
+| `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--json]` | run 一覧 |
+| `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
+| `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
+| `runo archive RUN... ` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す |
+| `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
+| `runo tidy [--apply] [--only KIND] [--older-than 30d] [--purge-work RUN...]` | 整理候補の表示と実行 |
+| `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |
+
+`list` は既定で active、created、直近 `list_since_days` 日、pinned の run を表示し、
+scratch と archived は表示しません。
+
+`tidy` の候補は次の 5 種類です。
+
+| kind | 条件 | 動作 |
+|---|---|---|
+| `expired-scratch` | 期限切れの scratch run | delete |
+| `stale-failed` | `--older-than` より古い failed / cancelled で、why も note も無い | delete |
+| `old-completed` | `--older-than` の 3 倍より古い completed | archive |
+| `orphan-job` | Slurm が知らない submitted / running | sync |
+| `unused-build` | 非 archived run が参照しない `.runops/build/*` | delete |
+
+pinned の run は `tidy` と `delete` の対象になりません。
+
+exit code は 0 が成功、1 が実行時エラー（sbatch 失敗など）、2 が使い方や設定のエラーです。

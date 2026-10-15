@@ -1,5 +1,3 @@
-"""runops: HPC simulation run management CLI tool."""
+"""runops: run ledger and Slurm job submission for HPC simulation projects."""
 
-from __future__ import annotations
-
-__version__ = "1.3.0"
+__version__ = "2.0.0.dev0"

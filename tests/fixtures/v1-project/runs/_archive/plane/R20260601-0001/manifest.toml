@@ -1,0 +1,19 @@
+[run]
+id = "R20260601-0001"
+status = "completed"
+created_at = "2026-06-01T00:00:00+00:00"
+
+[path]
+run_dir = "@ROOT@/runs/_archive/plane/R20260601-0001"
+bundle_archived_from = "@ROOT@/runs/plane"
+bundle_archived_at = "2026-07-20T00:00:00+00:00"
+
+[origin]
+case = "plane"
+
+[simulator]
+name = "beach"
+adapter = "beach"
+
+[job]
+walltime = "1:00:00"

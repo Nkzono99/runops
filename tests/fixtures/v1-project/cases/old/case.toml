@@ -1,0 +1,6 @@
+[case]
+name = "old"
+simulator = "beach_patched"
+
+[job]
+walltime = "1:00:00"

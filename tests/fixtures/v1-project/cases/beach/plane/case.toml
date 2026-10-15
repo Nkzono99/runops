@@ -1,0 +1,19 @@
+[case]
+name = "plane"
+simulator = "beach"
+launcher = "camphor"
+# keep this comment
+
+[classification]
+model = "sheath"
+submodel = "plane"
+tags = ["2d"]
+
+[job]
+partition = "gr20001a"
+processes = 1
+threads = 8
+cores = 8
+walltime = "1:00:00"
+
+[params]

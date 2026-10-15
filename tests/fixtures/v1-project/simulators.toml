@@ -1,0 +1,12 @@
+[simulators.beach]
+adapter = "beach"
+resolver_mode = "package"
+executable = "beach"
+
+[simulators.beach_patched]
+adapter = "beach"
+resolver_mode = "local_executable"
+executable = "@ROOT@/.runops/work/beach-x-abc/bin/beach"
+
+[simulators.beach_patched.codex_plugins.foo]
+reason = "x"

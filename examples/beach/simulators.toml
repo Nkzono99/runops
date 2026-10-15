@@ -1,5 +1,0 @@
-[simulators.beach]
-adapter = "beach"
-resolver_mode = "package"
-executable = "beach"
-# pip install beach-bem

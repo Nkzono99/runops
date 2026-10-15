@@ -1,327 +1,72 @@
-"""Generic simulator adapter providing reasonable defaults.
+"""Built-in ``generic`` adapter (SPEC §8.4).
 
-This adapter handles simulators that follow common conventions:
-a single executable, a single input file, and standard output
-locations within the ``work/`` directory.
+* Text files in ``input/`` containing Jinja2 markers are rendered with the
+  run params (dotted keys are also exposed as nested objects).
+* ``[simulators.X].command`` is the program command, split with shlex;
+  ``{executable}`` is replaced by the resolved executable.
+* ``[simulators.X].success_marker``: when set, ``work/<marker>`` must exist
+  for a run to count as completed; otherwise Slurm's state decides.
 """
 
 from __future__ import annotations
 
-import json
-import logging
-import shutil
+import shlex
 from pathlib import Path
 from typing import Any
 
-from runops.adapters._provenance import (
-    collect_executable_provenance as _collect_executable_provenance,
-)
-from runops.adapters._runtime import (
-    ExecutableRuntimeDefaults as _ExecutableRuntimeDefaults,
-)
-from runops.adapters._runtime import (
-    resolve_executable_runtime as _resolve_executable_runtime,
-)
-from runops.adapters.base import SimulatorAdapter
+import jinja2
 
-logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Constants
-# ---------------------------------------------------------------------------
-
-INPUT_DIR = "input"
-WORK_DIR = "work"
-ANALYSIS_DIR = "analysis"
-STATUS_DIR = "status"
-SUBMIT_DIR = "submit"
-
-EXIT_CODE_FILE = "exit_code"
-STDOUT_FILE = "stdout.log"
-STDERR_FILE = "stderr.log"
-
-SUMMARY_FILE = "summary.json"
-
-_RUNTIME_DEFAULTS = _ExecutableRuntimeDefaults()
+from runops.adapters.base import RuntimeInfo, SimulatorAdapter, exe_str, set_dotted
 
 
 class GenericAdapter(SimulatorAdapter):
-    """Generic adapter that works for many simple simulators.
+    name = "generic"
 
-    Conventions:
-    - Input files live in ``<run_dir>/input/``.
-    - Execution happens in ``<run_dir>/work/``.
-    - Success is determined by a zero exit code written to
-      ``<run_dir>/work/exit_code``.
+    def __init__(self) -> None:
+        self.sim_config: dict[str, Any] = {}
 
-    Class Attributes:
-        adapter_name: Registry key for this adapter.
-    """
+    def configure(self, sim_config: dict[str, Any]) -> None:
+        self.sim_config = dict(sim_config)
 
-    adapter_name: str = "generic"
-
-    # ------------------------------------------------------------------
-    # SimulatorAdapter interface
-    # ------------------------------------------------------------------
-
-    @property
-    def name(self) -> str:
-        """Return the canonical name of this adapter."""
-        return self.adapter_name
-
-    def render_inputs(
-        self,
-        case_data: dict[str, Any],
-        run_dir: Path,
-    ) -> list[str]:
-        """Copy input files listed in *case_data* into the run directory.
-
-        If ``case_data["params"]`` exists, it is serialised as a JSON file
-        named ``params.json`` inside ``<run_dir>/input/``.
-
-        If ``case_data["case"]["input_files"]`` is a list of source paths,
-        each file is copied into ``<run_dir>/input/``.
-
-        Args:
-            case_data: Merged case/survey parameters.
-            run_dir: Target run directory.
-
-        Returns:
-            List of relative paths (from *run_dir*) to generated input files.
-
-        Raises:
-            ValueError: If required case metadata is missing.
-        """
-        case_section = case_data.get("case", {})
-        if not case_section:
-            msg = "case_data must contain a 'case' section"
-            raise ValueError(msg)
-
-        input_dir = run_dir / INPUT_DIR
-        input_dir.mkdir(parents=True, exist_ok=True)
-
-        created: list[str] = []
-
-        # Serialise parameters
-        params = case_data.get("params")
-        if params is not None:
-            params_file = input_dir / "params.json"
-            params_file.write_text(json.dumps(params, indent=2))
-            created.append(params_file.relative_to(run_dir).as_posix())
-
-        # Copy explicit input files
-        source_files: list[str] = case_section.get("input_files", [])
-        for src_str in source_files:
-            src = Path(src_str)
-            if not src.is_file():
-                logger.warning("Input file not found, skipping: %s", src)
-                continue
-            dest = input_dir / src.name
-            shutil.copy2(src, dest)
-            created.append(dest.relative_to(run_dir).as_posix())
-
-        return created
-
-    def resolve_runtime(
-        self,
-        simulator_config: dict[str, Any],
-        resolver_mode: str,
-    ) -> dict[str, Any]:
-        """Resolve the simulator runtime from *simulator_config*.
-
-        Supports three resolver modes defined in SPEC section 16:
-
-        * ``package`` -- looks up ``executable`` in ``$PATH``.
-        * ``local_source`` -- uses ``source_repo`` and optionally runs
-          ``build_command`` to produce ``executable``.
-        * ``local_executable`` -- uses a fully-qualified ``executable``
-          path directly.
-
-        Args:
-            simulator_config: Simulator section from ``simulators.toml``.
-            resolver_mode: One of ``"package"``, ``"local_source"``,
-                ``"local_executable"``.
-
-        Returns:
-            Runtime information dictionary with at least ``executable``
-            and ``resolver_mode`` keys.
-
-        Raises:
-            ValueError: If *resolver_mode* is unsupported or required keys
-                are missing.
-        """
-        return _resolve_executable_runtime(
-            simulator_config,
-            resolver_mode,
-            defaults=_RUNTIME_DEFAULTS,
-            which=shutil.which,
-            start_dir=Path.cwd(),
-        )
-
-    def build_program_command(
-        self,
-        runtime_info: dict[str, Any],
-        run_dir: Path,
-    ) -> list[str]:
-        """Build ``[executable, ...]`` for the simulator.
-
-        The generic adapter simply returns the executable path.  If an
-        ``input/params.json`` file exists it is passed as the first
-        positional argument.
-
-        Args:
-            runtime_info: Output from :meth:`resolve_runtime`.
-            run_dir: The run directory.
-
-        Returns:
-            Command as a list of strings (no MPI launcher prefix).
-        """
-        executable: str = runtime_info.get("executable", "")
-        if not executable:
-            msg = "runtime_info must contain 'executable'"
-            raise ValueError(msg)
-
-        cmd = [executable]
-        params_file = run_dir / INPUT_DIR / "params.json"
-        if params_file.exists():
-            cmd.append(str(params_file))
-        return cmd
-
-    def detect_outputs(self, run_dir: Path) -> dict[str, Any]:
-        """Scan ``<run_dir>/work/`` for output files.
-
-        Args:
-            run_dir: The run directory.
-
-        Returns:
-            Mapping of descriptive label to relative path strings.
-        """
-        work_dir = run_dir / WORK_DIR
-        if not work_dir.is_dir():
-            logger.warning("work/ directory not found in %s", run_dir)
-            return {}
-
-        outputs: dict[str, Any] = {}
-        stdout = work_dir / STDOUT_FILE
-        stderr = work_dir / STDERR_FILE
-
-        if stdout.exists():
-            outputs["stdout"] = stdout.relative_to(run_dir).as_posix()
-        if stderr.exists():
-            outputs["stderr"] = stderr.relative_to(run_dir).as_posix()
-
-        # Collect remaining files (excluding status markers)
-        for path in sorted(work_dir.iterdir()):
-            if path.name in {STDOUT_FILE, STDERR_FILE, EXIT_CODE_FILE}:
-                continue
-            if path.is_file():
-                outputs[path.stem] = path.relative_to(run_dir).as_posix()
-            elif path.is_dir():
-                outputs[path.name] = path.relative_to(run_dir).as_posix()
-
-        return outputs
-
-    def probe_readiness(self, run_dir: Path) -> dict[str, Any]:
-        """Return a bounded readiness observation for generic runs."""
+    def case_template(self) -> dict[str, str]:
         return {
-            "simulator_status": self.detect_status(run_dir),
-            "outputs": {},
-            "warnings": [],
+            "input.txt": "# rendered with Jinja2, e.g. value = {{ params['x'] | default(1) }}\n"
         }
 
+    def render_inputs(self, params: dict[str, Any], run_dir: Path) -> list[str]:
+        nested: dict[str, Any] = {}
+        for key, value in params.items():
+            try:
+                set_dotted(nested, key, value)
+            except ValueError:
+                nested[key] = value
+        env = jinja2.Environment(undefined=jinja2.StrictUndefined, keep_trailing_newline=True)
+        written: list[str] = []
+        input_dir = run_dir / "input"
+        for path in sorted(p for p in input_dir.rglob("*") if p.is_file()):
+            try:
+                text = path.read_text(encoding="utf-8")
+            except (UnicodeDecodeError, OSError):
+                continue
+            if "{{" not in text and "{%" not in text:
+                continue
+            try:
+                rendered = env.from_string(text).render(params=params, **nested)
+            except jinja2.TemplateError as exc:
+                raise ValueError(f"{path.name}: template error: {exc}") from exc
+            path.write_text(rendered, encoding="utf-8")
+            written.append(path.relative_to(run_dir).as_posix())
+        return written
+
+    def build_command(self, runtime: RuntimeInfo, run_dir: Path) -> list[str]:
+        command = str(self.sim_config.get("command", "")).strip()
+        executable = exe_str(runtime.executable)
+        if not command:
+            return [executable]
+        return [part.replace("{executable}", executable) for part in shlex.split(command)]
+
     def detect_status(self, run_dir: Path) -> str:
-        """Determine simulation status from ``work/exit_code`` and logs.
-
-        The detection logic is:
-
-        1. If ``work/exit_code`` exists and contains ``0``, return
-           ``"completed"``.
-        2. If ``work/exit_code`` exists with a non-zero value, return
-           ``"failed"``.
-        3. If ``work/`` contains output files but no exit code, return
-           ``"running"``.
-        4. Otherwise return ``"unknown"``.
-
-        Args:
-            run_dir: The run directory.
-
-        Returns:
-            A status string.
-        """
-        work_dir = run_dir / WORK_DIR
-        exit_code_path = work_dir / EXIT_CODE_FILE
-
-        if exit_code_path.exists():
-            try:
-                code = int(exit_code_path.read_text(encoding="utf-8").strip())
-            except (ValueError, OSError):
-                return "unknown"
-            return "completed" if code == 0 else "failed"
-
-        # No exit code yet -- check whether work/ has any content
-        if work_dir.is_dir() and any(work_dir.iterdir()):
-            return "running"
-
-        return "unknown"
-
-    def summarize(self, run_dir: Path) -> dict[str, Any]:
-        """Produce a basic summary of the run.
-
-        For the generic adapter this includes:
-        - detected outputs (file listing)
-        - detected status
-        - exit code (if available)
-
-        Args:
-            run_dir: The run directory.
-
-        Returns:
-            Summary dictionary.
-        """
-        summary: dict[str, Any] = {}
-        errors: list[str] = []
-
-        try:
-            summary["status"] = self.detect_status(run_dir)
-        except Exception as exc:
-            errors.append(f"detect_status: {exc}")
-            summary["status"] = "unknown"
-
-        try:
-            summary["outputs"] = self.detect_outputs(run_dir)
-        except Exception as exc:
-            errors.append(f"detect_outputs: {exc}")
-            summary["outputs"] = {}
-
-        exit_code_path = run_dir / WORK_DIR / EXIT_CODE_FILE
-        if exit_code_path.exists():
-            try:
-                summary["exit_code"] = int(
-                    exit_code_path.read_text(encoding="utf-8").strip()
-                )
-            except (ValueError, OSError) as exc:
-                errors.append(f"exit_code: {exc}")
-
-        if errors:
-            summary["errors"] = errors
-
-        return summary
-
-    def collect_provenance(
-        self,
-        runtime_info: dict[str, Any],
-    ) -> dict[str, Any]:
-        """Collect provenance information from *runtime_info*.
-
-        Gathers:
-        - resolver mode
-        - executable path and SHA-256 hash (if the file exists)
-        - source repository git commit (if ``local_source`` mode)
-
-        Args:
-            runtime_info: Output from :meth:`resolve_runtime`.
-
-        Returns:
-            Provenance dictionary.
-        """
-        return _collect_executable_provenance(runtime_info)
+        marker = str(self.sim_config.get("success_marker", "")).strip()
+        if not marker:
+            return "unknown"
+        return "completed" if (run_dir / "work" / marker).exists() else "failed"

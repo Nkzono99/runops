@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "runops"
-version = "1.3.0"
-description = "HPC simulation run management CLI tool for Slurm-based environments"
+version = "2.0.0.dev0"
+description = "Run ledger and Slurm job submission for HPC simulation projects"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
@@ -17,18 +17,14 @@ dependencies = [
     "tomlkit>=0.13",
     "rich>=13.0",
     "jinja2>=3.1",
-    "mcp>=1.27.1",
 ]
 
 [project.scripts]
-runo = "runops.cli.main:app"
-runops = "runops.cli.main:runops_app"
+runo = "runops.cli:main"
+runops = "runops.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/runops"]
-
-[tool.hatch.build.targets.wheel.force-include]
-"README.md" = "runops/_data/README.md"
 
 [dependency-groups]
 dev = [
@@ -41,14 +37,8 @@ dev = [
 
 [tool.ruff]
 target-version = "py310"
-line-length = 88
+line-length = 100
 src = ["src", "tests"]
-extend-exclude = [
-    "src/runops/templates/scaffold/vscode_settings.json",
-    # Bundled skill helper scripts are copied into generated projects and are
-    # validated by their skill-level smoke tests, not runops's lint profile.
-    "src/runops/templates/skills/*/scripts/*.py",
-]
 
 [tool.ruff.lint]
 select = [
@@ -71,39 +61,24 @@ ignore = [
     "UP045",  # Optional[X] required for typer compatibility with Python 3.10
 ]
 
+[tool.ruff.lint.per-file-ignores]
+"src/runops/harness.py" = ["E501"]
+"tests/*" = ["E501", "N818", "TC002"]
+
 [tool.ruff.lint.isort]
 known-first-party = ["runops"]
 
 [tool.mypy]
 python_version = "3.10"
-strict = true
-warn_return_any = true
-warn_unused_configs = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+warn_unused_ignores = true
+ignore_missing_imports = true
 mypy_path = "src"
-# Scaffolded scripts under templates/ are reference implementations copied into
-# user projects.  They may target the generated project environment rather than
-# runops's strict internal mypy profile.
-exclude = [
-    "^src/runops/templates/adapters/.*/summarize\\.py$",
-    "^src/runops/templates/skills/.*/scripts/.*\\.py$",
-]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-[tool.runops.coverage-policy.modules]
-"src/runops/core/manifest.py" = 95
-"src/runops/application/execution/submission/apply.py" = 90
-"src/runops/application/execution/submission/claim.py" = 90
-"src/runops/application/execution/submission/planning.py" = 90
-"src/runops/core/state.py" = 90
-"src/runops/core/event_log.py" = 80
-"src/runops/slurm/submit.py" = 90
-"src/runops/adapters/contrib/beach/adapter.py" = 80
-"src/runops/adapters/contrib/beach/diagnostics.py" = 80
-"src/runops/application/analysis/story/models.py" = 95
-"src/runops/application/analysis/story/schema.py" = 90
-"src/runops/application/analysis/story/audit.py" = 95
-"src/runops/application/analysis/story/sources.py" = 80
-"src/runops/application/analysis/story/render.py" = 90
-"src/runops/application/analysis/story/workspace.py" = 80
+[tool.coverage.run]
+# Exercised from copies inside test projects (project-local adapters).
+omit = ["src/runops/legacy_adapters/*"]

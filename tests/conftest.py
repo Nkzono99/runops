@@ -1,105 +1,126 @@
-"""Common test fixtures for runops tests."""
+"""Shared fixtures: a generic project and a fake Slurm."""
 
 from __future__ import annotations
 
-import subprocess
+import re
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
 
 import pytest
 
+from runops import slurm
+from runops.cli import main
+from runops.ops.setup import init_project
+from runops.project import Project
+from runops.slurm import CommandResult
 
-@pytest.fixture()
-def tmp_project(tmp_path: Path) -> Path:
-    """Create a minimal runops project directory structure.
+CASE_TOML = """\
+[case]
+name = "demo"
+simulator = "generic"
+tags = ["t1"]
 
-    Returns:
-        Path to the temporary project root.
-    """
-    (tmp_path / "runops.toml").write_text('[project]\nname = "test-project"\n')
-    (tmp_path / "cases").mkdir()
-    (tmp_path / "runs").mkdir()
-    return tmp_path
+[job]
+partition = "gr1"
+walltime = "1:00:00"
+ntasks = 4
 
-
-@pytest.fixture()
-def mock_init_external_processes(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Skip slow external init side effects in CLI scaffold tests."""
-    monkeypatch.setattr(
-        "runops.cli.init.command._clone_doc_repos",
-        lambda *_args, **_kwargs: ([], []),
-    )
-
-    real_run = subprocess.run
-
-    def fake_subprocess_run(
-        args: Any,
-        *run_args: Any,
-        **run_kwargs: Any,
-    ) -> subprocess.CompletedProcess[Any]:
-        if isinstance(args, (list, tuple)) and args and args[0] == "git":
-            command = args[1] if len(args) > 1 else ""
-            cwd = run_kwargs.get("cwd")
-            if command == "init":
-                if cwd is not None:
-                    (Path(cwd) / ".git").mkdir(parents=True, exist_ok=True)
-                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-            if command in {"add", "commit"}:
-                return subprocess.CompletedProcess(args, 0, stdout="", stderr="")
-        return real_run(args, *run_args, **run_kwargs)
-
-    monkeypatch.setattr(subprocess, "run", fake_subprocess_run)
+[params]
+x = 1
+name = "a"
+"""
 
 
-@pytest.fixture()
-def sample_case_data() -> dict[str, Any]:
-    """Return sample case.toml data as a dictionary."""
-    return {
-        "case": {
-            "name": "test_case",
-            "simulator": "test_sim",
-            "launcher": "slurm_srun",
-            "description": "A test case",
-        },
-        "job": {
-            "partition": "debug",
-            "nodes": 1,
-            "ntasks": 4,
-            "walltime": "00:10:00",
-        },
-        "params": {
-            "nx": 64,
-            "ny": 64,
-            "dt": 1.0e-6,
-        },
-    }
+@dataclass
+class FakeSlurm:
+    """Records commands; job states are set per job id."""
+
+    next_id: int = 1000
+    states: dict[str, str] = field(default_factory=dict)  # job id -> state
+    unknown: set[str] = field(default_factory=set)
+    commands: list[list[str]] = field(default_factory=list)
+    fail_sbatch: bool = False
+
+    def __call__(self, cmd: list[str]) -> CommandResult:
+        self.commands.append(cmd)
+        tool = cmd[0]
+        if tool == "sbatch":
+            if self.fail_sbatch:
+                return CommandResult(1, "", "sbatch: error: invalid partition")
+            self.next_id += 1
+            job = str(self.next_id)
+            self.states[job] = "PENDING"
+            return CommandResult(0, f"Submitted batch job {job}\n", "")
+        if tool == "scancel":
+            self.states[cmd[1]] = "CANCELLED"
+            return CommandResult(0, "", "")
+        if tool == "squeue":
+            job = cmd[cmd.index("--job") + 1]
+            state = self.states.get(job, "")
+            if job in self.unknown or state not in ("PENDING", "RUNNING"):
+                return CommandResult(0, "", "")
+            return CommandResult(0, state + "\n", "")
+        if tool == "sacct":
+            job = cmd[cmd.index("--jobs") + 1]
+            if job in self.unknown or job not in self.states:
+                return CommandResult(0, "", "")
+            return CommandResult(
+                0,
+                f"{job}|{self.states[job]}|0:0\n{job}.batch|{self.states[job]}|0:0\n",
+                "",
+            )
+        raise AssertionError(f"unexpected command {cmd}")
+
+    @property
+    def last_job(self) -> str:
+        return str(self.next_id)
 
 
-@pytest.fixture()
-def sample_manifest_data() -> dict[str, Any]:
-    """Return sample manifest.toml data as a dictionary."""
-    return {
-        "run": {
-            "id": "R20260327-0001",
-            "display_name": "test_run",
-            "status": "created",
-            "created_at": "2026-03-27T13:00:00+09:00",
-        },
-        "origin": {
-            "case": "test_case",
-            "survey": "",
-            "parent_run": "",
-        },
-        "simulator": {
-            "name": "test_sim",
-            "adapter": "test_adapter",
-        },
-        "job": {
-            "scheduler": "slurm",
-            "job_id": "",
-            "partition": "debug",
-            "nodes": 1,
-            "ntasks": 4,
-            "walltime": "00:10:00",
-        },
-    }
+@pytest.fixture
+def fake_slurm(monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
+    fake = FakeSlurm()
+    monkeypatch.setattr(slurm, "default_runner", fake)
+    return fake
+
+
+@pytest.fixture
+def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    root = tmp_path / "proj"
+    init_project(root, ["generic"], install=False)
+    case = root / "cases" / "demo"
+    case.mkdir(parents=True)
+    (case / "case.toml").write_text(CASE_TOML)
+    (case / "input.txt").write_text("x = {{ x }}\nname = {{ name }}\n")
+    monkeypatch.chdir(root)
+    monkeypatch.setenv("COLUMNS", "250")
+    monkeypatch.setenv("RUNOPS_ACTOR", "test")
+    return root
+
+
+@pytest.fixture
+def project(project_dir: Path) -> Project:
+    return Project.open(project_dir)
+
+
+class CliResult:
+    def __init__(self, code: int, out: str, err: str) -> None:
+        self.code = code
+        self.out = out
+        self.err = err
+
+    def run_ids(self) -> list[str]:
+        return re.findall(r"created (R\d{8}-\d{4})", self.out)
+
+
+@pytest.fixture
+def cli(capsys: pytest.CaptureFixture[str]):  # type: ignore[no-untyped-def]
+    def run(*args: str) -> CliResult:
+        code = 0
+        try:
+            main(list(args))
+        except SystemExit as exc:
+            code = int(exc.code or 0)
+        captured = capsys.readouterr()
+        return CliResult(code, captured.out, captured.err)
+
+    return run

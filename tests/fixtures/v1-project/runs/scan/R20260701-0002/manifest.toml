@@ -1,0 +1,24 @@
+[run]
+id = "R20260701-0002"
+status = "failed"
+created_at = "2026-07-01T01:00:00+00:00"
+
+[path]
+run_dir = "@ROOT@/runs/scan/R20260701-0002"
+
+[origin]
+case = "old"
+
+[simulator]
+name = "beach_patched"
+adapter = "beach"
+
+[simulator_source]
+executable = "@ROOT@/.runops/work/beach-x-abc/bin/beach"
+
+[launcher]
+name = "camphor"
+
+[job]
+job_id = "101"
+walltime = "1:00:00"

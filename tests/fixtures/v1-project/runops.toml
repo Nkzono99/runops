@@ -1,0 +1,5 @@
+[project]
+name = "fixture_v1"
+
+[knowledge]
+enabled = true

@@ -1,7 +1,0 @@
-[launchers.camphor]
-type = "srun"
-use_slurm_ntasks = true
-resource_style = "rsc"
-modules = ["intel/2023.2", "intelmpi/2023.2"]
-stdout = "stdout.%J.log"
-stderr = "stderr.%J.log"
