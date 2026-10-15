@@ -1,19 +1,6 @@
 ---
 name: check
-description: "Run all quality checks (ruff format, ruff check, mypy, pytest, branch coverage) on the changed files. Report pass/fail for each step. If anything fails, show the error and suggest a fix."
+description: "Run runops quality gates (ruff format, ruff check, mypy, pytest with branch coverage) after code changes, and the extra checks for filesystem, adapter, or migration changes. Report pass/fail per step and fix failures."
 ---
 
-# 品質チェック実行
-
-変更したファイルに対して全品質ゲートを実行し、結果を報告する。
-
-```bash
-uv run ruff format --check src/ tests/
-uv run ruff check src/ tests/
-uv run mypy src/
-uv run pytest tests/ -x -q
-uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
-uv run python -m runops.application.operator.coverage_policy coverage.json
-```
-
-失敗したステップがあればエラーを表示し、修正案を提示する。
+Read `.agents/skills/check/SKILL.md` and follow it. That file is the single source for this skill; files it references are relative to `.agents/skills/check/`.

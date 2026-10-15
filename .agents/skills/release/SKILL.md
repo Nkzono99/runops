@@ -5,7 +5,7 @@ description: "Prepare and publish a new runops release from main. Bump version, 
 
 # runops リリース
 
-`$release` は新しいバージョンの runops をリリースするスキル。
+新しいバージョンの runops をリリースするスキル（Codex では `$release`、Claude Code では `/release`）。
 
 ## リリースノート方針
 
@@ -17,16 +17,17 @@ description: "Prepare and publish a new runops release from main. Bump version, 
 ## 使い方
 
 ```
-$release patch      # 0.2.1 -> 0.2.2
-$release minor      # 0.2.1 -> 0.3.0
-$release major      # 0.2.1 -> 1.0.0
-$release 0.3.0      # 明示的にバージョン指定
+release patch      # 0.2.1 -> 0.2.2
+release minor      # 0.2.1 -> 0.3.0
+release major      # 0.2.1 -> 1.0.0
+release 0.3.0      # 明示的にバージョン指定
 ```
 
 引数なしで呼んだ場合は、変更内容から bump レベルを自動判定し、
 main release commit → main push → CI 確認 → tag → GitHub Release → publish 確認まで一気通貫で実行する。
 
-現在は個人開発のため main-first。release commit は `main` 上で作り、
+現在は個人開発のため main-first。v2 の作業 branch（`v2`）は、最初の 2.0.0 リリース前に
+`main` へ fast-forward または merge しておく。release commit は `main` 上で作り、
 品質ゲートと CI green を確認してから、その release commit に tag を切る。
 `--force`、non-fast-forward push、`--no-verify` は使わない。
 
@@ -42,6 +43,7 @@ git status --porcelain
 uv run pytest tests/ -x -q
 
 # lint / type check
+uv run ruff format --check src/ tests/
 uv run ruff check src/ tests/
 uv run mypy src/
 ```

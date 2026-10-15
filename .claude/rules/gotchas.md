@@ -1,66 +1,36 @@
-# Gotchas (よくあるミス)
+# Gotchas
 
-## Circular imports
+## KUDPC の Lustre は RENAME_NOREPLACE に未対応
 
-`cli/init/workflow.py` は harness の plugin recommendation helper を使う。
-harness 側から `cli/init/command.py` や `workflow.py` を import するとループするため、
-harness は templates と adapters.registry を依存の入口にする。
+`/LARGE0`、`/LARGE1` では `renameat2(RENAME_NOREPLACE)` が EINVAL を返す。
+`util.move_noreplace` は存在確認 + `rename` に落とす。`/tmp` 上のテストだけでは
+この経路を通らないので、filesystem を触る変更は `--basetemp=/LARGE0/...` でも確認する。
 
-## `_write_if_missing` のセマンティクス
+## importlib.metadata のキャッシュ
 
-`_write_if_missing` は **ファイルが存在しなければ書く**。
-既存ファイルは一切上書きしない。テストでファイル上書きを期待すると失敗する。
+`.venv` の dist-info 一覧は directory の mtime でキャッシュされる。Lustre の mtime は秒単位のため、
+同じ秒に入れ替えた package を見落とす。`registry._entry_point` は探索前に
+`importlib.invalidate_caches()` を呼ぶ。`.pth`（editable install）を効かせるため
+`sys.path.append` ではなく `site.addsitedir` を使う。
 
-## load_static vs get_jinja_env
+## project ローカル adapter の module 名
 
-- `load_static("path")` — そのまま返す (変数展開なし)
-- `get_jinja_env().get_template("path")` — Jinja2 レンダリングが必要な場合
+`adapters/X.py` は `runops_project_adapters.X` として読み込まれる。同じ process で別 project を
+開くと `sys.modules` が上書きされる（テストでは問題にならないが、長寿命 process では注意）。
 
-テンプレートに `{{` が含まれないなら `load_static` で十分。
+## typer の `standalone_mode=False`
 
-## tomllib vs tomli
+`main()` は `app(..., standalone_mode=False)` で呼ぶため、`typer.Exit` は例外ではなく戻り値の
+終了コードになる。`--version` の callback も同じ経路を通る。
 
-Python 3.11+ は `tomllib` が標準。3.10 では `tomli` を使う。
-ファイル先頭の `sys.version_info` 分岐を踏襲すること。
+## ログインノードでの実行
 
-## python vs python3
+pytest は軽量なのでログインノードで実行してよい。simulator の build（`runo build`、
+`local_source`）や他 repo の重いテストは、各 repo の規約に従い計算ノード（`tssrun`）で行う。
 
-この環境では `python` コマンドが無いことがある。
-ワンライナーや検証には `uv run python` か `python3` を使う。
+## v1 project を触るとき
 
-## settings.json と settings.local.json
-
-- `.claude/settings.json` — Git 管理。チーム共有の permissions / model
-- `.claude/settings.local.json` — .gitignore 済。個人の許可パターン
-
-local が team を **マージ上書き** する。同じキーを両方に書くと local が勝つ。
-
-## Adapter の pip_packages / doc_repos
-
-Adapter が返すリストは **累積** (重複排除) される。
-同じ package を複数 adapter が返しても 1 回だけ install される。
-
-## バージョン二重管理
-
-`pyproject.toml` の `version` と `src/runops/__init__.py` の `__version__` は
-**必ず同時に更新する**。片方だけ変えるとランタイム (`runops --version`) と
-PyPI パッケージのバージョンがずれる。`/release` スキルを使えば自動で両方更新される。
-
-## release の commit / tag 順序
-
-release commit は `main` 上で作り、`git push origin main` 後に CI green を確認する。
-tag はその `main` の release commit に `git tag -a` で付ける。
-
-tag 作成と `git push origin vX.Y.Z` を並列に走らせると、tag が古い commit を指したまま
-publish されることがある。
-
-## read_text() の encoding
-
-`Path.read_text()` は `encoding` 引数を省略するとシステムロケール依存になる。
-日本語を含むファイルを読むときは必ず `encoding="utf-8"` を明示する。
-
-## ハーネス lock
-
-`harness.lock` は **テンプレートの hash** を記録する。
-ファイルの hash ではない。比較は「disk hash == lock hash」→ unedited。
-lock がない旧プロジェクトでは全ファイルが "edited" 扱いになる。
+実運用の v1 project（例: `~/large1/project_dust_release`）には `runo migrate-v1 --dry-run` だけを
+実行する。適用は `work/`、`.venv`、`refs/`、`materials/` を除いたコピーで行う。v1 の
+`.runops/work/<build>/src` は simulator repo の git worktree のことがある（migrate が
+`git worktree repair` する）。

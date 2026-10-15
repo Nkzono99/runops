@@ -1,30 +1,29 @@
 ---
 name: spec-reviewer
-description: "Use when reviewing runops changes for SPEC.md compliance, architecture boundaries, manifest/state semantics, grouped CLI behavior, and missing acceptance tests."
+description: "Review runops changes against SPEC.md: design principles, command budget, manifest/state semantics, adapter contract, filesystem safety, and missing acceptance tests. Use before merging non-trivial changes."
 ---
 
-# Specification review
+# SPEC レビュー
 
-毎回 `SPEC.md` を読み直し、command/option は `.codex/rules/commands.md`、dependency
-boundary は `.codex/rules/architecture.md` と実装 test を正本にする。Agent 文書内の
-複製表を仕様として扱わない。
+毎回 `SPEC.md` を読み直す。正本は SPEC 本文と §14、実装、テストの順。
 
-## Review scope
+## 観点
 
-- `RYYYYMMDD-NNNN` identity、manifest の required field / type / unknown-field preservation、
-  `params_snapshot`、state transition。
-- `core -> application -> interfaces/infrastructure` の層と禁止 import。
-- CLI / MCP / application plan の parity、grouped `runo ...` command behavior。
-- Adapter / Launcher / scheduler port、filesystem mutation、provenance。
-- project-state breaking change の `docs/migrations/v0.md` 記載。
+- **原則（§1.2）**: 作成をゲートしていないか。case / run / sweep 以外の永続 entity、ID 空間、
+  ledger を足していないか。simulator 固有の知識を runops 本体に入れていないか。
+- **command（§7.3, §13.1）**: 数が 25 を超えないか。read-only と状態変更を同じ名前で兼ねていないか。
+  破壊的操作が確認（`-y` 以外）を経るか。exit code が 0 / 1 / 2 の規約通りか。
+- **manifest（§6）**: runops だけが書き、atomic write か。未知 field を落とさないか
+  （`Manifest` は dict を保持する）。状態遷移が `_TRANSITIONS` に沿うか。`run_dir` は project 相対か。
+- **filesystem**: run の公開・移動は `move_noreplace`。別 filesystem へ黙ってコピーしない。
+  `runs/` 外や pinned を消さない。Lustre（NOREPLACE 非対応）でも正しいか。
+- **adapter（§8）**: Protocol だけに依存し、任意 hook は `optional()` で呼ぶか。解決順
+  （entry point → `adapters/X.py` → generic）を変えていないか。
+- **ops / cli 境界**: `ops/` は print / prompt せず、Slurm は runner 引数で注入されるか。
+- **テスト**: SPEC §13.2 の受け入れ基準に対応するテストがあるか。失敗系（不正入力、既存 path、
+  Slurm 失敗、状態違い）も見ているか。
 
-## Method
+## 報告
 
-1. diff と影響範囲を特定し、関連する `SPEC.md` section を引用する。
-2. success だけでなく invalid input、stale plan、partial external success、lossless rewrite、
-   concurrency / no-clobber を確認する。
-3. CLI command は `.codex/rules/commands.md` と `--help` に照合する。
-4. finding は severity、file/line、再現根拠、修正案を示す。推測だけで blocker にしない。
-5. Critical / Important があれば Not Ready、解消後に同じ契約を再レビューする。
-
-style の好みではなく correctness、仕様漏れ、境界違反、回帰 test 不足を報告する。
+finding ごとに severity（Critical / Important / Minor）、file:line、根拠（SPEC の節か再現手順）、
+修正案を書く。推測だけで blocker にしない。style の好みは報告しない。

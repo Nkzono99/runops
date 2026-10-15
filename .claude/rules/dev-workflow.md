@@ -2,59 +2,31 @@
 
 ## 品質ゲート
 
-コードを変更したら、コミット前に以下を通すこと:
+コミット前に `check` skill の手順を通す。CI（`.github/workflows/ci.yml`）も同じ
+ruff format / ruff check / mypy / pytest（branch coverage 80%）を Python 3.10–3.13 で実行する。
 
-```bash
-uv run ruff format --check src/ tests/
-uv run ruff check src/ tests/
-uv run mypy src/
-uv run pytest tests/ -x -q
-uv run pytest --cov=runops --cov-branch --cov-report=term-missing --cov-report=json:coverage.json --cov-fail-under=80
-uv run python -m runops.application.operator.coverage_policy coverage.json
-```
+## コーディング
 
-CI でも同じチェックと分岐込み coverage floor が走る。ruff format 違反は自動修正可 (`uv run ruff format src/ tests/`)。
+- Python 3.10+。`tomllib` は `runops.util.tomllib` を使う（3.10 は `tomli`）。
+- 型ヒントを付ける（mypy は `disallow_untyped_defs`）。line length 100。
+- 新しい command / option / field は先に `SPEC.md` を更新し、`sync-docs` skill の表に沿って
+  文書と skill を揃える。command は合計 25 を超えない。
+- 新しい永続 entity、ID 空間、ledger、作成前のゲートを足さない（SPEC §1.2）。
 
-## コーディング規約
+## テスト
 
-- Python 3.10+ (match 文OK、`X | Y` 型ユニオンOK)
-- docstring は Google style、ただし自明なものに無理に書かない
-- mypy strict: `Any` の使い捨てを避け、型ヒントを明示する
-- line length 88 (ruff 既定)
-- テストは `tests/test_<package>/test_<module>.py` に配置
-- CLI テストは `typer.testing.CliRunner` 経由
-- Slurm 依存はモック化 (`subprocess.run` を monkeypatch)
-- TOML fixture は `tests/fixtures/` に配置
+- 受け入れ基準（SPEC §13.2）ごとにテストがある。挙動を変えたら対応するテストを直す。
+- CLI は `tests/conftest.py` の `cli` fixture（`runops.cli.main` を呼び exit code と出力を返す）、
+  Slurm は `fake_slurm`、project は `project_dir`（generic simulator と `demo` case）を使う。
+- job.sh は `tests/golden/`、v1 移行は `tests/fixtures/v1-project/` を使う。
+- 実際の Slurm、ネットワーク、計算ノードを必要とするテストを書かない。
 
-## テスト方針
+## Git
 
-- 新機能 / バグ修正には対応するテストを書く
-- Adapter / Launcher は contract test で抽象メソッドの網羅を確認
-- CLI テストは exit code + stdout/stderr を検証
-- `_write_if_missing` 等の冪等ヘルパーは「2 回呼んでも壊れない」ことを確認
-
-## Git ルール
-
-- 1 コミット = 1 論理変更
-- commit message は英語推奨 (`fix:`, `feat:`, `refactor:`, `test:`, `docs:`)
-- 現在は個人開発のため main-first。通常作業は `main` で行い、品質ゲート後に `origin/main` へ fast-forward / direct push する
-- 大きな設計レビュー、共同作業、実験的な変更だけ `codex/...`, `feature/...`, `fix/...` などの branch / PR に分ける
-- GitHub ruleset は default branch の削除と non-fast-forward だけを防ぐ。CI は push 後にも走るため、失敗したら同じ `main` 上で修正 commit を積む
-- `--no-verify` / `--force` は使わない
+- 1 コミット 1 論理変更。message は英語の Conventional Commits（`feat:`, `fix:`, `docs:` ...）。
+- main-first。大きな変更だけ branch を切る。`--no-verify`、`--force`、`git reset --hard` は使わない。
+- コミットや push はユーザーの依頼があるときだけ行う。
 
 ## リリース
 
-`/release` スキルで実施する。手順の概要:
-
-1. 品質ゲート通過を確認
-2. `pyproject.toml` と `src/runops/__init__.py` のバージョンを **同時に** 更新
-3. 日本語のリリースノート草案を作る
-4. `main` 上で `git commit -m "chore: bump version to X.Y.Z"` を作成
-5. `git push origin main` 後、CI green を確認する
-6. その release commit に `git tag -a vX.Y.Z` を切る
-7. `git push origin vX.Y.Z` を実行し、`Publish to PyPI` を確認する
-8. GitHub Release 本文も日本語で作成する
-
-tag は必ず `main` の release commit に付ける。`git pull --ff-only origin main`、
-`git tag -a`、`git push origin vX.Y.Z` は並列化しない。tag が release commit
-以外を指すと publish が壊れる。
+`release` skill に従う。`pyproject.toml` と `src/runops/__init__.py` の version を同時に更新する。

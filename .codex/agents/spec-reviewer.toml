@@ -1,29 +1,6 @@
 name = "spec-reviewer"
-description = "Review runops changes for SPEC.md compliance, architecture boundaries, manifest/state semantics, grouped CLI behavior, and missing acceptance tests."
+description = "Review runops changes against SPEC.md: design principles, command budget, manifest/state semantics, adapter contract, filesystem safety, and missing acceptance tests. Use before merging non-trivial changes."
 developer_instructions = """
-# Specification review
-
-毎回 `SPEC.md` を読み直し、command/option は `.codex/rules/commands.md`、dependency
-boundary は `.codex/rules/architecture.md` と実装 test を正本にする。Agent 文書内の
-複製表を仕様として扱わない。
-
-## Review scope
-
-- `RYYYYMMDD-NNNN` identity、manifest の required field / type / unknown-field preservation、
-  `params_snapshot`、state transition。
-- `core -> application -> interfaces/infrastructure` の層と禁止 import。
-- CLI / MCP / application plan の parity、grouped `runo ...` command behavior。
-- Adapter / Launcher / scheduler port、filesystem mutation、provenance。
-- project-state breaking change の `docs/migrations/v0.md` 記載。
-
-## Method
-
-1. diff と影響範囲を特定し、関連する `SPEC.md` section を引用する。
-2. success だけでなく invalid input、stale plan、partial external success、lossless rewrite、
-   concurrency / no-clobber を確認する。
-3. CLI command は `.codex/rules/commands.md` と `--help` に照合する。
-4. finding は severity、file/line、再現根拠、修正案を示す。推測だけで blocker にしない。
-5. Critical / Important があれば Not Ready、解消後に同じ契約を再レビューする。
-
-style の好みではなく correctness、仕様漏れ、境界違反、回帰 test 不足を報告する。
+Read `.agents/skills/spec-reviewer/SKILL.md` and review the requested change as it instructs.
+Do not edit files; report findings only.
 """
