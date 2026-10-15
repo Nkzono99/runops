@@ -10,7 +10,8 @@
 
 `.venv` の dist-info 一覧は directory の mtime でキャッシュされる。Lustre の mtime は秒単位のため、
 同じ秒に入れ替えた package を見落とす。`registry._entry_point` は探索前に
-`importlib.invalidate_caches()` を呼ぶ。`.pth`（editable install）を効かせるため
+`importlib.invalidate_caches()` と `MetadataPathFinder.invalidate_caches()` を呼ぶ
+（Python 3.10 では前者だけでは metadata のキャッシュが消えない）。`.pth`（editable install）を効かせるため
 `sys.path.append` ではなく `site.addsitedir` を使う。
 
 ## project ローカル adapter の module 名

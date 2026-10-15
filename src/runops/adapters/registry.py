@@ -48,6 +48,13 @@ def _entry_point(
     # Metadata directory listings are cached by mtime; on filesystems with
     # one-second mtime (Lustre) a package installed moments ago would be missed.
     importlib.invalidate_caches()
+    # Python 3.10's importlib.invalidate_caches() does not reach the metadata
+    # finder's FastPath cache; clear it explicitly.
+    finder: Any = md.MetadataPathFinder
+    try:
+        finder.invalidate_caches()
+    except TypeError:  # 3.10 defines it without @classmethod
+        finder.invalidate_caches(finder)
     for site in venv_site_packages(project_root / ".venv"):
         for dist in md.distributions(path=[str(site)]):
             for ep in dist.entry_points:
