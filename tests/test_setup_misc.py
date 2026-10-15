@@ -143,3 +143,25 @@ def test_init_not_interactive_with_yes(
     res = cli("init", "-y", "--no-install")
     assert res.code == 0, res.err
     assert load_toml(tmp_path / "runops.toml")["simulators"] == {}
+
+
+def test_init_interactive_reasks_unknown_site(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin", _Tty("nowhere\ncamphor\n\n"))
+    res = cli("init", "--no-install")
+    assert res.code == 0, res.err
+    assert "unknown site preset 'nowhere'" in res.err
+    assert load_toml(tmp_path / "runops.toml")["site"]["name"] == "kudpc"
+
+
+def test_usage_error_exit_code(cli) -> None:  # type: ignore[no-untyped-def]
+    res = cli("list", "--no-such-option")
+    assert res.code == 2
+    assert "no-such-option" in res.err
+
+
+def test_cli_does_not_import_click_directly() -> None:
+    source = (Path(__file__).parents[1] / "src/runops/cli.py").read_text()
+    assert "import click" not in source  # newer typer vendors click

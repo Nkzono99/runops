@@ -121,19 +121,12 @@ def init(
     Run from a terminal without arguments, it asks for the site preset and the
     simulators; the site default is guessed from the host name.
     """
-    from runops.ops.setup import SITE_PRESETS, detect_site, hostname, init_project
+    from runops.ops.setup import detect_site, hostname, init_project
 
     sims = sims or []
     root = Path.cwd()
     if not sims and not site and not yes and sys.stdin.isatty():
-        import click
-
-        guessed = detect_site()
-        site = typer.prompt(
-            f"Site preset (guessed from host {hostname()})",
-            default=guessed,
-            type=click.Choice(list(SITE_PRESETS)),
-        )
+        site = _prompt_site(detect_site(), hostname())
         answer = typer.prompt(
             "Simulators, comma-separated (emses, beach, generic; empty for none)",
             default="",
@@ -154,6 +147,21 @@ def init(
         "next: start your agent (Codex / Claude Code) here and describe what to simulate; "
         "AGENTS.md and the runops skills tell it how to use runo."
     )
+
+
+def _prompt_site(guessed: str, host: str) -> str:
+    """Ask for a site preset until a known one (or alias) is given."""
+    from runops.ops.setup import SITE_ALIASES, SITE_PRESETS
+
+    choices = " / ".join(SITE_PRESETS)
+    while True:
+        answer = str(
+            typer.prompt(f"Site preset ({choices}; guessed from host {host})", default=guessed)
+        ).strip()
+        site = SITE_ALIASES.get(answer, answer)
+        if site in SITE_PRESETS:
+            return site
+        err.print(f"[yellow]unknown site preset {answer!r}; choose {choices}[/]")
 
 
 @app.command()
@@ -882,12 +890,12 @@ def main(argv: list[str] | None = None) -> None:
     except typer.Abort:
         err.print("aborted")
         sys.exit(1)
-    except Exception as exc:  # click usage errors
-        import click
-
-        if isinstance(exc, click.ClickException):
-            exc.show()
-            sys.exit(2)
+    except Exception as exc:
+        # Usage errors from typer's click (vendored in newer typer, so match by shape).
+        show = getattr(exc, "show", None)
+        if callable(show) and isinstance(getattr(exc, "exit_code", None), int):
+            show()
+            sys.exit(int(exc.exit_code) or 2)  # type: ignore[attr-defined]
         raise
     if isinstance(code, int) and code:
         sys.exit(code)
