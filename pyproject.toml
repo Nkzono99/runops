@@ -9,6 +9,20 @@ description = "Run ledger and Slurm job submission for HPC simulation projects"
 readme = "README.md"
 license = "Apache-2.0"
 requires-python = ">=3.10"
+keywords = ["hpc", "slurm", "simulation", "ai-agent", "workflow"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Physics",
+    "Topic :: System :: Distributed Computing",
+]
 dependencies = [
     "packaging>=24.0",
     "typer>=0.9",
@@ -18,6 +32,11 @@ dependencies = [
     "rich>=13.0",
     "jinja2>=3.1",
 ]
+
+[project.urls]
+Homepage = "https://github.com/Nkzono99/runops"
+Documentation = "https://github.com/Nkzono99/runops/blob/main/docs/reference.md"
+Issues = "https://github.com/Nkzono99/runops/issues"
 
 [project.scripts]
 runo = "runops.cli:main"

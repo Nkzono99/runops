@@ -1,105 +1,122 @@
-# runops
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Nkzono99/runops/main/.github/assets/runops-banner.svg" alt="runops" width="680">
+</p>
 
-runops は、HPC / Slurm 上のシミュレーションを AI エージェントと進めるための
-run 管理ツールです。エージェントに「何を調べたいか」を伝えると、case（入力テンプレート）
-から run directory を作り、job を投入し、結果と経緯を run ごとに記録します。
+<p align="center">
+  <b>HPC シミュレーションを、AI エージェントとの会話で回す。</b><br>
+  case から run を作り、Slurm に投げ、結果と経緯を run ごとに残します。<br>
+  人が打つコマンドは <code>runo init</code> だけです。
+</p>
 
-管理するものは case、run、sweep の 3 つだけです。run が増えても一覧は直近のものに絞られ、
-古い run の整理もエージェントが提案します。
+<p align="center">
+  <a href="https://pypi.org/project/runops/"><img src="https://img.shields.io/pypi/v/runops?color=6366f1&label=PyPI" alt="PyPI"></a>
+  <a href="https://pypi.org/project/runops/"><img src="https://img.shields.io/pypi/pyversions/runops?color=14b8a6" alt="Python"></a>
+  <a href="https://github.com/Nkzono99/runops/actions/workflows/ci.yml"><img src="https://github.com/Nkzono99/runops/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/Nkzono99/runops/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-8b949e" alt="License"></a>
+</p>
+
+---
+
+## こんなふうに使います
+
+> **あなた**　平板シースの case で、wc を 0, 0.147, 0.294、phiz を 0, 45 で振った本計算の候補を見せて。投入は確認してから。
+>
+> **エージェント**　6 件の候補を作りました（`runs/flat/wc-phiz-scan/`、計 約 57,600 core-hours、gr20001a / 800 並列 / 12 時間）。先に 100 step の smoke を 1 件流して入力を確かめますか？それとも 6 件をそのまま投入しますか？
+>
+> **あなた**　smoke を流して、通ったら全部投げて。
+>
+> **エージェント**　smoke は 3 分で正常終了しました。6 件を投入しました（job 8184100–8184105）。終わる頃にもう一度確認します。
+
+<details>
+<summary>このときエージェントが実行しているコマンド</summary>
+
+```bash
+runo sweep flat --set plasma.wc=0,0.147,0.294 --set plasma.phiz=0,45 --label wc-phiz-scan
+runo new flat --scratch --set jobcon.nstep=100 --why "入力の確認" --submit
+runo sync && runo log R20261015-0007 --err
+runo sweep flat --set plasma.wc=0,0.147,0.294 --set plasma.phiz=0,45 \
+     --label wc-phiz-scan --why "wc と磁場角の依存" --apply --submit -y
+```
+
+</details>
+
+## 特長
+
+- **run が主役**　1 回の実行は 1 つの directory。入力、job.sh、出力、ノート、由来が `manifest.toml` と一緒に残ります。
+- **増えても散らからない**　値違いは case を増やさず run として作ります。一覧は実行中と直近の run だけ。古い run や期限切れの smoke は整理候補として提案されます。
+- **simulator が知識を連れてくる**　MPIEMSES3D や BEACH の package を入れると、adapter とエージェント向け skill が project に入ります。plugin の install は要りません。
+- **確認してから動く**　投入、削除、整理の前に、対象と資源量を示して確認を取ります。「作って」は作成だけ、「試して」は短い smoke まで。
 
 ## はじめる
-
-人が実行するコマンドは `runo init` だけです。
 
 ```bash
 uv tool install runops
 mkdir lunar-sheath && cd lunar-sheath
-runo init emses --site camphor     # simulator 名と site を指定（どちらも省略可）
+runo init emses --site camphor
 ```
 
-`runo init` は `runops.toml`、`cases/`、`runs/`、`LOG.md`、`notes/`、`AGENTS.md`、
-skill を作り、simulator の package を `.venv` に入れます。あとはこの directory で
-Codex や Claude Code を起動し、やりたいことを伝えます。
+`simulator` と `--site` はどちらも省略できます。できた directory で Codex や
+Claude Code を起動し、調べたいことを伝えてください。生成された `AGENTS.md` と
+skill が、エージェントに runops の使い方を教えます。
 
-## エージェントへの依頼例
+## 頼めること
+
+| やりたいこと | 頼み方の例 |
+|---|---|
+| case を用意する | 「cookbook の平板シースを元に case を作って。gr20001a に 800 並列、120 時間で」 |
+| 試してから本計算 | 「100 step だけ smoke で試して、通ったら wc を 3 通りに振った候補を見せて」 |
+| 様子を見る | 「先週投げた run の状況を見て。失敗していたら原因をノートに残して」 |
+| 続きを流す | 「R20261015-0003 の続きを 2 倍の step で」 |
+| 片付ける | 「古い run を整理して。消すものと archive するものを先に見せて」 |
+| simulator を足す | 「パッチを当てた ~/BEACH-dev をビルドして別 simulator として登録して」 |
+| 更新する | 「runops と simulator を最新にして」 |
+| v1 から移る | 「この project を runops v2 に移行して（`runo migrate-v1` を dry-run で確認してから）」 |
+
+## project に残るもの
 
 ```text
-cookbook の平板シースを元に case を作って。plasma.toml の基準値は Te=Ti=10 eV で、
-camphor の gr20001a に 800 並列、120 時間で投げられるようにして。
+lunar-sheath/
+├── runops.toml          site・simulator・launcher の設定
+├── cases/flat/          case.toml と base 入力ファイル
+├── runs/
+│   ├── flat/
+│   │   └── R20261015-0002--wc0.147/
+│   │       ├── manifest.toml   状態・由来・params・ノート
+│   │       ├── input/  submit/job.sh  work/  analysis/
+│   ├── _scratch/        smoke / debug（期限付き）
+│   └── _archive/        archive した run
+├── LOG.md               run をまたぐ結論と次の判断
+├── notes/               再利用する知見（1 topic 1 file）
+└── AGENTS.md  .agents/skills/  .claude/skills/
 ```
 
-```text
-まず 100 step だけ smoke で試して、問題なければ wc を 0, 0.147, 0.294 と
-phiz を 0, 45 で振った本計算の候補を見せて。投入は確認してから。
-```
+## 対応 simulator
 
-```text
-先週投げた run の状況を見て。失敗していたら原因を調べてノートに残して。
-```
-
-```text
-古い run を整理して。消すものと archive するものを先に見せて。
-```
-
-```text
-BEACH も使えるようにして。パッチを当てた ~/BEACH-dev もビルドして別 simulator として登録して。
-```
-
-```text
-runops と simulator を最新にして。
-```
-
-```text
-この project は runops v1 で作ったので v2 に移行して（`runo migrate-v1` を dry-run で確認してから）。
-```
-
-エージェントは生成された `AGENTS.md` と skill に従って `runo` を実行します。投入、削除、
-整理、移行のように影響の大きい操作は、対象と資源量を示して確認を取ってから行います。
-
-## 何が残るか
-
-```text
-runops.toml            site / simulators / launchers / defaults
-cases/<case>/          case.toml と base 入力ファイル
-runs/<case>/<run_id>--<label>/
-                       manifest.toml, input/, submit/job.sh, work/, analysis/, notes.md
-runs/_scratch/         smoke / debug 用の run（期限付き）
-runs/_archive/         archive した run（元の相対 path を保つ）
-LOG.md                 run をまたぐ結論と次の判断（追記のみ）
-notes/<topic>.md       再利用する知見（1 topic 1 file）
-AGENTS.md, CLAUDE.md, .agents/skills/, .claude/skills/
-                       runops が生成するエージェント向けの入口と skill
-```
-
-run の値違いは case を増やさずに run として作り、一覧は既定で実行中と直近の run だけを
-表示します。古い run や期限切れの smoke は、エージェントが整理候補として提案します。
-
-## simulator との連携
-
-simulator 固有の処理（入力の書き換え、完了判定、要約）は adapter が担います。
-MPIEMSES3D（`mpiemses3d-tools`）と BEACH（`beach-bem`）は package に adapter と
-エージェント向け skill を同梱しており、`.venv` に入れるだけで使えます。plugin の
-install や再起動は要りません。adapter を含む版がまだ入っていない場合は、runops 同梱の
-移植版 adapter が `adapters/` に置かれます。自作の simulator を対応させる方法は
-[adapter ガイド](docs/adapter.md) にあります。
+| simulator | package | 状態 |
+|---|---|---|
+| MPIEMSES3D | `mpiemses3d-tools` ≥ 4.20 | adapter と skill を同梱 |
+| BEACH | `beach-bem` | 次のリリースで同梱。それまでは runops 同梱の移植版 adapter を使用 |
+| その他 | 自作の adapter、または `generic` | [adapter ガイド](https://github.com/Nkzono99/runops/blob/main/docs/adapter.md) |
 
 ## ドキュメント
 
-| 文書 | 内容 |
-|---|---|
-| [リファレンス](docs/reference.md) | `runops.toml`、`case.toml`、`manifest.toml`、全 command（主にエージェントと開発者向け） |
-| [adapter ガイド](docs/adapter.md) | simulator package 作者向けの adapter と skill 同梱 |
-| [SPEC.md](SPEC.md) | 設計と決定事項 |
+- [リファレンス](https://github.com/Nkzono99/runops/blob/main/docs/reference.md)：`runops.toml`、`case.toml`、`manifest.toml`、全コマンド（主にエージェントと開発者向け）
+- [adapter ガイド](https://github.com/Nkzono99/runops/blob/main/docs/adapter.md)：simulator package に adapter と skill を同梱する方法
+- [SPEC](https://github.com/Nkzono99/runops/blob/main/SPEC.md)：設計と決定事項
 
-## 開発
+<details>
+<summary>開発</summary>
 
 ```bash
+git clone https://github.com/Nkzono99/runops.git && cd runops
 uv sync --dev
 uv run pytest
 uv run ruff check src/ tests/ && uv run ruff format --check src/ tests/
 uv run mypy src/
 ```
 
-## ライセンス
+</details>
 
-Apache-2.0
+---
+
+<p align="center"><sub>Apache-2.0 · Made for simulation research on HPC</sub></p>
