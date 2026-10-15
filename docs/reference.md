@@ -14,7 +14,7 @@ schema = 2
 name = "lunar-sheath"
 
 [site]
-name = "camphor"
+name = "kudpc"
 resource_style = "rsc"            # "standard" | "rsc"
 modules = ["intel/2023.2", "intelmpi/2023.2"]
 stdout = "stdout.%J.log"          # 省略時は work/%j.out
@@ -132,7 +132,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 
 | command | 動作 |
 |---|---|
-| `runo init [SIM...] [--site camphor] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec` |
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
 | `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度を点検 |
 | `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
 | `runo build SIM [--force]` | `local_source` の simulator を build |

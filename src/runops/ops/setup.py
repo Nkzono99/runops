@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import shutil
+import socket
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -34,9 +35,9 @@ KNOWN_PACKAGES = {
 KNOWN_EXECUTABLES = {"emses": "mpiemses3D", "beach": "beach"}
 
 SITE_PRESETS: dict[str, dict[str, Any]] = {
-    "camphor": {
+    "kudpc": {
         "site": {
-            "name": "camphor",
+            "name": "kudpc",
             "resource_style": "rsc",
             "modules": ["intel/2023.2", "intelmpi/2023.2"],
             "stdout": "stdout.%J.log",
@@ -52,6 +53,31 @@ SITE_PRESETS: dict[str, dict[str, Any]] = {
         "launcher": {"kind": "srun", "use_slurm_ntasks": True},
     },
 }
+SITE_ALIASES = {"camphor": "kudpc"}
+# Login nodes of Kyoto University's supercomputer systems (A, B, C, G).
+KUDPC_HOST_PREFIXES = ("camphor", "laurel", "cinnamon", "gardenia")
+
+
+def hostname() -> str:
+    return socket.gethostname()
+
+
+def detect_site(host: str | None = None) -> str:
+    """Site preset suggested by the host name (``kudpc`` or ``standard``)."""
+    name = (hostname() if host is None else host).lower()
+    return "kudpc" if name.startswith(KUDPC_HOST_PREFIXES) else "standard"
+
+
+def resolve_site(site: str) -> tuple[str, bool]:
+    """Return (preset, detected) for a ``--site`` value; empty means detect."""
+    if not site:
+        return detect_site(), True
+    preset = SITE_ALIASES.get(site, site)
+    if preset not in SITE_PRESETS:
+        known = ", ".join([*SITE_PRESETS, *SITE_ALIASES])
+        raise UsageError(f"unknown site preset {site!r}; known: {known}")
+    return preset, False
+
 
 GITIGNORE = """\
 .venv/
@@ -81,6 +107,8 @@ Extend an existing file instead of creating a similar one.
 @dataclass
 class InitReport:
     root: Path
+    site: str = ""
+    site_detected: bool = False
     created: list[str] = field(default_factory=list)
     installed: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -108,10 +136,9 @@ def init_project(
         raise UsageError(f"{root / CONFIG_FILE} already exists")
     if (root / "simulators.toml").exists():
         raise UsageError(f"{root} is a runops v1 project; use `runo migrate-v1`")
-    preset = SITE_PRESETS.get(site or "standard")
-    if preset is None:
-        raise UsageError(f"unknown site preset {site!r}; known: {', '.join(SITE_PRESETS)}")
-    report = InitReport(root)
+    site_key, detected = resolve_site(site)
+    preset = SITE_PRESETS[site_key]
+    report = InitReport(root, site=site_key, site_detected=detected)
     simulators: dict[str, Any] = {}
     for arg in sims:
         sim_name, spec = parse_sim_arg(arg)

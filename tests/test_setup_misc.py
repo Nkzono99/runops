@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import io
 import json
 from pathlib import Path
+
+import pytest
 
 from runops.ops.setup import init_project
 from runops.project import Project
@@ -81,3 +84,62 @@ def test_dest_must_stay_in_runs(project_dir: Path, cli) -> None:  # type: ignore
 def test_version(cli) -> None:  # type: ignore[no-untyped-def]
     res = cli("--version")
     assert res.code == 0 and res.out.strip().startswith("2.")
+
+
+def test_detect_site() -> None:
+    from runops.ops.setup import detect_site
+
+    for host in ("camphor31", "laurel32", "cinnamon1", "gardenia13", "Laurel5.kudpc.kyoto-u.ac.jp"):
+        assert detect_site(host) == "kudpc", host
+    for host in ("xb0092", "mylaptop", "login1"):
+        assert detect_site(host) == "standard", host
+
+
+def test_init_guesses_site_from_hostname(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr("runops.ops.setup.hostname", lambda: "laurel32")
+    monkeypatch.chdir(tmp_path)
+    res = cli("init", "--no-install")
+    assert res.code == 0, res.err
+    assert "site: kudpc (guessed from host laurel32" in res.out
+    config = load_toml(tmp_path / "runops.toml")
+    assert config["site"]["resource_style"] == "rsc"
+    assert config["site"]["name"] == "kudpc"
+
+
+def test_init_explicit_site_wins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr("runops.ops.setup.hostname", lambda: "laurel32")
+    monkeypatch.chdir(tmp_path)
+    res = cli("init", "--site", "standard", "--no-install")
+    assert "guessed" not in res.out
+    assert load_toml(tmp_path / "runops.toml")["site"]["resource_style"] == "standard"
+    assert cli("init", "--site", "nowhere", "--no-install").code == 2
+
+
+class _Tty(io.StringIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def test_init_interactive(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr("runops.ops.setup.hostname", lambda: "camphor31")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin", _Tty("\nemses, generic\n"))  # Enter keeps the guess
+    res = cli("init", "--no-install")
+    assert res.code == 0, res.err
+    assert "guessed from host camphor31" in res.out
+    config = load_toml(tmp_path / "runops.toml")
+    assert config["site"]["resource_style"] == "rsc"
+    assert sorted(config["simulators"]) == ["emses", "generic"]
+    assert config["simulators"]["emses"]["modules"][0].startswith("hdf5/")
+
+
+def test_init_not_interactive_with_yes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin", _Tty(""))
+    res = cli("init", "-y", "--no-install")
+    assert res.code == 0, res.err
+    assert load_toml(tmp_path / "runops.toml")["simulators"] == {}

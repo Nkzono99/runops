@@ -29,8 +29,10 @@ mkdir lunar-sheath && cd lunar-sheath
 runo init
 ```
 
-できた directory で Codex か Claude Code を起動して、調べたいことを話しかけてください。
-使う simulator や計算機の設定も、エージェントに伝えれば `runops.toml` に書き込みます。
+`runo init` は計算機の種類と使う simulator を尋ねます。計算機はホスト名から推定するので、
+京大スパコンのログインノードなら Enter で進めます。できた directory で Codex か Claude Code を
+起動して、調べたいことを話しかけてください。設定を後から変えたいときも、エージェントに伝えれば
+`runops.toml` を書き換えます。
 
 ## 頼めること
 

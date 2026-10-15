@@ -77,6 +77,12 @@ class FakeSlurm:
         return str(self.next_id)
 
 
+@pytest.fixture(autouse=True)
+def fixed_hostname(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Site detection must not depend on the machine running the tests."""
+    monkeypatch.setattr("runops.ops.setup.hostname", lambda: "testhost")
+
+
 @pytest.fixture
 def fake_slurm(monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
     fake = FakeSlurm()

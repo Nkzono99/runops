@@ -169,7 +169,7 @@ schema = 2
 name = "lunar-sheath"
 
 [site]
-name = "camphor"
+name = "kudpc"
 resource_style = "rsc"            # "standard" | "rsc"
 modules = ["intel/2023.2", "intelmpi/2023.2"]
 stdout = "stdout.%J.log"
@@ -459,7 +459,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 
 | command | 効果 |
 |---|---|
-| `runo init [SIM...] [--site NAME] [-y]` | `runops.toml`、`cases/`、`runs/`、`LOG.md`、`AGENTS.md`、`.venv` を作る。SIM ごとに adapter package を `.venv` に install し、skill を展開する（§8） |
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | `runops.toml`、`cases/`、`runs/`、`LOG.md`、`AGENTS.md`、`.venv` を作る。SIM ごとに adapter package を `.venv` に install し、skill を展開する（§8）。端末から引数なしで実行すると site と simulator を尋ねる。`--site` が無ければ host 名から推定する（KUDPC のログインノードなら `kudpc`） |
 | `runo doctor [--json]` | `runops.toml` の妥当性、adapter の import 可否、executable の存在、`sbatch` の有無、skill の鮮度を検査 |
 | `runo update [--skills-only] [-y]` | adapter package を upgrade し、skill を再展開する |
 | `runo build SIM [--force]` | `local_source` simulator を `.runops/build/` に build する（§4.1） |
@@ -911,3 +911,4 @@ v2 の `docs/` は次の 3 ファイルだけにする。
 | submit 時の executable hash | attempt ごとに `exe_hash` を記録し、作成時と違えば warning | `runo update` 後の retry が作成時の hash のまま別 binary で走っていた |
 | 同一入力の warning | `input_hash`（と `exe_hash`）が一致する既存 run を作成時に知らせる | §1.3 で観察した variation の重複を、ゲート無しで抑える |
 | 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |
+| `runo init` の対話と site の推定 | 端末から引数なしで実行したときだけ site と simulator を尋ねる。site の既定はホスト名（`camphor*`、`laurel*`、`cinnamon*`、`gardenia*` なら `kudpc`）。プリセット名は `kudpc` とし、`camphor` も同じ意味で受け付ける | 人が打つのは `runo init` だけなので、ここで KUDPC 向けの設定を取り違えないようにする。エージェントや CI からの実行（端末でない、`-y`、引数あり）は従来どおり尋ねない |

@@ -107,21 +107,44 @@ def init(
     sims: Optional[list[str]] = typer.Argument(
         None, help="Simulators: NAME or NAME=package-spec (e.g. emses, beach, generic)."
     ),
-    site: str = typer.Option("", "--site", help="Site preset: camphor | standard."),
+    site: str = typer.Option(
+        "", "--site", help="Site preset: kudpc | standard (default: guessed from the host name)."
+    ),
     name: str = typer.Option("", "--name", help="Project name (default: directory name)."),
     no_install: bool = typer.Option(
         False, "--no-install", help="Do not create .venv or install packages."
     ),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
-    """Create a runops project in the current directory."""
-    from runops.ops.setup import init_project
+    """Create a runops project in the current directory.
+
+    Run from a terminal without arguments, it asks for the site preset and the
+    simulators; the site default is guessed from the host name.
+    """
+    from runops.ops.setup import SITE_PRESETS, detect_site, hostname, init_project
 
     sims = sims or []
     root = Path.cwd()
+    if not sims and not site and not yes and sys.stdin.isatty():
+        import click
+
+        guessed = detect_site()
+        site = typer.prompt(
+            f"Site preset (guessed from host {hostname()})",
+            default=guessed,
+            type=click.Choice(list(SITE_PRESETS)),
+        )
+        answer = typer.prompt(
+            "Simulators, comma-separated (emses, beach, generic; empty for none)",
+            default="",
+            show_default=False,
+        )
+        sims = [s.strip() for s in answer.split(",") if s.strip()]
     if sims and not no_install and any(s.split("=")[0] != "generic" for s in sims):
         _confirm(f"Create .venv in {root} and install simulator packages?", yes)
     report = init_project(root, sims, site=site, name=name, install=not no_install)
+    if report.site_detected:
+        out.print(f"site: {report.site} (guessed from host {hostname()}; use --site to change)")
     for item in report.created:
         out.print(f"created {item}")
     for spec in report.installed:

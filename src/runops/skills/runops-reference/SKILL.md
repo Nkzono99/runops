@@ -7,7 +7,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 
 | command | effect |
 |---|---|
-| `runo init [SIM...] [--site NAME] [-y]` | create runops.toml, cases/, runs/, LOG.md, notes/, AGENTS.md, skills; install simulator packages |
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | create runops.toml, cases/, runs/, LOG.md, notes/, AGENTS.md, skills; install simulator packages. Site defaults to a guess from the host name; asks interactively only in a terminal without arguments |
 | `runo doctor [--json]` | check config, adapters, executables, sbatch, skill freshness |
 | `runo update [--skills-only] [-y]` | upgrade simulator packages and redeploy skills / AGENTS.md block |
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit> |
