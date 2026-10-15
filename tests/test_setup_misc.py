@@ -165,3 +165,49 @@ def test_usage_error_exit_code(cli) -> None:  # type: ignore[no-untyped-def]
 def test_cli_does_not_import_click_directly() -> None:
     source = (Path(__file__).parents[1] / "src/runops/cli.py").read_text()
     assert "import click" not in source  # newer typer vendors click
+
+
+def test_init_install_prompt_defaults_to_yes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    calls: list[bool] = []
+
+    def fake_install(project, *, upgrade):  # type: ignore[no-untyped-def]
+        calls.append(upgrade)
+        return ["MPIEMSES3D"], []
+
+    monkeypatch.setattr("runops.ops.setup.install_packages", fake_install)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.stdin", _Tty("\nemses\n\n")
+    )  # site: Enter, sims: emses, install: Enter
+    res = cli("init")
+    assert res.code == 0, res.err
+    assert "may build simulator binaries" in res.out
+    assert "[Y/n]" in res.out
+    assert calls == [False]
+    assert "installed MPIEMSES3D" in res.out
+
+
+def test_init_install_declined_keeps_project(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.setattr(
+        "runops.ops.setup.install_packages",
+        lambda project, *, upgrade: (_ for _ in ()).throw(AssertionError("must not install")),
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("sys.stdin", _Tty("\nemses\nn\n"))
+    res = cli("init")
+    assert res.code == 0, res.err
+    assert "runo update" in res.out
+    assert "emses" in load_toml(tmp_path / "runops.toml")["simulators"]
+
+
+def test_init_install_needs_yes_off_terminal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    monkeypatch.chdir(tmp_path)
+    res = cli("init", "emses")
+    assert res.code == 2 and "--yes" in res.err
+    assert not (tmp_path / "runops.toml").exists()

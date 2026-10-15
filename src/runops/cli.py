@@ -91,6 +91,19 @@ def _confirm(message: str, yes: bool) -> None:
         raise typer.Exit(1)
 
 
+def _ask_install(root: Path, yes: bool) -> bool:
+    """Ask before creating .venv; default yes. Off a terminal, require -y."""
+    message = (
+        f"Create .venv in {root} and install simulator packages "
+        "(may build simulator binaries and take several minutes)?"
+    )
+    if yes:
+        return True
+    if not sys.stdin.isatty():
+        raise UsageError(f"{message} -- confirmation required; rerun with -y/--yes or --no-install")
+    return bool(typer.confirm(message, default=True))
+
+
 def _resolve(project: Project, refs: list[str]) -> list[Manifest]:
     if not refs:
         raise UsageError("give at least one RUN")
@@ -133,11 +146,14 @@ def init(
             show_default=False,
         )
         sims = [s.strip() for s in answer.split(",") if s.strip()]
-    if sims and not no_install and any(s.split("=")[0] != "generic" for s in sims):
-        _confirm(f"Create .venv in {root} and install simulator packages?", yes)
-    report = init_project(root, sims, site=site, name=name, install=not no_install)
+    install = not no_install
+    if sims and install and any(s.split("=")[0] != "generic" for s in sims):
+        install = _ask_install(root, yes)
+    report = init_project(root, sims, site=site, name=name, install=install)
     if report.site_detected:
         out.print(f"site: {report.site} (guessed from host {hostname()}; use --site to change)")
+    if not install and not no_install:
+        out.print("packages not installed; ask your agent or run `runo update` later")
     for item in report.created:
         out.print(f"created {item}")
     for spec in report.installed:
