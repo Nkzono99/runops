@@ -1,90 +1,93 @@
 # runops
 
-runops は、HPC / Slurm 上のシミュレーションを run directory 単位で管理する CLI です。
-case（入力テンプレート）から run を作り、job.sh を生成して投入し、状態を
-`manifest.toml` に記録します。AI エージェントが `runo` コマンドで操作することを
-前提に、project に `AGENTS.md` と skill を生成します。
+runops は、HPC / Slurm 上のシミュレーションを AI エージェントと進めるための
+run 管理ツールです。エージェントに「何を調べたいか」を伝えると、case（入力テンプレート）
+から run directory を作り、job を投入し、結果と経緯を run ごとに記録します。
 
-管理する名詞は case、run、sweep の 3 つだけです。run が増えても、一覧は既定で
-active と直近の run だけを表示し、`runo tidy` が整理候補を提案します。
+管理するものは case、run、sweep の 3 つだけです。run が増えても一覧は直近のものに絞られ、
+古い run の整理もエージェントが提案します。
 
-## インストール
+## はじめる
 
-```bash
-uv tool install runops        # または uvx --from runops runo ...
-runo --version
-```
-
-## 5 分チュートリアル
+人が実行するコマンドは `runo init` だけです。
 
 ```bash
+uv tool install runops
 mkdir lunar-sheath && cd lunar-sheath
-runo init emses --site camphor      # runops.toml, AGENTS.md, skills, .venv を作る
-runo doctor                         # adapter, executable, sbatch, skill を点検
-
-runo case new flat --simulator emses
-cp ~/somewhere/plasma.toml cases/flat/plasma.toml
-$EDITOR cases/flat/case.toml        # [job] の partition / walltime / 資源量
-
-runo new flat --why "基準条件" --scratch          # smoke 用の短命 run
-runo new flat --why "wc を 0.147 に" --set plasma.wc=0.147
-runo sweep flat --set plasma.wc=0,0.147,0.294 --set plasma.phiz=0,45   # 候補だけ表示
-runo sweep flat --set plasma.wc=0,0.147,0.294 --set plasma.phiz=0,45 --apply --why "角度依存"
-
-runo submit R20261015-0002          # job.sh を生成して sbatch
-runo sync                           # squeue / sacct から状態を更新
-runo list                           # active と直近 30 日の run
-runo log R20261015-0002 --err
-runo note R20261015-0002 "初期 sheath 形成に 2e4 step"
-runo tidy                           # 整理候補（--apply で実行）
+runo init emses --site camphor     # simulator 名と site を指定（どちらも省略可）
 ```
 
-エージェントには目的だけ伝えれば十分です。生成された `AGENTS.md` に、確認が必要な
-操作（投入、削除、整理）とノートの置き場所が書かれています。
+`runo init` は `runops.toml`、`cases/`、`runs/`、`LOG.md`、`notes/`、`AGENTS.md`、
+skill を作り、simulator の package を `.venv` に入れます。あとはこの directory で
+Codex や Claude Code を起動し、やりたいことを伝えます。
 
-## project の構成
+## エージェントへの依頼例
+
+```text
+cookbook の平板シースを元に case を作って。plasma.toml の基準値は Te=Ti=10 eV で、
+camphor の gr20001a に 800 並列、120 時間で投げられるようにして。
+```
+
+```text
+まず 100 step だけ smoke で試して、問題なければ wc を 0, 0.147, 0.294 と
+phiz を 0, 45 で振った本計算の候補を見せて。投入は確認してから。
+```
+
+```text
+先週投げた run の状況を見て。失敗していたら原因を調べてノートに残して。
+```
+
+```text
+古い run を整理して。消すものと archive するものを先に見せて。
+```
+
+```text
+BEACH も使えるようにして。パッチを当てた ~/BEACH-dev もビルドして別 simulator として登録して。
+```
+
+```text
+runops と simulator を最新にして。
+```
+
+```text
+この project は runops v1 で作ったので v2 に移行して（`runo migrate-v1` を dry-run で確認してから）。
+```
+
+エージェントは生成された `AGENTS.md` と skill に従って `runo` を実行します。投入、削除、
+整理、移行のように影響の大きい操作は、対象と資源量を示して確認を取ってから行います。
+
+## 何が残るか
 
 ```text
 runops.toml            site / simulators / launchers / defaults
 cases/<case>/          case.toml と base 入力ファイル
 runs/<case>/<run_id>--<label>/
-                       manifest.toml, input/, submit/job.sh, work/, analysis/
+                       manifest.toml, input/, submit/job.sh, work/, analysis/, notes.md
 runs/_scratch/         smoke / debug 用の run（期限付き）
 runs/_archive/         archive した run（元の相対 path を保つ）
 LOG.md                 run をまたぐ結論と次の判断（追記のみ）
 notes/<topic>.md       再利用する知見（1 topic 1 file）
-AGENTS.md, CLAUDE.md   runops が生成する agent 向け入口
-.agents/skills/, .claude/skills/
-                       runops と simulator package の skill
+AGENTS.md, CLAUDE.md, .agents/skills/, .claude/skills/
+                       runops が生成するエージェント向けの入口と skill
 ```
 
-## simulator の追加
+run の値違いは case を増やさずに run として作り、一覧は既定で実行中と直近の run だけを
+表示します。古い run や期限切れの smoke は、エージェントが整理候補として提案します。
 
-simulator 固有の処理は adapter が担います。adapter は次のどれかで見つかります。
+## simulator との連携
 
-1. simulator の Python package が公開する `runops.adapters` entry point
-2. project の `adapters/<name>.py`
-3. runops 同梱の `generic`（Jinja2 テンプレートと任意のコマンド）
-
-package は skill と reference も同梱でき、`runo init` / `runo update` が project に
-展開します。詳しくは [adapter ガイド](docs/adapter.md) を参照してください。
-
-## v1 からの移行
-
-```bash
-cd my-v1-project
-runo migrate-v1 --dry-run     # 変更計画だけ表示
-runo migrate-v1               # 適用（v1 の設定と harness は .runops/v1-backup/ に退避）
-```
-
-各 run の元の manifest は `manifest.v1.toml` として残ります。`research/`、
-`materials/`、`refs/` などは移動しません。
+simulator 固有の処理（入力の書き換え、完了判定、要約）は adapter が担います。
+MPIEMSES3D（`mpiemses3d-tools`）と BEACH（`beach-bem`）は package に adapter と
+エージェント向け skill を同梱しており、`.venv` に入れるだけで使えます。plugin の
+install や再起動は要りません。adapter を含む版がまだ入っていない場合は、runops 同梱の
+移植版 adapter が `adapters/` に置かれます。自作の simulator を対応させる方法は
+[adapter ガイド](docs/adapter.md) にあります。
 
 ## ドキュメント
 
 | 文書 | 内容 |
 |---|---|
-| [リファレンス](docs/reference.md) | `runops.toml`、`case.toml`、`manifest.toml`、全 command |
+| [リファレンス](docs/reference.md) | `runops.toml`、`case.toml`、`manifest.toml`、全 command（主にエージェントと開発者向け） |
 | [adapter ガイド](docs/adapter.md) | simulator package 作者向けの adapter と skill 同梱 |
 | [SPEC.md](SPEC.md) | 設計と決定事項 |
 

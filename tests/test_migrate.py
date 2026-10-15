@@ -133,3 +133,37 @@ def test_apply(v1_root: Path, cli) -> None:  # type: ignore[no-untyped-def]
 def test_apply_deletes_test_runs_on_request(v1_root: Path, cli) -> None:  # type: ignore[no-untyped-def]
     assert cli("migrate-v1", "-y", "--apply-delete-test-runs").code == 0
     assert not (v1_root / ".runops/test-runs/T20260701-0001").exists()
+
+
+def test_build_worktree_is_repaired(v1_root: Path, tmp_path: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    import subprocess
+
+    def git(*args: str, cwd: Path) -> str:
+        return subprocess.run(
+            ["git", *args], cwd=cwd, check=True, capture_output=True, text=True
+        ).stdout
+
+    repo = tmp_path / "beachsrc"
+    repo.mkdir()
+    git("init", "-q", cwd=repo)
+    git(
+        "-c",
+        "user.email=t@e",
+        "-c",
+        "user.name=t",
+        "commit",
+        "-q",
+        "--allow-empty",
+        "-m",
+        "x",
+        cwd=repo,
+    )
+    worktree = v1_root / ".runops/work/beach-x-abc/src"
+    git("worktree", "add", "-q", "--detach", str(worktree), cwd=repo)
+
+    assert cli("migrate-v1", "-y").code == 0
+    moved = v1_root / ".runops/build/beach-x-abc/src"
+    listing = git("worktree", "list", "--porcelain", cwd=repo)
+    assert f"worktree {moved}" in listing
+    assert "prunable" not in listing
+    assert git("rev-parse", "--is-inside-work-tree", cwd=moved).strip() == "true"

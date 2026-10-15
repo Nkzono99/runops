@@ -101,7 +101,13 @@ def test_init_deploys_adapter_skills_and_update(
 def test_runops_skills_are_short() -> None:
     root = Path(__file__).parents[1] / "src/runops/skills"
     names = sorted(p.name for p in root.iterdir() if p.is_dir())
-    assert names == ["runops-check-status", "runops-create-run", "runops-reference", "runops-tidy"]
+    assert names == [
+        "runops-check-status",
+        "runops-create-run",
+        "runops-maintain",
+        "runops-reference",
+        "runops-tidy",
+    ]
     for name in names:
         text = (root / name / "SKILL.md").read_text()
         assert text.startswith("---\nname: " + name)

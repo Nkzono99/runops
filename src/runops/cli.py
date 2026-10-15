@@ -127,7 +127,10 @@ def init(
     for spec in report.installed:
         out.print(f"installed {spec}")
     _warn(report.warnings)
-    out.print("next: `runo case new NAME --simulator SIM`, then `runo new NAME --why ...`")
+    out.print(
+        "next: start your agent (Codex / Claude Code) here and describe what to simulate; "
+        "AGENTS.md and the runops skills tell it how to use runo."
+    )
 
 
 @app.command()

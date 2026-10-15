@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from importlib import resources
@@ -481,6 +482,7 @@ def apply_plan(plan: MigrationPlan, *, delete_test_runs: bool = False) -> list[s
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(src), str(dst))
             log.append(f"moved {plan.rel(src)} -> {plan.rel(dst)}")
+            log += _repair_worktrees(dst)
 
     for case_toml in plan.case_rewrites:
         _rewrite_case(case_toml)
@@ -521,6 +523,27 @@ def apply_plan(plan: MigrationPlan, *, delete_test_runs: bool = False) -> list[s
     project.rebuild_index()
     log.append("deployed skills, wrote AGENTS.md / CLAUDE.md, rebuilt run index")
     log.append("next: `runo doctor`, then `runo list --all`")
+    return log
+
+
+def _repair_worktrees(directory: Path) -> list[str]:
+    """Re-register git worktrees (``.git`` files) moved along with a build dir."""
+    log: list[str] = []
+    candidates = [directory / ".git", *directory.glob("*/.git")]
+    for git_file in candidates:
+        if not git_file.is_file():
+            continue
+        result = subprocess.run(
+            ["git", "-C", str(git_file.parent), "worktree", "repair"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        where = git_file.parent
+        if result.returncode == 0:
+            log.append(f"repaired git worktree link for {where}")
+        else:
+            log.append(f"warning: git worktree repair failed for {where}: {result.stderr.strip()}")
     return log
 
 

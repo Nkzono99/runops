@@ -609,7 +609,9 @@ runops は `init` と `update` で次を行う。
 
 ### 8.3 runops 自身の skill
 
-runops は次の 4 skill だけを同梱し、simulator skill と同じ仕組みで展開する。
+runops は次の 5 skill だけを同梱し、simulator skill と同じ仕組みで展開する。
+利用者が覚えるコマンドは `runo init` だけとし、それ以外（simulator の追加、更新、v1 移行を含む）は
+エージェントへの依頼で行う。
 各 SKILL.md は 60 行以内に収める。
 
 | skill | 内容 |
@@ -618,6 +620,7 @@ runops は次の 4 skill だけを同梱し、simulator skill と同じ仕組み
 | `runops-check-status` | `sync` → `list` → `log` の順。失敗時の `retry` と `tidy --purge-work` |
 | `runops-tidy` | `tidy` を定期的に実行する判断基準。pin の使い方 |
 | `runops-reference` | command 一覧（§7.3 の表をそのまま載せる） |
+| `runops-maintain` | simulator の追加、runops と simulator package の更新、`migrate-v1`、`doctor` の読み方 |
 
 ### 8.4 generic adapter
 
