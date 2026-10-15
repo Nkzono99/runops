@@ -134,7 +134,14 @@ def init_project(
         "site": {k: v for k, v in preset["site"].items() if v != ""},
         "simulators": simulators,
         "launchers": {"srun": dict(preset["launcher"])},
-        "defaults": {"launcher": "srun", "scratch_ttl_days": 7, "list_since_days": 30},
+        "defaults": {
+            "launcher": "srun",
+            "scratch_ttl_days": 7,
+            "list_since_days": 30,
+            "tidy_failed_days": 30,
+            "tidy_archive_days": 90,
+            "label_max_length": 48,
+        },
     }
     root.mkdir(parents=True, exist_ok=True)
     (root / CONFIG_FILE).write_text(tomli_w.dumps(config), encoding="utf-8")

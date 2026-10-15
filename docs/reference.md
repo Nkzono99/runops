@@ -47,8 +47,11 @@ modules = []
 
 [defaults]
 launcher = "srun"
-scratch_ttl_days = 7
-list_since_days = 30
+scratch_ttl_days = 7              # scratch run の期限（日）
+list_since_days = 30              # runo list が既定で表示する期間（日）
+tidy_failed_days = 30             # why もノートも無い failed / cancelled を削除候補にするまで（日）
+tidy_archive_days = 90            # completed を archive 候補にするまで（日）
+label_max_length = 48             # run 名の自動ラベルの最大文字数（8 以上）
 ```
 
 | resolver_mode | executable の解決 |
@@ -139,7 +142,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
 | `runo archive RUN... ` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
-| `runo tidy [--apply] [--only KIND] [--older-than 30d] [--purge-work RUN...]` | 整理候補の表示と実行 |
+| `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |
 | `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |
 
 `list` は既定で active、created、直近 `list_since_days` 日、pinned の run を表示し、
@@ -150,11 +153,12 @@ scratch と archived は表示しません。
 | kind | 条件 | 動作 |
 |---|---|---|
 | `expired-scratch` | 期限切れの scratch run | delete |
-| `stale-failed` | `--older-than` より古い failed / cancelled で、why も note も無い | delete |
-| `old-completed` | `--older-than` の 3 倍より古い completed | archive |
+| `stale-failed` | `tidy_failed_days`（既定 30）日より古い failed / cancelled で、why も note も無い | delete |
+| `old-completed` | `tidy_archive_days`（既定 90）日より古い completed | archive |
 | `orphan-job` | Slurm が知らない submitted / running | sync |
 | `unused-build` | 非 archived run が参照しない `.runops/build/*` | delete |
 
-pinned の run は `tidy` と `delete` の対象になりません。
+日数は `runops.toml` の `[defaults]` で変えられます。`--older-than 14d` のように指定すると、
+その回だけ両方の日数をその値で置き換えます。pinned の run は `tidy` と `delete` の対象になりません。
 
 exit code は 0 が成功、1 が実行時エラー（sbatch 失敗など）、2 が使い方や設定のエラーです。

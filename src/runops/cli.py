@@ -745,7 +745,12 @@ def delete(
 def tidy(
     apply: bool = typer.Option(False, "--apply"),
     only: Optional[list[str]] = typer.Option(None, "--only", help="Restrict to a kind."),
-    older_than: str = typer.Option("30d", "--older-than"),
+    older_than: str = typer.Option(
+        "",
+        "--older-than",
+        help="Use this age (e.g. 14d) for both thresholds instead of "
+        "[defaults].tidy_failed_days / tidy_archive_days.",
+    ),
     purge_work: Optional[list[str]] = typer.Option(
         None,
         "--purge-work",
@@ -775,7 +780,10 @@ def tidy(
     for kind in only or []:
         if kind not in KINDS:
             raise UsageError(f"unknown kind {kind!r}; known: {', '.join(KINDS)}")
-    candidates = find_candidates(project, older_than=parse_age(older_than), runner=_runner())
+    override = parse_age(older_than) if older_than else None
+    candidates = find_candidates(
+        project, failed_after=override, archive_after=override, runner=_runner()
+    )
     if only:
         candidates = [c for c in candidates if c.kind in only]
     if as_json and not apply:

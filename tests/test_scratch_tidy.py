@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -97,3 +98,45 @@ def test_list_filters(project_dir: Path, cli) -> None:  # type: ignore[no-untype
     assert len(json.loads(cli("list", "--status", "created", "--json").out)) == 2
     assert json.loads(cli("list", "--case", "nope", "--json").out) == []
     assert cli("list", "--status", "bogus").code == 2
+
+
+def _set_defaults(project_dir: Path, **values: object) -> None:
+    cfg = project_dir / "runops.toml"
+    text = cfg.read_text()
+    for key, value in values.items():
+        text = re.sub(rf"(?m)^{key} = .*$", f"{key} = {value}", text)
+    cfg.write_text(text)
+
+
+def test_tidy_thresholds_from_config(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (failed,) = cli("new", "demo", "--submit").run_ids()
+    fake_slurm.states[fake_slurm.last_job] = "FAILED"
+    (done,) = cli("new", "demo", "--submit").run_ids()
+    fake_slurm.states[fake_slurm.last_job] = "COMPLETED"
+    cli("sync")
+    _set(project_dir, failed, created_at=_ago(10))
+    _set(project_dir, done, created_at=_ago(20))
+    assert json.loads(cli("tidy", "--json").out) == []  # defaults: 30 / 90 days
+
+    _set_defaults(project_dir, tidy_failed_days=7, tidy_archive_days=14)
+    kinds = {(c["kind"], c["target"]) for c in json.loads(cli("tidy", "--json").out)}
+    assert kinds == {("stale-failed", failed), ("old-completed", done)}
+
+    _set_defaults(project_dir, tidy_failed_days=30, tidy_archive_days=90)
+    kinds = {c["kind"] for c in json.loads(cli("tidy", "--older-than", "5d", "--json").out)}
+    assert kinds == {"stale-failed", "old-completed"}
+
+
+def test_invalid_defaults_rejected(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    _set_defaults(project_dir, tidy_failed_days=0)
+    res = cli("list")
+    assert res.code == 2 and "tidy_failed_days" in res.err
+    _set_defaults(project_dir, tidy_failed_days=30, label_max_length=4)
+    assert cli("list").code == 2
+
+
+def test_label_max_length_from_config(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    _set_defaults(project_dir, label_max_length=10)
+    (run_id,) = cli("new", "demo", "--set", "a_long_parameter_name=123456").run_ids()
+    label = Project.open(project_dir).resolve_run(run_id).label
+    assert label == "a_long_par"

@@ -44,7 +44,14 @@ _LAUNCHER_KEYS = {
     "extra_options",
     "modules",
 }
-_DEFAULT_KEYS = {"launcher", "scratch_ttl_days", "list_since_days"}
+_DEFAULT_KEYS = {
+    "launcher",
+    "scratch_ttl_days",
+    "list_since_days",
+    "tidy_failed_days",
+    "tidy_archive_days",
+    "label_max_length",
+}
 _TOP_KEYS = {"schema", "project", "site", "simulators", "launchers", "defaults"}
 
 
@@ -89,6 +96,9 @@ class Defaults:
     launcher: str = ""
     scratch_ttl_days: float = 7
     list_since_days: float = 30
+    tidy_failed_days: float = 30
+    tidy_archive_days: float = 90
+    label_max_length: int = 48
 
 
 @dataclass
@@ -229,9 +239,14 @@ def parse_config(root: Path, data: dict[str, Any]) -> ProjectConfig:
     _warn_unknown(defaults_raw, _DEFAULT_KEYS, "[defaults]", warnings)
     defaults = Defaults(
         launcher=str(defaults_raw.get("launcher", "")),
-        scratch_ttl_days=float(defaults_raw.get("scratch_ttl_days", 7)),
-        list_since_days=float(defaults_raw.get("list_since_days", 30)),
+        scratch_ttl_days=_positive(defaults_raw, "scratch_ttl_days", 7),
+        list_since_days=_positive(defaults_raw, "list_since_days", 30),
+        tidy_failed_days=_positive(defaults_raw, "tidy_failed_days", 30),
+        tidy_archive_days=_positive(defaults_raw, "tidy_archive_days", 90),
+        label_max_length=int(_positive(defaults_raw, "label_max_length", 48)),
     )
+    if defaults.label_max_length < 8:
+        raise UsageError("[defaults].label_max_length must be at least 8")
     if defaults.launcher and defaults.launcher not in launchers:
         raise UsageError(f"[defaults].launcher {defaults.launcher!r} is not a defined launcher")
     return ProjectConfig(
@@ -243,6 +258,13 @@ def parse_config(root: Path, data: dict[str, Any]) -> ProjectConfig:
         defaults=defaults,
         warnings=warnings,
     )
+
+
+def _positive(table: dict[str, Any], key: str, default: float) -> float:
+    value = table.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or value <= 0:
+        raise UsageError(f"[defaults].{key} must be a positive number, got {value!r}")
+    return float(value)
 
 
 def _table(data: dict[str, Any], key: str) -> dict[str, Any]:

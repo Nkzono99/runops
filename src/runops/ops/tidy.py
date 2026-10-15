@@ -44,12 +44,18 @@ class TidyReport:
 def find_candidates(
     project: Project,
     *,
-    older_than: timedelta,
+    failed_after: timedelta | None = None,
+    archive_after: timedelta | None = None,
     now: datetime | None = None,
     runner: CommandRunner = default_runner,
     check_slurm: bool = True,
 ) -> list[Candidate]:
     now = now or datetime.now().astimezone()
+    defaults = project.config.defaults
+    if failed_after is None:
+        failed_after = timedelta(days=defaults.tidy_failed_days)
+    if archive_after is None:
+        archive_after = timedelta(days=defaults.tidy_archive_days)
     out: list[Candidate] = []
     referenced: set[str] = set()
     for m in project.iter_runs():
@@ -67,7 +73,7 @@ def find_candidates(
         if (
             m.status in (RunState.FAILED, RunState.CANCELLED)
             and not m.pinned
-            and age > older_than
+            and age > failed_after
             and not m.why
             and not m.notes
             and not (m.run_dir / "notes.md").exists()
@@ -80,7 +86,7 @@ def find_candidates(
                     f"{m.status.value}, {age.days}d old, no why/notes",
                 )
             )
-        elif m.status == RunState.COMPLETED and not m.pinned and age > older_than * 3:
+        elif m.status == RunState.COMPLETED and not m.pinned and age > archive_after:
             out.append(Candidate("old-completed", m.id, rel, f"completed, {age.days}d old"))
         elif m.status in ACTIVE_STATES and check_slurm and m.job_id:
             try:

@@ -198,8 +198,11 @@ modules = []
 
 [defaults]
 launcher = "srun"
-scratch_ttl_days = 7
-list_since_days = 30
+scratch_ttl_days = 7              # scratch run の期限（日）
+list_since_days = 30              # runo list が既定で表示する期間（日）
+tidy_failed_days = 30             # why もノートも無い failed / cancelled を削除候補にするまで（日）
+tidy_archive_days = 90            # completed を archive 候補にするまで（日）
+label_max_length = 48             # run 名の自動ラベルの最大文字数（8 以上）
 ```
 
 規則:
@@ -211,6 +214,8 @@ list_since_days = 30
 - `[site]`、`[launchers.*]`、`[simulators.*].modules` の merge 順は v1 と同じ:
   site modules → launcher modules → simulator modules。
 - 未知の key は **warning を出して無視** する（fail しない）。
+- `[defaults]` の日数と文字数は正の数でなければ設定エラー（exit code 2）。project ごとの運用方針
+  （整理の目安、表示期間、命名の長さ）はここに置き、コードに埋め込まない。
 
 ### 4.1 resolver_mode と build cache
 
@@ -460,7 +465,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo archive RUN... [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする |
 | `runo restore RUN` | archive 前の場所に戻す。既に何かあれば拒否 |
 | `runo delete RUN... [-y]` | directory を削除。`created`/`failed`/`cancelled`/scratch のみ。`pinned` は拒否 |
-| `runo tidy [--apply] [--older-than 30d] [--purge-work RUN...] [--json]` | 整理候補を表示する（§7.5）。`--apply` で実行 |
+| `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | 整理候補を表示する（§7.5）。`--apply` で実行 |
 | `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project を v2 layout に変換する（§11） |
 | `runo --version` | version 表示 |
 
@@ -483,11 +488,12 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | kind | 条件 | 動作 |
 |---|---|---|
 | `expired-scratch` | `scratch = true` かつ `expires_at` を過ぎ、`pinned = false` | delete |
-| `stale-failed` | `failed`/`cancelled` で `--older-than`（既定 30d）より古く、note も `why` も空 | delete |
-| `old-completed` | `completed` で `--older-than` の 3 倍より古く、`pinned = false` | archive |
+| `stale-failed` | `failed`/`cancelled` で `defaults.tidy_failed_days`（既定 30）日より古く、note も `why` も空 | delete |
+| `old-completed` | `completed` で `defaults.tidy_archive_days`（既定 90）日より古く、`pinned = false` | archive |
 | `orphan-job` | `submitted`/`running` だが squeue/sacct に job が無い | sync（state 確定） |
 | `unused-build` | `.runops/build/*` のうち、非 archived run の manifest から参照されないもの | delete |
 
+- `--older-than AGE`（例 `14d`）はその回だけ、上の 2 つの日数をどちらもこの値で置き換える。
 - `--purge-work RUN...` は指定 run の `work/` の中身を削除し `work_purged_at` を記録する。
   adapter が `keep_patterns()` を返す場合、一致するファイルは残す。`completed` 以外は拒否。
 - `tidy` は receipt や tombstone を作らない。失敗したら error を出して止まる。
@@ -502,7 +508,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   より細かい選択が要るなら `runo new --set` を使う。
 - 生成先は `runs/<case>/<sweep_label>/<run_id>--<label>/`。
   `sweep_label` 省略時は `sweep-<YYYYMMDD>-<NN>`。
-- label は changed_keys から自動生成する（`wc0.147_phiz45`）。長さ上限 48 文字。
+- label は changed_keys から自動生成する（`wc0.147_phiz45`）。長さ上限は `defaults.label_max_length`（既定 48 文字）。
   key の短縮 alias は case.toml の `[naming.aliases]` で指定できる（v1 と同じ）。
 
 ---
@@ -882,3 +888,4 @@ v2 の `docs/` は次の 3 ファイルだけにする。
 | `.venv` の entry point 探索 | `site.addsitedir` で `.pth` も処理し、探索前に `importlib.invalidate_caches()` | editable install と、mtime が秒単位の Lustre 上での再インストール直後に対応 |
 | migrate の可逆性 | 削除せず `.runops/v1-backup/<stamp>/` と `manifest.v1.toml` に退避 | 実 project の v1 資料を失わない |
 | 依頼と操作範囲、観察方針 | AGENTS.md block と `runops-check-status` に記載 | runhand の work policy から取り込み |
+| 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |

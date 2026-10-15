@@ -30,7 +30,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo archive RUN... [-y]` / `runo archive --older-than 90d [-y]` | move to runs/_archive |
 | `runo restore RUN` | move back |
 | `runo delete RUN... [-y]` | remove created/failed/cancelled/scratch runs |
-| `runo tidy [--apply] [--only KIND] [--older-than 30d] [--purge-work RUN...] [--json]` | cleanup |
+| `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | cleanup (thresholds: `[defaults].tidy_failed_days` / `tidy_archive_days`) |
 | `runo migrate-v1 [--dry-run]` | convert a runops v1 project |
 
 ## Layout

@@ -247,7 +247,13 @@ def _plan_config(root: Path, v1_runops: dict[str, Any], plan: MigrationPlan) -> 
         "site": site,
         "simulators": simulators,
         "launchers": launchers,
-        "defaults": {"scratch_ttl_days": 7, "list_since_days": 30},
+        "defaults": {
+            "scratch_ttl_days": 7,
+            "list_since_days": 30,
+            "tidy_failed_days": 30,
+            "tidy_archive_days": 90,
+            "label_max_length": 48,
+        },
     }
     if len(launchers) == 1:
         config["defaults"]["launcher"] = next(iter(launchers))

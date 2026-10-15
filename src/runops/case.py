@@ -109,13 +109,18 @@ def changed_keys(base: dict[str, Any], params: dict[str, Any]) -> list[str]:
     return [k for k, v in params.items() if k not in base or base[k] != v]
 
 
-def make_label(keys: list[str], params: dict[str, Any], aliases: dict[str, str]) -> str:
+def make_label(
+    keys: list[str],
+    params: dict[str, Any],
+    aliases: dict[str, str],
+    max_length: int = LABEL_MAX,
+) -> str:
     """Auto label from changed keys, e.g. ``wc0.147_phiz45``."""
     parts = []
     for key in keys:
         alias = aliases.get(key) or key.rsplit(".", 1)[-1]
         parts.append(f"{alias}{_format_value(params[key])}")
-    return slugify("_".join(parts))
+    return slugify("_".join(parts), max_length)
 
 
 def slugify(value: str, max_length: int = LABEL_MAX) -> str:

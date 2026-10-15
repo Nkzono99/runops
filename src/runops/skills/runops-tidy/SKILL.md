@@ -7,8 +7,9 @@ description: Keep a runops project small (tidy, archive, pin, delete). Use when 
 
 1. `runo tidy` lists candidates without changing anything:
    - `expired-scratch`: scratch runs past their expiry -> delete
-   - `stale-failed`: failed/cancelled runs older than 30 days with no `why` and no notes -> delete
-   - `old-completed`: completed runs older than 90 days -> archive
+   - `stale-failed`: failed/cancelled runs older than `tidy_failed_days` (default 30) with no
+     `why` and no notes -> delete
+   - `old-completed`: completed runs older than `tidy_archive_days` (default 90) -> archive
    - `orphan-job`: submitted/running runs that Slurm no longer knows -> sync
    - `unused-build`: build caches no active run uses -> delete
 2. Show the list to the user. Apply with `runo tidy --apply`, or one kind with
@@ -20,3 +21,5 @@ description: Keep a runops project small (tidy, archive, pin, delete). Use when 
    `runo restore RUN` brings it back. Archived runs stay findable by id.
 5. `runo delete RUN` removes created/failed/cancelled or scratch runs only.
 6. Run `runo tidy` when starting a new line of work, so the list stays readable.
+7. The day counts live in `[defaults]` of `runops.toml`. When the user wants a different
+   policy for the project, change them there; `--older-than 14d` overrides both for one run.

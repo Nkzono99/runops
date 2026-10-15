@@ -157,11 +157,14 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
     params.update(request.sets)
     changed = changed_keys(base, params)
     if request.label:
-        label = slugify(request.label)
+        label = slugify(request.label, project.config.defaults.label_max_length)
     else:
-        label = make_label(changed, params, case.aliases)
+        label = make_label(changed, params, case.aliases, project.config.defaults.label_max_length)
         if request.continue_run:
-            label = slugify(f"{label or source.id if source else label}-cont")
+            label = slugify(
+                f"{label or source.id if source else label}-cont",
+                project.config.defaults.label_max_length,
+            )
     parent = _dest_parent(project, case, request.dest, request.scratch)
     spec = RunSpec(params=params, changed=changed, label=label, parent=parent)
     return _materialize(project, case, [spec], request, source=source)
@@ -201,7 +204,9 @@ def plan_sweep(
                 ref=f"p{i:04d}",
                 params=params,
                 values=values,
-                label=make_label(keys, params, case.aliases),
+                label=make_label(
+                    keys, params, case.aliases, project.config.defaults.label_max_length
+                ),
             )
         )
     hours = 0.0
