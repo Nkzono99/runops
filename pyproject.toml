@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "runops"
-version = "2.1.2"
+version = "2.1.3"
 description = "Run ledger and Slurm job submission for HPC simulation projects"
 readme = "README.md"
 license = "Apache-2.0"
