@@ -13,14 +13,15 @@ runops の挙動は複数の場所に書かれている。変更の種類から�
 | `runops.toml` / `case.toml` の field | `SPEC.md` §4, §5 | `docs/reference.md`、`config.py` / `case.py` の既知 key 集合 |
 | manifest の field | `SPEC.md` §6.2 | `docs/reference.md` の manifest 表、`ops/migrate.py` の変換 |
 | adapter 契約・skill 同梱 | `SPEC.md` §8 | `docs/adapter.md`、`adapters/base.py` の docstring、`legacy_adapters/` |
-| エージェントの使い方・規則 | `src/runops/harness.py`（project の AGENTS.md block） | `src/runops/skills/*/SKILL.md`、README の依頼例 |
+| エージェントの使い方・規則 | `src/runops/harness.py`（project の AGENTS.md block） | `src/runops/skills/*/SKILL.md`、README の依頼例、`docs/guide.md` |
 | 実装中の判断で SPEC 本文と違う結論になった | `SPEC.md` 本文を直し、§14 に理由を 1 行追加 | — |
 
 ## 規則
 
 - README は利用者向けで、人が覚えるコマンドは `runo init` だけという前提で書く。それ以外は
   エージェントへの依頼例として書く。
-- `docs/` は `reference.md` と `adapter.md` の 2 本だけ。ページを増やす前に既存ページの節で収める。
+- `docs/` は `guide.md`（使い方）、`reference.md`（一覧）、`adapter.md`（package 作者向け）の 3 本だけ。
+  ページを増やす前に既存ページの節で収める。command や挙動を変えたら `guide.md` の頼み方と裏のコマンドも確認する。
 - project に展開する skill は各 60 行以内、AGENTS.md block は 120 行以内（テストあり）。
 - 経緯は書かない（commit message と SPEC §14 に残す）。現在の挙動だけを書く。
 

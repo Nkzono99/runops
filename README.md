@@ -48,6 +48,7 @@ runo init
 | v1 から移る | この project を runops v2 に移行して（`runo migrate-v1` を dry-run で確認してから） |
 
 投入、削除、整理、移行の前には、エージェントが対象と資源量を示して確認を取ります。
+場面ごとの流れは [使い方ガイド](https://github.com/Nkzono99/runops/blob/main/docs/guide.md) にあります。
 
 ## project の中身
 
@@ -85,6 +86,7 @@ run は ID が変わらないので、directory を移動してもエージェ�
 
 ---
 
+[使い方ガイド](https://github.com/Nkzono99/runops/blob/main/docs/guide.md) ·
 [リファレンス](https://github.com/Nkzono99/runops/blob/main/docs/reference.md) ·
 [adapter ガイド](https://github.com/Nkzono99/runops/blob/main/docs/adapter.md) ·
 [SPEC](https://github.com/Nkzono99/runops/blob/main/SPEC.md) ·

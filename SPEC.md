@@ -880,9 +880,10 @@ src/runops/
 
 ### 13.3 ドキュメント
 
-v2 の `docs/` は次の 3 ファイルだけにする。
+v2 の文書は次の 4 ファイルだけにする。
 
 - `README.md`: 導入と 5 分の tutorial
+- `docs/guide.md`: 場面ごとの使い方。エージェントへの頼み方と裏の `runo` コマンドを並べる
 - `docs/reference.md`: §4〜§7 を利用者向けに書き直したもの
 - `docs/adapter.md`: §8 を simulator package 作者向けに書き直したもの
 
@@ -914,3 +915,4 @@ v2 の `docs/` は次の 3 ファイルだけにする。
 | 同一入力の warning | `input_hash`（と `exe_hash`）が一致する既存 run を作成時に知らせる | §1.3 で観察した variation の重複を、ゲート無しで抑える |
 | 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |
 | `runo init` の対話と site の推定 | 端末から引数なしで実行したときだけ site と simulator を尋ねる。site の既定はホスト名（`camphor*`、`laurel*`、`cinnamon*`、`gardenia*` なら `kudpc`）。プリセット名は `kudpc` とし、`camphor` も同じ意味で受け付ける | 人が打つのは `runo init` だけなので、ここで KUDPC 向けの設定を取り違えないようにする。エージェントや CI からの実行（端末でない、`-y`、引数あり）は従来どおり尋ねない |
+| 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |
