@@ -59,6 +59,16 @@ def _apply_state(project: Project, manifest: Manifest, job: JobState | None) -> 
         else:
             new_state = RunState.FAILED
             message = f"job not found in squeue/sacct; exit record says exit={record['exit_code']}"
+    elif job.state is None:
+        manifest.job["last_slurm_state"] = job.slurm_state
+        manifest.save()
+        return SyncResult(
+            manifest.id,
+            before.value,
+            before.value,
+            job.slurm_state,
+            f"unrecognized Slurm state {job.slurm_state!r}; left {before.value}",
+        )
     else:
         slurm_state = job.slurm_state
         new_state = job.state

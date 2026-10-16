@@ -418,6 +418,8 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 - `sync` は対象 run の job id をまとめて 1 回の `squeue --jobs=...` で問い合わせ、そこに無い
   job だけを 1 回の `sacct --jobs=...` で引く。`tidy` の `orphan-job` 判定も同じ。
   scheduler への問い合わせ回数は run 数に依存しない。
+  runops が対応づけていない Slurm 状態の job は状態を変えずに `last_slurm_state` だけ残し、
+  他の run の更新は続ける。
 - job.sh は program 終了時に `submit/exit.<job_id>`（`exit_code`、`started_at`、`finished_at`、
   `hostname`）を書く。squeue にも sacct にも無い job は、この file があれば
   `exit_code = 0` のとき adapter の判定（既定 completed）、それ以外は `failed` にする。

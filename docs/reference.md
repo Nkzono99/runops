@@ -119,7 +119,8 @@ runops だけが書きます。手で編集しないでください。主な fie
 失敗と判定すれば `failed` にします。job.sh は終了時に `submit/exit.<job_id>`（exit code と
 開始・終了時刻）を書くので、Slurm の会計から消えた job もこの file で completed / failed が
 決まります。`sync` と `tidy` は対象 run の job id をまとめて 1 回の `squeue` と `sacct` で
-問い合わせます。
+問い合わせます。runops が知らない Slurm 状態の job は状態を変えず、
+`last_slurm_state` にその状態だけを記録します。
 
 `submit` は executable を hash し直して attempt に記録し、作成時と違えば警告します。
 `new` と `sweep --apply` は同じ入力（`input_hash`）の run が既にあれば警告します。

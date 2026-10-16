@@ -35,10 +35,17 @@ def default_runner(cmd: list[str]) -> CommandResult:
 _STATE_MAP = {
     "PENDING": RunState.SUBMITTED,
     "REQUEUED": RunState.SUBMITTED,
+    "REQUEUE_HOLD": RunState.SUBMITTED,
+    "REQUEUE_FED": RunState.SUBMITTED,
+    "RESV_DEL_HOLD": RunState.SUBMITTED,
     "CONFIGURING": RunState.RUNNING,
     "RUNNING": RunState.RUNNING,
     "COMPLETING": RunState.RUNNING,
     "SUSPENDED": RunState.RUNNING,
+    "STOPPED": RunState.RUNNING,
+    "SIGNALING": RunState.RUNNING,
+    "STAGE_OUT": RunState.RUNNING,
+    "RESIZING": RunState.RUNNING,
     "COMPLETED": RunState.COMPLETED,
     "FAILED": RunState.FAILED,
     "NODE_FAIL": RunState.FAILED,
@@ -47,6 +54,7 @@ _STATE_MAP = {
     "PREEMPTED": RunState.FAILED,
     "BOOT_FAIL": RunState.FAILED,
     "DEADLINE": RunState.FAILED,
+    "SPECIAL_EXIT": RunState.FAILED,
     "CANCELLED": RunState.CANCELLED,
 }
 
@@ -55,7 +63,9 @@ _JOB_RE = re.compile(r"Submitted batch job (\d+)")
 
 @dataclass
 class JobState:
-    state: RunState
+    """A job Slurm reports. ``state`` is ``None`` for a Slurm state runops does not map."""
+
+    state: RunState | None
     slurm_state: str
     exit_code: str = ""
 
@@ -97,7 +107,8 @@ def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobSta
     """One ``squeue`` call and, for jobs it does not list, one ``sacct`` call.
 
     Keeps scheduler load independent of the number of active runs. A job
-    missing from both is ``None``.
+    missing from both is ``None``; a job in an unmapped Slurm state has
+    ``JobState.state = None`` so one odd job does not stop the others.
     """
     ids = [j for j in dict.fromkeys(job_ids) if j]
     states: dict[str, JobState | None] = dict.fromkeys(ids)
@@ -108,9 +119,7 @@ def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobSta
         for line in result.stdout.splitlines():
             parts = line.split()
             if len(parts) >= 2 and parts[0] in states:
-                state = map_state(parts[1])
-                if state is not None:
-                    states[parts[0]] = JobState(state, parts[1].rstrip("+"))
+                states[parts[0]] = JobState(map_state(parts[1]), parts[1].rstrip("+"))
     pending = [j for j in ids if states[j] is None]
     if not pending:
         return states
@@ -131,8 +140,6 @@ def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobSta
             continue
         job_id = parts[0].strip()
         if job_id in states and states[job_id] is None:
-            state = map_state(parts[1])
-            if state is None:
-                raise RunError(f"unknown Slurm state {parts[1]!r} for job {job_id}")
-            states[job_id] = JobState(state, parts[1].split()[0].rstrip("+"), parts[2].strip())
+            raw = parts[1].split()[0].rstrip("+") if parts[1].strip() else ""
+            states[job_id] = JobState(map_state(parts[1]), raw, parts[2].strip())
     return states

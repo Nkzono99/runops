@@ -6,8 +6,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from runops.manifest import Manifest
+from runops.manifest import Manifest, RunState
 from runops.project import Project
+from runops.slurm import CommandResult, JobState, query_many
 
 
 def _manifest(project_dir: Path, run_id: str) -> Manifest:
@@ -137,3 +138,32 @@ def test_sweep_label_counter_follows_dest(project: Project) -> None:
     second = plan_sweep(project, "demo", {"x": [2]}, dest="runs/elsewhere")
     assert first.parent.parent == project.runs_dir / "elsewhere"
     assert first.sweep_label.endswith("-01") and second.sweep_label.endswith("-02")
+
+
+def test_unmapped_slurm_state_does_not_stop_sync(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (odd,) = cli("new", "demo", "--submit").run_ids()
+    (done,) = cli("new", "demo", "--submit").run_ids()
+    fake_slurm.states[_manifest(project_dir, odd).job_id] = "REVOKED"
+    fake_slurm.states[_manifest(project_dir, done).job_id] = "COMPLETED"
+
+    out = cli("sync", "--json")
+    assert out.code == 0
+    results = {r["run_id"]: r for r in json.loads(out.out)}
+    assert results[done]["after"] == "completed"
+    assert results[odd]["after"] == "submitted"
+    assert "REVOKED" in results[odd]["message"]
+    assert _manifest(project_dir, odd).job["last_slurm_state"] == "REVOKED"
+    assert cli("tidy", "--json").code == 0  # not an orphan-job either
+
+
+def test_squeue_unmapped_state_skips_sacct() -> None:
+    calls: list[list[str]] = []
+
+    def runner(cmd: list[str]) -> CommandResult:
+        calls.append(cmd)
+        return CommandResult(0, "7 SOMETHING_NEW\n8 REQUEUE_HOLD\n", "")
+
+    states = query_many(["7", "8"], runner=runner)
+    assert [c[0] for c in calls] == ["squeue"]
+    assert states["7"] == JobState(None, "SOMETHING_NEW")
+    assert states["8"] == JobState(RunState.SUBMITTED, "REQUEUE_HOLD")
