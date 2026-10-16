@@ -211,3 +211,28 @@ def test_init_install_needs_yes_off_terminal(
     res = cli("init", "emses")
     assert res.code == 2 and "--yes" in res.err
     assert not (tmp_path / "runops.toml").exists()
+
+
+def test_init_finishes_when_install_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    from runops.errors import RunError
+
+    def failing_install(project, *, upgrade):  # type: ignore[no-untyped-def]
+        raise RunError("package install failed:\nerror: fpm not found")
+
+    monkeypatch.setattr("runops.ops.setup.install_packages", failing_install)
+    monkeypatch.chdir(tmp_path)
+    res = cli("init", "beach", "-y")
+    assert res.code == 0, res.err
+    assert "fpm not found" in res.err
+    assert "runo update" in res.err
+    for name in (
+        "runops.toml",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".agents/skills/runops-maintain/SKILL.md",
+    ):
+        assert (tmp_path / name).exists(), name
+    assert load_toml(tmp_path / "runops.toml")["simulators"]["beach"]["package"] == "beach-bem>=3.0"
+    assert (tmp_path / "adapters/beach.py").is_file()  # no entry point yet -> bundled port

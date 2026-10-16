@@ -152,7 +152,12 @@ def init(
     report = init_project(root, sims, site=site, name=name, install=install)
     if report.site_detected:
         out.print(f"site: {report.site} (guessed from host {hostname()}; use --site to change)")
-    if not install and not no_install:
+    if report.install_failed:
+        err.print(
+            "[yellow]the project is ready, but simulator packages are not installed; "
+            "ask your agent to fix the install, or run `runo update` after fixing it[/]"
+        )
+    elif not install and not no_install:
         out.print("packages not installed; ask your agent or run `runo update` later")
     for item in report.created:
         out.print(f"created {item}")

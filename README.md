@@ -80,7 +80,7 @@ run は ID が変わらないので、directory を移動してもエージェ�
 | simulator | package | 状態 |
 |---|---|---|
 | MPIEMSES3D | `mpiemses3d-tools` ≥ 4.20 | adapter とエージェント向け skill を同梱 |
-| BEACH | `beach-bem` | 次のリリースで同梱。それまでは runops 内蔵の adapter を使用 |
+| BEACH | `beach-bem` ≥ 3.0 | adapter とエージェント向け skill を同梱 |
 | その他 | 自作の adapter、または `generic` | [adapter ガイド](https://github.com/Nkzono99/runops/blob/main/docs/adapter.md) |
 
 ---

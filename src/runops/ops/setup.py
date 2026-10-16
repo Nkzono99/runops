@@ -30,7 +30,7 @@ from runops.runtime import package_specs, resolve_runtime
 # Package specs for simulators whose adapter lives in their own package.
 KNOWN_PACKAGES = {
     "emses": "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git",
-    "beach": "beach-bem",
+    "beach": "beach-bem>=3.0",  # 3.0 ships the runops adapter and skills
 }
 KNOWN_EXECUTABLES = {"emses": "mpiemses3D", "beach": "beach"}
 
@@ -109,6 +109,7 @@ class InitReport:
     root: Path
     site: str = ""
     site_detected: bool = False
+    install_failed: bool = False
     created: list[str] = field(default_factory=list)
     installed: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -190,8 +191,14 @@ def init_project(
 
     project = Project(load_config(root))
     if install:
-        report.installed, warnings = install_packages(project, upgrade=False)
-        report.warnings += warnings
+        # A failed install must not leave a half-made project: runops.toml is
+        # already written, so finish the agent files and let `runo update` retry.
+        try:
+            report.installed, warnings = install_packages(project, upgrade=False)
+            report.warnings += warnings
+        except RunopsError as exc:
+            report.install_failed = True
+            report.warnings.append(f"package install failed: {exc}")
     report.created += add_legacy_adapters(project)
     report.warnings += refresh_agent_files(project)
     report.created += ["AGENTS.md", "CLAUDE.md", ".agents/skills/", ".claude/skills/"]
