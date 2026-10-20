@@ -217,6 +217,14 @@ def delete_run(project: Project, manifest: Manifest) -> None:
     run_dir = manifest.run_dir.resolve()
     if not inside(run_dir, project.runs_dir):
         raise UsageError(f"{run_dir} is outside runs/; refusing to delete")
+    nested = next(
+        (p for p in run_dir.rglob(MANIFEST_FILE) if p.parent != run_dir and p.is_file()), None
+    )
+    if nested is not None:
+        raise UsageError(
+            f"{manifest.id} contains another run ({project.rel(nested.parent)}); "
+            "move it out of the run directory first"
+        )
     shutil.rmtree(run_dir)
     project.update_index(manifest.id, None)
     _prune_empty(run_dir.parent, project.runs_dir)

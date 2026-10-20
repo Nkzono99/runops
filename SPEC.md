@@ -135,6 +135,7 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
     index.toml             # run id -> path cache（§7.2）
     id.lock                # run id 採番用 lock
     run.lock               # manifest の読み直し・更新用 lock（submit / cancel / retry / sync）
+    last_run_id            # 最後に払い出した run id。削除後も同じ id を再利用しないため
     v1-backup/<stamp>/     # migrate-v1 が退避した v1 の設定と harness（§11）
     build/
       <sim>-<commit>/      # local_source の build cache（§4.1）
@@ -147,6 +148,11 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
   見つける（§7.2）。
 - 既定の配置先は `runs/<case_name>/`。`--dest` で上書きできる。`_` で始まる
   directory（`_scratch`、`_archive`）は runops が予約する。
+- run directory の中（自身と子孫）には run を置けない。`--dest` が既存 run の中なら拒否し、
+  `delete` は中に別の run があれば拒否する（§7.2 の走査は manifest のある directory で止まる）。
+- run id は `R<YYYYMMDD>-<NNNN>`。その日の既存 run と `.runops/last_run_id` の大きい方に 1 を足す。
+  run を削除しても番号は再利用しない（ログやノートに残った id が別の run を指さないように）。
+  `last_run_id` を失っても既存 run からの採番に戻るだけで、動作は壊れない。
 - run は同じ親 directory の `.<name>.staging` で組み立ててから rename で公開する。
   rename は `renameat2(RENAME_NOREPLACE)` を使い、filesystem が対応しない場合
   （KUDPC の Lustre は EINVAL を返す）は project lock 下で存在確認してから `rename` する。

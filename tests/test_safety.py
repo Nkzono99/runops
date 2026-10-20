@@ -87,6 +87,40 @@ def test_purge_refuses_when_adapter_fails(
     assert not _manifest(project_dir, run_id).data["storage"]["work_purged_at"]
 
 
+def test_dest_inside_a_run_is_refused(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (run_id,) = cli("new", "demo").run_ids()
+    run_dir = _manifest(project_dir, run_id).run_dir
+    for dest in (str(run_dir), str(run_dir / "analysis" / "sub")):
+        res = cli("new", "demo", "--dest", dest)
+        assert res.code == 2 and "inside the run" in res.err
+
+
+def test_delete_refuses_nested_run(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (outer,) = cli("new", "demo", "--scratch").run_ids()
+    (inner,) = cli("new", "demo", "--scratch").run_ids()
+    outer_dir = _manifest(project_dir, outer).run_dir
+    inner_dir = _manifest(project_dir, inner).run_dir
+    inner_dir.rename(outer_dir / "analysis" / inner_dir.name)  # moved in by hand
+    res = cli("delete", outer, "-y")
+    assert res.code == 2 and "contains another run" in res.err
+    assert outer_dir.is_dir()
+
+
+def test_deleted_id_is_not_reused(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (first,) = cli("new", "demo", "--scratch").run_ids()
+    assert cli("delete", first, "-y").code == 0
+    (second,) = cli("new", "demo").run_ids()
+    assert second != first
+    assert int(second[-4:]) == int(first[-4:]) + 1
+
+
+def test_ids_survive_lost_counter(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (first,) = cli("new", "demo").run_ids()
+    (project_dir / ".runops/last_run_id").unlink()
+    (second,) = cli("new", "demo").run_ids()
+    assert int(second[-4:]) == int(first[-4:]) + 1
+
+
 def test_sync_reports_setup_failure(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
     (run_id,) = cli("new", "demo", "--submit").run_ids()
     m = _manifest(project_dir, run_id)

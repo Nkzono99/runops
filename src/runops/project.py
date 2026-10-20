@@ -14,11 +14,12 @@ from pathlib import Path
 from runops.config import ProjectConfig, find_project_root, load_config
 from runops.errors import UsageError
 from runops.manifest import MANIFEST_FILE, Manifest
-from runops.util import dump_toml, load_toml, tomllib
+from runops.util import atomic_write_text, dump_toml, load_toml, tomllib
 
 RUN_ID_RE = re.compile(r"^R(\d{8})-(\d{4,})$")
 STATE_DIR = ".runops"
 INDEX_FILE = "index.toml"
+LAST_ID_FILE = "last_run_id"
 ARCHIVE_DIR = "_archive"
 SCRATCH_DIR = "_scratch"
 
@@ -144,6 +145,16 @@ class Project:
         shown = "\n  ".join(self.rel(p.parent) for p in matches[:20])
         raise UsageError(f"{ref!r} matches {len(matches)} runs:\n  {shown}")
 
+    def enclosing_run(self, path: Path) -> Path | None:
+        """The run directory at or above *path* (up to ``runs/``), if any."""
+        runs = self.runs_dir.resolve()
+        current = path.resolve()
+        while current != runs and runs in current.parents:
+            if (current / MANIFEST_FILE).is_file():
+                return current
+            current = current.parent
+        return None
+
     # ---- locks -------------------------------------------------------
     @contextmanager
     def _flock(self, name: str) -> Iterator[None]:
@@ -180,14 +191,27 @@ class Project:
 
     # ---- run id allocation -------------------------------------------
     def next_run_ids(self, count: int, today: datetime | None = None) -> list[str]:
-        """Allocate *count* fresh ids. Call while holding :meth:`id_lock`."""
+        """Allocate *count* fresh ids. Call while holding :meth:`id_lock`.
+
+        Ids are never reused: ``.runops/last_run_id`` keeps the highest id handed
+        out, so deleting the newest run of the day does not free its number.
+        """
         day = (today or datetime.now().astimezone()).strftime("%Y%m%d")
         highest = 0
-        for run_id in self.rebuild_index():
+        for run_id in [*self.rebuild_index(), self._last_run_id()]:
             match = RUN_ID_RE.match(run_id)
             if match and match.group(1) == day:
                 highest = max(highest, int(match.group(2)))
-        return [f"R{day}-{highest + i:04d}" for i in range(1, count + 1)]
+        ids = [f"R{day}-{highest + i:04d}" for i in range(1, count + 1)]
+        if ids:
+            atomic_write_text(self.state_dir / LAST_ID_FILE, ids[-1] + "\n")
+        return ids
+
+    def _last_run_id(self) -> str:
+        try:
+            return (self.state_dir / LAST_ID_FILE).read_text(encoding="utf-8").strip()
+        except OSError:
+            return ""
 
 
 def _peek_run_id(path: Path) -> str:

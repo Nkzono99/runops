@@ -135,6 +135,10 @@ def _dest_parent(project: Project, case: Case, dest: str, scratch: bool) -> Path
         raise UsageError(f"--dest must be inside {project.runs_dir}")
     if inside(path, project.runs_dir / ARCHIVE_DIR):
         raise UsageError("--dest must not be inside runs/_archive")
+    enclosing = project.enclosing_run(path)
+    if enclosing is not None:
+        # Discovery stops at a run directory, so a run nested in it would be lost.
+        raise UsageError(f"--dest must not be inside the run {project.rel(enclosing)}")
     return path
 
 
