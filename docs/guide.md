@@ -165,6 +165,11 @@ runops が知らない Slurm 状態の job は状態を変えず、`last_slurm_s
 `retry` は `failed` / `cancelled` の run を `created` に戻し、試行回数を 1 つ増やします。
 `work/` は消しません。
 
+「消えたジョブを再投入して」「全部止めて」のように範囲を言わない依頼は、エージェントを起動した
+project の run だけが対象です。同じアカウントの別 project のジョブや runops 外のジョブは、
+`squeue` に見えていても対象にせず、該当する run が無ければそう伝えます。別 project の run も
+扱いたいときは、その project か run を名指ししてください。
+
 ## 5. 続きを流す
 
 > R20261015-0003 の続きを 2 倍の step で。

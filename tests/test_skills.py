@@ -117,3 +117,17 @@ def test_runops_skills_are_short() -> None:
 def test_agents_md_short(project_dir: Path) -> None:
     assert len((project_dir / "AGENTS.md").read_text().splitlines()) <= 120
     assert (project_dir / "CLAUDE.md").read_text() == "@AGENTS.md\n"
+
+
+def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> None:
+    agents = (project_dir / "AGENTS.md").read_text()
+    assert "Scope is this project" in agents
+    assert "never a target list" in agents
+    skills = project_dir / ".agents/skills"
+    status = (skills / "runops-check-status/SKILL.md").read_text()
+    assert "starts from this project's runs" in status
+    assert "account-wide `squeue` / `sacct` are not" in status
+    assert (
+        "another project's `runs/` are refused"
+        in (skills / "runops-reference/SKILL.md").read_text()
+    )

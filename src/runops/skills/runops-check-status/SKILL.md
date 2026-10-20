@@ -17,6 +17,10 @@ description: Check the progress or result of runops runs (sync, list, log, retry
    and raise the case walltime for the next run.
 5. To rerun the same inputs: `runo retry RUN` then `runo submit RUN` after confirming.
    To change inputs, create a new run with `runo new --from RUN --set ...`.
+   Recovery ("jobs vanished, resubmit them") starts from this project's runs:
+   `runo sync`, then `runo list --status failed --status cancelled`. Only those runs are
+   candidates; jobs seen in account-wide `squeue` / `sacct` are not. If none match, say so.
+   Skip runs whose notes say another session cancelled them to fix and replace them.
 6. If a run's `work/` is large and the run is done, `runo tidy --purge-work RUN`
    removes outputs except the adapter's keep patterns.
 

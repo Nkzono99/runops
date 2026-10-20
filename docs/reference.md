@@ -6,6 +6,9 @@
 ## runops.toml
 
 project root にあり、`runo` はここを上方向に探して project を特定します。
+command はこの project の `runs/` 配下だけを扱い、別 project の run directory や
+directory を path で渡すとエラーになります。run id は project ごとなので、同じ id が
+別 project にあっても cwd の project の run を指します。
 
 ```toml
 schema = 2

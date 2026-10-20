@@ -39,7 +39,8 @@ description: Full runops (runo) command reference, project layout and manifest f
 `runops.toml` (site, simulators, launchers, defaults), `cases/<name>/case.toml` plus base
 input files, `runs/<case>/<run_id>--<label>/` with `manifest.toml`, `input/`, `submit/job.sh`,
 `work/` (cwd for Slurm logs), `analysis/`, optional `notes.md`. Scratch runs live in
-`runs/_scratch/`, archived runs in `runs/_archive/`.
+`runs/_scratch/`, archived runs in `runs/_archive/`. `runo` acts on the project found
+from the cwd; paths into another project's `runs/` are refused.
 
 ## Manifest
 

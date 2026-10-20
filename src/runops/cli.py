@@ -488,7 +488,7 @@ def submit_cmd(
     if all_runs:
         if runs and len(runs) > 1:
             raise UsageError("--all takes at most one DIR")
-        under = Path(runs[0]).resolve() if runs else project.runs_dir
+        under = project.runs_subdir(runs[0]) if runs else project.runs_dir
         targets = [
             m
             for m in project.iter_runs(under)
@@ -687,7 +687,7 @@ def list_cmd(
         if s not in {state.value for state in RunState}:
             raise UsageError(f"unknown status {s!r}")
     flt = ListFilter(
-        path=path.resolve() if path else None,
+        path=project.runs_subdir(path) if path else None,
         show_all=show_all,
         since=parse_age(since) if since else None,
         cases=cases or [],

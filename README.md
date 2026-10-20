@@ -48,6 +48,7 @@ runo init
 | v1 から移る | この project を runops v2 に移行して（`runo migrate-v1` を dry-run で確認してから） |
 
 投入、削除、整理、移行の前には、エージェントが対象と資源量を示して確認を取ります。
+範囲を言わない依頼（「全部再投入して」など）は、エージェントを起動した project の run だけが対象です。
 場面ごとの流れは [使い方ガイド](https://github.com/Nkzono99/runops/blob/main/docs/guide.md) にあります。
 
 ## project の中身

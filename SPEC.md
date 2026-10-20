@@ -461,6 +461,9 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   見つからなければ exit code 2 でエラー。
 - `RUN` 引数は run id、run directory path、または directory 名の一意な部分文字列を受け付ける。
   複数一致は exit code 2 でエラーにし候補を表示する。
+- path で与える `RUN` と `DIR`（`submit --all`、`list`）は、この project の `runs/`
+  配下に限る。別 project の path は exit code 2 で拒否する。run id は project ごとの空間なので、
+  同じ id が別 project にあっても cwd の project の run を指す。
 - 一覧系 command は `--json` を持ち、agent が機械可読に読める。`new` と `sweep --apply` の
   `--json` は作成した run の同じ summary を返す。summary には `params`、`changed_keys`、
   `parent_run`、`exe_hash`、`input_hash` を含め、run 同士の比較に別 command を要らなくする。
@@ -743,7 +746,8 @@ seal、index を持たない）。
 - `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表、§9 のノート規約、
   §5 の「variation は case ではなく run で表現する」規約、
   「submit 前に対象と資源量を提示して確認を取る」「`manifest.toml` と `input/` を直接
-  編集しない」の 2 つの安全規則、展開済み skill の一覧。
+  編集しない」「操作対象は起動した project の run と job に限る」の 3 つの安全規則、
+  展開済み skill の一覧。
 - harness file は project root にだけ置く。`runs/` や `cases/` 配下には生成しない。
 - `CLAUDE.md`: `@AGENTS.md` の 1 行。
 - `.agents/skills/`、`.claude/skills/`: §8.2、§8.3 の展開結果。
@@ -957,4 +961,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |
 | `runo init` の対話と site の推定 | 端末から引数なしで実行したときだけ site と simulator を尋ねる。site の既定はホスト名（`camphor*`、`laurel*`、`cinnamon*`、`gardenia*` なら `kudpc`）。プリセット名は `kudpc` とし、`camphor` も同じ意味で受け付ける | 人が打つのは `runo init` だけなので、ここで KUDPC 向けの設定を取り違えないようにする。エージェントや CI からの実行（端末でない、`-y`、引数あり）は従来どおり尋ねない |
 | 異常系と同時操作（2026-10-20） | `run.lock` 下で manifest を読み直す、準備の失敗で program を起動しない、adapter を読めなければ purge しない、build cache の key を内容と `build_command` から作る、run の入れ子を禁止、run id を再利用しない（`last_run_id`）、`new --from` で case の変更を警告 | 外部レビューで、二重投入で 1 回目の履歴が消える、準備失敗が completed になる、adapter の故障で保持ファイルが消える、未追跡ファイルの変更で古い binary を使う、削除した id が別の run を指す、を確認した |
+| 操作範囲は起動 project（2026-10-21） | AGENTS.md block と skill に「対象は起動した project の run と job id だけ。アカウント全体の squeue / sacct は診断に見るだけ。自分で別 directory に移らず、生の `sbatch` / `scancel` を使わない」を書く。CLI は別 project の path を拒否する | 範囲を言わない「再投入して」で、エージェントが別 project や runops 管理外のジョブまで再投入した。cwd で project を決める既存の model に、path 引数の抜け道（`submit --all /other/runs` など）があった（#112） |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

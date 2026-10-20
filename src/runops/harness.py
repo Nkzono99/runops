@@ -60,6 +60,11 @@ This is a runops project: simulation runs are tracked as directories under
   production submit. Earlier runs may fill in parameters, not add actions.
 - Before `submit`, `sweep --apply --submit`, or `submit --all`, show the target runs,
   partition and resources, and get confirmation.
+- Scope is this project: the runs under `runs/` here and their job ids. "all", "resubmit",
+  "cancel the duplicates" mean runs of this project. Do not `cd` to other projects or use
+  raw `sbatch` / `scancel` to widen it; account-wide `squeue` / `sacct` is for diagnosis,
+  never a target list. If no run here matches, say so. Touch other projects' runs only when
+  the user names them, and never revive runs another session cancelled to fix them.
 - After a production submit is accepted, report the job ids and stop. When asked to
   watch, check once for early failure, then near the expected end; no `tail -f` loops.
 - Never edit `manifest.toml` or a run's `input/` by hand. Change the case or create a
