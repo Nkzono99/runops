@@ -38,6 +38,7 @@ class FakeSlurm:
     next_id: int = 1000
     states: dict[str, str] = field(default_factory=dict)  # job id -> state
     unknown: set[str] = field(default_factory=set)
+    elapsed: dict[str, str] = field(default_factory=dict)  # job id -> sacct Elapsed
     commands: list[list[str]] = field(default_factory=list)
     fail_sbatch: bool = False
 
@@ -65,7 +66,8 @@ class FakeSlurm:
                     if state in ("PENDING", "RUNNING"):
                         lines.append(f"{job} {state}")
                 else:
-                    lines.append(f"{job}|{state}|0:0\n{job}.batch|{state}|0:0")
+                    took = self.elapsed.get(job, "")
+                    lines.append(f"{job}|{state}|0:0|{took}\n{job}.batch|{state}|0:0|{took}")
             return CommandResult(0, "".join(line + "\n" for line in lines), "")
         raise AssertionError(f"unexpected command {cmd}")
 

@@ -84,6 +84,25 @@ def parse_iso(value: str) -> datetime | None:
     return parsed
 
 
+_DURATION_RE = re.compile(r"^(?:(\d+)-)?(?:(\d+):)?(\d+):(\d+)(?:\.\d+)?$")
+
+
+def parse_duration(value: str) -> int | None:
+    """Seconds in a Slurm duration (``[D-][H:]MM:SS``, e.g. sacct ``Elapsed``)."""
+    match = _DURATION_RE.match(str(value).strip())
+    if not match:
+        return None
+    days, hours, minutes, seconds = (int(g) if g else 0 for g in match.groups())
+    return ((days * 24 + hours) * 60 + minutes) * 60 + seconds
+
+
+def format_duration(seconds: int) -> str:
+    """``HH:MM:SS``, or ``D-HH:MM:SS`` from one day on."""
+    days, rest = divmod(max(int(seconds), 0), 86400)
+    text = f"{rest // 3600:02d}:{rest % 3600 // 60:02d}:{rest % 60:02d}"
+    return f"{days}-{text}" if days else text
+
+
 _AGE_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*([dhw]?)\s*$")
 
 

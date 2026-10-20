@@ -45,6 +45,6 @@ input files, `runs/<case>/<run_id>--<label>/` with `manifest.toml`, `input/`, `s
 
 `[run]` id, label, status, why, scratch, expires_at, pinned, tags, `[[notes]]`;
 `[origin]` case, sweep, parent_run; `[simulator]` executable and provenance;
-`[job]` resources, job_id, `[[job.attempts]]`; `[params]` final values;
+`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed); `[params]` final values;
 `[variation].changed_keys`. Status: created -> submitted -> running ->
 completed | failed | cancelled; terminal runs can be archived.

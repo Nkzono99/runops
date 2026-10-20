@@ -12,7 +12,7 @@ from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.common import run_sim_context
 from runops.project import Project
 from runops.slurm import CommandRunner, JobState, default_runner, query, query_many
-from runops.util import load_toml, now_iso, tomllib
+from runops.util import format_duration, load_toml, now_iso, parse_duration, parse_iso, tomllib
 
 
 @dataclass
@@ -109,9 +109,22 @@ def _settle(project: Project, manifest: Manifest, job: JobState | None) -> SyncR
         manifest.job["finished_at"] = now
         if attempts:
             attempts[-1]["finished_at"] = now
+            elapsed = _elapsed(job, record)
+            if elapsed:
+                attempts[-1]["elapsed"] = elapsed
     manifest.set_status(new_state)
     manifest.save()
     return SyncResult(manifest.id, before.value, new_state.value, slurm_state, message)
+
+
+def _elapsed(job: JobState | None, record: dict[str, Any] | None) -> str:
+    """Run time of the attempt: sacct ``Elapsed``, else the exit record's start/end."""
+    seconds = parse_duration(job.elapsed) if job is not None and job.elapsed else None
+    if seconds is None and record is not None:
+        start, end = parse_iso(record["started_at"]), parse_iso(record["finished_at"])
+        if start and end and end >= start:
+            seconds = int((end - start).total_seconds())
+    return format_duration(seconds) if seconds is not None else ""
 
 
 def read_exit_record(run_dir: Path, job_id: str) -> dict[str, Any] | None:

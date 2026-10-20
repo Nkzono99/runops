@@ -107,7 +107,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
 | `[origin]` | `case`、`sweep`、`parent_run`、`created_by`、`case_input_hash` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
-| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`） |
+| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`） |
 | `[params]` | case の params に `--set` を適用した最終値 |
 | `[variation]` | `changed_keys` |
 | `[identity]` | `input_hash` |
@@ -134,6 +134,10 @@ program を起動せずに終わり、`stage = "setup"` と exit code を記録�
 run id は削除後も再利用しません。`--dest` に既存 run の中は指定できません。
 
 ## command
+
+`list --json` と `status --json` は、walltime の根拠として `walltime`、最新 attempt の `elapsed`、
+`walltime_used`（elapsed / walltime）、`slurm_state` も返します。表では `TIMEOUT` などを
+`failed (TIMEOUT)` と示します。
 
 全 command は `--help` で option を確認できます。`RUN` には run id、run directory、
 または directory 名の一意な部分文字列を渡せます。

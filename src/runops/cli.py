@@ -555,7 +555,9 @@ def retry(
 def _status_table(project: Project, manifests: list[Manifest]) -> Table:
     from runops.ops.listing import relative_age
 
-    table = Table("id", "status", "label", "case", "sweep", "created", "note", "why", box=None)
+    table = Table(
+        "id", "status", "label", "case", "sweep", "created", "elapsed", "note", "why", box=None
+    )
     for m in manifests:
         s = m.to_summary(project.root)
         color = {
@@ -566,6 +568,11 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             "cancelled": "yellow",
         }.get(s["status"], "")
         status = f"[{color}]{s['status']}[/]" if color else s["status"]
+        if s["status"] == "failed" and s["slurm_state"] not in ("", "FAILED", "UNKNOWN"):
+            status += f" ({s['slurm_state']})"  # e.g. TIMEOUT, OUT_OF_MEMORY
+        elapsed = s["elapsed"]
+        if elapsed and s["walltime_used"] is not None:
+            elapsed += f" ({s['walltime_used']:.0%})"
         if s["scratch"]:
             status += " [dim](scratch)[/]"
         if s["pinned"]:
@@ -577,6 +584,7 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             s["case"],
             s["sweep"],
             relative_age(s["created_at"]),
+            elapsed,
             s["last_note"][:60],
             s["why"][:60],
         )

@@ -108,6 +108,11 @@ run id、入力、sweep の帰属、ノートはそのままで、移動元は�
 資源量（partition、walltime、並列数）は case の `[job]` に書きます。1 回だけ partition を
 変えるなら「今回は gr20001b で投げて」と頼めば `runo submit RUN --partition gr20001b` になります。
 
+walltime は、同じ case・同じ資源で終わった run の実時間を元に決めます。`runo list --json` と
+`runo status` は、各 run の `elapsed`（最新の実行の実時間）、`walltime`、使った割合を示します。
+エージェントは「R… が 15:42 で終わったので 1.3〜1.5 倍の 24 時間」のように根拠の run を挙げて提案し、
+似た run が無ければ見積もれないと伝えます。walltime 切れの run は `failed (TIMEOUT)` と表示されます。
+
 ## 4. 様子を見る
 
 > 先週投げた run の状況を見て。失敗していたら原因をノートに残して。

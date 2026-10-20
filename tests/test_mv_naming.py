@@ -89,3 +89,34 @@ def test_sweep_names_label_each_point(project_dir: Path, cli) -> None:  # type: 
     assert cli("sweep", "demo", "--set", "x=1,2", "--names", "x=a").code == 2
     assert cli("sweep", "demo", "--set", "x=1,2", "--names", "y=a,b").code == 2
     assert cli("sweep", "demo", "--set", "x=1,2", "--names", "x=a,a").code == 2
+
+
+def test_elapsed_and_timeout_are_reported(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (ok,) = cli("new", "demo", "--submit").run_ids()
+    fake_slurm.states[fake_slurm.last_job] = "COMPLETED"
+    fake_slurm.elapsed[fake_slurm.last_job] = "00:45:00"
+    (slow,) = cli("new", "demo", "--submit").run_ids()
+    fake_slurm.states[fake_slurm.last_job] = "TIMEOUT"
+    fake_slurm.elapsed[fake_slurm.last_job] = "01:00:02"
+    cli("sync")
+
+    rows = {r["id"]: r for r in json.loads(cli("list", "--json").out)}
+    assert rows[ok]["elapsed"] == "00:45:00"
+    assert rows[ok]["walltime"] == "1:00:00"
+    assert rows[ok]["walltime_used"] == 0.75
+    assert rows[slow]["status"] == "failed" and rows[slow]["slurm_state"] == "TIMEOUT"
+    assert _manifest(project_dir, ok).job["attempts"][-1]["elapsed"] == "00:45:00"
+    table = cli("status", ok, slow).out
+    assert "00:45:00 (75%)" in table and "failed (TIMEOUT)" in table
+
+
+def test_elapsed_from_exit_record(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (run_id,) = cli("new", "demo", "--submit").run_ids()
+    m = _manifest(project_dir, run_id)
+    fake_slurm.unknown.add(m.job_id)
+    (m.run_dir / "submit" / f"exit.{m.job_id}").write_text(
+        'exit_code = 0\nstarted_at = "2026-10-15T10:00:00+09:00"\n'
+        'finished_at = "2026-10-16T11:30:05+09:00"\nhostname = "n1"\nstage = "run"\n'
+    )
+    cli("sync")
+    assert _manifest(project_dir, run_id).job["attempts"][-1]["elapsed"] == "1-01:30:05"

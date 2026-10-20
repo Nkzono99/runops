@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 
 from runops.errors import UsageError
-from runops.util import dump_toml, load_toml, now_iso, parse_iso, tomllib
+from runops.util import dump_toml, load_toml, now_iso, parse_duration, parse_iso, tomllib
 
 MANIFEST_FILE = "manifest.toml"
 SCHEMA_VERSION = 2
@@ -193,4 +193,19 @@ class Manifest:
             "parent_run": str(self.section("origin").get("parent_run", "")),
             "exe_hash": str(self.section("simulator").get("exe_hash", "")),
             "input_hash": str(self.section("identity").get("input_hash", "")),
+            # Walltime evidence for the next run: elapsed of the latest attempt.
+            **self.timing(),
+        }
+
+    def timing(self) -> dict[str, Any]:
+        """Walltime, latest attempt elapsed, the fraction used, and the last Slurm state."""
+        walltime = str(self.job.get("walltime", ""))
+        attempts = self.job.get("attempts") or []
+        elapsed = str(attempts[-1].get("elapsed", "")) if attempts else ""
+        limit, used = parse_duration(walltime), parse_duration(elapsed)
+        return {
+            "walltime": walltime,
+            "elapsed": elapsed,
+            "walltime_used": round(used / limit, 3) if limit and used is not None else None,
+            "slurm_state": str(self.job.get("last_slurm_state", "")),
         }

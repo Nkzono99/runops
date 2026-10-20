@@ -20,6 +20,26 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
 6. Before submitting, show the run ids, partition, resources and core-hours and get
    confirmation. Then `runo submit RUN...` or create with `--submit`.
 
+## Naming
+
+Names identify a series and its key settings; the manifest and input hold the rest.
+- Shared settings of a series go in the parent directory (`sweep --label`, `--dest`),
+  e.g. `d5m_T10eV_v400kms_pe`; the run label shows only what differs per point.
+- When a swept value is long (a whole array), name each value:
+  `--names KEY=wh0,wh1,...`. Do not add dummy parameters for naming.
+- Use units (`T10eV`, `v400kms`), skip defaults, do not repeat parent info in labels.
+  Check the preview against existing series before `--apply`.
+- To rename or regroup existing runs, `runo mv RUN... --dest DIR [--label L] --why ...`.
+  It keeps ids and inputs; never re-create a run just to change its name.
+
+## Walltime
+
+Before setting `[job].walltime`, look for a comparable finished run (same case,
+resources and step count): `runo list --case C --all --json` shows `elapsed`,
+`walltime` and `walltime_used`. Suggest about 1.3-1.5x its elapsed, rounded up, and
+name the run it came from. A `TIMEOUT` run's elapsed is only a lower bound. With no
+comparable run, say the estimate is unknown. Change the case only after confirmation.
+
 Values in `--set` are TOML literals: `3`, `1.5e-6`, `true`, `"text"`, `[1, 2]`.
 Unquoted words become strings.
 

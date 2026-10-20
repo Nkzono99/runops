@@ -377,6 +377,7 @@ finished_at = ""
 slurm_state = "COMPLETED"
 exit_code = 0                     # exit record から
 exe_hash = "sha256:..."           # submit 時点の executable の hash
+elapsed = "15:42:10"              # sacct の Elapsed、無ければ exit record の開始・終了から
 
 [params]
 "tmgrid.nx" = 4000
@@ -463,6 +464,8 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 - 一覧系 command は `--json` を持ち、agent が機械可読に読める。`new` と `sweep --apply` の
   `--json` は作成した run の同じ summary を返す。summary には `params`、`changed_keys`、
   `parent_run`、`exe_hash`、`input_hash` を含め、run 同士の比較に別 command を要らなくする。
+  walltime の根拠として `walltime`、最新 attempt の `elapsed`、`walltime_used`（elapsed / walltime）、
+  `slurm_state`（`TIMEOUT` など）も含める。
 - 破壊的 command（`cancel`、`delete`、`tidy --apply`、`archive`）は対象を表示して
   確認を取る。`-y/--yes` で省略。
 - exit code: 0 成功、1 対象 run の実行時エラー（例: sbatch 失敗）、2 使用方法・設定エラー。
@@ -937,6 +940,8 @@ v2 の文書は次の 4 ファイルだけにする。
 | adapter の追加 hook | `configure(sim_config)`、`job_prelude(run_dir)` | generic の `command` 取得と、EMSES の `rm -f *_0000.h5` など v1 の setup command を表す |
 | launcher `kind = "none"` | MPI launcher を使わず program を直接実行 | OpenMP のみの BEACH run 用 |
 | `runo pin` | command を 1 つ追加（計 23 + `--version`） | `pinned` を立てる手段が本文に無かった |
+| `runo mv`、`sweep --names` / `--dest`（2026-10-20） | id を保つ改名・移動を command にする（計 24）。sweep の各点に短い名前を付け、親 directory を選べるようにする | 運用で、投入前に名前を短くするだけで 10 run を `new --from` で作り直し、id が 10 増えた（#110）。構造化配列を 1 軸にすると label に配列が展開された（#111）。未投入 run の入力編集は「入力は作成時に固定」を崩すので見送る |
+| walltime の根拠（2026-10-20） | attempt ごとに `elapsed` を記録し、`list` / `status` に `elapsed`、`walltime`、`walltime_used`、`slurm_state` を出す。表では TIMEOUT などを `failed (TIMEOUT)` と示す。似た run の選択と余裕の倍率は skill の指針に置き、runops は推奨値を出さない | 「似た run」の自動判定は外れたときの害が大きい。根拠の数値を見せ、判断はエージェントと人に任せる（#109） |
 | generic の `success_marker` | 既定は未設定（Slurm の状態に従う） | 既定 `COMPLETED` だと marker を書かない program が全て failed になる |
 | skill 名 | package の skill 名をそのまま使う | MPIEMSES3D の skill は既に `mpiemses3d-` で名前空間がある |
 | `new --from RUN` の入力 | case の base file に、source run の params と `--set` を適用 | generic の template と TOML override の両方で同じ結果になる |

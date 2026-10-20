@@ -68,6 +68,7 @@ class JobState:
     state: RunState | None
     slurm_state: str
     exit_code: str = ""
+    elapsed: str = ""  # sacct Elapsed; empty for squeue rows
 
 
 def map_state(raw: str) -> RunState | None:
@@ -129,7 +130,7 @@ def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobSta
             f"--jobs={','.join(pending)}",
             "--noheader",
             "--parsable2",
-            "--format=JobID,State,ExitCode",
+            "--format=JobID,State,ExitCode,Elapsed",
         ]
     )
     if result.returncode != 0:
@@ -141,5 +142,6 @@ def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobSta
         job_id = parts[0].strip()
         if job_id in states and states[job_id] is None:
             raw = parts[1].split()[0].rstrip("+") if parts[1].strip() else ""
-            states[job_id] = JobState(map_state(parts[1]), raw, parts[2].strip())
+            elapsed = parts[3].strip() if len(parts) > 3 else ""
+            states[job_id] = JobState(map_state(parts[1]), raw, parts[2].strip(), elapsed)
     return states

@@ -13,6 +13,8 @@ description: Check the progress or result of runops runs (sync, list, log, retry
    tail of the latest job's stdout / stderr (`-n 200` for more, `-f` to follow).
 4. For a failed run, read the stderr log and the adapter summary
    (`runo summarize RUN`). Record the cause with `runo note RUN "..."`.
+   `failed (TIMEOUT)` means the walltime ran out: compare `elapsed` with `walltime`
+   and raise the case walltime for the next run.
 5. To rerun the same inputs: `runo retry RUN` then `runo submit RUN` after confirming.
    To change inputs, create a new run with `runo new --from RUN --set ...`.
 6. If a run's `work/` is large and the run is done, `runo tidy --purge-work RUN`
