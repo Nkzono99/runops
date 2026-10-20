@@ -129,6 +129,20 @@ def read_lock(project: Project) -> list[dict[str, Any]]:
     return list(skills) if isinstance(skills, list) else []
 
 
+def stale_runops_skills(project: Project) -> str:
+    """Warning when the deployed runops skills predate the installed runops; else ``""``.
+
+    Cheap (reads ``skills.lock`` only), so ``runo context`` can call it on every start.
+    """
+    deployed = {str(e.get("version")) for e in read_lock(project) if e.get("source") == "runops"}
+    if not deployed or deployed == {__version__}:
+        return ""
+    return (
+        f"runops skills are from {', '.join(sorted(deployed))}, installed is {__version__}; "
+        "run `runo update --skills-only`"
+    )
+
+
 def deployed_skill_names(project: Project) -> list[str]:
     root = project.root / SKILL_ROOTS[0]
     if not root.is_dir():

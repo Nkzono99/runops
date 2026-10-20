@@ -249,6 +249,7 @@ def context(as_json: bool = typer.Option(False, "--json")) -> None:
         _print_json(data)
         return
     out.print(f"[bold]{data['project']}[/] ({data['root']}) runops {data['runops_version']}")
+    _warn(data["warnings"])
     sims = ", ".join(f"{k} ({v['adapter']})" for k, v in data["simulators"].items())
     out.print(f"simulators: {sims or '-'}")
     counts = ", ".join(f"{k}={v}" for k, v in sorted(data["status_counts"].items()))

@@ -234,6 +234,7 @@ run id で引き続き見つかり、`runo restore` で戻せます。
 | 更新する | runops と simulator を最新にして | `uv tool upgrade runops`、`runo update -y` |
 
 `runo update` は simulator package を更新し、package に同梱された skill を配置し直します。
+runops を更新した後、project の skill が古いままだと `runo context` が警告を出すので、「skill を更新して」と頼んでください。
 `AGENTS.md` は `<!-- runops:begin -->` から `<!-- runops:end -->` までだけを書き換えるので、
 その外に書いた project 固有の規則は残ります。
 

@@ -11,6 +11,7 @@ from runops.adapters.registry import optional
 from runops.errors import UsageError
 from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.common import run_sim_context
+from runops.ops.skills import stale_runops_skills
 from runops.project import Project
 from runops.util import now_iso, parse_iso
 
@@ -91,4 +92,5 @@ def project_context(project: Project, *, log_lines: int = 20) -> dict[str, Any]:
         "recent_runs": [m.to_summary(project.root) for m in recent],
         "notes_files": note_files,
         "log_tail": log_tail,
+        "warnings": [w for w in [stale_runops_skills(project)] if w],
     }

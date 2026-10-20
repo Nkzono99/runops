@@ -486,7 +486,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo doctor [--json]` | `runops.toml` の妥当性、adapter の import 可否、executable の存在、`sbatch` の有無、skill の鮮度を検査 |
 | `runo update [--skills-only] [-y]` | adapter package を upgrade し、skill を再展開する |
 | `runo build SIM [--force]` | `local_source` simulator を `.runops/build/` に build する（§4.1） |
-| `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行 |
+| `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
 | `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
 | `runo case list` | case 一覧 |
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |

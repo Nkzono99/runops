@@ -6,6 +6,7 @@ import json
 import shutil
 from pathlib import Path
 
+from runops import __version__
 from runops.manifest import Manifest
 from runops.project import Project
 
@@ -204,3 +205,13 @@ def test_context_and_summarize(project_dir: Path, cli) -> None:  # type: ignore[
     res = cli("summarize", run_id)
     assert res.code == 0
     assert (_manifest(project_dir, run_id).run_dir / "analysis/summary.json").is_file()
+
+
+def test_context_warns_about_stale_runops_skills(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    assert json.loads(cli("context", "--json").out)["warnings"] == []
+    lock = project_dir / ".runops/skills.lock"
+    text = lock.read_text()
+    lock.write_text(text.replace(f'version = "{__version__}"', 'version = "0.0.1"'))
+    data = json.loads(cli("context", "--json").out)
+    assert data["warnings"] and "runo update --skills-only" in data["warnings"][0]
+    assert "0.0.1" in cli("context").err

@@ -28,6 +28,7 @@ v1 leftovers. Fix what it reports, then run it again.
 
 - runops itself: `uv tool upgrade runops` (or reinstall the way it was installed),
   then `runo update --skills-only` to refresh skills and the AGENTS.md block.
+  `runo context` warns when this project's runops skills are older than the installed runops.
 - Simulator packages: `runo update -y`. Tell the user which packages changed.
 - `runo update` rewrites only the `<!-- runops:begin/end -->` block of AGENTS.md and
   directories marked `.managed-by-runops`.
