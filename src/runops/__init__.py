@@ -1,3 +1,3 @@
 """runops: run ledger and Slurm job submission for HPC simulation projects."""
 
-__version__ = "2.1.3"
+__version__ = "2.2.0"
