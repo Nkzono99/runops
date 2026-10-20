@@ -214,8 +214,8 @@ run id で引き続き見つかり、`runo restore` で戻せます。
 `AGENTS.md` は `<!-- runops:begin -->` から `<!-- runops:end -->` までだけを書き換えるので、
 その外に書いた project 固有の規則は残ります。
 
-`local_source` の simulator は、source の commit ごとに `.runops/build/<sim>-<commit>/` へ
-build し、run の manifest に commit と executable の hash を記録します。後から「この run は
+`local_source` の simulator は、source の commit と `build_command`（dirty なら未追跡を含む
+ファイルの内容も）ごとに `.runops/build/<sim>-<commit>-<hash>/` へ build し、run の manifest に commit と executable の hash を記録します。後から「この run は
 どの版で計算したか」を確かめられます。
 
 simulator 用の adapter を自分で書く方法は [adapter ガイド](adapter.md) にあります。

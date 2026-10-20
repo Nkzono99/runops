@@ -10,7 +10,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | create runops.toml, cases/, runs/, LOG.md, notes/, AGENTS.md, skills; install simulator packages. Site defaults to a guess from the host name; asks interactively only in a terminal without arguments |
 | `runo doctor [--json]` | check config, adapters, executables, sbatch, skill freshness |
 | `runo update [--skills-only] [-y]` | upgrade simulator packages and redeploy skills / AGENTS.md block |
-| `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit> |
+| `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit>-<hash> |
 | `runo context [--json]` | project summary for agents |
 | `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases |
 | `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run |

@@ -228,7 +228,10 @@ label_max_length = 48             # run 名の自動ラベルの最大文字数�
 
 - `local_source` の build は `runo new` / `runo submit` 時に executable が無ければ自動で行う。
   `runo build SIM [--force]` で明示的にも行える（command 数に含める）。
-- `source_repo` が dirty なら build dir 名に `-dirty` を付け、manifest の `git_dirty = true` を記録する。
+- build dir 名は `<sim>-<short_commit>[-dirty]-<digest>`。digest は `build_command` と、dirty なら
+  build にコピーする全ファイル（追跡済みと未追跡、ignore 以外）の内容の hash。未追跡ファイルの
+  内容や `build_command` を変えると別の build になる。コピー後に source が変わっていたら build を中止する。
+  dirty なら manifest に `git_dirty = true` を記録する。
 - build cache は `tidy` が `unused-build` として挙げる（どの非 archived run の manifest からも
   参照されない build dir）。
 

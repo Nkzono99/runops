@@ -110,7 +110,12 @@ def _git(repo: Path, *args: str) -> str:
 
 
 def source_state(project: Project, sim: SimulatorConfig) -> tuple[Path, str, bool, str]:
-    """Return (repo, full_commit, dirty, build_dir_name)."""
+    """Return (repo, full_commit, dirty, build_dir_name).
+
+    The name ends in a digest of ``build_command`` and, when the repo is dirty,
+    of every file the build copies (tracked and untracked, by content), so a
+    changed untracked file or build command never reuses an old build.
+    """
     if not sim.source_repo:
         raise UsageError(f"[simulators.{sim.name}].source_repo is required for local_source")
     repo = Path(sim.source_repo).expanduser()
@@ -119,25 +124,49 @@ def source_state(project: Project, sim: SimulatorConfig) -> tuple[Path, str, boo
     if not repo.is_dir():
         raise UsageError(f"source_repo {repo} does not exist")
     commit = _git(repo, "rev-parse", "HEAD").strip()
-    status = _git(repo, "status", "--porcelain")
-    dirty = bool(status.strip())
-    name = f"{sim.name}-{commit[:12]}"
-    if dirty:
-        digest = hashlib.sha256(_git(repo, "diff", "HEAD").encode())
-        digest.update(status.encode())
-        name += f"-dirty-{digest.hexdigest()[:8]}"
+    dirty = bool(_git(repo, "status", "--porcelain").strip())
+    files = _source_files(repo) if dirty else []
+    digest = _build_digest(sim, repo, files)
+    name = f"{sim.name}-{commit[:12]}{'-dirty' if dirty else ''}-{digest}"
     return repo, commit, dirty, name
 
 
+def _source_files(repo: Path) -> list[str]:
+    """Files a build copies: tracked plus untracked, minus ignored."""
+    files = _git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
+    return sorted(set(filter(None, files.split("\0"))))
+
+
+def _build_digest(sim: SimulatorConfig, root: Path, files: list[str]) -> str:
+    """8-hex digest of ``build_command`` and the content of *files* under *root*."""
+    digest = hashlib.sha256(f"build_command\0{sim.build_command}\0".encode())
+    for rel in files:
+        digest.update(f"{rel}\0".encode())
+        path = root / rel
+        if path.is_symlink():
+            digest.update(f"link:{path.readlink()}".encode())
+        elif path.is_file():
+            digest.update(hash_file(path).encode())
+        elif path.is_dir():  # a submodule: hash what is checked out in it
+            for sub in sorted(path.rglob("*")):
+                inner = sub.relative_to(path)
+                if sub.is_file() and ".git" not in inner.parts:
+                    digest.update(f"{inner.as_posix()}\0{hash_file(sub)}".encode())
+        else:
+            digest.update(b"missing")
+        digest.update(b"\0")
+    return digest.hexdigest()[:8]
+
+
 def build_simulator(project: Project, sim: SimulatorConfig, *, force: bool = False) -> Path:
-    """Build *sim* into ``.runops/build/<name>-<commit>``; return the build dir."""
+    """Build *sim* into ``.runops/build/<name>``; return the build dir."""
     if sim.resolver_mode != "local_source":
         raise UsageError(f"simulator {sim.name!r} is not resolver_mode = local_source")
     if not sim.build_command:
         raise UsageError(f"[simulators.{sim.name}].build_command is required")
     if not sim.executable:
         raise UsageError(f"[simulators.{sim.name}].executable is required")
-    repo, _commit, _dirty, name = source_state(project, sim)
+    repo, commit, dirty, name = source_state(project, sim)
     target = project.build_dir / name
     if (target / sim.executable).exists() and not force:
         return target
@@ -145,8 +174,8 @@ def build_simulator(project: Project, sim: SimulatorConfig, *, force: bool = Fal
     if partial.exists():
         shutil.rmtree(partial)
     partial.mkdir(parents=True)
-    files = _git(repo, "ls-files", "-z", "--cached", "--others", "--exclude-standard")
-    for rel in filter(None, files.split("\0")):
+    files = _source_files(repo)
+    for rel in files:
         src = repo / rel
         dst = partial / rel
         if src.is_dir():
@@ -154,6 +183,11 @@ def build_simulator(project: Project, sim: SimulatorConfig, *, force: bool = Fal
         elif src.exists() or src.is_symlink():
             dst.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(src, dst, follow_symlinks=False)
+    # The name was computed from the live tree; check the copy is that tree.
+    moved = _git(repo, "rev-parse", "HEAD").strip() != commit
+    if moved or (dirty and not name.endswith(_build_digest(sim, partial, files))):
+        shutil.rmtree(partial)
+        raise RunError(f"{repo} changed while copying it for the build; run the build again")
     log_path = partial / "runops-build.log"
     with log_path.open("w") as log:
         result = subprocess.run(

@@ -58,7 +58,7 @@ label_max_length = 48             # run 名の自動ラベルの最大文字数�
 |---|---|
 | `package` | `.venv/bin/<executable>`、無ければ PATH |
 | `local_executable` | 絶対 path、project 相対 path、PATH の順 |
-| `local_source` | `source_repo` の HEAD を `.runops/build/<sim>-<commit>/` にコピーし `build_command` を実行。dirty なら名前に `-dirty-<hash>` が付く |
+| `local_source` | `source_repo` の HEAD を `.runops/build/<sim>-<commit>-<hash>/` にコピーし `build_command` を実行。`<hash>` は `build_command` と、dirty なら未追跡を含む全ファイルの内容から作る（dirty なら `-dirty` も付く） |
 
 module は site、launcher、simulator、case の順に結合されます。`generic` adapter では
 `command`（`{executable}` を置換）と `success_marker`（`work/` 内の完了 marker）も使えます。

@@ -48,7 +48,7 @@ command = "{{executable}} --flag"
 
     (first,) = cli("new", "srccase").run_ids()
     commit = _git(repo, "rev-parse", "HEAD")
-    build = project_dir / f".runops/build/mysim-{commit[:12]}"
+    (build,) = (project_dir / ".runops/build").glob(f"mysim-{commit[:12]}-*")
     assert (build / "bin/sim").is_file()
     m = Project.open(project_dir).resolve_run(first)
     sim = m.section("simulator")
@@ -91,3 +91,60 @@ build_command = "echo compile error >&2; exit 3"
     assert not any(
         p for p in (project_dir / ".runops/build").iterdir() if not p.name.startswith(".")
     )
+
+
+def _add_sim(project_dir: Path, repo: Path, counter: Path, build_command: str = "") -> None:
+    build_command = build_command or (
+        f"echo built >> {counter} && mkdir -p bin && cat main.sh extra.txt > bin/sim"
+    )
+    cfg = project_dir / "runops.toml"
+    text = cfg.read_text()
+    if "[simulators.mysim]" in text:
+        text = text[: text.index("\n[simulators.mysim]")]
+    cfg.write_text(
+        text
+        + f"""
+[simulators.mysim]
+adapter = "generic"
+resolver_mode = "local_source"
+source_repo = "{repo}"
+executable = "bin/sim"
+build_command = "{build_command}"
+"""
+    )
+
+
+def test_untracked_content_change_rebuilds(project: Project, tmp_path: Path) -> None:
+    """`git status` shows `?? extra.txt` both times; the content still keys the cache."""
+    from runops.runtime import build_simulator
+
+    repo = _make_repo(tmp_path)
+    counter = tmp_path / "builds.txt"
+    _add_sim(project.root, repo, counter)
+    (repo / "extra.txt").write_text("version-one\n")
+    sim = Project.open(project.root).config.simulators["mysim"]
+    first = build_simulator(project, sim)
+    (repo / "extra.txt").write_text("version-two\n")
+    second = build_simulator(project, sim)
+    assert first != second
+    assert "version-two" in (second / "bin/sim").read_text()
+    assert counter.read_text().count("built") == 2
+
+
+def test_build_command_change_rebuilds(project: Project, tmp_path: Path) -> None:
+    from runops.runtime import build_simulator
+
+    repo = _make_repo(tmp_path)
+    (repo / "extra.txt").write_text("x\n")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "extra")
+    counter = tmp_path / "builds.txt"
+    _add_sim(project.root, repo, counter)
+    first = build_simulator(project, Project.open(project.root).config.simulators["mysim"])
+    _add_sim(
+        project.root, repo, counter, f"echo built >> {counter} && mkdir -p bin && echo B > bin/sim"
+    )
+    second = build_simulator(project, Project.open(project.root).config.simulators["mysim"])
+    assert first != second
+    assert (second / "bin/sim").read_text() == "B\n"
+    assert counter.read_text().count("built") == 2
