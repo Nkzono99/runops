@@ -782,6 +782,32 @@ def archive(
         out.print(f"archived {m.id} -> {project.rel(dst)}")
 
 
+@app.command("mv")
+def mv_cmd(
+    runs: list[str] = typer.Argument(...),
+    dest: str = typer.Option("", "--dest", help="New parent directory under runs/."),
+    label: Optional[str] = typer.Option(
+        None, "--label", help="New label (directory suffix); one RUN only. '' drops it."
+    ),
+    why: str = typer.Option("", "--why", help="Reason, recorded in the run's notes."),
+) -> None:
+    """Rename or move runs under runs/, keeping their ids, inputs and history."""
+    from runops.ops.tidy import move_run
+
+    if not dest and label is None:
+        raise UsageError("give --dest and/or --label")
+    project = _project()
+    targets = _resolve(project, runs)
+    if label is not None and len(targets) > 1:
+        raise UsageError("--label applies to one RUN; use --dest to move several")
+    warnings: list[str] = []
+    for m in targets:
+        result = move_run(project, m, dest=dest, label=label, why=why, by=_actor())
+        warnings += result.warnings
+        out.print(f"moved {m.id}: {project.rel(result.src)} -> {project.rel(result.dst)}")
+    _warn(warnings)
+
+
 @app.command()
 def restore(run: str = typer.Argument(...)) -> None:
     """Move an archived run back to where it was."""

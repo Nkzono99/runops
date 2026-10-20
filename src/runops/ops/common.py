@@ -8,8 +8,9 @@ from typing import Any
 
 from runops.adapters.registry import ResolvedAdapter, resolve_adapter
 from runops.config import SimulatorConfig
+from runops.errors import UsageError
 from runops.manifest import Manifest
-from runops.project import Project
+from runops.project import ARCHIVE_DIR, Project
 
 
 @dataclass
@@ -37,3 +38,19 @@ def inside(path: Path, parent: Path) -> bool:
     except ValueError:
         return False
     return True
+
+
+def resolve_dest(project: Project, dest: str) -> Path:
+    """A ``--dest`` directory: under ``runs/``, outside ``_archive`` and outside any run."""
+    path = Path(dest)
+    if not path.is_absolute():
+        path = project.root / path if path.parts[0] == "runs" else project.runs_dir / path
+    if not inside(path, project.runs_dir):
+        raise UsageError(f"--dest must be inside {project.runs_dir}")
+    if inside(path, project.runs_dir / ARCHIVE_DIR):
+        raise UsageError("--dest must not be inside runs/_archive")
+    enclosing = project.enclosing_run(path)
+    if enclosing is not None:
+        # Discovery stops at a run directory, so a run nested in it would be lost.
+        raise UsageError(f"--dest must not be inside the run {project.rel(enclosing)}")
+    return path

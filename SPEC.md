@@ -500,6 +500,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo note RUN [TEXT] [--by WHO]` | TEXT があれば `[[notes]]` に追記、なければ notes と `notes.md` を表示 |
 | `runo pin RUN [--off] [--reason TEXT]` | `run.pinned` を切り替える。pinned は `list` に常に出て、`tidy` / `delete` の対象外 |
 | `runo summarize RUN... [--force]` | adapter の `summarize()` を呼び `analysis/summary.json` を書く。既存があれば `--force` なしではスキップ |
+| `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | run を `runs/` 配下で改名・移動する。id、入力、履歴は変えない（§7.7） |
 | `runo archive RUN... [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする |
 | `runo restore RUN` | archive 前の場所に戻す。既に何かあれば拒否 |
 | `runo delete RUN... [-y]` | directory を削除。`created`/`failed`/`cancelled`/scratch のみ。`pinned` は拒否 |
@@ -858,7 +859,7 @@ src/runops/
 | 項目 | 目標 |
 |---|---|
 | `src/runops/` の行数（skill の md を除く） | 8,000 行以下 |
-| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 23 |
+| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 24 |
 | ユーザーが編集する TOML | `runops.toml`、`case.toml` の 2 種 |
 | runops が書く TOML | `manifest.toml`、`.runops/skills.lock`、`.runops/index.toml` の 3 種 |
 | 依存 | `typer`、`rich`、`tomli-w`、`tomlkit`、`jinja2`、`packaging`（`mcp` を外す） |

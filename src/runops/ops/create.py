@@ -23,9 +23,9 @@ from runops.case import (
 )
 from runops.errors import RunError, UsageError
 from runops.manifest import MANIFEST_FILE, SCHEMA_VERSION, Manifest
-from runops.ops.common import SimContext, inside, sim_context
+from runops.ops.common import SimContext, resolve_dest, sim_context
 from runops.ops.submit import write_job_for
-from runops.project import ARCHIVE_DIR, SCRATCH_DIR, Project
+from runops.project import SCRATCH_DIR, Project
 from runops.runtime import resolve_runtime
 from runops.util import hash_tree, move_noreplace, now_iso, parse_value
 
@@ -128,18 +128,7 @@ def _dest_parent(project: Project, case: Case, dest: str, scratch: bool) -> Path
         return project.runs_dir / SCRATCH_DIR
     if not dest:
         return project.runs_dir / case.name
-    path = Path(dest)
-    if not path.is_absolute():
-        path = project.root / path if path.parts[0] == "runs" else project.runs_dir / path
-    if not inside(path, project.runs_dir):
-        raise UsageError(f"--dest must be inside {project.runs_dir}")
-    if inside(path, project.runs_dir / ARCHIVE_DIR):
-        raise UsageError("--dest must not be inside runs/_archive")
-    enclosing = project.enclosing_run(path)
-    if enclosing is not None:
-        # Discovery stops at a run directory, so a run nested in it would be lost.
-        raise UsageError(f"--dest must not be inside the run {project.rel(enclosing)}")
-    return path
+    return resolve_dest(project, dest)
 
 
 def create_run(project: Project, request: CreateRequest) -> CreateResult:

@@ -155,6 +155,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--json]` | run 一覧 |
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
+| `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可 |
 | `runo archive RUN... ` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |

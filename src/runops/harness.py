@@ -24,6 +24,7 @@ COMMANDS = """\
 | `runo note RUN "text"` / `runo pin RUN --reason TEXT` | append an observation / protect a key run |
 | `runo summarize RUN` | adapter summary into analysis/summary.json |
 | `runo tidy` / `runo tidy --apply` | list / apply cleanup (expired scratch, stale failures, old runs) |
+| `runo mv RUN... [--dest DIR] [--label L] --why TEXT` | rename / move runs, keeping ids and inputs |
 | `runo archive RUN` / `runo restore RUN` / `runo delete RUN` | move to runs/_archive / back / remove |
 | `runo build SIM` | build a local_source simulator into .runops/build |
 | `runo doctor` / `runo update` | check environment / upgrade simulator packages and skills |"""
@@ -62,7 +63,8 @@ This is a runops project: simulation runs are tracked as directories under
 - After a production submit is accepted, report the job ids and stop. When asked to
   watch, check once for early failure, then near the expected end; no `tail -f` loops.
 - Never edit `manifest.toml` or a run's `input/` by hand. Change the case or create a
-  new run with `--set` / `new --from`.
+  new run with `--set` / `new --from`. To rename or move a run, use `runo mv`, not a
+  re-created copy.
 - Express variations as runs, not cases: use `runo new CASE --set k=v`,
   `runo new --from RUN --set k=v`, or `runo sweep`. Create a new case only when the
   structure of the base input files changes.

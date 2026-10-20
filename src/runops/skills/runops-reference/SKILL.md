@@ -27,6 +27,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo note RUN [TEXT] [--by WHO]` | append / show notes |
 | `runo pin RUN [--off] [--reason TEXT]` | keep a run visible and safe from tidy/delete |
 | `runo summarize RUN... [--force]` | analysis/summary.json from the adapter |
+| `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | rename/move created or finished runs; id, inputs, sweep and notes kept |
 | `runo archive RUN... [-y]` / `runo archive --older-than 90d [-y]` | move to runs/_archive |
 | `runo restore RUN` | move back |
 | `runo delete RUN... [-y]` | remove created/failed/cancelled/scratch runs |

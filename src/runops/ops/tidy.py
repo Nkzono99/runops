@@ -9,9 +9,11 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from runops.adapters.registry import optional
+from runops.case import slugify
 from runops.errors import RunopsError, UsageError
 from runops.manifest import ACTIVE_STATES, MANIFEST_FILE, Manifest, RunState
-from runops.ops.common import inside, run_sim_context
+from runops.ops.common import inside, resolve_dest, run_sim_context
+from runops.ops.submit import write_job_for
 from runops.ops.sync import sync_run
 from runops.project import ARCHIVE_DIR, Project
 from runops.slurm import CommandRunner, JobState, default_runner, query_many
@@ -196,6 +198,74 @@ def restore_run(project: Project, manifest: Manifest) -> Path:
     project.update_index(moved.id, dst)
     _prune_empty(src.parent, project.runs_dir / ARCHIVE_DIR)
     return dst
+
+
+@dataclass
+class MoveResult:
+    run_id: str
+    src: Path
+    dst: Path
+    warnings: list[str] = field(default_factory=list)
+
+
+_MOVABLE = (RunState.CREATED, RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED)
+
+
+def move_run(
+    project: Project,
+    manifest: Manifest,
+    *,
+    dest: str = "",
+    label: str | None = None,
+    why: str = "",
+    by: str = "",
+) -> MoveResult:
+    """Rename and/or move a run under ``runs/``, keeping its id, inputs and history.
+
+    Submitted/running runs are refused (Slurm holds absolute paths into the run
+    directory); archived runs move with ``restore``. The old path and *why* are
+    appended to the run's notes; a created run gets a fresh ``job.sh``.
+    """
+    with project.run_lock():
+        manifest.reload()
+        status = manifest.status
+        if status not in _MOVABLE:
+            hint = "restore it first" if status == RunState.ARCHIVED else "wait or cancel it"
+            raise UsageError(f"{manifest.id} is {status.value}; {hint}")
+        src = manifest.run_dir.resolve()
+        parent = resolve_dest(project, dest) if dest else src.parent
+        if inside(parent, src):
+            raise UsageError(f"--dest must not be inside {manifest.id} itself")
+        new_label = (
+            manifest.label
+            if label is None
+            else slugify(label, project.config.defaults.label_max_length)
+        )
+        if label and not new_label:
+            raise UsageError(f"--label {label!r} has no usable characters")
+        name = f"{manifest.id}--{new_label}" if new_label else manifest.id
+        dst = parent / name
+        if dst.resolve() == src:
+            raise UsageError(f"{manifest.id} is already at {project.rel(src)}")
+        if dst.exists():
+            raise UsageError(f"{project.rel(dst)} already exists")
+        parent.mkdir(parents=True, exist_ok=True)
+        move_noreplace(src, dst)
+        moved = Manifest.load(dst / MANIFEST_FILE)
+        moved.run["label"] = new_label
+        moved.section("path")["run_dir"] = project.rel(dst)
+        text = f"moved from {project.rel(src)}"
+        moved.add_note(f"{text}: {why}" if why else text, by or "runops")
+        moved.save()
+        project.update_index(moved.id, dst)
+        result = MoveResult(moved.id, src, dst)
+        if status == RunState.CREATED:
+            try:
+                write_job_for(project, moved)
+            except RunopsError as exc:  # submit regenerates job.sh anyway
+                result.warnings.append(f"{moved.id}: job.sh not regenerated ({exc})")
+    _prune_empty(src.parent, project.runs_dir)
+    return result
 
 
 def check_deletable(manifest: Manifest) -> None:
