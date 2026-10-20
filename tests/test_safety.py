@@ -121,6 +121,16 @@ def test_ids_survive_lost_counter(project_dir: Path, cli) -> None:  # type: igno
     assert int(second[-4:]) == int(first[-4:]) + 1
 
 
+def test_new_from_warns_when_case_inputs_changed(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (src,) = cli("new", "demo", "--set", "x=5").run_ids()
+    res = cli("new", "--from", src, "--set", "name=b")
+    assert res.code == 0 and "input files changed" not in res.err
+    (project_dir / "cases/demo/input.txt").write_text("x = {{ x }}\nname = {{ name }}\nnew = 1\n")
+    res = cli("new", "--from", src, "--set", "name=c")
+    assert res.code == 0
+    assert "input files changed" in res.err and src in res.err
+
+
 def test_sync_reports_setup_failure(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
     (run_id,) = cli("new", "demo", "--submit").run_ids()
     m = _manifest(project_dir, run_id)

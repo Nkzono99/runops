@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 import unicodedata
@@ -10,7 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from runops.errors import UsageError
-from runops.util import load_toml, tomllib
+from runops.util import hash_file, load_toml, tomllib
 
 CASE_FILE = "case.toml"
 LABEL_MAX = 48
@@ -59,6 +60,13 @@ class Case:
                 if path.is_file():
                     items.append((path, path.relative_to(extra).as_posix()))
         return items
+
+    def input_hash(self) -> str:
+        """Content hash of :meth:`input_sources` (the base files a run is rendered from)."""
+        digest = hashlib.sha256()
+        for src, rel in self.input_sources():
+            digest.update(f"{rel}\0{hash_file(src)}\0".encode())
+        return f"sha256:{digest.hexdigest()}"
 
 
 def load_case(cases_dir: Path, name: str) -> Case:

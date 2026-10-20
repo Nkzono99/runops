@@ -105,7 +105,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 |---|---|
 | `[run]` | `id`、`label`、`status`、`created_at`、`why`、`scratch`、`expires_at`、`pinned`、`tags`、`status_before_archive` |
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
-| `[origin]` | `case`、`sweep`、`parent_run`、`created_by` |
+| `[origin]` | `case`、`sweep`、`parent_run`、`created_by`、`case_input_hash` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
 | `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`） |
 | `[params]` | case の params に `--set` を適用した最終値 |
@@ -126,7 +126,12 @@ program を起動せずに終わり、`stage = "setup"` と exit code を記録�
 
 `submit` は executable を hash し直して attempt に記録し、作成時と違えば警告します。
 `new` と `sweep --apply` は同じ入力（`input_hash`）の run が既にあれば警告します。
-どちらも作成や投入は拒否しません。
+`new --from RUN` は、元の run を作った後に case の入力ファイルが変わっていれば警告します
+（入力は今の case から作るため）。どれも作成や投入は拒否しません。
+
+`submit`、`cancel`、`retry`、`sync` は lock の中で manifest を読み直してから更新します。
+同じ run を 2 回指定しても、複数のエージェントが同時に投入しても sbatch は 1 回です。
+run id は削除後も再利用しません。`--dest` に既存 run の中は指定できません。
 
 ## command
 

@@ -335,6 +335,7 @@ archived_at = ""
 case = "flat_surface"
 sweep = ""                        # sweep label。単発 run は空
 parent_run = ""                   # --from RUN で派生した場合の source
+case_input_hash = "sha256:..."    # 作成時の case の base 入力ファイルの hash
 created_by = "agent"              # "human" | "agent" | 任意文字列
 
 [simulator]
@@ -439,6 +440,8 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   file が無ければ adapter の判定に従い、`unknown` なら `failed`。
 - `submit` は manifest に記録された executable を hash し直し、attempt に `exe_hash` を残す。
   作成時の `[simulator].exe_hash` と違えば warning を出す（拒否しない）。
+- `new --from RUN` は case の base 入力ファイルが source の作成時（`[origin].case_input_hash`）から
+  変わっていれば warning を出す（拒否しない）。
 - `submit`、`cancel`、`retry`、`sync` は `.runops/run.lock` の中で manifest を読み直してから
   状態を確認・更新する。同じ run を 2 回指定しても、複数の process から同時に投入しても sbatch は 1 回。
 - `new` / `sweep --apply` は `identity.input_hash` が既存 run と一致するとき warning を出す
@@ -931,4 +934,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 同一入力の warning | `input_hash`（と `exe_hash`）が一致する既存 run を作成時に知らせる | §1.3 で観察した variation の重複を、ゲート無しで抑える |
 | 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |
 | `runo init` の対話と site の推定 | 端末から引数なしで実行したときだけ site と simulator を尋ねる。site の既定はホスト名（`camphor*`、`laurel*`、`cinnamon*`、`gardenia*` なら `kudpc`）。プリセット名は `kudpc` とし、`camphor` も同じ意味で受け付ける | 人が打つのは `runo init` だけなので、ここで KUDPC 向けの設定を取り違えないようにする。エージェントや CI からの実行（端末でない、`-y`、引数あり）は従来どおり尋ねない |
+| 異常系と同時操作（2026-10-20） | `run.lock` 下で manifest を読み直す、準備の失敗で program を起動しない、adapter を読めなければ purge しない、build cache の key を内容と `build_command` から作る、run の入れ子を禁止、run id を再利用しない（`last_run_id`）、`new --from` で case の変更を警告 | 外部レビューで、二重投入で 1 回目の履歴が消える、準備失敗が completed になる、adapter の故障で保持ファイルが消える、未追跡ファイルの変更で古い binary を使う、削除した id が別の run を指す、を確認した |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

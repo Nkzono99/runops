@@ -171,7 +171,16 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
             )
     parent = _dest_parent(project, case, request.dest, request.scratch)
     spec = RunSpec(params=params, changed=changed, label=label, parent=parent)
-    return _materialize(project, case, [spec], request, source=source)
+    result = _materialize(project, case, [spec], request, source=source)
+    if source is not None:
+        recorded = str(source.section("origin").get("case_input_hash", ""))
+        if recorded and recorded != case.input_hash():
+            # Inputs come from the case as it is now, not as it was for the source.
+            result.warnings.append(
+                f"case {case.name!r} input files changed since {source.id} was created; "
+                f"{result.manifests[0].id} differs from it by more than the inherited params"
+            )
+    return result
 
 
 def plan_sweep(
@@ -399,6 +408,7 @@ def _populate(
             "case": case.name,
             "sweep": spec.sweep,
             "parent_run": source.id if source else "",
+            "case_input_hash": case.input_hash(),
             "created_by": request.created_by,
         },
         "simulator": simulator,
