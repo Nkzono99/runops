@@ -116,9 +116,11 @@ runops だけが書きます。手で編集しないでください。主な fie
 
 状態は `created → submitted → running → completed | failed | cancelled` と進み、
 終了した run は `archived` にできます。`sync` は Slurm が COMPLETED でも adapter が
-失敗と判定すれば `failed` にします。job.sh は終了時に `submit/exit.<job_id>`（exit code と
-開始・終了時刻）を書くので、Slurm の会計から消えた job もこの file で completed / failed が
-決まります。`sync` と `tidy` は対象 run の job id をまとめて 1 回の `squeue` と `sacct` で
+失敗と判定すれば `failed` にします。job.sh は終了時に `submit/exit.<job_id>`（exit code、
+開始・終了時刻、`stage`）を書くので、Slurm の会計から消えた job もこの file で completed / failed が
+決まります。`module load`、`cd`、`setup_commands`、`pre_commands` などの準備が失敗すると、job.sh は
+program を起動せずに終わり、`stage = "setup"` と exit code を記録します。
+`sync` と `tidy` は対象 run の job id をまとめて 1 回の `squeue` と `sacct` で
 問い合わせます。runops が知らない Slurm 状態の job は状態を変えず、
 `last_slurm_state` にその状態だけを記録します。
 

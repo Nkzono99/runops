@@ -93,6 +93,8 @@ def _settle(project: Project, manifest: Manifest, job: JobState | None) -> SyncR
                 message = "Slurm COMPLETED but adapter reports failure"
         if job.exit_code:
             manifest.job["exit_code"] = job.exit_code
+    if record is not None and record["stage"] == "setup":
+        message = f"job setup failed before the program started (exit={record['exit_code']})"
     attempts = manifest.job.get("attempts") or []
     if record is not None:
         manifest.job.setdefault("exit_code", str(record["exit_code"]))
@@ -128,6 +130,7 @@ def read_exit_record(run_dir: Path, job_id: str) -> dict[str, Any] | None:
         "started_at": str(data.get("started_at", "")),
         "finished_at": str(data.get("finished_at", "")),
         "hostname": str(data.get("hostname", "")),
+        "stage": str(data.get("stage", "")),
     }
 
 

@@ -113,7 +113,8 @@ run の状態は `created → submitted → running → completed | failed | can
 1. Slurm が状態を返す job はその状態に従う。Slurm が `COMPLETED` でも、adapter が出力を見て
    失敗と判断すれば `failed` にする。
 2. Slurm の記録から消えた job は、job.sh が終了時に書く `submit/exit.<job_id>` を見る。
-   exit code が 0 なら adapter の判定、0 以外なら `failed`。
+   exit code が 0 なら adapter の判定、0 以外なら `failed`。`module load` や `pre_commands` などの
+   準備が失敗した job は program を起動せずに終わり、`failed` になる。
 3. その記録も無ければ adapter の判定に従い、判定できなければ `failed`。
 
 runops が知らない Slurm 状態の job は状態を変えず、`last_slurm_state` に状態名だけを残します。

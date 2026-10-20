@@ -4,6 +4,12 @@ The script ``cd``s to the run directory; the program command from the
 adapter is relative to it.  Slurm stdout/stderr go to ``work/``.  On exit
 the script writes ``submit/exit.<job_id>`` (exit code, start/end time) so
 ``sync`` can settle the run without Slurm accounting.
+
+Setup (``module load``, ``export``, ``cd``, venv, ``setup_commands``,
+``pre_commands``, the adapter prelude) runs under ``set -e``: the first failing
+command ends the job before the program starts, and an ``EXIT`` trap writes the
+exit record with ``stage = "setup"``.  The program itself runs without
+``set -e`` so its exit code always reaches the record (``stage = "run"``).
 """
 
 from __future__ import annotations
@@ -72,6 +78,24 @@ def render_job_script(
         lines.append(f"#SBATCH {directive}")
     lines.append("")
     lines.append("set -o pipefail")
+    # Absolute, so a failed `cd` still leaves the record in the run directory.
+    record_dir = shlex.quote(str(run_dir / EXIT_RECORD_DIR))
+    lines.append(f"runops_exit_record={record_dir}/exit.${{SLURM_JOB_ID:-local}}")
+    lines.append("runops_record() {")
+    lines.append(
+        '    printf \'exit_code = %s\\nstarted_at = "%s"\\nfinished_at = "%s"\\n'
+        'hostname = "%s"\\nstage = "%s"\\n\' '
+        '"$1" "${runops_start}" "$(date -Is)" "$(hostname)" "$2" > "${runops_exit_record}"'
+    )
+    lines.append("}")
+    lines.append("runops_setup_failed() {")
+    lines.append("    local rc=$?")
+    lines.append('    echo "runops: setup failed exit=${rc}; program not started" >&2')
+    lines.append('    runops_record "${rc}" setup')
+    lines.append("}")
+    lines.append("runops_start=$(date -Is)")
+    lines.append("trap runops_setup_failed EXIT")
+    lines.append("set -e")
 
     modules: list[str] = []
     for module in [
@@ -96,17 +120,15 @@ def render_job_script(
         lines.append(f"source {shlex.quote(str(venv_activate))}")
     setup = [*site.setup_commands, *_list(job.get("pre_commands")), *(prelude or [])]
     lines.extend(setup)
+    lines.append("set +e")
+    lines.append("trap - EXIT")
     lines.append("runops_start=$(date -Is)")
     lines.append('echo "runops: start ${runops_start} on $(hostname)"')
     lines.append(exec_line(launcher, program, job))
     lines.append("status=$?")
     lines.extend(_list(job.get("post_commands")))
     lines.append('echo "runops: end $(date -Is) exit=${status}"')
-    lines.append(
-        'printf \'exit_code = %s\\nstarted_at = "%s"\\nfinished_at = "%s"\\nhostname = "%s"\\n\' '
-        '"${status}" "${runops_start}" "$(date -Is)" "$(hostname)" '
-        f'> "{EXIT_RECORD_DIR}/exit.${{SLURM_JOB_ID:-local}}"'
-    )
+    lines.append('runops_record "${status}" run')
     lines.append("exit ${status}")
     return "\n".join(lines) + "\n"
 

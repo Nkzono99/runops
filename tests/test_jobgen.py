@@ -85,3 +85,54 @@ def test_bad_walltime() -> None:
             sim=SimulatorConfig(name="s", adapter="s"),
             program=["a"],
         )
+
+
+def _run_script(tmp_path: Path, pre: list[str], program: list[str]) -> tuple[int, dict, Path]:
+    """Render job.sh for a run under *tmp_path* and execute it with bash."""
+    import subprocess
+
+    from runops.util import load_toml
+
+    run_dir = tmp_path / "run"
+    (run_dir / "submit").mkdir(parents=True)
+    text = render_job_script(
+        run_dir=run_dir,
+        run_id="R1",
+        job={"walltime": "0:10:00", "pre_commands": pre},
+        site=SiteConfig(),
+        launcher=LauncherConfig(name="none", kind="none"),
+        sim=SimulatorConfig(name="s", adapter="s"),
+        program=program,
+    )
+    script = run_dir / "submit" / "job.sh"
+    script.write_text(text)
+    env = {k: v for k, v in os.environ.items() if k != "SLURM_JOB_ID"}
+    proc = subprocess.run(["bash", str(script)], cwd=tmp_path, env=env, capture_output=True)
+    return proc.returncode, load_toml(run_dir / "submit" / "exit.local"), run_dir
+
+
+@pytest.mark.parametrize("failing", ["false", "cd /nonexistent-runops-dir"])
+def test_setup_failure_stops_before_program(tmp_path: Path, failing: str) -> None:
+    code, record, run_dir = _run_script(
+        tmp_path, ["echo prep > prep.txt", failing, "echo late > late.txt"], ["touch", "ran"]
+    )
+    assert code != 0
+    assert record["exit_code"] == code
+    assert record["stage"] == "setup"
+    assert (run_dir / "prep.txt").exists()
+    assert not (run_dir / "late.txt").exists()
+    assert not (run_dir / "ran").exists()
+
+
+def test_program_exit_code_is_recorded(tmp_path: Path) -> None:
+    code, record, run_dir = _run_script(tmp_path, ["true"], ["sh", "-c", "touch ran; exit 3"])
+    assert code == 3
+    assert record["exit_code"] == 3
+    assert record["stage"] == "run"
+    assert (run_dir / "ran").exists()
+
+
+def test_program_success_is_recorded(tmp_path: Path) -> None:
+    code, record, _run_dir = _run_script(tmp_path, [], ["true"])
+    assert code == 0
+    assert record == {**record, "exit_code": 0, "stage": "run"}

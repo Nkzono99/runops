@@ -3,6 +3,7 @@ nested runs, id reuse after delete, and `new --from` after the case changed."""
 
 from __future__ import annotations
 
+import json
 import threading
 from pathlib import Path
 
@@ -84,3 +85,15 @@ def test_purge_refuses_when_adapter_fails(
     assert "nothing was deleted" in res.err
     assert (work / "checkpoint.h5").exists() and (work / "big.dat").exists()
     assert not _manifest(project_dir, run_id).data["storage"]["work_purged_at"]
+
+
+def test_sync_reports_setup_failure(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (run_id,) = cli("new", "demo", "--submit").run_ids()
+    m = _manifest(project_dir, run_id)
+    fake_slurm.unknown.add(m.job_id)
+    (m.run_dir / "submit" / f"exit.{m.job_id}").write_text(
+        'exit_code = 127\nstarted_at = ""\nfinished_at = ""\nhostname = "n1"\nstage = "setup"\n'
+    )
+    (result,) = json.loads(cli("sync", "--json").out)
+    assert result["after"] == "failed"
+    assert "setup failed" in result["message"]

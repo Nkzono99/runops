@@ -293,7 +293,7 @@ ntasks = 800
   submit/
     job.sh
     sbatch.log           # 投入時の stdout/stderr（追記）
-    exit.<job_id>        # job.sh が終了時に書く exit code と開始・終了時刻（TOML）
+    exit.<job_id>        # job.sh が終了時に書く exit code、開始・終了時刻、stage（TOML）
   work/                  # simulator の出力。cwd はここ
   analysis/
     summary.json         # runo summarize の出力
@@ -422,7 +422,10 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   runops が対応づけていない Slurm 状態の job は状態を変えずに `last_slurm_state` だけ残し、
   他の run の更新は続ける。
 - job.sh は program 終了時に `submit/exit.<job_id>`（`exit_code`、`started_at`、`finished_at`、
-  `hostname`）を書く。squeue にも sacct にも無い job は、この file があれば
+  `hostname`、`stage = "run"`）を書く。program より前の準備（`module load`、`export`、`cd`、venv、
+  `setup_commands`、`pre_commands`、adapter の `job_prelude`）は `set -e` で実行し、失敗したら
+  program を起動せずに終了して、その exit code と `stage = "setup"` を記録する。
+  `post_commands` の失敗は記録する exit code を変えない。squeue にも sacct にも無い job は、この file があれば
   `exit_code = 0` のとき adapter の判定（既定 completed）、それ以外は `failed` にする。
   file が無ければ adapter の判定に従い、`unknown` なら `failed`。
 - `submit` は manifest に記録された executable を hash し直し、attempt に `exe_hash` を残す。
