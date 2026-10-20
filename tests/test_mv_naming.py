@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from runops.manifest import Manifest
@@ -63,3 +64,28 @@ def test_mv_refusals(project_dir: Path, cli, fake_slurm) -> None:  # type: ignor
     cli("archive", a, "-y")
     res = cli("mv", a, "--dest", "back")
     assert res.code == 2 and "restore" in res.err
+
+
+def test_sweep_names_label_each_point(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    long_values = "x=[1,2,3],[4,5,6]"
+    res = cli("sweep", "demo", "--set", long_values, "--set", "name=a,b", "--json")
+    assert json.loads(res.out)["points"][0]["label"] == "x1-2-3_namea"
+
+    args = ["sweep", "demo", "--set", long_values, "--set", "name=a,b", "--names", "x=wh0,wh1"]
+    preview = json.loads(cli(*args, "--label", "d5m_T10eV", "--dest", "runs", "--json").out)
+    assert [p["label"] for p in preview["points"]] == [
+        "wh0_namea",
+        "wh0_nameb",
+        "wh1_namea",
+        "wh1_nameb",
+    ]
+    assert preview["parent"] == "runs/d5m_T10eV"
+    res = cli(*args, "--label", "d5m_T10eV", "--dest", "runs", "--apply")
+    assert res.code == 0, res.err
+    m = _manifest(project_dir, res.run_ids()[0])
+    assert m.run_dir.parent == project_dir / "runs/d5m_T10eV"
+    assert m.label == "wh0_namea" and m.params["x"] == [1, 2, 3]
+
+    assert cli("sweep", "demo", "--set", "x=1,2", "--names", "x=a").code == 2
+    assert cli("sweep", "demo", "--set", "x=1,2", "--names", "y=a,b").code == 2
+    assert cli("sweep", "demo", "--set", "x=1,2", "--names", "x=a,a").code == 2

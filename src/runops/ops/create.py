@@ -107,6 +107,27 @@ def parse_sweep_sets(items: list[str]) -> dict[str, list[Any]]:
     return axes
 
 
+def parse_sweep_names(items: list[str], axes: dict[str, list[Any]]) -> dict[str, list[str]]:
+    """``--names KEY=n1,n2,...``: a short label for each value of a swept KEY."""
+    names: dict[str, list[str]] = {}
+    for item in items:
+        key, sep, raw = item.partition("=")
+        key = key.strip()
+        if not sep or not key:
+            raise UsageError(f"--names expects KEY=n1,n2,..., got {item!r}")
+        if key not in axes:
+            raise UsageError(f"--names {key}: not a swept key ({', '.join(axes)})")
+        if key in names:
+            raise UsageError(f"--names {key} given more than once")
+        values = [slugify(v.strip(), 80) for v in raw.split(",")]
+        if len(values) != len(axes[key]):
+            raise UsageError(f"--names {key}: {len(values)} names for {len(axes[key])} values")
+        if not all(values) or len(set(values)) != len(values):
+            raise UsageError(f"--names {key}: names must be non-empty and distinct")
+        names[key] = values
+    return names
+
+
 def _split_values(raw: str) -> list[str]:
     parts, depth, current = [], 0, ""
     for char in raw:
@@ -180,10 +201,12 @@ def plan_sweep(
     sweep_label: str = "",
     limit: int | None = None,
     dest: str = "",
+    names: dict[str, list[str]] | None = None,
 ) -> SweepPlan:
     case = load_case(project.cases_dir, case_name)
     keys = list(axes)
-    combos = list(itertools.product(*(axes[k] for k in keys)))
+    names = names or {}
+    combos = list(itertools.product(*(range(len(axes[k])) for k in keys)))
     if limit is not None:
         combos = combos[: max(limit, 0)]
     base_parent = _dest_parent(project, case, dest, False)
@@ -198,7 +221,8 @@ def plan_sweep(
     points: list[SweepPoint] = []
     for i, combo in enumerate(combos, start=1):
         params = dict(case.params)
-        values = dict(zip(keys, combo, strict=True))
+        values = {k: axes[k][j] for k, j in zip(keys, combo, strict=True)}
+        point_names = {k: names[k][j] for k, j in zip(keys, combo, strict=True) if k in names}
         params.update(values)
         points.append(
             SweepPoint(
@@ -206,7 +230,11 @@ def plan_sweep(
                 params=params,
                 values=values,
                 label=make_label(
-                    keys, params, case.aliases, project.config.defaults.label_max_length
+                    keys,
+                    params,
+                    case.aliases,
+                    project.config.defaults.label_max_length,
+                    point_names,
                 ),
             )
         )

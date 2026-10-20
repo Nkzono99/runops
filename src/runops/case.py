@@ -122,10 +122,18 @@ def make_label(
     params: dict[str, Any],
     aliases: dict[str, str],
     max_length: int = LABEL_MAX,
+    names: dict[str, str] | None = None,
 ) -> str:
-    """Auto label from changed keys, e.g. ``wc0.147_phiz45``."""
+    """Auto label from changed keys, e.g. ``wc0.147_phiz45``.
+
+    *names* maps a key to the short name given for its value (``sweep --names``);
+    it replaces alias + value for that key.
+    """
     parts = []
     for key in keys:
+        if names and key in names:
+            parts.append(names[key])
+            continue
         alias = aliases.get(key) or key.rsplit(".", 1)[-1]
         parts.append(f"{alias}{_format_value(params[key])}")
     return slugify("_".join(parts), max_length)

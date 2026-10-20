@@ -62,6 +62,22 @@ runops が扱う名詞は case、run、sweep の 3 つです。
 `new --from` は元の run の params を引き継ぎますが、入力ファイルは今の case から作ります。
 元の run を作った後に case の入力ファイルを直していると、作成時に警告が出ます。
 
+### 名前の付け方
+
+名前は、系列と主な条件を見分けるためのものです。全条件は manifest と `input/` にあります。
+系列で共通の条件は親 directory に、各点の違いは run の label に置きます。
+
+> 直径 5 m、10 eV、400 km/s、光電子ありで深さ比 wh を 0〜4 で振って。名前は短く。
+
+エージェントは `runo sweep ... --label d5m_T10eV_v400kms_pe --dest runs --names ptcond.boundaries=wh0,wh1,wh2,wh3,wh4`
+のように作り、`runs/d5m_T10eV_v400kms_pe/R…--wh2` になります。`--names` は、配列のような長い値を
+掃引するときに各値へ短い名前を付けます（入力には何も足しません）。
+
+作った後で名前や置き場所を変えたいときは「R…〜R… を runs/pe にまとめて」と頼めば
+`runo mv RUN... --dest runs/pe --why "..."` になります。`--label` で label も変えられます。
+run id、入力、sweep の帰属、ノートはそのままで、移動元はノートに残ります。
+投入中（submitted / running）の run は動かせません。
+
 ## 3. 試してから本計算
 
 いきなり本計算を投げず、短い scratch run で動作を確かめてから投入する流れです。

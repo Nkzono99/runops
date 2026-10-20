@@ -16,7 +16,7 @@ COMMANDS = """\
 | `runo case list` / `runo case new NAME --simulator SIM [--from CASE]` | list / scaffold cases |
 | `runo new CASE --why TEXT [--set k=v]... [--scratch] [--submit]` | create one run |
 | `runo new --from RUN --why TEXT [--set k=v]... [--continue]` | derive a run from another |
-| `runo sweep CASE --set k=v1,v2 [--set ...] [--apply] [--submit]` | preview / create a parameter product |
+| `runo sweep CASE --set k=v1,v2 [--names k=n1,n2] [--apply] [--submit]` | preview / create a parameter product |
 | `runo submit RUN... [--partition P]` / `runo submit --all DIR` | sbatch created runs |
 | `runo sync` / `runo status RUN` / `runo log RUN [--err]` | refresh state from Slurm / show / read logs |
 | `runo list [--all] [--case C] [--status S] [--json]` | recent + active runs (old, scratch, archived hidden) |

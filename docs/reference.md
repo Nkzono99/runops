@@ -148,7 +148,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
 | `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る |
 | `runo new --from RUN [--set k=v]... [--continue]` | 既存 run の params から派生。`--continue` は adapter の restart 対応が必要 |
-| `runo sweep CASE --set k=v1,v2 ... [--label] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成 |
+| `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
 | `runo cancel RUN... [-y]` / `runo retry RUN [--submit]` | scancel / failed・cancelled を created に戻す |
 | `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |

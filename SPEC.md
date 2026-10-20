@@ -488,7 +488,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo case list` | case 一覧 |
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
 | `runo new --from RUN [--why] [--set k=v]... [--continue] [--submit]` | 既存 run の params から派生 run を作る。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
-| `runo sweep CASE --set k=v1,v2,... [--set ...] [--label L] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
+| `runo sweep CASE --set k=v1,v2,... [--set ...] [--names KEY=n1,n2,...]... [--label L] [--dest DIR] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否 |
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
 | `runo cancel RUN... [-y]` | scancel して sync |
@@ -550,6 +550,22 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   `sweep_label` 省略時は `sweep-<YYYYMMDD>-<NN>`。
 - label は changed_keys から自動生成する（`wc0.147_phiz45`）。長さ上限は `defaults.label_max_length`（既定 48 文字）。
   key の短縮 alias は case.toml の `[naming.aliases]` で指定できる（v1 と同じ）。
+- `--names KEY=n1,n2,...` は掃引する KEY の各値に短い名前を付け、label ではその key の
+  alias + 値の代わりに名前を使う（構造化した配列を 1 軸にしたとき `wh0`、`wh1` のようにする）。
+  名前の数は値の数と同じで、重複は不可。入力や params には何も足さない。
+- `--dest DIR` は sweep directory の親を変える（既定 `runs/<case>`）。系列で共通の条件を
+  `--label` に、各点の違いを label に置く命名を作れる。
+
+### 7.7 `mv` の規則
+
+- `runo mv RUN... --dest DIR` は run を DIR（`runs/` 配下、`_archive` と既存 run の外）へ移す。
+  `--label L` は directory 名の suffix と `run.label` を変える（1 run のときだけ。`''` で外す）。
+- run id、`input/`、`input_hash`、`[origin]`（case、sweep、parent_run）、notes、投入履歴は変えない。
+  `[path].run_dir` と index を更新し、移動元と `--why` を `[[notes]]` に追記する。
+- 対象は `created`、`completed`、`failed`、`cancelled`。`submitted` / `running` は拒否する
+  （Slurm が run directory の絶対 path を持つ）。`archived` は `restore` を使う。
+- 既存 path は上書きしない（`move_noreplace`）。`created` の run は job.sh を作り直す。
+- 手で `mv` しても run は id で見つかるが、`run.label` と `[path].run_dir` が古いまま残る。
 
 ---
 

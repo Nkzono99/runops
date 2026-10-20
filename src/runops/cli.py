@@ -381,6 +381,12 @@ def sweep(
         None, "--set", help="key=v1,v2,... (product over all --set)."
     ),
     label: str = typer.Option("", "--label", help="Sweep label (directory under runs/<case>/)."),
+    names: Optional[list[str]] = typer.Option(
+        None, "--names", help="KEY=n1,n2,...: short run label for each value of a swept KEY."
+    ),
+    dest: str = typer.Option(
+        "", "--dest", help="Parent of the sweep directory (default runs/<case>)."
+    ),
     why: str = typer.Option("", "--why"),
     apply: bool = typer.Option(False, "--apply", help="Create the runs."),
     submit: bool = typer.Option(False, "--submit", help="Submit after --apply."),
@@ -394,6 +400,7 @@ def sweep(
     from runops.ops.create import (
         CreateRequest,
         apply_sweep,
+        parse_sweep_names,
         parse_sweep_sets,
         plan_sweep,
     )
@@ -401,7 +408,16 @@ def sweep(
     if submit and not apply:
         raise UsageError("--submit requires --apply")
     project = _project()
-    plan = plan_sweep(project, case, parse_sweep_sets(sets or []), sweep_label=label, limit=limit)
+    axes = parse_sweep_sets(sets or [])
+    plan = plan_sweep(
+        project,
+        case,
+        axes,
+        sweep_label=label,
+        limit=limit,
+        dest=dest,
+        names=parse_sweep_names(names or [], axes),
+    )
     if as_json and not apply:
         _print_json(
             {
