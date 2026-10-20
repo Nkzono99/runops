@@ -36,6 +36,21 @@ def sync_run(
 
 
 def _apply_state(project: Project, manifest: Manifest, job: JobState | None) -> SyncResult:
+    """Settle *manifest* under :meth:`Project.run_lock` from a fresh copy of the file.
+
+    *job* was queried for the job id the caller saw; if a concurrent submit or
+    retry changed it meanwhile, the run is left for the next sync.
+    """
+    with project.run_lock():
+        queried = manifest.job_id
+        manifest.reload()
+        if manifest.job_id != queried:
+            status = manifest.status.value
+            return SyncResult(manifest.id, status, status, "", "job changed while syncing")
+        return _settle(project, manifest, job)
+
+
+def _settle(project: Project, manifest: Manifest, job: JobState | None) -> SyncResult:
     """Settle *manifest* from the Slurm state *job* (``None`` = unknown to Slurm).
 
     Precedence for a job Slurm no longer reports: the exit record job.sh wrote

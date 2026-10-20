@@ -107,7 +107,12 @@ def _ask_install(root: Path, yes: bool) -> bool:
 def _resolve(project: Project, refs: list[str]) -> list[Manifest]:
     if not refs:
         raise UsageError("give at least one RUN")
-    return [project.resolve_run(ref) for ref in refs]
+    # The same run given twice (id and path, or a repeated id) is one target.
+    unique: dict[Path, Manifest] = {}
+    for ref in refs:
+        manifest = project.resolve_run(ref)
+        unique.setdefault(manifest.run_dir.resolve(), manifest)
+    return list(unique.values())
 
 
 # ---------------------------------------------------------------------------

@@ -134,6 +134,7 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
     skills.lock            # 展開した skill の由来と version（§8.2）
     index.toml             # run id -> path cache（§7.2）
     id.lock                # run id 採番用 lock
+    run.lock               # manifest の読み直し・更新用 lock（submit / cancel / retry / sync）
     v1-backup/<stamp>/     # migrate-v1 が退避した v1 の設定と harness（§11）
     build/
       <sim>-<commit>/      # local_source の build cache（§4.1）
@@ -426,6 +427,8 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   file が無ければ adapter の判定に従い、`unknown` なら `failed`。
 - `submit` は manifest に記録された executable を hash し直し、attempt に `exe_hash` を残す。
   作成時の `[simulator].exe_hash` と違えば warning を出す（拒否しない）。
+- `submit`、`cancel`、`retry`、`sync` は `.runops/run.lock` の中で manifest を読み直してから
+  状態を確認・更新する。同じ run を 2 回指定しても、複数の process から同時に投入しても sbatch は 1 回。
 - `new` / `sweep --apply` は `identity.input_hash` が既存 run と一致するとき warning を出す
   （同じ executable なら「結果は同一のはず」、違えば「executable が違う」）。作成は拒否しない。
 - `purged` state は廃止。`work/` の削除は `[storage].work_purged_at` で表す。

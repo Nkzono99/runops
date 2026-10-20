@@ -5,8 +5,9 @@ from __future__ import annotations
 import fcntl
 import os
 import re
+import threading
 from collections.abc import Iterator
-from contextlib import contextmanager, suppress
+from contextlib import AbstractContextManager, contextmanager, suppress
 from datetime import datetime
 from pathlib import Path
 
@@ -20,6 +21,8 @@ STATE_DIR = ".runops"
 INDEX_FILE = "index.toml"
 ARCHIVE_DIR = "_archive"
 SCRATCH_DIR = "_scratch"
+
+_HELD = threading.local()  # per thread: lock path -> re-entry depth
 
 
 class Project:
@@ -141,17 +144,41 @@ class Project:
         shown = "\n  ".join(self.rel(p.parent) for p in matches[:20])
         raise UsageError(f"{ref!r} matches {len(matches)} runs:\n  {shown}")
 
-    # ---- run id allocation -------------------------------------------
+    # ---- locks -------------------------------------------------------
     @contextmanager
-    def id_lock(self) -> Iterator[None]:
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        with (self.state_dir / "id.lock").open("a+") as handle:
-            fcntl.flock(handle, fcntl.LOCK_EX)
+    def _flock(self, name: str) -> Iterator[None]:
+        path = (self.state_dir / name).resolve()
+        held: dict[Path, int] = _HELD.__dict__.setdefault("depth", {})
+        if held.get(path):  # re-entered; a second flock on a new fd would deadlock
+            held[path] += 1
             try:
                 yield
             finally:
+                held[path] -= 1
+            return
+        self.state_dir.mkdir(parents=True, exist_ok=True)
+        with path.open("a+") as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX)
+            held[path] = 1
+            try:
+                yield
+            finally:
+                del held[path]
                 fcntl.flock(handle, fcntl.LOCK_UN)
 
+    def id_lock(self) -> AbstractContextManager[None]:
+        """Serialize run id allocation and run creation."""
+        return self._flock("id.lock")
+
+    def run_lock(self) -> AbstractContextManager[None]:
+        """Serialize read-modify-write of run manifests (submit, cancel, retry, sync).
+
+        Callers reload the manifest inside the lock: ``Manifest.save()`` is atomic
+        but does not stop a stale in-memory copy from overwriting a newer one.
+        """
+        return self._flock("run.lock")
+
+    # ---- run id allocation -------------------------------------------
     def next_run_ids(self, count: int, today: datetime | None = None) -> list[str]:
         """Allocate *count* fresh ids. Call while holding :meth:`id_lock`."""
         day = (today or datetime.now().astimezone()).strftime("%Y%m%d")

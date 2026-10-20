@@ -88,8 +88,23 @@ def submit_run(
     runner: CommandRunner = default_runner,
     warnings: list[str] | None = None,
 ) -> str:
-    """sbatch *manifest*; returns the job id. Warnings are appended to *warnings*."""
-    options = options or SubmitOptions()
+    """sbatch *manifest*; returns the job id. Warnings are appended to *warnings*.
+
+    The manifest is re-read under :meth:`Project.run_lock`, so a run given twice
+    (or submitted by two processes at once) is sbatch'ed only once.
+    """
+    with project.run_lock():
+        manifest.reload()
+        return _submit_locked(project, manifest, options or SubmitOptions(), runner, warnings)
+
+
+def _submit_locked(
+    project: Project,
+    manifest: Manifest,
+    options: SubmitOptions,
+    runner: CommandRunner,
+    warnings: list[str] | None,
+) -> str:
     if manifest.status != RunState.CREATED:
         raise UsageError(
             f"{manifest.id} is {manifest.status.value}; only created runs can be "
@@ -159,30 +174,35 @@ def _current_exe_hash(manifest: Manifest) -> str:
 def cancel_run(
     project: Project, manifest: Manifest, *, runner: CommandRunner = default_runner
 ) -> None:
-    if manifest.status not in ACTIVE_STATES:
-        raise UsageError(f"{manifest.id} is {manifest.status.value}; nothing to cancel")
-    if manifest.job_id:
-        scancel(manifest.job_id, runner=runner)
-    now = now_iso()
-    manifest.job["finished_at"] = now
-    manifest.job["last_slurm_state"] = "CANCELLED"
-    attempts = manifest.job.get("attempts") or []
-    if attempts:
-        attempts[-1]["finished_at"] = now
-        attempts[-1]["slurm_state"] = "CANCELLED"
-    manifest.set_status(RunState.CANCELLED)
-    manifest.save()
+    with project.run_lock():
+        manifest.reload()
+        if manifest.status not in ACTIVE_STATES:
+            raise UsageError(f"{manifest.id} is {manifest.status.value}; nothing to cancel")
+        if manifest.job_id:
+            scancel(manifest.job_id, runner=runner)
+        now = now_iso()
+        manifest.job["finished_at"] = now
+        manifest.job["last_slurm_state"] = "CANCELLED"
+        attempts = manifest.job.get("attempts") or []
+        if attempts:
+            attempts[-1]["finished_at"] = now
+            attempts[-1]["slurm_state"] = "CANCELLED"
+        manifest.set_status(RunState.CANCELLED)
+        manifest.save()
 
 
 def retry_run(project: Project, manifest: Manifest) -> None:
-    if manifest.status not in (RunState.FAILED, RunState.CANCELLED):
-        raise UsageError(
-            f"{manifest.id} is {manifest.status.value}; only failed/cancelled runs can be retried"
-        )
-    manifest.set_status(RunState.CREATED)
-    manifest.job["job_id"] = ""
-    manifest.job["finished_at"] = ""
-    manifest.save()
+    with project.run_lock():
+        manifest.reload()
+        if manifest.status not in (RunState.FAILED, RunState.CANCELLED):
+            raise UsageError(
+                f"{manifest.id} is {manifest.status.value}; "
+                "only failed/cancelled runs can be retried"
+            )
+        manifest.set_status(RunState.CREATED)
+        manifest.job["job_id"] = ""
+        manifest.job["finished_at"] = ""
+        manifest.save()
 
 
 def _append(path: Path, text: str) -> None:

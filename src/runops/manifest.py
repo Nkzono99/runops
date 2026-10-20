@@ -70,6 +70,10 @@ class Manifest:
     def save(self) -> None:
         dump_toml(self.path, self.data)
 
+    def reload(self) -> None:
+        """Re-read the file, dropping in-memory changes (use under ``Project.run_lock``)."""
+        self.data = Manifest.load(self.path).data
+
     @property
     def run_dir(self) -> Path:
         return self.path.parent
