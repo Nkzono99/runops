@@ -106,7 +106,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 
 | section | field |
 |---|---|
-| `[run]` | `id`、`label`、`status`、`created_at`、`why`、`scratch`、`expires_at`、`pinned`、`tags`、`status_before_archive` |
+| `[run]` | `id`、`label`、`status`、`created_at`、`why`、`scratch`、`expires_at`、`pinned`、`tags`、`status_before_archive`、`superseded_by`（置き換え先の run id） |
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
 | `[origin]` | `case`、`sweep`、`parent_run`、`created_by`、`case_input_hash` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
@@ -163,7 +163,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可 |
-| `runo archive RUN... ` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。移動前に全対象を検査し、指定した RUN が終了していなければ何も動かさない。DIR は配下の run（系列）で、created / submitted / running と pinned を除いて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |
 | `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |

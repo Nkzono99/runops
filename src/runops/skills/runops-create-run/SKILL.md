@@ -19,6 +19,11 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
    base input file changes, not for a different value.
 6. Before submitting, show the run ids, partition, resources and core-hours and get
    confirmation. Then `runo submit RUN...` or create with `--submit`.
+7. When the new runs replace an old series (a bug or wrong input in the old one), ask
+   whether the old series is still needed. Deriving with `--from` alone does not make
+   the source obsolete. If it is not needed and its runs are finished:
+   `runo archive OLD_DIR --superseded-by NEW_DIR --why "..."`. Report the current
+   series, the archive path and the count.
 
 ## Naming
 

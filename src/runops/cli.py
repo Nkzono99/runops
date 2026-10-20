@@ -771,39 +771,58 @@ def summarize(
 
 @app.command()
 def archive(
-    runs: Optional[list[str]] = typer.Argument(None),
+    runs: Optional[list[str]] = typer.Argument(
+        None, help="Runs, or directories under runs/ (a series)."
+    ),
     older_than: str = typer.Option(
         "", "--older-than", help="Archive completed runs older than this (e.g. 90d)."
     ),
+    superseded_by: str = typer.Option(
+        "",
+        "--superseded-by",
+        help="Run or series directory that replaces these runs; recorded in each manifest.",
+    ),
+    why: str = typer.Option("", "--why", help="Reason, recorded in each run's notes."),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
     """Move terminal runs to runs/_archive/ (same relative path)."""
     from datetime import datetime
 
-    from runops.ops.tidy import archive_run
+    from runops.ops.tidy import ArchivePlan, archive_run, plan_archive
 
     project = _project()
+    if superseded_by and not why:
+        raise UsageError("--superseded-by needs --why")
     if older_than:
-        if runs:
+        if runs or superseded_by:
             raise UsageError("give RUNs or --older-than, not both")
         cutoff = datetime.now().astimezone() - parse_age(older_than)
-        targets = [
-            m
-            for m in project.iter_runs()
-            if m.status == RunState.COMPLETED
-            and not m.pinned
-            and (m.created_datetime() or cutoff) < cutoff
-        ]
+        plan = ArchivePlan(
+            targets=[
+                m
+                for m in project.iter_runs()
+                if m.status == RunState.COMPLETED
+                and not m.pinned
+                and (m.created_datetime() or cutoff) < cutoff
+            ]
+        )
     else:
-        targets = _resolve(project, runs or [])
-    if not targets:
+        plan = plan_archive(project, runs or [], superseded_by=superseded_by)
+    for m, reason in plan.skipped:
+        out.print(f"  skip {m.id}  {reason}  {project.rel(m.run_dir)}")
+    if not plan.targets:
         out.print("nothing to archive")
         return
-    for m in targets:
-        out.print(f"  {m.id}  {project.rel(m.run_dir)}")
-    _confirm(f"Archive {len(targets)} runs?", yes)
-    for m in targets:
-        dst = archive_run(project, m)
+    for m in plan.targets:
+        line = f"  {m.id}  {m.status.value}  {project.rel(m.run_dir)}"
+        if m.id in plan.superseded_by:
+            line += f"  -> {', '.join(plan.superseded_by[m.id])}"
+        out.print(line)
+    _confirm(f"Archive {len(plan.targets)} runs?", yes)
+    for m in plan.targets:
+        dst = archive_run(
+            project, m, superseded_by=plan.superseded_by.get(m.id), why=why, by=_actor()
+        )
         out.print(f"archived {m.id} -> {project.rel(dst)}")
 
 

@@ -31,6 +31,7 @@ def test_paths_into_another_project_are_refused(
         ("submit", str(theirs.run_dir), "-y"),
         ("submit", "--all", str(other_project / "runs"), "-y"),
         ("list", str(other_project / "runs")),
+        ("archive", str(other_project / "runs/demo/series"), "-y"),
     ):
         res = cli(*args)
         assert res.code == 2, args

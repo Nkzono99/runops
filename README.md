@@ -43,6 +43,7 @@ runo init
 | 様子を見る | 先週投げた run の状況を見て。失敗していたら原因をノートに残して |
 | 続きを流す | R20261015-0003 の続きを 2 倍の step で |
 | 片付ける | 古い run を整理して。消すものと archive するものを先に見せて |
+| 作り直した旧系列を片付ける | 旧系列は新系列で置き換えたので、対応を記録して archive して |
 | simulator を足す | パッチを当てた ~/BEACH-dev をビルドして、別の simulator として登録して |
 | 更新する | runops と simulator を最新にして |
 | v1 から移る | この project を runops v2 に移行して（`runo migrate-v1` を dry-run で確認してから） |

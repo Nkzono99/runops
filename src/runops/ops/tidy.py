@@ -144,9 +144,76 @@ def apply_candidates(
 # ---- archive / restore / delete --------------------------------------
 
 
-def archive_run(project: Project, manifest: Manifest) -> Path:
+_TERMINAL = (RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED)
+
+
+@dataclass
+class ArchivePlan:
+    targets: list[Manifest] = field(default_factory=list)
+    skipped: list[tuple[Manifest, str]] = field(default_factory=list)
+    superseded_by: dict[str, list[str]] = field(default_factory=dict)  # old id -> new ids
+
+
+def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") -> ArchivePlan:
+    """Check every target before anything moves.
+
+    A RUN that cannot be archived is an error. A directory (a series) stands for the
+    runs below it; its submitted/running/created and pinned runs are skipped and listed.
+    With *superseded_by* (a RUN or a series directory), each old run records the
+    replacement runs derived from it (``origin.parent_run``), or all of them when none is.
+    """
+    if not refs:
+        raise UsageError("give at least one RUN or directory")
+    explicit: dict[str, Manifest] = {}
+    expanded: dict[str, Manifest] = {}
+    for ref in refs:
+        runs, is_dir = project.resolve_runs(ref)
+        for m in runs:
+            (expanded if is_dir else explicit)[m.id] = m
+    plan = ArchivePlan()
+    for run_id, m in {**expanded, **explicit}.items():
+        if inside(m.run_dir, project.runs_dir / ARCHIVE_DIR):
+            reason = "already archived"
+        elif m.status not in _TERMINAL:
+            reason = m.status.value
+        elif m.pinned and run_id not in explicit:
+            reason = "pinned"
+        else:
+            plan.targets.append(m)
+            continue
+        if run_id in explicit:
+            raise UsageError(f"{run_id} is {reason}; only terminal runs can be archived")
+        plan.skipped.append((m, reason))
+    if superseded_by:
+        new, _ = project.resolve_runs(superseded_by)
+        old_ids = {m.id for m in plan.targets} | {m.id for m, _ in plan.skipped}
+        if old_ids & {m.id for m in new}:
+            raise UsageError("--superseded-by must not include the runs being archived")
+        for m in plan.targets:
+            derived = [r.id for r in new if r.parent_run == m.id]
+            plan.superseded_by[m.id] = derived or [r.id for r in new]
+    return plan
+
+
+def archive_run(
+    project: Project,
+    manifest: Manifest,
+    *,
+    superseded_by: list[str] | None = None,
+    why: str = "",
+    by: str = "",
+) -> Path:
+    """Move a terminal run to ``runs/_archive/``; record replacements and *why* if given."""
+    with project.run_lock():
+        manifest.reload()
+        return _archive_locked(project, manifest, superseded_by or [], why, by)
+
+
+def _archive_locked(
+    project: Project, manifest: Manifest, superseded_by: list[str], why: str, by: str
+) -> Path:
     status = manifest.status
-    if status not in (RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED):
+    if status not in _TERMINAL:
         raise UsageError(f"{manifest.id} is {status.value}; only terminal runs can be archived")
     src = manifest.run_dir.resolve()
     archive_root = project.runs_dir / ARCHIVE_DIR
@@ -170,6 +237,12 @@ def archive_run(project: Project, manifest: Manifest) -> Path:
             "archived_at": now_iso(),
         }
     )
+    if superseded_by:
+        moved.run["superseded_by"] = list(superseded_by)
+        text = f"superseded by {', '.join(superseded_by)}"
+        moved.add_note(f"{text}: {why}" if why else text, by or "runops")
+    elif why:
+        moved.add_note(f"archived: {why}", by or "runops")
     moved.set_status(RunState.ARCHIVED)
     moved.save()
     project.update_index(moved.id, dst)

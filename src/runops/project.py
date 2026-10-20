@@ -154,6 +154,27 @@ class Project:
                 return candidate.resolve()
         raise UsageError(f"no directory {str(ref)!r}")
 
+    def resolve_runs(self, ref: str) -> tuple[list[Manifest], bool]:
+        """A run reference, or a directory under ``runs/`` standing for every run below it.
+
+        Returns the runs and whether *ref* was such a directory. Archived runs are left
+        out of a directory unless the directory is inside ``runs/_archive`` itself.
+        """
+        for candidate in (Path(ref), self.root / ref, self.runs_dir / ref):
+            if candidate.is_dir() and not (candidate / MANIFEST_FILE).is_file():
+                under = self.runs_subdir(candidate)
+                archive = (self.runs_dir / ARCHIVE_DIR).resolve()
+                keep_archived = under == archive or archive in under.parents
+                runs = [
+                    m
+                    for m in self.iter_runs(under)
+                    if keep_archived or archive not in m.run_dir.resolve().parents
+                ]
+                if not runs:
+                    raise UsageError(f"no runs under {self.rel(under)}")
+                return runs, True
+        return [self.resolve_run(ref)], False
+
     def _check_in_runs(self, path: Path, ref: str) -> None:
         # Commands act on the project found from the cwd (SPEC §7.1, §7.2). A path
         # into another project would otherwise be handled with this project's config.

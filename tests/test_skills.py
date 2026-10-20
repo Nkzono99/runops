@@ -123,10 +123,13 @@ def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> 
     agents = (project_dir / "AGENTS.md").read_text()
     assert "Scope is this project" in agents
     assert "never a target list" in agents
+    assert "--superseded-by" in agents
     skills = project_dir / ".agents/skills"
     status = (skills / "runops-check-status/SKILL.md").read_text()
     assert "starts from this project's runs" in status
     assert "account-wide `squeue` / `sacct` are not" in status
+    assert "--superseded-by" in (skills / "runops-create-run/SKILL.md").read_text()
+    assert "--superseded-by" in (skills / "runops-tidy/SKILL.md").read_text()
     assert (
         "another project's `runs/` are refused"
         in (skills / "runops-reference/SKILL.md").read_text()

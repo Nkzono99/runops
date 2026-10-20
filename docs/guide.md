@@ -216,6 +216,18 @@ run は消さなくても `runo list` が古いものを隠しますが、direct
 候補を確認したら `runo tidy --apply` で実行します。archive は `runs/_archive/` への移動で、
 run id で引き続き見つかり、`runo restore` で戻せます。
 
+### 置き換えた系列を片付ける
+
+不備を直して新しい系列を作り直すと、エージェントは旧系列がまだ要るかを尋ねます。要らなければ
+
+> 旧系列は不要。新系列で置き換えたと記録して archive して。
+
+で `runo archive runs/<case>/<旧系列> --superseded-by runs/<case>/<新系列> --why "..."` になります。
+系列の directory を渡すと、対象の run を先に表示し、投入中・実行中・作成のみの run と pin した run は
+除きます。各旧 run の `superseded_by` には、その run から `--from` で作った新 run（無ければ新系列の全 run）が
+記録され、理由はノートに残ります。比較用に派生しただけの run は置き換えとは扱わないので、
+旧系列が不要かどうかは毎回確かめます。
+
 論文の図に使う run や基準にする run は pin しておくと、`list` に常に表示され、`tidy` や `delete`
 の対象になりません。
 

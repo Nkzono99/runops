@@ -25,7 +25,8 @@ COMMANDS = """\
 | `runo summarize RUN` | adapter summary into analysis/summary.json |
 | `runo tidy` / `runo tidy --apply` | list / apply cleanup (expired scratch, stale failures, old runs) |
 | `runo mv RUN... [--dest DIR] [--label L] --why TEXT` | rename / move runs, keeping ids and inputs |
-| `runo archive RUN` / `runo restore RUN` / `runo delete RUN` | move to runs/_archive / back / remove |
+| `runo archive RUN\\|DIR... [--superseded-by RUN\\|DIR --why T]` | move finished runs (or a series) to runs/_archive |
+| `runo restore RUN` / `runo delete RUN` | move back / remove |
 | `runo build SIM` | build a local_source simulator into .runops/build |
 | `runo doctor` / `runo update` | check environment / upgrade simulator packages and skills |"""
 
@@ -70,6 +71,8 @@ This is a runops project: simulation runs are tracked as directories under
 - Never edit `manifest.toml` or a run's `input/` by hand. Change the case or create a
   new run with `--set` / `new --from`. To rename or move a run, use `runo mv`, not a
   re-created copy.
+- When a new series replaces an old one, ask whether the old one is still needed; if not,
+  `runo archive OLD_DIR --superseded-by NEW_DIR --why ...` and report what was archived.
 - Express variations as runs, not cases: use `runo new CASE --set k=v`,
   `runo new --from RUN --set k=v`, or `runo sweep`. Create a new case only when the
   structure of the base input files changes.
