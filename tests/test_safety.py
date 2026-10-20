@@ -63,3 +63,24 @@ def test_concurrent_submits_sbatch_once(project: Project, cli, fake_slurm) -> No
         t.join()
     assert _sbatch_calls(fake_slurm) == 1
     assert len(errors) == len(copies) - 1
+
+
+def test_purge_refuses_when_adapter_fails(
+    project_dir: Path, cli, fake_slurm, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    (run_id,) = cli("new", "demo", "--submit").run_ids()
+    fake_slurm.states[fake_slurm.last_job] = "COMPLETED"
+    cli("sync")
+    work = _manifest(project_dir, run_id).run_dir / "work"
+    (work / "checkpoint.h5").write_text("keep me")
+    (work / "big.dat").write_text("x")
+
+    def broken(*_args: object) -> object:
+        raise UsageError("adapter 'generic' could not be imported")
+
+    monkeypatch.setattr("runops.ops.tidy.run_sim_context", broken)
+    res = cli("tidy", "--purge-work", run_id, "-y")
+    assert res.code == 2
+    assert "nothing was deleted" in res.err
+    assert (work / "checkpoint.h5").exists() and (work / "big.dat").exists()
+    assert not _manifest(project_dir, run_id).data["storage"]["work_purged_at"]

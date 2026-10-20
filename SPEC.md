@@ -519,6 +519,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 - `--older-than AGE`（例 `14d`）はその回だけ、上の 2 つの日数をどちらもこの値で置き換える。
 - `--purge-work RUN...` は指定 run の `work/` の中身を削除し `work_purged_at` を記録する。
   adapter が `keep_patterns()` を返す場合、一致するファイルは残す。`completed` 以外は拒否。
+  adapter を読み込めない（残すファイルを判定できない）ときは何も消さずにエラーにする。
 - `tidy` は receipt や tombstone を作らない。失敗したら error を出して止まる。
   部分実行された結果は各 run の manifest にそのまま残る（再実行で続きから処理できる）。
 

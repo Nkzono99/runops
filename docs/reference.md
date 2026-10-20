@@ -168,5 +168,6 @@ scratch と archived は表示しません。
 
 日数は `runops.toml` の `[defaults]` で変えられます。`--older-than 14d` のように指定すると、
 その回だけ両方の日数をその値で置き換えます。pinned の run は `tidy` と `delete` の対象になりません。
+`--purge-work` は adapter を読み込めないと何も消さずにエラーにします。
 
 exit code は 0 が成功、1 が実行時エラー（sbatch 失敗など）、2 が使い方や設定のエラーです。

@@ -226,9 +226,14 @@ def purge_work(project: Project, manifest: Manifest) -> list[str]:
     if manifest.status != RunState.COMPLETED:
         raise UsageError(f"{manifest.id} is {manifest.status.value}; purge-work needs completed")
     try:
-        keep = list(optional(run_sim_context(project, manifest).adapter, "keep_patterns", []) or [])
-    except RunopsError:
-        keep = []
+        adapter = run_sim_context(project, manifest).adapter
+    except RunopsError as exc:
+        # "No keep patterns" and "cannot tell which files to keep" differ: refuse.
+        raise UsageError(
+            f"{manifest.id}: cannot load the adapter to read keep_patterns; "
+            f"nothing was deleted ({exc})"
+        ) from None
+    keep = list(optional(adapter, "keep_patterns", []) or [])
     work = manifest.run_dir / "work"
     removed: list[str] = []
     if work.is_dir():
