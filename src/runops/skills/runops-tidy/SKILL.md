@@ -19,6 +19,10 @@ description: Keep a runops project small (tidy, archive, pin, delete). Use when 
    `runo pin RUN --reason "baseline for fig. 3"` (`--off` to unpin).
 4. `runo archive RUN` moves a finished run to `runs/_archive/` (same relative path);
    `runo restore RUN` brings it back. Archived runs stay findable by id.
+   A directory archives a series: it lists the runs first and skips created/submitted/
+   running and pinned ones. For a replaced series add
+   `--superseded-by NEW_DIR --why "..."`; each old run records its replacement
+   (the new run derived from it, else the whole new series) in `superseded_by`.
 5. `runo delete RUN` removes created/failed/cancelled or scratch runs only.
 6. Run `runo tidy` when starting a new line of work, so the list stays readable.
 7. The day counts live in `[defaults]` of `runops.toml`. When the user wants a different

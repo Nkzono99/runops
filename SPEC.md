@@ -325,6 +325,7 @@ scratch = false
 expires_at = ""                   # scratch の場合のみ。ISO 8601
 pinned = false
 tags = ["sheath", "2d"]
+superseded_by = []               # archive --superseded-by で記録した置き換え先の run id
 
 [path]
 run_dir = "runs/flat_surface/R20261015-0003--wc0147_phi45"   # project root 相対。絶対 path は書かない
@@ -378,6 +379,7 @@ slurm_state = "COMPLETED"
 exit_code = 0                     # exit record から
 exe_hash = "sha256:..."           # submit 時点の executable の hash
 elapsed = "15:42:10"              # sacct の Elapsed、無ければ exit record の開始・終了から
+cancel_reason = ""                # cancel --why の理由。retry はこれがあれば確認を取る
 
 [params]
 "tmgrid.nx" = 4000
@@ -461,6 +463,9 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   見つからなければ exit code 2 でエラー。
 - `RUN` 引数は run id、run directory path、または directory 名の一意な部分文字列を受け付ける。
   複数一致は exit code 2 でエラーにし候補を表示する。
+- path で与える `RUN` と `DIR`（`submit --all`、`list`、`archive`）は、この project の `runs/`
+  配下に限る。別 project の path は exit code 2 で拒否する。run id は project ごとの空間なので、
+  同じ id が別 project にあっても cwd の project の run を指す。
 - 一覧系 command は `--json` を持ち、agent が機械可読に読める。`new` と `sweep --apply` の
   `--json` は作成した run の同じ summary を返す。summary には `params`、`changed_keys`、
   `parent_run`、`exe_hash`、`input_hash` を含め、run 同士の比較に別 command を要らなくする。
@@ -494,8 +499,8 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo sweep CASE --set k=v1,v2,... [--set ...] [--names KEY=n1,n2,...]... [--label L] [--dest DIR] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否 |
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
-| `runo cancel RUN... [-y]` | scancel して sync |
-| `runo retry RUN [--submit]` | `failed`/`cancelled` を `created` に戻す |
+| `runo cancel RUN... [--why TEXT] [-y]` | scancel して sync。`--why` は `cancelled: ...` の note として残す |
+| `runo retry RUN [--submit] [-y]` | `failed`/`cancelled` を `created` に戻す。直近の cancel に `--why` があれば理由を示して確認を取る |
 | `runo status [RUN...] [--json]` | manifest の状態を表示。Slurm を呼ばない |
 | `runo sync [RUN...] [--json]` | squeue/sacct で状態を更新。引数なしは `submitted`/`running` 全件 |
 | `runo log RUN [--err] [-n N] [-f]` | 最新 job の stdout/stderr を表示。`-f` は tail -f |
@@ -504,7 +509,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo pin RUN [--off] [--reason TEXT]` | `run.pinned` を切り替える。pinned は `list` に常に出て、`tidy` / `delete` の対象外 |
 | `runo summarize RUN... [--force]` | adapter の `summarize()` を呼び `analysis/summary.json` を書く。既存があれば `--force` なしではスキップ |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | run を `runs/` 配下で改名・移動する。id、入力、履歴は変えない（§7.7） |
-| `runo archive RUN... [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする。移動前に全対象を検査し、指定した RUN が終端でなければ何も動かさない。DIR は配下の run（系列）を指し、終端でない run と pinned を除いて表示する。`--superseded-by` は各 run に置き換え先（`parent_run` がその run の置き換え先 run、無ければ指定した全 run）を `run.superseded_by` に記録し、`--why` を note に残す |
 | `runo restore RUN` | archive 前の場所に戻す。既に何かあれば拒否 |
 | `runo delete RUN... [-y]` | directory を削除。`created`/`failed`/`cancelled`/scratch のみ。`pinned` は拒否 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | 整理候補を表示する（§7.5）。`--apply` で実行 |
@@ -740,10 +745,12 @@ seal、index を持たない）。
 
 `init` が生成する agent 向けファイルは次だけ。
 
-- `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表、§9 のノート規約、
-  §5 の「variation は case ではなく run で表現する」規約、
-  「submit 前に対象と資源量を提示して確認を取る」「`manifest.toml` と `input/` を直接
-  編集しない」の 2 つの安全規則、展開済み skill の一覧。
+- `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表、作業の進め方、
+  §9 のノート規約、展開済み skill の一覧。作業の進め方は次の 5 項目で、それぞれ「何をするか」と
+  短い理由で書く（禁止事項の列挙にしない）。依頼が操作の範囲を決める、submit 前に対象と資源量を
+  示して確認を取る、操作対象は起動した project の run と job、run の変更は `runo` を通す
+  （variation は case ではなく run、§5）、理由を残す（`--why`、`cancel --why`、`--superseded-by`）。
+- skill は手順を書き、AGENTS.md の方針を繰り返さない。
 - harness file は project root にだけ置く。`runs/` や `cases/` 配下には生成しない。
 - `CLAUDE.md`: `@AGENTS.md` の 1 行。
 - `.agents/skills/`、`.claude/skills/`: §8.2、§8.3 の展開結果。
@@ -957,4 +964,7 @@ v2 の文書は次の 4 ファイルだけにする。
 | 整理と命名のしきい値 | `[defaults]` に `tidy_failed_days`、`tidy_archive_days`、`label_max_length` を追加。completed の目安は「`--older-than` の 3 倍」をやめて独立の値に | project ごとに計算期間や命名が違い、エージェントに毎回 option を渡させると揃わない |
 | `runo init` の対話と site の推定 | 端末から引数なしで実行したときだけ site と simulator を尋ねる。site の既定はホスト名（`camphor*`、`laurel*`、`cinnamon*`、`gardenia*` なら `kudpc`）。プリセット名は `kudpc` とし、`camphor` も同じ意味で受け付ける | 人が打つのは `runo init` だけなので、ここで KUDPC 向けの設定を取り違えないようにする。エージェントや CI からの実行（端末でない、`-y`、引数あり）は従来どおり尋ねない |
 | 異常系と同時操作（2026-10-20） | `run.lock` 下で manifest を読み直す、準備の失敗で program を起動しない、adapter を読めなければ purge しない、build cache の key を内容と `build_command` から作る、run の入れ子を禁止、run id を再利用しない（`last_run_id`）、`new --from` で case の変更を警告 | 外部レビューで、二重投入で 1 回目の履歴が消える、準備失敗が completed になる、adapter の故障で保持ファイルが消える、未追跡ファイルの変更で古い binary を使う、削除した id が別の run を指す、を確認した |
+| 操作範囲は起動 project（2026-10-21） | AGENTS.md block と skill に「対象は起動した project の run と job id だけ。アカウント全体の squeue / sacct は診断に見るだけ。自分で別 directory に移らず、生の `sbatch` / `scancel` を使わない」を書く。CLI は別 project の path を拒否する | 範囲を言わない「再投入して」で、エージェントが別 project や runops 管理外のジョブまで再投入した。cwd で project を決める既存の model に、path 引数の抜け道（`submit --all /other/runs` など）があった。他 session が修正のために止めた run を見分けられるよう、`cancel --why` を note に残し、`retry` はその理由を示して確認を取る（#112） |
+| 置き換えた系列の整理（2026-10-21） | `archive` が DIR（系列）を受け、`--superseded-by` で置き換え先を manifest に記録する。新しい command と tidy の種別は足さない。skill は新系列を作ったら旧系列の要否を確かめ、不要なら archive して現用系列・archive 先・件数を報告する | 修正版を作った後に旧系列が作業領域に残り、毎回ユーザーが整理を頼んでいた。`parent_run` だけでは比較用の派生と置き換えを区別できないので、置き換えは明示操作で記録する。旧 `archive` は 1 件ずつ検査していて、途中の running run で一部だけ移動していた（#113） |
+| 生成ハーネスの書き方（2026-10-21） | AGENTS.md の Rules を「作業の進め方」5 項目に絞り、各項目を「何をするか」と短い理由で書く。skill は手順に専念し、AGENTS.md の方針（manifest を手で編集しない等）を繰り返さない | #112・#113 で規則が増え、禁止形（never / do not）が並んでいた。現行の Claude の prompting 指針は、しないことより何をするかを、理由と共に書くことを勧め、強い禁止語は過剰反応を招くとしている |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

@@ -160,10 +160,17 @@ runops が知らない Slurm 状態の job は状態を変えず、`last_slurm_s
 | 原因を調べる | R20261016-0003 が落ちた理由を調べて | `runo log RUN --err`、`runo summarize RUN`、`runo note RUN "..."` |
 | 一時的な障害で、同じ入力で流し直す | 同じ入力でもう一度投げて | `runo retry RUN`、`runo submit RUN` |
 | 入力を直して流し直す | dt を半分にして作り直して | `runo new --from RUN --set ... --why "..."` |
-| 止める | R20261016-0004 を止めて | `runo cancel RUN` |
+| 止める | R20261016-0004 を止めて | `runo cancel RUN`（直すために止めるときは `--why`） |
 
 `retry` は `failed` / `cancelled` の run を `created` に戻し、試行回数を 1 つ増やします。
 `work/` は消しません。
+
+「消えたジョブを再投入して」「全部止めて」のように範囲を言わない依頼は、エージェントを起動した
+project の run だけが対象です。同じアカウントの別 project のジョブや runops 外のジョブは、
+`squeue` に見えていても対象にせず、該当する run が無ければそう伝えます。別 project の run も
+扱いたいときは、その project か run を名指ししてください。
+入力を直すために止めた run は `runo cancel RUN --why "..."` で理由を残すと、別のセッションが
+「消えたジョブ」として再投入しません（`retry` が理由を示して確認を取ります）。
 
 ## 5. 続きを流す
 
@@ -210,6 +217,18 @@ run は消さなくても `runo list` が古いものを隠しますが、direct
 
 候補を確認したら `runo tidy --apply` で実行します。archive は `runs/_archive/` への移動で、
 run id で引き続き見つかり、`runo restore` で戻せます。
+
+### 置き換えた系列を片付ける
+
+不備を直して新しい系列を作り直すと、エージェントは旧系列がまだ要るかを尋ねます。要らなければ
+
+> 旧系列は不要。新系列で置き換えたと記録して archive して。
+
+で `runo archive runs/<case>/<旧系列> --superseded-by runs/<case>/<新系列> --why "..."` になります。
+系列の directory を渡すと、対象の run を先に表示し、投入中・実行中・作成のみの run と pin した run は
+除きます。各旧 run の `superseded_by` には、その run から `--from` で作った新 run（無ければ新系列の全 run）が
+記録され、理由はノートに残ります。比較用に派生しただけの run は置き換えとは扱わないので、
+旧系列が不要かどうかは毎回確かめます。
 
 論文の図に使う run や基準にする run は pin しておくと、`list` に常に表示され、`tidy` や `delete`
 の対象になりません。

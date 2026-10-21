@@ -134,6 +134,14 @@ class Manifest:
         return str(self.section("origin").get("sweep", ""))
 
     @property
+    def parent_run(self) -> str:
+        return str(self.section("origin").get("parent_run", ""))
+
+    @property
+    def superseded_by(self) -> list[str]:
+        return [str(r) for r in self.run.get("superseded_by", [])]
+
+    @property
     def params(self) -> dict[str, Any]:
         return dict(self.section("params"))
 
@@ -190,7 +198,8 @@ class Manifest:
             # Enough for an agent to compare runs without another command.
             "params": self.params,
             "changed_keys": list(self.section("variation").get("changed_keys", [])),
-            "parent_run": str(self.section("origin").get("parent_run", "")),
+            "parent_run": self.parent_run,
+            "superseded_by": self.superseded_by,
             "exe_hash": str(self.section("simulator").get("exe_hash", "")),
             "input_hash": str(self.section("identity").get("input_hash", "")),
             # Walltime evidence for the next run: elapsed of the latest attempt.

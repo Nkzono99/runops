@@ -6,6 +6,9 @@
 ## runops.toml
 
 project root にあり、`runo` はここを上方向に探して project を特定します。
+command はこの project の `runs/` 配下だけを扱い、別 project の run directory や
+directory を path で渡すとエラーになります。run id は project ごとなので、同じ id が
+別 project にあっても cwd の project の run を指します。
 
 ```toml
 schema = 2
@@ -103,11 +106,11 @@ runops だけが書きます。手で編集しないでください。主な fie
 
 | section | field |
 |---|---|
-| `[run]` | `id`、`label`、`status`、`created_at`、`why`、`scratch`、`expires_at`、`pinned`、`tags`、`status_before_archive` |
+| `[run]` | `id`、`label`、`status`、`created_at`、`why`、`scratch`、`expires_at`、`pinned`、`tags`、`status_before_archive`、`superseded_by`（置き換え先の run id） |
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
 | `[origin]` | `case`、`sweep`、`parent_run`、`created_by`、`case_input_hash` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
-| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`） |
+| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`、`cancel --why` の `cancel_reason`） |
 | `[params]` | case の params に `--set` を適用した最終値 |
 | `[variation]` | `changed_keys` |
 | `[identity]` | `input_hash` |
@@ -154,13 +157,13 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo new --from RUN [--set k=v]... [--continue]` | 既存 run の params から派生。`--continue` は adapter の restart 対応が必要 |
 | `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
-| `runo cancel RUN... [-y]` / `runo retry RUN [--submit]` | scancel / failed・cancelled を created に戻す |
+| `runo cancel RUN... [--why TEXT] [-y]` / `runo retry RUN [--submit] [-y]` | scancel（`--why` は note に残る）/ failed・cancelled を created に戻す（理由付きで cancel された run は確認を取る） |
 | `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
 | `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--json]` | run 一覧 |
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可 |
-| `runo archive RUN... ` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。移動前に全対象を検査し、指定した RUN が終了していなければ何も動かさない。DIR は配下の run（系列）で、created / submitted / running と pinned を除いて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |
 | `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |

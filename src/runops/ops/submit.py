@@ -172,7 +172,12 @@ def _current_exe_hash(manifest: Manifest) -> str:
 
 
 def cancel_run(
-    project: Project, manifest: Manifest, *, runner: CommandRunner = default_runner
+    project: Project,
+    manifest: Manifest,
+    *,
+    runner: CommandRunner = default_runner,
+    why: str = "",
+    by: str = "",
 ) -> None:
     with project.run_lock():
         manifest.reload()
@@ -187,8 +192,20 @@ def cancel_run(
         if attempts:
             attempts[-1]["finished_at"] = now
             attempts[-1]["slurm_state"] = "CANCELLED"
+        if why:
+            (attempts[-1] if attempts else manifest.job)["cancel_reason"] = why
+            manifest.add_note(f"cancelled: {why}", by or "runops")
         manifest.set_status(RunState.CANCELLED)
         manifest.save()
+
+
+def cancel_reason(manifest: Manifest) -> str:
+    """The ``cancel --why`` reason of a cancelled run, if its latest cancel gave one."""
+    if manifest.status != RunState.CANCELLED:
+        return ""
+    attempts = manifest.job.get("attempts") or []
+    record = attempts[-1] if attempts else manifest.job
+    return str(record.get("cancel_reason", ""))
 
 
 def retry_run(project: Project, manifest: Manifest) -> None:

@@ -215,3 +215,19 @@ def test_context_warns_about_stale_runops_skills(project_dir: Path, cli) -> None
     data = json.loads(cli("context", "--json").out)
     assert data["warnings"] and "runo update --skills-only" in data["warnings"][0]
     assert "0.0.1" in cli("context").err
+
+
+def test_cancel_why_guards_retry(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (run_id,) = cli("new", "demo", "--submit").run_ids()
+    assert cli("cancel", run_id, "--why", "wrong dt; replaced by new series", "-y").code == 0
+    m = _manifest(project_dir, run_id)
+    assert m.notes[-1]["text"] == "cancelled: wrong dt; replaced by new series"
+    res = cli("retry", run_id)  # not a terminal: confirmation required
+    assert res.code == 2 and "wrong dt" in res.err
+    assert _manifest(project_dir, run_id).status.value == "cancelled"
+    assert cli("retry", run_id, "-y").code == 0
+    assert _manifest(project_dir, run_id).status.value == "created"
+    # a later cancel without --why does not reuse the old reason
+    assert cli("submit", run_id).code == 0
+    assert cli("cancel", run_id, "-y").code == 0
+    assert cli("retry", run_id).code == 0

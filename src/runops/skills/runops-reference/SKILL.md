@@ -18,8 +18,8 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | sbatch created runs |
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
-| `runo cancel RUN... [-y]` | scancel |
-| `runo retry RUN [--submit]` | failed/cancelled -> created |
+| `runo cancel RUN... [--why TEXT] [-y]` | scancel; `--why` is noted and `retry` asks before reviving |
+| `runo retry RUN [--submit] [-y]` | failed/cancelled -> created |
 | `runo status [RUN...] [--json]` | show manifest state (no Slurm call) |
 | `runo sync [RUN...] [--json]` | update state from Slurm |
 | `runo log RUN [--err] [-n N] [-f]` | latest job stdout/stderr |
@@ -28,7 +28,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo pin RUN [--off] [--reason TEXT]` | keep a run visible and safe from tidy/delete |
 | `runo summarize RUN... [--force]` | analysis/summary.json from the adapter |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | rename/move created or finished runs; id, inputs, sweep and notes kept |
-| `runo archive RUN... [-y]` / `runo archive --older-than 90d [-y]` | move to runs/_archive |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | move finished runs or a series to runs/_archive; record the replacement |
 | `runo restore RUN` | move back |
 | `runo delete RUN... [-y]` | remove created/failed/cancelled/scratch runs |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | cleanup (thresholds: `[defaults].tidy_failed_days` / `tidy_archive_days`) |
@@ -39,12 +39,13 @@ description: Full runops (runo) command reference, project layout and manifest f
 `runops.toml` (site, simulators, launchers, defaults), `cases/<name>/case.toml` plus base
 input files, `runs/<case>/<run_id>--<label>/` with `manifest.toml`, `input/`, `submit/job.sh`,
 `work/` (cwd for Slurm logs), `analysis/`, optional `notes.md`. Scratch runs live in
-`runs/_scratch/`, archived runs in `runs/_archive/`.
+`runs/_scratch/`, archived runs in `runs/_archive/`. `runo` acts on the project found
+from the cwd; paths into another project's `runs/` are refused.
 
 ## Manifest
 
-`[run]` id, label, status, why, scratch, expires_at, pinned, tags, `[[notes]]`;
+`[run]` id, label, status, why, scratch, expires_at, pinned, tags, superseded_by, `[[notes]]`;
 `[origin]` case, sweep, parent_run; `[simulator]` executable and provenance;
-`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed); `[params]` final values;
+`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason); `[params]` final values;
 `[variation].changed_keys`. Status: created -> submitted -> running ->
 completed | failed | cancelled; terminal runs can be archived.

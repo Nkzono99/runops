@@ -117,3 +117,21 @@ def test_runops_skills_are_short() -> None:
 def test_agents_md_short(project_dir: Path) -> None:
     assert len((project_dir / "AGENTS.md").read_text().splitlines()) <= 120
     assert (project_dir / "CLAUDE.md").read_text() == "@AGENTS.md\n"
+
+
+def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> None:
+    agents = (project_dir / "AGENTS.md").read_text()
+    assert "Work within this project" in agents
+    assert "act on them only when the user names them" in agents
+    assert "runo cancel --why" in agents
+    assert "--superseded-by" in agents
+    skills = project_dir / ".agents/skills"
+    status = (skills / "runops-check-status/SKILL.md").read_text()
+    assert "`runo list --status failed --status cancelled`. These runs are the candidates" in status
+    assert "stopped on purpose" in status
+    assert "--superseded-by" in (skills / "runops-create-run/SKILL.md").read_text()
+    assert "--superseded-by" in (skills / "runops-tidy/SKILL.md").read_text()
+    assert (
+        "another project's `runs/` are refused"
+        in (skills / "runops-reference/SKILL.md").read_text()
+    )
