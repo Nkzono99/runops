@@ -43,8 +43,9 @@ def render_block(project: Project, skills: list[str]) -> str:
     return f"""{BEGIN}
 # {project.config.name}
 
-This is a runops project: simulation runs are tracked as directories under
-`runs/`, each with a `manifest.toml` owned by runops. Use the `runo` CLI.
+This is a runops project. Each run is a directory under `runs/` with a `manifest.toml`
+that runops owns. The `runo` CLI creates, submits, tracks and tidies runs, and acts on
+the project found from the current directory.
 
 ## Simulators
 
@@ -54,38 +55,36 @@ This is a runops project: simulation runs are tracked as directories under
 
 {COMMANDS}
 
-## Rules
+## How to work here
 
-- The request sets what may happen: "make/create" creates runs only; "run/submit" also
-  submits; "try/test" allows a short `--scratch` run and its submission, never a
-  production submit. Earlier runs may fill in parameters, not add actions.
-- Before `submit`, `sweep --apply --submit`, or `submit --all`, show the target runs,
-  partition and resources, and get confirmation.
-- Scope is this project: the runs under `runs/` here and their job ids. "all", "resubmit",
-  "cancel the duplicates" mean runs of this project. Do not `cd` to other projects or use
-  raw `sbatch` / `scancel` to widen it; account-wide `squeue` / `sacct` is for diagnosis,
-  never a target list. If no run here matches, say so. Touch other projects' runs only when
-  the user names them, and never revive runs another session cancelled to fix them.
-  When you cancel runs to fix or replace them, pass `runo cancel --why` so no one revives them.
-- After a production submit is accepted, report the job ids and stop. When asked to
-  watch, check once for early failure, then near the expected end; no `tail -f` loops.
-- Never edit `manifest.toml` or a run's `input/` by hand. Change the case or create a
-  new run with `--set` / `new --from`. To rename or move a run, use `runo mv`, not a
-  re-created copy.
-- When a new series replaces an old one, ask whether the old one is still needed; if not,
-  `runo archive OLD_DIR --superseded-by NEW_DIR --why ...` and report what was archived.
-- Express variations as runs, not cases: use `runo new CASE --set k=v`,
-  `runo new --from RUN --set k=v`, or `runo sweep`. Create a new case only when the
-  structure of the base input files changes.
-- Always pass `--why` when creating runs. Use `--scratch` for smoke/debug runs.
+- **Let the request set the actions.** "make/create" means creating runs; "run/submit"
+  also submits; "try/test" means a short `--scratch` run that you may submit. Earlier
+  runs can supply parameters, while the request decides what happens.
+- **Confirm before compute is spent.** Before any submit, show the runs, partition,
+  resources and core-hours, and wait for the go-ahead. Once Slurm accepts the jobs,
+  report the job ids and end the turn; Slurm does the waiting. When asked to watch,
+  check once early and once near the expected end.
+- **Work within this project.** Requests such as "resubmit everything" mean the runs
+  under `runs/` here: find them with `runo sync` and `runo list`. Account-wide `squeue`
+  and `sacct` help diagnose, but other projects and unmanaged jobs belong to other
+  sessions, so act on them only when the user names them. If nothing here matches, say so.
+- **Change runs through `runo`.** `runo` writes each run's manifest and `input/`, so
+  they stay an exact record of what ran.
+  Express a change as a new run (`runo new --from RUN --set k=v`, `runo sweep`) and
+  rename or regroup with `runo mv`. Variations are runs; a new case is for a different
+  structure of the base input.
+- **Leave the reason behind.** Give each new run `--why`. When you cancel runs to fix or
+  replace them, add `runo cancel --why`, so later sessions and `runo retry` leave them
+  stopped. When a new series replaces an old one, ask whether the old one is still
+  needed and archive it with `--superseded-by`.
 
 ## Notes
 
-- Observations about one run: `runo note RUN "..."` (or the run's `notes.md`).
-- Conclusions across runs and next decisions: append to `LOG.md` under a dated heading.
-- Reusable knowledge (formulas, methods, pitfalls): `notes/<topic>.md`, one file per
-  topic. Extend an existing file instead of creating a similar one.
-- Do not create note files anywhere else (`research/`, `analysis/*.md`, `runs/`).
+Notes live in three places, where `runo context` and the next session find them:
+- one run: `runo note RUN "..."`;
+- conclusions across runs and next decisions: `LOG.md`, appended under a dated heading;
+- reusable knowledge (formulas, methods, pitfalls): `notes/<topic>.md`, extending the
+  existing file for a topic.
 
 ## Skills
 

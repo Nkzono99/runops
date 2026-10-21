@@ -121,13 +121,14 @@ def test_agents_md_short(project_dir: Path) -> None:
 
 def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> None:
     agents = (project_dir / "AGENTS.md").read_text()
-    assert "Scope is this project" in agents
-    assert "never a target list" in agents
+    assert "Work within this project" in agents
+    assert "act on them only when the user names them" in agents
+    assert "runo cancel --why" in agents
     assert "--superseded-by" in agents
     skills = project_dir / ".agents/skills"
     status = (skills / "runops-check-status/SKILL.md").read_text()
-    assert "starts from this project's runs" in status
-    assert "account-wide `squeue` / `sacct` are not" in status
+    assert "`runo list --status failed --status cancelled`. These runs are the candidates" in status
+    assert "stopped on purpose" in status
     assert "--superseded-by" in (skills / "runops-create-run/SKILL.md").read_text()
     assert "--superseded-by" in (skills / "runops-tidy/SKILL.md").read_text()
     assert (

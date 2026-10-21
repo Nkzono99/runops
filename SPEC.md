@@ -745,11 +745,12 @@ seal、index を持たない）。
 
 `init` が生成する agent 向けファイルは次だけ。
 
-- `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表、§9 のノート規約、
-  §5 の「variation は case ではなく run で表現する」規約、
-  「submit 前に対象と資源量を提示して確認を取る」「`manifest.toml` と `input/` を直接
-  編集しない」「操作対象は起動した project の run と job に限る」の 3 つの安全規則、
-  展開済み skill の一覧。
+- `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表、作業の進め方、
+  §9 のノート規約、展開済み skill の一覧。作業の進め方は次の 5 項目で、それぞれ「何をするか」と
+  短い理由で書く（禁止事項の列挙にしない）。依頼が操作の範囲を決める、submit 前に対象と資源量を
+  示して確認を取る、操作対象は起動した project の run と job、run の変更は `runo` を通す
+  （variation は case ではなく run、§5）、理由を残す（`--why`、`cancel --why`、`--superseded-by`）。
+- skill は手順を書き、AGENTS.md の方針を繰り返さない。
 - harness file は project root にだけ置く。`runs/` や `cases/` 配下には生成しない。
 - `CLAUDE.md`: `@AGENTS.md` の 1 行。
 - `.agents/skills/`、`.claude/skills/`: §8.2、§8.3 の展開結果。
@@ -965,4 +966,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 異常系と同時操作（2026-10-20） | `run.lock` 下で manifest を読み直す、準備の失敗で program を起動しない、adapter を読めなければ purge しない、build cache の key を内容と `build_command` から作る、run の入れ子を禁止、run id を再利用しない（`last_run_id`）、`new --from` で case の変更を警告 | 外部レビューで、二重投入で 1 回目の履歴が消える、準備失敗が completed になる、adapter の故障で保持ファイルが消える、未追跡ファイルの変更で古い binary を使う、削除した id が別の run を指す、を確認した |
 | 操作範囲は起動 project（2026-10-21） | AGENTS.md block と skill に「対象は起動した project の run と job id だけ。アカウント全体の squeue / sacct は診断に見るだけ。自分で別 directory に移らず、生の `sbatch` / `scancel` を使わない」を書く。CLI は別 project の path を拒否する | 範囲を言わない「再投入して」で、エージェントが別 project や runops 管理外のジョブまで再投入した。cwd で project を決める既存の model に、path 引数の抜け道（`submit --all /other/runs` など）があった。他 session が修正のために止めた run を見分けられるよう、`cancel --why` を note に残し、`retry` はその理由を示して確認を取る（#112） |
 | 置き換えた系列の整理（2026-10-21） | `archive` が DIR（系列）を受け、`--superseded-by` で置き換え先を manifest に記録する。新しい command と tidy の種別は足さない。skill は新系列を作ったら旧系列の要否を確かめ、不要なら archive して現用系列・archive 先・件数を報告する | 修正版を作った後に旧系列が作業領域に残り、毎回ユーザーが整理を頼んでいた。`parent_run` だけでは比較用の派生と置き換えを区別できないので、置き換えは明示操作で記録する。旧 `archive` は 1 件ずつ検査していて、途中の running run で一部だけ移動していた（#113） |
+| 生成ハーネスの書き方（2026-10-21） | AGENTS.md の Rules を「作業の進め方」5 項目に絞り、各項目を「何をするか」と短い理由で書く。skill は手順に専念し、AGENTS.md の方針（manifest を手で編集しない等）を繰り返さない | #112・#113 で規則が増え、禁止形（never / do not）が並んでいた。現行の Claude の prompting 指針は、しないことより何をするかを、理由と共に書くことを勧め、強い禁止語は過剰反応を招くとしている |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |
