@@ -110,7 +110,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
 | `[origin]` | `case`、`sweep`、`parent_run`、`created_by`、`case_input_hash` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
-| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`） |
+| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`、`cancel --why` の `cancel_reason`） |
 | `[params]` | case の params に `--set` を適用した最終値 |
 | `[variation]` | `changed_keys` |
 | `[identity]` | `input_hash` |
@@ -157,7 +157,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo new --from RUN [--set k=v]... [--continue]` | 既存 run の params から派生。`--continue` は adapter の restart 対応が必要 |
 | `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
-| `runo cancel RUN... [-y]` / `runo retry RUN [--submit]` | scancel / failed・cancelled を created に戻す |
+| `runo cancel RUN... [--why TEXT] [-y]` / `runo retry RUN [--submit] [-y]` | scancel（`--why` は note に残る）/ failed・cancelled を created に戻す（理由付きで cancel された run は確認を取る） |
 | `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
 | `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--json]` | run 一覧 |
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |

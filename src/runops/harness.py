@@ -20,7 +20,7 @@ COMMANDS = """\
 | `runo submit RUN... [--partition P]` / `runo submit --all DIR` | sbatch created runs |
 | `runo sync` / `runo status RUN` / `runo log RUN [--err]` | refresh state from Slurm / show / read logs |
 | `runo list [--all] [--case C] [--status S] [--json]` | recent + active runs (old, scratch, archived hidden) |
-| `runo cancel RUN` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
+| `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
 | `runo note RUN "text"` / `runo pin RUN --reason TEXT` | append an observation / protect a key run |
 | `runo summarize RUN` | adapter summary into analysis/summary.json |
 | `runo tidy` / `runo tidy --apply` | list / apply cleanup (expired scratch, stale failures, old runs) |
@@ -66,6 +66,7 @@ This is a runops project: simulation runs are tracked as directories under
   raw `sbatch` / `scancel` to widen it; account-wide `squeue` / `sacct` is for diagnosis,
   never a target list. If no run here matches, say so. Touch other projects' runs only when
   the user names them, and never revive runs another session cancelled to fix them.
+  When you cancel runs to fix or replace them, pass `runo cancel --why` so no one revives them.
 - After a production submit is accepted, report the job ids and stop. When asked to
   watch, check once for early failure, then near the expected end; no `tail -f` loops.
 - Never edit `manifest.toml` or a run's `input/` by hand. Change the case or create a

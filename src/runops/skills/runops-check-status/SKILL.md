@@ -20,7 +20,8 @@ description: Check the progress or result of runops runs (sync, list, log, retry
    Recovery ("jobs vanished, resubmit them") starts from this project's runs:
    `runo sync`, then `runo list --status failed --status cancelled`. Only those runs are
    candidates; jobs seen in account-wide `squeue` / `sacct` are not. If none match, say so.
-   Skip runs whose notes say another session cancelled them to fix and replace them.
+   Skip runs cancelled with a reason (`cancelled: ...` note; `runo retry` asks before
+   reviving one) unless the user names them. Cancel to fix with `runo cancel RUN --why`.
 6. If a run's `work/` is large and the run is done, `runo tidy --purge-work RUN`
    removes outputs except the adapter's keep patterns.
 

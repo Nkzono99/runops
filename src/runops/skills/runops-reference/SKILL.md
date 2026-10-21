@@ -18,8 +18,8 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | sbatch created runs |
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
-| `runo cancel RUN... [-y]` | scancel |
-| `runo retry RUN [--submit]` | failed/cancelled -> created |
+| `runo cancel RUN... [--why TEXT] [-y]` | scancel; `--why` is noted and `retry` asks before reviving |
+| `runo retry RUN [--submit] [-y]` | failed/cancelled -> created |
 | `runo status [RUN...] [--json]` | show manifest state (no Slurm call) |
 | `runo sync [RUN...] [--json]` | update state from Slurm |
 | `runo log RUN [--err] [-n N] [-f]` | latest job stdout/stderr |
@@ -46,6 +46,6 @@ from the cwd; paths into another project's `runs/` are refused.
 
 `[run]` id, label, status, why, scratch, expires_at, pinned, tags, superseded_by, `[[notes]]`;
 `[origin]` case, sweep, parent_run; `[simulator]` executable and provenance;
-`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed); `[params]` final values;
+`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason); `[params]` final values;
 `[variation].changed_keys`. Status: created -> submitted -> running ->
 completed | failed | cancelled; terminal runs can be archived.

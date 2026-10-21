@@ -524,6 +524,9 @@ def submit_cmd(
 @app.command()
 def cancel(
     runs: list[str] = typer.Argument(...),
+    why: str = typer.Option(
+        "", "--why", help="Reason, recorded as a note (e.g. 'wrong input; replaced by ...')."
+    ),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
     """scancel submitted/running runs."""
@@ -533,7 +536,7 @@ def cancel(
     targets = _resolve(project, runs)
     _confirm("Cancel " + ", ".join(f"{m.id} (job {m.job_id})" for m in targets) + "?", yes)
     for m in targets:
-        cancel_run(project, m, runner=_runner())
+        cancel_run(project, m, runner=_runner(), why=why, by=_actor())
         out.print(f"cancelled {m.id}")
 
 
@@ -541,12 +544,17 @@ def cancel(
 def retry(
     run: str = typer.Argument(...),
     submit: bool = typer.Option(False, "--submit"),
+    yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
     """Reset a failed/cancelled run to created (work/ is kept)."""
-    from runops.ops.submit import retry_run
+    from runops.ops.submit import cancel_reason, retry_run
 
     project = _project()
     m = project.resolve_run(run)
+    reason = cancel_reason(m)
+    if reason:
+        # Someone cancelled it on purpose (e.g. to fix and replace it); do not revive it silently.
+        _confirm(f"{m.id} was cancelled: {reason}. Retry anyway?", yes)
     retry_run(project, m)
     out.print(f"{m.id} -> created")
     if submit:
