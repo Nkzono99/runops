@@ -573,6 +573,9 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 - 対象は `created`、`completed`、`failed`、`cancelled`。`submitted` / `running` は拒否する
   （Slurm が run directory の絶対 path を持つ）。`archived` は `restore` を使う。
 - 既存 path は上書きしない（`move_noreplace`）。`created` の run は job.sh を作り直す。
+- 複数 run は `run.lock` を 1 回取り、全対象の状態と移動先を検査してから移す。1 件でも拒否されれば
+  どれも動かさない。移動中に filesystem の error が起きたら止まり、移し終えた run id を error に示す
+  （exit code 1）。`archive RUN...` も同じ手順で移す。
 - 手で `mv` しても run は id で見つかるが、`run.label` と `[path].run_dir` が古いまま残る。
 
 ---
@@ -967,4 +970,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 操作範囲は起動 project（2026-10-21） | AGENTS.md block と skill に「対象は起動した project の run と job id だけ。アカウント全体の squeue / sacct は診断に見るだけ。自分で別 directory に移らず、生の `sbatch` / `scancel` を使わない」を書く。CLI は別 project の path を拒否する | 範囲を言わない「再投入して」で、エージェントが別 project や runops 管理外のジョブまで再投入した。cwd で project を決める既存の model に、path 引数の抜け道（`submit --all /other/runs` など）があった。他 session が修正のために止めた run を見分けられるよう、`cancel --why` を note に残し、`retry` はその理由を示して確認を取る（#112） |
 | 置き換えた系列の整理（2026-10-21） | `archive` が DIR（系列）を受け、`--superseded-by` で置き換え先を manifest に記録する。新しい command と tidy の種別は足さない。skill は新系列を作ったら旧系列の要否を確かめ、不要なら archive して現用系列・archive 先・件数を報告する | 修正版を作った後に旧系列が作業領域に残り、毎回ユーザーが整理を頼んでいた。`parent_run` だけでは比較用の派生と置き換えを区別できないので、置き換えは明示操作で記録する。旧 `archive` は 1 件ずつ検査していて、途中の running run で一部だけ移動していた（#113） |
 | 生成ハーネスの書き方（2026-10-21） | AGENTS.md の Rules を「作業の進め方」5 項目に絞り、各項目を「何をするか」と短い理由で書く。skill は手順に専念し、AGENTS.md の方針（manifest を手で編集しない等）を繰り返さない | #112・#113 で規則が増え、禁止形（never / do not）が並んでいた。現行の Claude の prompting 指針は、しないことより何をするかを、理由と共に書くことを勧め、強い禁止語は過剰反応を招くとしている |
+| 複数 run の mv / archive（2026-10-22） | 1 回の `run.lock` の下で全対象を読み直して検査し、通ってから移す。途中の filesystem error では移し終えた run id を示して止まる | `mv A B C --dest X` は 1 件ずつ検査して移していたので、途中の submitted run で一部だけ移動していた。archive は表示の後で lock を取り直していて、その間に再投入された run で同じことが起き得た |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

@@ -5,8 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from runops.manifest import Manifest
 from runops.project import Project
+from runops.util import move_noreplace
 
 
 def _manifest(project_dir: Path, run_id: str) -> Manifest:
@@ -120,3 +123,40 @@ def test_elapsed_from_exit_record(project_dir: Path, cli, fake_slurm) -> None:  
     )
     cli("sync")
     assert _manifest(project_dir, run_id).job["attempts"][-1]["elapsed"] == "1-01:30:05"
+
+
+def test_mv_checks_every_run_before_moving(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    a, b, c = cli("sweep", "demo", "--set", "x=1,2,3", "--label", "s", "--apply").run_ids()
+    before = {r: _manifest(project_dir, r).run_dir for r in (a, b, c)}
+    assert cli("submit", b).code == 0
+    res = cli("mv", a, b, c, "--dest", "regrouped")
+    assert res.code == 2 and f"{b} is submitted" in res.err
+    assert {r: _manifest(project_dir, r).run_dir for r in (a, b, c)} == before
+    assert not (project_dir / "runs/regrouped").exists()
+
+    (project_dir / "runs/regrouped" / before[c].name).mkdir(parents=True)
+    res = cli("mv", a, c, "--dest", "regrouped")
+    assert res.code == 2 and "already exists" in res.err
+    assert _manifest(project_dir, a).run_dir == before[a]
+
+
+def test_mv_reports_runs_moved_before_a_failure(
+    project_dir: Path,
+    cli,  # type: ignore[no-untyped-def]
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    a, b = cli("sweep", "demo", "--set", "x=1,2", "--label", "s", "--apply").run_ids()
+    calls: list[Path] = []
+
+    def flaky(src: Path, dst: Path) -> None:
+        calls.append(src)
+        if len(calls) == 2:
+            raise OSError("disk quota exceeded")
+        move_noreplace(src, dst)
+
+    monkeypatch.setattr("runops.ops.tidy.move_noreplace", flaky)
+    res = cli("mv", a, b, "--dest", "regrouped")
+    assert res.code == 1
+    assert f"{b}: disk quota exceeded (already moved: {a})" in res.err
+    assert _manifest(project_dir, a).run_dir.parent == project_dir / "runs/regrouped"
+    assert _manifest(project_dir, b).run_dir.parent == project_dir / "runs/demo/s"

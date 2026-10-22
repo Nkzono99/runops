@@ -796,7 +796,7 @@ def archive(
     """Move terminal runs to runs/_archive/ (same relative path)."""
     from datetime import datetime
 
-    from runops.ops.tidy import ArchivePlan, archive_run, plan_archive
+    from runops.ops.tidy import ArchivePlan, archive_runs, plan_archive
 
     project = _project()
     if superseded_by and not why:
@@ -827,11 +827,11 @@ def archive(
             line += f"  -> {', '.join(plan.superseded_by[m.id])}"
         out.print(line)
     _confirm(f"Archive {len(plan.targets)} runs?", yes)
-    for m in plan.targets:
-        dst = archive_run(
-            project, m, superseded_by=plan.superseded_by.get(m.id), why=why, by=_actor()
-        )
-        out.print(f"archived {m.id} -> {project.rel(dst)}")
+    archived = archive_runs(
+        project, plan.targets, superseded_by=plan.superseded_by, why=why, by=_actor()
+    )
+    for run_id, dst in archived:
+        out.print(f"archived {run_id} -> {project.rel(dst)}")
 
 
 @app.command("mv")
@@ -844,7 +844,7 @@ def mv_cmd(
     why: str = typer.Option("", "--why", help="Reason, recorded in the run's notes."),
 ) -> None:
     """Rename or move runs under runs/, keeping their ids, inputs and history."""
-    from runops.ops.tidy import move_run
+    from runops.ops.tidy import move_runs
 
     if not dest and label is None:
         raise UsageError("give --dest and/or --label")
@@ -852,12 +852,10 @@ def mv_cmd(
     targets = _resolve(project, runs)
     if label is not None and len(targets) > 1:
         raise UsageError("--label applies to one RUN; use --dest to move several")
-    warnings: list[str] = []
-    for m in targets:
-        result = move_run(project, m, dest=dest, label=label, why=why, by=_actor())
-        warnings += result.warnings
-        out.print(f"moved {m.id}: {project.rel(result.src)} -> {project.rel(result.dst)}")
-    _warn(warnings)
+    results = move_runs(project, targets, dest=dest, label=label, why=why, by=_actor())
+    for r in results:
+        out.print(f"moved {r.run_id}: {project.rel(r.src)} -> {project.rel(r.dst)}")
+    _warn([w for r in results for w in r.warnings])
 
 
 @app.command()
