@@ -10,7 +10,7 @@ from pathlib import Path
 
 from runops.adapters.registry import optional
 from runops.case import slugify
-from runops.errors import RunopsError, UsageError
+from runops.errors import RunError, RunopsError, UsageError
 from runops.manifest import ACTIVE_STATES, MANIFEST_FILE, Manifest, RunState
 from runops.ops.common import inside, resolve_dest, run_sim_context
 from runops.ops.submit import write_job_for
@@ -206,12 +206,37 @@ def archive_run(
     """Move a terminal run to ``runs/_archive/``; record replacements and *why* if given."""
     with project.run_lock():
         manifest.reload()
-        return _archive_locked(project, manifest, superseded_by or [], why, by)
+        dst = _archive_dst(project, manifest)
+        return _archive_locked(project, manifest, dst, superseded_by or [], why, by)
 
 
-def _archive_locked(
-    project: Project, manifest: Manifest, superseded_by: list[str], why: str, by: str
-) -> Path:
+def archive_runs(
+    project: Project,
+    manifests: list[Manifest],
+    *,
+    superseded_by: dict[str, list[str]] | None = None,
+    why: str = "",
+    by: str = "",
+) -> list[tuple[str, Path]]:
+    """Archive several runs: all are checked under one ``run.lock`` before any moves."""
+    replacements = superseded_by or {}
+    done: list[tuple[str, Path]] = []
+    with project.run_lock():
+        for m in manifests:
+            m.reload()
+        dsts = [_archive_dst(project, m) for m in manifests]
+        for m, dst in zip(manifests, dsts, strict=True):
+            try:
+                _archive_locked(project, m, dst, replacements.get(m.id, []), why, by)
+            except (RunopsError, OSError) as exc:
+                moved = ", ".join(run_id for run_id, _ in done)
+                tail = f" (already archived: {moved})" if moved else ""
+                raise RunError(f"{m.id}: {exc}{tail}") from exc
+            done.append((m.id, dst))
+    return done
+
+
+def _archive_dst(project: Project, manifest: Manifest) -> Path:
     status = manifest.status
     if status not in _TERMINAL:
         raise UsageError(f"{manifest.id} is {status.value}; only terminal runs can be archived")
@@ -227,6 +252,19 @@ def _archive_locked(
     dst = archive_root / rel
     if dst.exists():
         raise UsageError(f"{dst} already exists")
+    return dst
+
+
+def _archive_locked(
+    project: Project,
+    manifest: Manifest,
+    dst: Path,
+    superseded_by: list[str],
+    why: str,
+    by: str,
+) -> Path:
+    status = manifest.status
+    src = manifest.run_dir.resolve()
     move_noreplace(src, dst)
     moved = Manifest.load(dst / MANIFEST_FILE)
     moved.run["status_before_archive"] = status.value
@@ -284,60 +322,96 @@ class MoveResult:
 _MOVABLE = (RunState.CREATED, RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED)
 
 
-def move_run(
+@dataclass
+class _MovePlan:
+    manifest: Manifest
+    status: RunState
+    src: Path
+    dst: Path
+    label: str
+
+
+def move_runs(
     project: Project,
-    manifest: Manifest,
+    manifests: list[Manifest],
     *,
     dest: str = "",
     label: str | None = None,
     why: str = "",
     by: str = "",
-) -> MoveResult:
-    """Rename and/or move a run under ``runs/``, keeping its id, inputs and history.
+) -> list[MoveResult]:
+    """Rename and/or move runs under ``runs/``, keeping their ids, inputs and history.
 
-    Submitted/running runs are refused (Slurm holds absolute paths into the run
-    directory); archived runs move with ``restore``. The old path and *why* are
-    appended to the run's notes; a created run gets a fresh ``job.sh``.
+    Every run is checked under one ``run.lock`` before any directory moves, so a
+    refused run leaves all of them where they were. Submitted/running runs are refused
+    (Slurm holds absolute paths into the run directory); archived runs move with
+    ``restore``. The old path and *why* are appended to each run's notes; a created run
+    gets a fresh ``job.sh``.
     """
+    results: list[MoveResult] = []
     with project.run_lock():
-        manifest.reload()
-        status = manifest.status
-        if status not in _MOVABLE:
-            hint = "restore it first" if status == RunState.ARCHIVED else "wait or cancel it"
-            raise UsageError(f"{manifest.id} is {status.value}; {hint}")
-        src = manifest.run_dir.resolve()
-        parent = resolve_dest(project, dest) if dest else src.parent
-        if inside(parent, src):
-            raise UsageError(f"--dest must not be inside {manifest.id} itself")
-        new_label = (
-            manifest.label
-            if label is None
-            else slugify(label, project.config.defaults.label_max_length)
-        )
-        if label and not new_label:
-            raise UsageError(f"--label {label!r} has no usable characters")
-        name = f"{manifest.id}--{new_label}" if new_label else manifest.id
-        dst = parent / name
-        if dst.resolve() == src:
-            raise UsageError(f"{manifest.id} is already at {project.rel(src)}")
-        if dst.exists():
-            raise UsageError(f"{project.rel(dst)} already exists")
-        parent.mkdir(parents=True, exist_ok=True)
-        move_noreplace(src, dst)
-        moved = Manifest.load(dst / MANIFEST_FILE)
-        moved.run["label"] = new_label
-        moved.section("path")["run_dir"] = project.rel(dst)
-        text = f"moved from {project.rel(src)}"
-        moved.add_note(f"{text}: {why}" if why else text, by or "runops")
-        moved.save()
-        project.update_index(moved.id, dst)
-        result = MoveResult(moved.id, src, dst)
-        if status == RunState.CREATED:
+        plans = [_plan_move(project, m, dest, label) for m in manifests]
+        taken: dict[Path, str] = {}
+        for plan in plans:
+            other = taken.setdefault(plan.dst.resolve(), plan.manifest.id)
+            if other != plan.manifest.id:
+                raise UsageError(
+                    f"{other} and {plan.manifest.id} would both move to {project.rel(plan.dst)}"
+                )
+        for plan in plans:
             try:
-                write_job_for(project, moved)
-            except RunopsError as exc:  # submit regenerates job.sh anyway
-                result.warnings.append(f"{moved.id}: job.sh not regenerated ({exc})")
-    _prune_empty(src.parent, project.runs_dir)
+                results.append(_apply_move(project, plan, why, by))
+            except (RunopsError, OSError) as exc:
+                done = ", ".join(r.run_id for r in results)
+                moved = f" (already moved: {done})" if done else ""
+                raise RunError(f"{plan.manifest.id}: {exc}{moved}") from exc
+            finally:
+                _prune_empty(plan.src.parent, project.runs_dir)
+    return results
+
+
+def _plan_move(project: Project, manifest: Manifest, dest: str, label: str | None) -> _MovePlan:
+    manifest.reload()
+    status = manifest.status
+    if status not in _MOVABLE:
+        hint = "restore it first" if status == RunState.ARCHIVED else "wait or cancel it"
+        raise UsageError(f"{manifest.id} is {status.value}; {hint}")
+    src = manifest.run_dir.resolve()
+    parent = resolve_dest(project, dest) if dest else src.parent
+    if inside(parent, src):
+        raise UsageError(f"--dest must not be inside {manifest.id} itself")
+    new_label = (
+        manifest.label
+        if label is None
+        else slugify(label, project.config.defaults.label_max_length)
+    )
+    if label and not new_label:
+        raise UsageError(f"--label {label!r} has no usable characters")
+    name = f"{manifest.id}--{new_label}" if new_label else manifest.id
+    dst = parent / name
+    if dst.resolve() == src:
+        raise UsageError(f"{manifest.id} is already at {project.rel(src)}")
+    if dst.exists():
+        raise UsageError(f"{project.rel(dst)} already exists")
+    return _MovePlan(manifest, status, src, dst, new_label)
+
+
+def _apply_move(project: Project, plan: _MovePlan, why: str, by: str) -> MoveResult:
+    plan.dst.parent.mkdir(parents=True, exist_ok=True)
+    move_noreplace(plan.src, plan.dst)
+    moved = Manifest.load(plan.dst / MANIFEST_FILE)
+    moved.run["label"] = plan.label
+    moved.section("path")["run_dir"] = project.rel(plan.dst)
+    text = f"moved from {project.rel(plan.src)}"
+    moved.add_note(f"{text}: {why}" if why else text, by or "runops")
+    moved.save()
+    project.update_index(moved.id, plan.dst)
+    result = MoveResult(moved.id, plan.src, plan.dst)
+    if plan.status == RunState.CREATED:
+        try:
+            write_job_for(project, moved)
+        except RunopsError as exc:  # submit regenerates job.sh anyway
+            result.warnings.append(f"{moved.id}: job.sh not regenerated ({exc})")
     return result
 
 

@@ -162,7 +162,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--json]` | run 一覧 |
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
-| `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可 |
+| `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可。全対象を検査してから移し、1 件でも不可なら何も動かさない |
 | `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。移動前に全対象を検査し、指定した RUN が終了していなければ何も動かさない。DIR は配下の run（系列）で、created / submitted / running と pinned を除いて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |

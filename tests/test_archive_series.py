@@ -5,7 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from runops.errors import UsageError
 from runops.manifest import Manifest
+from runops.ops.tidy import archive_runs
 from runops.project import Project
 
 
@@ -96,3 +100,18 @@ def test_archive_series_skips_active_and_pinned(project_dir: Path, cli, fake_slu
     assert cli("archive", b, "-y").code == 0
     res = cli("archive", "runs/demo/mix", "-y")
     assert res.code == 0 and "nothing to archive" in res.out
+
+
+def test_archive_runs_rechecks_under_the_lock(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    a, b = cli(
+        "sweep", "demo", "--set", "x=1,2", "--label", "s", "--apply", "--submit", "-y"
+    ).run_ids()
+    assert cli("cancel", b, "-y").code == 0
+    _finish_all(cli, fake_slurm)
+    project = Project.open(project_dir)
+    stale = [project.resolve_run(a), project.resolve_run(b)]
+    # Between the preview and the move, the cancelled b is retried and resubmitted.
+    assert cli("retry", b, "--submit", "-y").code == 0
+    with pytest.raises(UsageError, match=f"{b} is submitted"):
+        archive_runs(project, stale)
+    assert _manifest(project_dir, a).status.value == "completed"
