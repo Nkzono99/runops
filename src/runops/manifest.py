@@ -41,6 +41,20 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
 }
 
 
+# Shown with each run so resource differences are visible next to parameter differences.
+_RESOURCE_KEYS = (
+    "partition",
+    "qos",
+    "walltime",
+    "nodes",
+    "ntasks",
+    "cpus_per_task",
+    "processes",
+    "threads",
+    "cores",
+)
+
+
 class Manifest:
     """A run manifest backed by a plain dict so unknown fields survive."""
 
@@ -198,6 +212,8 @@ class Manifest:
             # Enough for an agent to compare runs without another command.
             "params": self.params,
             "changed_keys": list(self.section("variation").get("changed_keys", [])),
+            "job_changed_keys": list(self.section("variation").get("job_changed_keys", [])),
+            "resources": {k: self.job[k] for k in _RESOURCE_KEYS if k in self.job},
             "parent_run": self.parent_run,
             "superseded_by": self.superseded_by,
             "exe_hash": str(self.section("simulator").get("exe_hash", "")),

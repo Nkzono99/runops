@@ -193,9 +193,7 @@ def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") 
             plan.targets.append(m)
             continue
         if run_id in explicit:
-            raise UsageError(
-                f"{run_id} is {reason}; only created or finished runs can be archived"
-            )
+            raise UsageError(f"{run_id} is {reason}; only created or finished runs can be archived")
         plan.skipped.append((m, reason))
     if superseded_by:
         new, _ = project.resolve_runs(superseded_by)
