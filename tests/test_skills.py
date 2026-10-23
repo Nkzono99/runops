@@ -152,14 +152,22 @@ def test_package_reference_links_point_at_deployed_references(
     )
     (ctx / "references").mkdir()
     (ctx / "references/Parameters.md").write_text("# params\n")
+    (ctx / "docs").mkdir()
+    (ctx / "docs/usage.md").write_text("# usage\n")
+    (ctx / "skills/refsim-guide/SKILL.md").write_text(
+        (ctx / "skills/refsim-guide/SKILL.md").read_text() + "Also [usage](../../docs/usage.md).\n"
+    )
     init_project(root, ["refsim=refsim-pkg"], install=False)
     monkeypatch.chdir(root)
     for base in (".agents/skills", ".claude/skills"):
         guide = root / base / "refsim-guide"
         assert "](../refsim-references/Parameters.md)" in (guide / "SKILL.md").read_text()
         assert (guide / "../refsim-references/Parameters.md").is_file()
+        assert "](../refsim-docs/usage.md)" in (guide / "SKILL.md").read_text()
+        assert (guide / "../refsim-docs/usage.md").is_file()
+        assert "docs documents" in (root / base / "refsim-docs/SKILL.md").read_text().lower()
     res = cli("doctor")
-    assert "refsim-guide: links to missing files: ../../docs/missing.md" in res.out
+    assert "refsim-guide: links to missing files: ../refsim-docs/missing.md" in res.out
     assert "Parameters.md" not in res.out
     # Bundled reference documents may link into their repository; only SKILL.md counts.
     refs = root / ".agents/skills/refsim-references/Parameters.md"

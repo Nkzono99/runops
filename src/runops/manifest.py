@@ -220,7 +220,15 @@ class Manifest:
             "input_hash": str(self.section("identity").get("input_hash", "")),
             # Walltime evidence for the next run: elapsed of the latest attempt.
             **self.timing(),
+            "progress": self.progress,
         }
+
+    @property
+    def progress(self) -> dict[str, Any] | None:
+        """Progress of the latest attempt as `runo sync` last saw it (adapter ``progress()``)."""
+        attempts = self.job.get("attempts") or []
+        value = attempts[-1].get("progress") if attempts else None
+        return dict(value) if isinstance(value, dict) else None
 
     def timing(self) -> dict[str, Any]:
         """Walltime, latest attempt elapsed, the fraction used, and the last Slurm state."""

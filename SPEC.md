@@ -460,6 +460,22 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 
 ---
 
+### 6.4 進捗
+
+adapter が `progress(run_dir)` を持つとき、`sync` は running の run と、queue を離れた
+直後の run について呼び、`{done, total, unit, start}` を受け取る。`done` は今の到達点、
+`total` は目標（不明なら省略）、`unit` は数える単位（`batch`、`step` など）、`start` は
+この attempt を始めた地点（resume した run の再開点。新規なら 0）。
+
+- 観測は `submit/progress.<job_id>.jsonl` に `{at, done}` として追記する（attempt ごと、
+  上限 1000 件程度）。queue を離れたときの観測は終了時刻で記録し、終了後の待ち時間を速度に含めない。
+- 要約を `[[job.attempts]].progress` に置く: `done`、`total`、`unit`、`start`、`fraction`、
+  `rate_recent_per_hour`（直近 10 分）、`rate_attempt_per_hour`（program 開始から。起点は
+  `start`）、`eta_hours`（running のみ）。program 開始時刻は job.sh が stdout に出す
+  `runops: start` 行から取り、`started_at` に入れる。
+- `status` / `list` は要約だけを読む（file を開かない）。read-only command は観測を足さない。
+- 解析は adapter が行い、runops は保存と表示だけを持つ（§1.2 #4）。
+
 ## 7. CLI
 
 ### 7.1 共通規則
@@ -502,7 +518,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
 | `runo case list` | case 一覧 |
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--job k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
-| `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | 既存 run の params と `[job]` から派生 run を作る（§5）。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
+| `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | 既存 run の params と `[job]` から派生 run を作る（§5）。置き場所の既定は元 run と同じ directory（元 run が archive / scratch なら `runs/<case>/`）。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
 | `runo sweep CASE --set k=v1,v2,... [--set ...] [--names KEY=n1,n2,...]... [--job k=v]... [--label L] [--dest DIR] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否 |
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
@@ -621,6 +637,7 @@ class SimulatorAdapter(ABC):
     def agent_context_dir(self) -> Path | None: return None      # §8.2
     def configure(self, sim_config: dict) -> None: ...           # runops.toml の [simulators.X] を受け取る
     def job_prelude(self, run_dir: Path) -> list[str]: return [] # job.sh で実行直前に置く shell 行
+    def progress(self, run_dir: Path) -> dict | None: return None  # §6.4。{done, total, unit, start}
 ```
 
 - job.sh は run_dir へ `cd` してから実行する（v1 と同じ。v1 adapter の path 規約
@@ -675,8 +692,9 @@ runops は `init` と `update` で次を行う。
    （例: `mpiemses3d-input-review`）。`runops-` で始まる名前は予約されており展開しない。
 2. `references/` を `.agents/skills/<adapter>-references/` にコピーし、
    `SKILL.md` が無ければ reference 一覧を列挙した `SKILL.md` を生成する。
-   展開した skill の `../../references/`（package 内の配置での参照）は
-   `../<adapter>-references/` に書き換える。
+   `docs/` があれば同じく `.agents/skills/<adapter>-docs/` に置く。展開した skill の
+   `../../references/`、`../../docs/`（package 内の配置での参照）は `../<adapter>-references/`、
+   `../<adapter>-docs/` に書き換える。
 3. 展開先には `.managed-by-runops` marker を置く。marker のある directory は
    `update` 時に **無条件で上書き** する。marker の無い同名 directory は触らず warning。
 4. `.runops/skills.lock` に adapter 名、package version、展開した directory、content hash を記録する。
@@ -981,5 +999,6 @@ v2 の文書は次の 4 ファイルだけにする。
 | 置き換えた系列の整理（2026-10-21） | `archive` が DIR（系列）を受け、`--superseded-by` で置き換え先を manifest に記録する。新しい command と tidy の種別は足さない。skill は新系列を作ったら旧系列の要否を確かめ、不要なら archive して現用系列・archive 先・件数を報告する | 修正版を作った後に旧系列が作業領域に残り、毎回ユーザーが整理を頼んでいた。`parent_run` だけでは比較用の派生と置き換えを区別できないので、置き換えは明示操作で記録する。旧 `archive` は 1 件ずつ検査していて、途中の running run で一部だけ移動していた（#113） |
 | 生成ハーネスの書き方（2026-10-21） | AGENTS.md の Rules を「作業の進め方」5 項目に絞り、各項目を「何をするか」と短い理由で書く。skill は手順に専念し、AGENTS.md の方針（manifest を手で編集しない等）を繰り返さない | #112・#113 で規則が増え、禁止形（never / do not）が並んでいた。現行の Claude の prompting 指針は、しないことより何をするかを、理由と共に書くことを勧め、強い禁止語は過剰反応を招くとしている |
 | 複数 run の mv / archive（2026-10-22） | 1 回の `run.lock` の下で全対象を読み直して検査し、通ってから移す。途中の filesystem error では移し終えた run id を示して止まる | `mv A B C --dest X` は 1 件ずつ検査して移していたので、途中の submitted run で一部だけ移動していた。archive は表示の後で lock を取り直していて、その間に再投入された run で同じことが起き得た |
+| 進捗と系列配置 2.5.0（2026-10-23） | adapter に任意の `progress()`、`sync` が時刻付き観測を保存し速度・残り時間を要約（§6.4）。`new --from` の既定置き場所を元 run と同じ directory に。agent context の `docs/` も展開 | 速度比較のために agent が時刻付き batch 観測を手で保存し、再開点や終了後の待ちを毎回補正していた（4 回）。継続世代が case 直下に並び、同じ計算の系列を見分けにくかった。skill が package の `docs/` を参照していたが展開されていなかった。進捗の解析は simulator 固有なので adapter が持ち、runops は保存と表示だけにする |
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

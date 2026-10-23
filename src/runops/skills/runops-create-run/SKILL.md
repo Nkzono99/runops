@@ -9,7 +9,7 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
 2. Pick the case. Express the variation with `--set`, not with a new case:
    - one run: `runo new CASE --why "..." --set section.key=value`
    - from an existing run: `runo new --from RUN --why "..." --set key=value`
-     (keeps the source's params and `[job]`; the output lists what differs)
+     (keeps the source's params and `[job]`, and sits beside it; the output lists what differs)
    - continue from a finished run (if the adapter supports it): `runo new --from RUN --continue --why "..."`
    - a product of values: `runo sweep CASE --set a=1,2 --set b=x,y --why "..."`
      shows the points and core-hours without creating anything; add `--apply` to create.

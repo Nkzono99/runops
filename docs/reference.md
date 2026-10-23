@@ -110,7 +110,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `[path]` | `run_dir`（project 相対）、`archived_from`、`archived_at` |
 | `[origin]` | `case`、`sweep`、`parent_run`、`created_by`、`case_input_hash` |
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
-| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`、`cancel --why` の `cancel_reason`） |
+| `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`、`cancel --why` の `cancel_reason`、`runo sync` が付ける `progress`（§進捗）） |
 | `[params]` | case の params に `--set` を適用した最終値 |
 | `[variation]` | `changed_keys`、`job_changed_keys`（case の `[job]` と違う key） |
 | `[identity]` | `input_hash` |
@@ -139,7 +139,9 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 ## command
 
 `list --json` と `status --json` は、walltime の根拠として `walltime`、最新 attempt の `elapsed`、
-`walltime_used`（elapsed / walltime）、`slurm_state` も返します。表では `TIMEOUT` などを
+`walltime_used`（elapsed / walltime）、`slurm_state` も返します。adapter が `progress()` を持てば
+`progress`（`done`、`total`、`unit`、`fraction`、`rate_recent_per_hour`、`rate_attempt_per_hour`、
+`eta_hours`）も返し、表の `progress` 列に `62% 0.198 s/batch eta 3.1h` と出します。表では `TIMEOUT` などを
 `failed (TIMEOUT)` と示します。
 
 全 command は `--help` で option を確認できます。`RUN` には run id、run directory、
@@ -154,7 +156,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo context [--json]` | agent 向けの現在地 |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
-| `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。`--continue` は adapter の restart 対応が必要 |
+| `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。置き場所の既定は元 run と同じ directory。`--continue` は adapter の restart 対応が必要 |
 | `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--job k=v]... [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
 | `runo cancel RUN... [--why TEXT] [-y]` / `runo retry RUN [--submit] [-y]` | scancel（`--why` は note に残る）/ failed・cancelled を created に戻す（理由付きで cancel された run は確認を取る） |

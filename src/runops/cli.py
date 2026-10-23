@@ -592,9 +592,20 @@ def retry(
 
 def _status_table(project: Project, manifests: list[Manifest]) -> Table:
     from runops.ops.listing import relative_age
+    from runops.ops.progress import format_progress
 
     table = Table(
-        "id", "status", "label", "case", "sweep", "created", "elapsed", "note", "why", box=None
+        "id",
+        "status",
+        "label",
+        "case",
+        "sweep",
+        "created",
+        "elapsed",
+        "progress",
+        "note",
+        "why",
+        box=None,
     )
     for m in manifests:
         s = m.to_summary(project.root)
@@ -625,6 +636,7 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             s["sweep"],
             relative_age(s["created_at"]),
             elapsed,
+            format_progress(s["progress"]),
             s["last_note"][:60],
             s["why"][:60],
         )

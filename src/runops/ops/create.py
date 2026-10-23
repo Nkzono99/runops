@@ -26,7 +26,7 @@ from runops.errors import RunError, UsageError
 from runops.manifest import MANIFEST_FILE, SCHEMA_VERSION, Manifest
 from runops.ops.common import SimContext, resolve_dest, sim_context
 from runops.ops.submit import write_job_for
-from runops.project import SCRATCH_DIR, Project
+from runops.project import ARCHIVE_DIR, SCRATCH_DIR, Project
 from runops.runtime import resolve_runtime
 from runops.util import hash_tree, move_noreplace, now_iso, parse_value
 
@@ -190,6 +190,18 @@ def _dest_parent(project: Project, case: Case, dest: str, scratch: bool) -> Path
     return resolve_dest(project, dest)
 
 
+def _beside(project: Project, source: Manifest) -> Path | None:
+    """The source run's directory under ``runs/``, unless it is archived or scratch."""
+    parent = source.run_dir.resolve().parent
+    runs = project.runs_dir.resolve()
+    if parent != runs and runs not in parent.parents:
+        return None
+    first = parent.relative_to(runs).parts[:1]
+    if first and first[0] in (ARCHIVE_DIR, SCRATCH_DIR):
+        return None
+    return parent
+
+
 def create_run(project: Project, request: CreateRequest) -> CreateResult:
     """Create one run from a case, or derived from another run (``--from``)."""
     source: Manifest | None = None
@@ -226,6 +238,10 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
         job = dict(case.job)
     job.update(request.job)
     parent = _dest_parent(project, case, request.dest, request.scratch)
+    if source is not None and not request.dest and not request.scratch:
+        # A derived or continued run sits beside its source, so one series (e.g. the
+        # restarts of one calculation) stays in one directory.
+        parent = _beside(project, source) or parent
     spec = RunSpec(
         params=params,
         changed=changed,
