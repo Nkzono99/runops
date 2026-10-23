@@ -13,6 +13,7 @@ from runops.adapters.base import RuntimeInfo, exe_str
 from runops.adapters.registry import optional
 from runops.case import (
     CASE_FILE,
+    JOB_KEYS,
     Case,
     changed_keys,
     core_hours,
@@ -37,6 +38,8 @@ class RunSpec:
     label: str
     parent: Path
     sweep: str = ""
+    job: dict[str, Any] = field(default_factory=dict)
+    job_changed: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -51,12 +54,15 @@ class CreateRequest:
     created_by: str = "human"
     from_run: str = ""
     continue_run: bool = False
+    job: dict[str, Any] = field(default_factory=dict)  # --job overrides of [job]
+    job_from_case: bool = False  # with --from: take [job] from the case, not the source run
 
 
 @dataclass
 class CreateResult:
     manifests: list[Manifest]
     warnings: list[str]
+    changes: list[str] = field(default_factory=list)  # input and resource differences, shown
 
 
 @dataclass
@@ -74,6 +80,7 @@ class SweepPlan:
     parent: Path
     points: list[SweepPoint]
     core_hours: float
+    job: dict[str, Any] = field(default_factory=dict)
 
 
 def parse_sets(items: list[str]) -> dict[str, Any]:
@@ -87,6 +94,37 @@ def parse_sets(items: list[str]) -> dict[str, Any]:
             raise UsageError(f"--set {key} given more than once")
         result[key] = parse_value(raw.strip())
     return result
+
+
+def parse_job(items: list[str]) -> dict[str, Any]:
+    """``--job key=value``: a run's own ``[job]`` values (walltime, processes, ...)."""
+    result: dict[str, Any] = {}
+    for item in items:
+        key, sep, raw = item.partition("=")
+        key = key.strip()
+        if not sep or not key:
+            raise UsageError(f"--job expects key=value, got {item!r}")
+        if key not in JOB_KEYS:
+            raise UsageError(f"--job {key}: not a job key ({', '.join(sorted(JOB_KEYS))})")
+        if key in result:
+            raise UsageError(f"--job {key} given more than once")
+        value = parse_value(raw.strip())
+        # A walltime such as 72:00:00 is not a TOML literal; it is always text.
+        result[key] = str(value) if key == "walltime" else value
+    return result
+
+
+def _job_keys(job: dict[str, Any]) -> dict[str, Any]:
+    return {k: v for k, v in job.items() if k in JOB_KEYS}
+
+
+def _diff(label: str, before: dict[str, Any], after: dict[str, Any]) -> str:
+    keys = [k for k in after if before.get(k) != after[k]]
+    keys += [k for k in before if k not in after]
+    if not keys:
+        return ""
+    parts = [f"{k} {before.get(k, '-')} -> {after.get(k, '-')}" for k in keys]
+    return f"{label}: " + ", ".join(parts)
 
 
 def parse_sweep_sets(items: list[str]) -> dict[str, list[Any]]:
@@ -179,9 +217,38 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
                 f"{label or source.id if source else label}-cont",
                 project.config.defaults.label_max_length,
             )
+    # A derived run keeps the resources of its source, so a change of processes or
+    # walltime does not need an edit of the case; --job overrides single values. Keys
+    # only the case has (e.g. modules added later) still come from the case.
+    if source is not None and not request.job_from_case:
+        job = {**case.job, **_job_keys(source.job)}
+    else:
+        job = dict(case.job)
+    job.update(request.job)
     parent = _dest_parent(project, case, request.dest, request.scratch)
-    spec = RunSpec(params=params, changed=changed, label=label, parent=parent)
+    spec = RunSpec(
+        params=params,
+        changed=changed,
+        label=label,
+        parent=parent,
+        job=job,
+        job_changed=[k for k in job if case.job.get(k) != job[k]],
+    )
     result = _materialize(project, case, [spec], request, source=source)
+    if source is not None:
+        against = f"vs {source.id}"
+        result.changes += [
+            line
+            for line in (
+                _diff(f"params {against}", source.params, params),
+                _diff(f"job {against}", _job_keys(source.job), job),
+            )
+            if line
+        ]
+    else:
+        line = _diff("job vs case", dict(case.job), job)
+        if line:
+            result.changes.append(line)
     if source is not None:
         recorded = str(source.section("origin").get("case_input_hash", ""))
         if recorded and recorded != case.input_hash():
@@ -202,8 +269,10 @@ def plan_sweep(
     limit: int | None = None,
     dest: str = "",
     names: dict[str, list[str]] | None = None,
+    job: dict[str, Any] | None = None,
 ) -> SweepPlan:
     case = load_case(project.cases_dir, case_name)
+    run_job = {**case.job, **(job or {})}
     keys = list(axes)
     names = names or {}
     combos = list(itertools.product(*(range(len(axes[k])) for k in keys)))
@@ -240,8 +309,8 @@ def plan_sweep(
         )
     hours = 0.0
     if points:
-        hours = core_hours(case.job, project.config.site.resource_style) * len(points)
-    return SweepPlan(case, sweep_label, parent, points, hours)
+        hours = core_hours(run_job, project.config.site.resource_style) * len(points)
+    return SweepPlan(case, sweep_label, parent, points, hours, run_job)
 
 
 def apply_sweep(project: Project, plan: SweepPlan, request: CreateRequest) -> CreateResult:
@@ -254,10 +323,16 @@ def apply_sweep(project: Project, plan: SweepPlan, request: CreateRequest) -> Cr
             label=p.label,
             parent=plan.parent,
             sweep=plan.sweep_label,
+            job=dict(plan.job),
+            job_changed=[k for k in plan.job if plan.case.job.get(k) != plan.job[k]],
         )
         for p in plan.points
     ]
-    return _materialize(project, plan.case, specs, request, source=None)
+    result = _materialize(project, plan.case, specs, request, source=None)
+    line = _diff("job vs case", dict(plan.case.job), plan.job)
+    if line:
+        result.changes.append(line)
+    return result
 
 
 def _materialize(
@@ -270,11 +345,11 @@ def _materialize(
 ) -> CreateResult:
     ctx = sim_context(project, case.simulator)
     warnings = list(case.warnings) + list(project.config.warnings)
-    for spec in specs[:1]:
-        warnings += [
-            str(w) for w in optional(ctx.adapter, "validate_params", [], spec.params) or []
-        ]
     runtime, runtime_warnings = resolve_runtime(project, ctx.sim, ctx.adapter)
+    for spec in specs[:1]:
+        warnings += _param_warnings(
+            ctx, runtime, optional(ctx.adapter, "validate_params", [], spec.params) or []
+        )
     warnings += runtime_warnings
     launcher = project.config.launcher(case.launcher)
     created: list[Manifest] = []
@@ -318,6 +393,28 @@ def _materialize(
                     shutil.rmtree(leftover, ignore_errors=True)
             raise
     return CreateResult(created, warnings)
+
+
+def _param_warnings(ctx: SimContext, runtime: RuntimeInfo, messages: list[Any]) -> list[str]:
+    """Adapter validation messages, labelled with the adapter version that judged them."""
+    if not messages:
+        return []
+    resolved = ctx.resolved
+    judge = " ".join(
+        x for x in (f"adapter {ctx.sim.adapter}", resolved.distribution, resolved.version) if x
+    )
+    out = [f"{judge}: {m}" for m in messages]
+    mode = runtime.resolver_mode or ctx.sim.resolver_mode
+    if mode != "package":
+        # The executable does not come from the adapter's package, so it may be newer
+        # than the schema the adapter checks against.
+        build = runtime.git_commit[:12] or exe_str(runtime.executable) or mode
+        out.append(
+            f"these checks use the schema of {judge}, while runs use a {mode} executable "
+            f"({build}); a key it calls unknown may be valid for that executable. "
+            "Check with the simulator's own preflight, or update the package."
+        )
+    return out
 
 
 def _hash_index(project: Project) -> dict[str, list[tuple[str, str]]]:
@@ -429,9 +526,12 @@ def _populate(
             "created_by": request.created_by,
         },
         "simulator": simulator,
-        "job": {"scheduler": "slurm", "job_id": "", "attempt": 0, **case.job},
+        "job": {"scheduler": "slurm", "job_id": "", "attempt": 0, **spec.job},
         "params": dict(spec.params),
-        "variation": {"changed_keys": list(spec.changed)},
+        "variation": {
+            "changed_keys": list(spec.changed),
+            "job_changed_keys": list(spec.job_changed),
+        },
         "identity": {"input_hash": hash_tree(input_dir)},
         "storage": {"work_purged_at": ""},
     }

@@ -14,8 +14,8 @@ COMMANDS = """\
 |---|---|
 | `runo context --json` | where the project stands: active runs, recent runs, LOG.md tail |
 | `runo case list` / `runo case new NAME --simulator SIM [--from CASE]` | list / scaffold cases |
-| `runo new CASE --why TEXT [--set k=v]... [--scratch] [--submit]` | create one run |
-| `runo new --from RUN --why TEXT [--set k=v]... [--continue]` | derive a run from another |
+| `runo new CASE --why TEXT [--set k=v]... [--job k=v]... [--scratch] [--submit]` | create one run |
+| `runo new --from RUN --why TEXT [--set k=v]... [--job k=v]... [--continue]` | derive a run (keeps its params and [job]) |
 | `runo sweep CASE --set k=v1,v2 [--names k=n1,n2] [--apply] [--submit]` | preview / create a parameter product |
 | `runo submit RUN... [--partition P]` / `runo submit --all DIR` | sbatch created runs |
 | `runo sync` / `runo status RUN` / `runo log RUN [--err]` | refresh state from Slurm / show / read logs |
@@ -25,7 +25,7 @@ COMMANDS = """\
 | `runo summarize RUN` | adapter summary into analysis/summary.json |
 | `runo tidy` / `runo tidy --apply` | list / apply cleanup (expired scratch, stale failures, old runs) |
 | `runo mv RUN... [--dest DIR] [--label L] --why TEXT` | rename / move runs, keeping ids and inputs |
-| `runo archive RUN\\|DIR... [--superseded-by RUN\\|DIR --why T]` | move finished runs (or a series) to runs/_archive |
+| `runo archive RUN\\|DIR... [--superseded-by RUN\\|DIR --why T]` | move created or finished runs (or a series) to runs/_archive |
 | `runo restore RUN` / `runo delete RUN` | move back / remove |
 | `runo build SIM` | build a local_source simulator into .runops/build |
 | `runo doctor` / `runo update` | check environment / upgrade simulator packages and skills |"""
@@ -70,9 +70,9 @@ the project found from the current directory.
   sessions, so act on them only when the user names them. If nothing here matches, say so.
 - **Change runs through `runo`.** `runo` writes each run's manifest and `input/`, so
   they stay an exact record of what ran.
-  Express a change as a new run (`runo new --from RUN --set k=v`, `runo sweep`) and
-  rename or regroup with `runo mv`. Variations are runs; a new case is for a different
-  structure of the base input.
+  Express a change as a new run (`runo new --from RUN --set k=v`, `--job walltime=...`
+  for resources, `runo sweep`) and rename or regroup with `runo mv`. Variations are
+  runs; a new case is for a different structure of the base input.
 - **Leave the reason behind.** Give each new run `--why`. When you cancel runs to fix or
   replace them, add `runo cancel --why`, so later sessions and `runo retry` leave them
   stopped. When a new series replaces an old one, ask whether the old one is still
@@ -85,6 +85,10 @@ Notes live in three places, where `runo context` and the next session find them:
 - conclusions across runs and next decisions: `LOG.md`, appended under a dated heading;
 - reusable knowledge (formulas, methods, pitfalls): `notes/<topic>.md`, extending the
   existing file for a topic.
+
+Analysis tools the simulator package does not bring go in `.runops/analysis-env/`
+(`uv venv .runops/analysis-env`), so `.venv` stays as `runo update` manages it. Run heavy
+reading and plotting where the site allows compute jobs.
 
 ## Skills
 

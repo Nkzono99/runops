@@ -63,7 +63,7 @@ def test_superseded_by_without_parent_link_records_the_series(
     assert _manifest(project_dir, old).superseded_by == [a, b]
 
     res = cli("archive", a, "--superseded-by", a, "--why", "x", "-y")
-    assert res.code == 2 and "created" in res.err
+    assert res.code == 2 and "must not include" in res.err
 
 
 def test_archive_checks_every_run_before_moving(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
@@ -115,3 +115,39 @@ def test_archive_runs_rechecks_under_the_lock(project_dir: Path, cli, fake_slurm
     with pytest.raises(UsageError, match=f"{b} is submitted"):
         archive_runs(project, stale)
     assert _manifest(project_dir, a).status.value == "completed"
+
+
+def test_archive_created_drafts_and_restore(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    d1, d2 = cli("sweep", "demo", "--set", "x=1,2", "--label", "draft", "--apply").run_ids()
+    (fixed,) = cli("new", "demo", "--set", "x=9", "--dest", "demo/final").run_ids()
+
+    # A series directory skips created runs unless it is being replaced.
+    res = cli("archive", "runs/demo/draft", "-y")
+    assert res.code == 0 and "nothing to archive" in res.out
+    assert f"skip {d1}  created" in res.out
+
+    res = cli("archive", "runs/demo/draft", "--superseded-by", fixed, "--why", "drafts", "-y")
+    assert res.code == 0, res.err
+    m = _manifest(project_dir, d1)
+    assert m.status.value == "archived"
+    assert m.run["status_before_archive"] == "created"
+    assert m.superseded_by == [fixed]
+    rows = json.loads(cli("list", "--archived", "--all", "--json").out)
+    assert {r["id"] for r in rows if r["status"] == "archived"} == {d1, d2}
+    assert f"-> {fixed}" in cli("list", "--archived", "--all").out
+
+    assert cli("restore", d1).code == 0
+    assert _manifest(project_dir, d1).status.value == "created"
+
+
+def test_archived_scratch_does_not_expire(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (keep,) = cli("new", "demo", "--scratch").run_ids()
+    (drop,) = cli("new", "demo", "--scratch").run_ids()
+    assert cli("archive", keep, "--why", "calibration reference", "-y").code == 0
+    project = Project.open(project_dir)
+    for run_id in (keep, drop):
+        m = project.resolve_run(run_id)
+        m.run["expires_at"] = "2000-01-01T00:00:00+00:00"
+        m.save()
+    cands = json.loads(cli("tidy", "--json").out)
+    assert [(c["kind"], c["target"]) for c in cands] == [("expired-scratch", drop)]

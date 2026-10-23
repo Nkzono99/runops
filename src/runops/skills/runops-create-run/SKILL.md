@@ -9,6 +9,7 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
 2. Pick the case. Express the variation with `--set`, not with a new case:
    - one run: `runo new CASE --why "..." --set section.key=value`
    - from an existing run: `runo new --from RUN --why "..." --set key=value`
+     (keeps the source's params and `[job]`; the output lists what differs)
    - continue from a finished run (if the adapter supports it): `runo new --from RUN --continue --why "..."`
    - a product of values: `runo sweep CASE --set a=1,2 --set b=x,y --why "..."`
      shows the points and core-hours without creating anything; add `--apply` to create.
@@ -17,11 +18,13 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
    `runo tidy` deletes them after they expire.
 5. Create a new case (`runo case new NAME --from CASE`) only when the structure of the
    base input file changes, not for a different value.
-6. Before submitting, show the run ids, partition, resources and core-hours and get
+6. Resources belong to the run: `--job walltime=72:00:00 --job processes=256` on `new` or
+   `sweep`. Change the case's `[job]` only for future runs, after confirmation.
+7. Before submitting, show the run ids, partition, resources and core-hours and get
    confirmation. Then `runo submit RUN...` or create with `--submit`.
-7. When the new runs replace an old series (a bug or wrong input in the old one), ask
+8. When the new runs replace an old series (a bug or wrong input in the old one), ask
    whether the old series is still needed. Deriving with `--from` alone does not make
-   the source obsolete. If it is not needed and its runs are finished:
+   the source obsolete. If it is not needed (finished runs, or created drafts):
    `runo archive OLD_DIR --superseded-by NEW_DIR --why "..."`. Report the current
    series, the archive path and the count.
 
@@ -43,7 +46,7 @@ Before setting `[job].walltime`, look for a comparable finished run (same case,
 resources and step count): `runo list --case C --all --json` shows `elapsed`,
 `walltime` and `walltime_used`. Suggest about 1.3-1.5x its elapsed, rounded up, and
 name the run it came from. A `TIMEOUT` run's elapsed is only a lower bound. With no
-comparable run, say the estimate is unknown. Change the case only after confirmation.
+comparable run, say the estimate is unknown. Set it with `--job walltime=...` after confirmation.
 
 Values in `--set` are TOML literals: `3`, `1.5e-6`, `true`, `"text"`, `[1, 2]`.
 Unquoted words become strings.

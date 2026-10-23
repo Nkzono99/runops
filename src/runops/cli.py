@@ -312,9 +312,13 @@ def case_list(as_json: bool = typer.Option(False, "--json")) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _print_created(project: Project, manifests: list[Manifest]) -> None:
+def _print_created(
+    project: Project, manifests: list[Manifest], changes: list[str] | None = None
+) -> None:
     for m in manifests:
         out.print(f"created {m.id}  {project.rel(m.run_dir)}")
+    for line in changes or []:
+        out.print(f"  {line}", markup=False)
 
 
 def _submit_each(project: Project, manifests: list[Manifest], *, quiet: bool = False) -> None:
@@ -341,16 +345,24 @@ def new(
     continue_run: bool = typer.Option(
         False, "--continue", help="Continue from --from RUN (adapter support needed)."
     ),
+    job: Optional[list[str]] = typer.Option(
+        None, "--job", help="key=value for this run's [job] (walltime, processes, ...)."
+    ),
+    job_from_case: bool = typer.Option(
+        False, "--job-from-case", help="With --from: take [job] from the case, not the run."
+    ),
     submit: bool = typer.Option(False, "--submit"),
     created_by: str = typer.Option("", "--created-by"),
     as_json: bool = typer.Option(False, "--json", help="Print the created run as JSON."),
 ) -> None:
     """Create one run."""
-    from runops.ops.create import CreateRequest, create_run, parse_sets
+    from runops.ops.create import CreateRequest, create_run, parse_job, parse_sets
 
     project = _project()
     if case and from_run:
         raise UsageError("give either CASE or --from RUN, not both")
+    if job_from_case and not from_run:
+        raise UsageError("--job-from-case needs --from RUN")
     request = CreateRequest(
         case=case or "",
         sets=parse_sets(sets or []),
@@ -362,13 +374,15 @@ def new(
         created_by=created_by or _actor(),
         from_run=from_run,
         continue_run=continue_run,
+        job=parse_job(job or []),
+        job_from_case=job_from_case,
     )
     result = create_run(project, request)
     _warn(result.warnings)
     if not why:
         _warn(["no --why given; consider `runo note RUN` to record the purpose"])
     if not as_json:
-        _print_created(project, result.manifests)
+        _print_created(project, result.manifests, result.changes)
     if submit:
         _submit_each(project, result.manifests, quiet=as_json)
     if as_json:
@@ -388,6 +402,9 @@ def sweep(
     dest: str = typer.Option(
         "", "--dest", help="Parent of the sweep directory (default runs/<case>)."
     ),
+    job: Optional[list[str]] = typer.Option(
+        None, "--job", help="key=value for the [job] of every point (walltime, processes, ...)."
+    ),
     why: str = typer.Option("", "--why"),
     apply: bool = typer.Option(False, "--apply", help="Create the runs."),
     submit: bool = typer.Option(False, "--submit", help="Submit after --apply."),
@@ -401,6 +418,7 @@ def sweep(
     from runops.ops.create import (
         CreateRequest,
         apply_sweep,
+        parse_job,
         parse_sweep_names,
         parse_sweep_sets,
         plan_sweep,
@@ -418,6 +436,7 @@ def sweep(
         limit=limit,
         dest=dest,
         names=parse_sweep_names(names or [], axes),
+        job=parse_job(job or []),
     )
     if as_json and not apply:
         _print_json(
@@ -429,6 +448,7 @@ def sweep(
                     {"ref": p.ref, "label": p.label, "values": p.values} for p in plan.points
                 ],
                 "core_hours": plan.core_hours,
+                "job": plan.job,
             }
         )
         return
@@ -446,6 +466,15 @@ def sweep(
             f"{len(plan.points)} runs -> {project.rel(plan.parent)}/  "
             f"(~{plan.core_hours:.1f} core-hours)"
         )
+        overridden = {k: v for k, v in plan.job.items() if plan.case.job.get(k) != v}
+        if overridden:
+            out.print(
+                "  job vs case: "
+                + ", ".join(
+                    f"{k} {plan.case.job.get(k, '-')} -> {v}" for k, v in overridden.items()
+                ),
+                markup=False,
+            )
     if not apply:
         out.print("preview only; add --apply to create")
         return
@@ -458,7 +487,7 @@ def sweep(
     result = apply_sweep(project, plan, request)
     _warn(result.warnings)
     if not as_json:
-        _print_created(project, result.manifests)
+        _print_created(project, result.manifests, result.changes)
     if submit:
         _submit_each(project, result.manifests, quiet=as_json)
     if as_json:
@@ -586,6 +615,8 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             status += " [dim](scratch)[/]"
         if s["pinned"]:
             status += " [dim](pinned)[/]"
+        if s["superseded_by"]:
+            status += f" [dim](-> {', '.join(s['superseded_by'])})[/]"
         table.add_row(
             s["id"],
             status,
@@ -793,7 +824,7 @@ def archive(
     why: str = typer.Option("", "--why", help="Reason, recorded in each run's notes."),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
-    """Move terminal runs to runs/_archive/ (same relative path)."""
+    """Move created or finished runs to runs/_archive/ (same relative path)."""
     from datetime import datetime
 
     from runops.ops.tidy import ArchivePlan, archive_runs, plan_archive

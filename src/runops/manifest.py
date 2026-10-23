@@ -27,7 +27,7 @@ ACTIVE_STATES = frozenset({RunState.SUBMITTED, RunState.RUNNING})
 TERMINAL_STATES = frozenset({RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED})
 
 _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
-    RunState.CREATED: frozenset({RunState.SUBMITTED}),
+    RunState.CREATED: frozenset({RunState.SUBMITTED, RunState.ARCHIVED}),
     RunState.SUBMITTED: frozenset(
         {RunState.RUNNING, RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}
     ),
@@ -37,8 +37,22 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.COMPLETED: frozenset({RunState.ARCHIVED}),
     RunState.FAILED: frozenset({RunState.CREATED, RunState.ARCHIVED}),
     RunState.CANCELLED: frozenset({RunState.CREATED, RunState.ARCHIVED}),
-    RunState.ARCHIVED: frozenset(TERMINAL_STATES),
+    RunState.ARCHIVED: frozenset({*TERMINAL_STATES, RunState.CREATED}),
 }
+
+
+# Shown with each run so resource differences are visible next to parameter differences.
+_RESOURCE_KEYS = (
+    "partition",
+    "qos",
+    "walltime",
+    "nodes",
+    "ntasks",
+    "cpus_per_task",
+    "processes",
+    "threads",
+    "cores",
+)
 
 
 class Manifest:
@@ -198,6 +212,8 @@ class Manifest:
             # Enough for an agent to compare runs without another command.
             "params": self.params,
             "changed_keys": list(self.section("variation").get("changed_keys", [])),
+            "job_changed_keys": list(self.section("variation").get("job_changed_keys", [])),
+            "resources": {k: self.job[k] for k in _RESOURCE_KEYS if k in self.job},
             "parent_run": self.parent_run,
             "superseded_by": self.superseded_by,
             "exe_hash": str(self.section("simulator").get("exe_hash", "")),

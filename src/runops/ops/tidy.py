@@ -76,7 +76,13 @@ def find_candidates(
         created = m.created_datetime()
         age = now - created if created else timedelta(0)
         rel = project.rel(m.run_dir)
-        if m.scratch and not m.pinned and m.status not in ACTIVE_STATES:
+        # An archived scratch run was kept on purpose; archiving ends its expiry.
+        if (
+            m.scratch
+            and not m.pinned
+            and m.status not in ACTIVE_STATES
+            and m.status != RunState.ARCHIVED
+        ):
             expires = parse_iso(str(m.run.get("expires_at", "")))
             if expires is not None and expires <= now:
                 out.append(Candidate("expired-scratch", m.id, rel, f"expired {expires:%Y-%m-%d}"))
@@ -145,6 +151,8 @@ def apply_candidates(
 
 
 _TERMINAL = (RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED)
+# A created run has no job, so it can be archived too (a draft replaced before submit).
+_ARCHIVABLE = (*_TERMINAL, RunState.CREATED)
 
 
 @dataclass
@@ -158,7 +166,8 @@ def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") 
     """Check every target before anything moves.
 
     A RUN that cannot be archived is an error. A directory (a series) stands for the
-    runs below it; its submitted/running/created and pinned runs are skipped and listed.
+    runs below it; its submitted/running and pinned runs are skipped and listed, and so
+    are its created runs unless *superseded_by* says the series was replaced.
     With *superseded_by* (a RUN or a series directory), each old run records the
     replacement runs derived from it (``origin.parent_run``), or all of them when none is.
     """
@@ -174,15 +183,17 @@ def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") 
     for run_id, m in {**expanded, **explicit}.items():
         if inside(m.run_dir, project.runs_dir / ARCHIVE_DIR):
             reason = "already archived"
-        elif m.status not in _TERMINAL:
+        elif m.status not in _ARCHIVABLE:
             reason = m.status.value
+        elif m.status == RunState.CREATED and run_id not in explicit and not superseded_by:
+            reason = "created (name it, or give --superseded-by)"
         elif m.pinned and run_id not in explicit:
             reason = "pinned"
         else:
             plan.targets.append(m)
             continue
         if run_id in explicit:
-            raise UsageError(f"{run_id} is {reason}; only terminal runs can be archived")
+            raise UsageError(f"{run_id} is {reason}; only created or finished runs can be archived")
         plan.skipped.append((m, reason))
     if superseded_by:
         new, _ = project.resolve_runs(superseded_by)
@@ -238,8 +249,10 @@ def archive_runs(
 
 def _archive_dst(project: Project, manifest: Manifest) -> Path:
     status = manifest.status
-    if status not in _TERMINAL:
-        raise UsageError(f"{manifest.id} is {status.value}; only terminal runs can be archived")
+    if status not in _ARCHIVABLE:
+        raise UsageError(
+            f"{manifest.id} is {status.value}; only created or finished runs can be archived"
+        )
     src = manifest.run_dir.resolve()
     archive_root = project.runs_dir / ARCHIVE_DIR
     if inside(src, archive_root):

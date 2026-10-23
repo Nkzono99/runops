@@ -135,3 +135,33 @@ def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> 
         "another project's `runs/` are refused"
         in (skills / "runops-reference/SKILL.md").read_text()
     )
+
+
+def test_package_reference_links_point_at_deployed_references(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    root = tmp_path / "proj"
+    site = root / ".venv/lib/python3.99/site-packages"
+    # A module name no other test imports, so its agent context is this project's.
+    write_dist(site, "refsim", DUMMY.replace('name = "dummy"', 'name = "refsim"'), "1.0")
+    ctx = site / "dummy_context"
+    (ctx / "skills/refsim-guide").mkdir(parents=True)
+    (ctx / "skills/refsim-guide/SKILL.md").write_text(
+        "---\nname: refsim-guide\ndescription: d\n---\n"
+        "See [params](../../references/Parameters.md) and `../../docs/missing.md`.\n"
+    )
+    (ctx / "references").mkdir()
+    (ctx / "references/Parameters.md").write_text("# params\n")
+    init_project(root, ["refsim=refsim-pkg"], install=False)
+    monkeypatch.chdir(root)
+    for base in (".agents/skills", ".claude/skills"):
+        guide = root / base / "refsim-guide"
+        assert "](../refsim-references/Parameters.md)" in (guide / "SKILL.md").read_text()
+        assert (guide / "../refsim-references/Parameters.md").is_file()
+    res = cli("doctor")
+    assert "refsim-guide: links to missing files: ../../docs/missing.md" in res.out
+    assert "Parameters.md" not in res.out
+    # Bundled reference documents may link into their repository; only SKILL.md counts.
+    refs = root / ".agents/skills/refsim-references/Parameters.md"
+    refs.write_text("see [src](../src/main.F90)\n")
+    assert "main.F90" not in cli("doctor").out

@@ -81,7 +81,10 @@ project の `adapters/mysim.py` に `Adapter` という名前で置けば使え�
 `runo init` と `runo update` は `skills/*` を project の `.agents/skills/` と
 `.claude/skills/` に同名でコピーし、`references/` を `<adapter>-references` として置きます。
 skill 名は package 側で名前空間を付けてください（例: `mysim-input-review`）。
-`runops-` で始まる名前は予約されています。展開した directory には
+`runops-` で始まる名前は予約されています。skill から reference へは
+`../<adapter>-references/X.md` と書いてください。package 内の配置どおりの
+`../../references/X.md` は展開時にこの形へ書き換えます。`runo doctor` は展開済み skill の
+相対リンク切れを報告します。展開した directory には
 `.managed-by-runops` が置かれ、更新時に上書きされます。利用者が作った同名 directory は
 上書きしません。
 

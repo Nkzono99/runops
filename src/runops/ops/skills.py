@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass, field
 from importlib import resources
@@ -103,6 +104,8 @@ def deploy(project: Project, sources: list[SkillSource]) -> DeployReport:
                 shutil.copytree(src, target)
                 if not (target / "SKILL.md").is_file():
                     _write_reference_index(target, source.source)
+                elif f"{source.source}-references" in source.skills:
+                    _point_at_deployed_references(target, source.source)
                 (target / MARKER).write_text(
                     f'source = "{source.source}"\nversion = "{source.version}"\n',
                     encoding="utf-8",
@@ -155,6 +158,45 @@ def _marker_source(marker: Path) -> str:
         return str(load_toml(marker).get("source", ""))
     except (OSError, tomllib.TOMLDecodeError):
         return ""
+
+
+# A package skill sits in <agent_context>/skills/<name>/ and often reaches its documents as
+# ../../references/; once deployed, the documents live in the sibling <adapter>-references/.
+_PACKAGE_REFERENCES = "../../references/"
+
+
+def _point_at_deployed_references(target: Path, source: str) -> None:
+    for md in target.rglob("*.md"):
+        text = md.read_text(encoding="utf-8")
+        if _PACKAGE_REFERENCES in text:
+            md.write_text(
+                text.replace(_PACKAGE_REFERENCES, f"../{source}-references/"), encoding="utf-8"
+            )
+
+
+_LINK = re.compile(r"\]\(([^)\s]+)\)|`(\.\.?/[^`\s]+)`")
+
+
+def broken_skill_links(project: Project) -> dict[str, list[str]]:
+    """Relative links in deployed SKILL.md files that point at nothing: {skill: [link, ...]}.
+
+    Only SKILL.md is checked: bundled reference documents are copies of repository docs
+    whose links into the repository are expected to be absent.
+    """
+    root = project.root / SKILL_ROOTS[0]
+    broken: dict[str, list[str]] = {}
+    if not root.is_dir():
+        return broken
+    for skill in sorted(root.iterdir()):
+        md = skill / "SKILL.md"
+        if md.is_file():
+            for match in _LINK.finditer(md.read_text(encoding="utf-8")):
+                link = (match.group(1) or match.group(2)).split("#", 1)[0]
+                if not link or "://" in link or link.startswith(("mailto:", "/")):
+                    continue
+                if not (md.parent / link).exists():
+                    broken.setdefault(skill.name, []).append(link)
+    return broken
 
 
 def _write_reference_index(target: Path, source: str) -> None:
