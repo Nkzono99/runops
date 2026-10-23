@@ -109,8 +109,8 @@ def parse_job(items: list[str]) -> dict[str, Any]:
         if key in result:
             raise UsageError(f"--job {key} given more than once")
         value = parse_value(raw.strip())
-        # A walltime such as 72:00:00 is not a TOML literal; keep it as text.
-        result[key] = raw.strip() if key == "walltime" else value
+        # A walltime such as 72:00:00 is not a TOML literal; it is always text.
+        result[key] = str(value) if key == "walltime" else value
     return result
 
 
@@ -218,9 +218,10 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
                 project.config.defaults.label_max_length,
             )
     # A derived run keeps the resources of its source, so a change of processes or
-    # walltime does not need an edit of the case; --job overrides single values.
+    # walltime does not need an edit of the case; --job overrides single values. Keys
+    # only the case has (e.g. modules added later) still come from the case.
     if source is not None and not request.job_from_case:
-        job = _job_keys(source.job)
+        job = {**case.job, **_job_keys(source.job)}
     else:
         job = dict(case.job)
     job.update(request.job)

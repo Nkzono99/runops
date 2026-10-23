@@ -286,7 +286,7 @@ ntasks = 800
   warning には判定した adapter と package version を付け、executable が package 由来でない
   （`local_source` / `local_executable`）ときは「schema が古いだけかもしれない」と添える。
 - run の `[job]` は、case から作る run では case の `[job]`、`new --from RUN`（`--continue` 含む）
-  では **元 run の `[job]`** を引き継ぐ。`--job k=v` で個別に上書きし（`[job]` の key のみ）、
+  では **元 run の `[job]`** を引き継ぐ（元 run に無い key は case から）。`--job k=v` で個別に上書きし（`[job]` の key のみ）、
   `--job-from-case` で case の値に戻す。資源の変更に case の編集を要しない。作成時に、元 run
   （または case）に対する params と資源の差分を表示する。
 - **variation は case ではなく run で表現する。** 「同じ物理設定で 1 つの値だけ変える」

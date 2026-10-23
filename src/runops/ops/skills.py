@@ -178,13 +178,18 @@ _LINK = re.compile(r"\]\(([^)\s]+)\)|`(\.\.?/[^`\s]+)`")
 
 
 def broken_skill_links(project: Project) -> dict[str, list[str]]:
-    """Relative links in deployed skills that point at nothing: {skill dir: [link, ...]}."""
+    """Relative links in deployed SKILL.md files that point at nothing: {skill: [link, ...]}.
+
+    Only SKILL.md is checked: bundled reference documents are copies of repository docs
+    whose links into the repository are expected to be absent.
+    """
     root = project.root / SKILL_ROOTS[0]
     broken: dict[str, list[str]] = {}
     if not root.is_dir():
         return broken
     for skill in sorted(root.iterdir()):
-        for md in sorted(skill.rglob("*.md")) if skill.is_dir() else []:
+        md = skill / "SKILL.md"
+        if md.is_file():
             for match in _LINK.finditer(md.read_text(encoding="utf-8")):
                 link = (match.group(1) or match.group(2)).split("#", 1)[0]
                 if not link or "://" in link or link.startswith(("mailto:", "/")):

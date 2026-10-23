@@ -71,8 +71,8 @@ the project found from the current directory.
 - **Change runs through `runo`.** `runo` writes each run's manifest and `input/`, so
   they stay an exact record of what ran.
   Express a change as a new run (`runo new --from RUN --set k=v`, `--job walltime=...`
-  for resources, `runo sweep`) and rename or regroup with `runo mv`. Variations are runs; a new case is for a different
-  structure of the base input.
+  for resources, `runo sweep`) and rename or regroup with `runo mv`. Variations are
+  runs; a new case is for a different structure of the base input.
 - **Leave the reason behind.** Give each new run `--why`. When you cancel runs to fix or
   replace them, add `runo cancel --why`, so later sessions and `runo retry` leave them
   stopped. When a new series replaces an old one, ask whether the old one is still

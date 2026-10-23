@@ -161,3 +161,7 @@ def test_package_reference_links_point_at_deployed_references(
     res = cli("doctor")
     assert "refsim-guide: links to missing files: ../../docs/missing.md" in res.out
     assert "Parameters.md" not in res.out
+    # Bundled reference documents may link into their repository; only SKILL.md counts.
+    refs = root / ".agents/skills/refsim-references/Parameters.md"
+    refs.write_text("see [src](../src/main.F90)\n")
+    assert "main.F90" not in cli("doctor").out
