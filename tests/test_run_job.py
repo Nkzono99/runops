@@ -68,3 +68,15 @@ def test_new_from_inherits_source_job(project_dir: Path, cli) -> None:  # type: 
     assert _manifest(project_dir, from_case).job["walltime"] == "3:00:00"
     res = cli("new", "demo", "--job-from-case")
     assert res.code == 2 and "needs --from" in res.err
+
+
+def test_new_from_lands_beside_its_source(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    (src,) = cli("new", "demo", "--dest", "demo/pe-refl-on").run_ids()
+    (nxt,) = cli("new", "--from", src, "--set", "x=2").run_ids()
+    assert _manifest(project_dir, nxt).run_dir.parent == project_dir / "runs/demo/pe-refl-on"
+    (moved,) = cli("new", "--from", src, "--dest", "demo/other").run_ids()
+    assert _manifest(project_dir, moved).run_dir.parent == project_dir / "runs/demo/other"
+
+    assert cli("archive", src, "-y").code == 0
+    (from_archive,) = cli("new", "--from", src).run_ids()
+    assert _manifest(project_dir, from_archive).run_dir.parent == project_dir / "runs/demo"

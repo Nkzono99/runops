@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,7 @@ from runops.errors import RunopsError, UsageError
 from runops.jobgen import exit_record_path
 from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.common import run_sim_context
+from runops.ops.progress import record_progress
 from runops.project import Project
 from runops.slurm import CommandRunner, JobState, default_runner, query, query_many
 from runops.util import format_duration, load_toml, now_iso, parse_duration, parse_iso, tomllib
@@ -112,6 +114,12 @@ def _settle(project: Project, manifest: Manifest, job: JobState | None) -> SyncR
             elapsed = _elapsed(job, record)
             if elapsed:
                 attempts[-1]["elapsed"] = elapsed
+        # The last sample is dated at the finish, so the rate ends where the job did.
+        record_progress(
+            project, manifest, at=parse_iso(now) or datetime.now().astimezone(), final=True
+        )
+    elif new_state == RunState.RUNNING:
+        record_progress(project, manifest, at=datetime.now().astimezone())
     manifest.set_status(new_state)
     manifest.save()
     return SyncResult(manifest.id, before.value, new_state.value, slurm_state, message)

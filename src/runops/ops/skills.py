@@ -69,8 +69,9 @@ def adapter_sources(project: Project, warnings: list[str]) -> list[SkillSource]:
                     )
                     continue
                 skills[path.name] = path  # the package owns its skill namespace
-        if (directory / "references").is_dir():
-            skills[f"{sim.adapter}-references"] = directory / "references"
+        for folder in _DOC_FOLDERS:
+            if (directory / folder).is_dir():
+                skills[f"{sim.adapter}-{folder}"] = directory / folder
         version = ctx.resolved.version or "local"
         sources.append(SkillSource(sim.adapter, version, skills))
     return sources
@@ -104,8 +105,8 @@ def deploy(project: Project, sources: list[SkillSource]) -> DeployReport:
                 shutil.copytree(src, target)
                 if not (target / "SKILL.md").is_file():
                     _write_reference_index(target, source.source)
-                elif f"{source.source}-references" in source.skills:
-                    _point_at_deployed_references(target, source.source)
+                else:
+                    _point_at_deployed_documents(target, source)
                 (target / MARKER).write_text(
                     f'source = "{source.source}"\nversion = "{source.version}"\n',
                     encoding="utf-8",
@@ -160,18 +161,27 @@ def _marker_source(marker: Path) -> str:
         return ""
 
 
-# A package skill sits in <agent_context>/skills/<name>/ and often reaches its documents as
-# ../../references/; once deployed, the documents live in the sibling <adapter>-references/.
-_PACKAGE_REFERENCES = "../../references/"
+# Document folders an agent context may hold beside skills/. Each is deployed as the
+# skill directory <adapter>-<folder>/ (with a generated SKILL.md index).
+_DOC_FOLDERS = ("references", "docs")
 
 
-def _point_at_deployed_references(target: Path, source: str) -> None:
+def _point_at_deployed_documents(target: Path, source: SkillSource) -> None:
+    """Rewrite ../../<folder>/ (the package layout) to ../<adapter>-<folder>/ (deployed)."""
+    moves = {
+        f"../../{folder}/": f"../{source.source}-{folder}/"
+        for folder in _DOC_FOLDERS
+        if f"{source.source}-{folder}" in source.skills
+    }
+    if not moves:
+        return
     for md in target.rglob("*.md"):
         text = md.read_text(encoding="utf-8")
-        if _PACKAGE_REFERENCES in text:
-            md.write_text(
-                text.replace(_PACKAGE_REFERENCES, f"../{source}-references/"), encoding="utf-8"
-            )
+        new = text
+        for old, replacement in moves.items():
+            new = new.replace(old, replacement)
+        if new != text:
+            md.write_text(new, encoding="utf-8")
 
 
 _LINK = re.compile(r"\]\(([^)\s]+)\)|`(\.\.?/[^`\s]+)`")
@@ -201,14 +211,15 @@ def broken_skill_links(project: Project) -> dict[str, list[str]]:
 
 def _write_reference_index(target: Path, source: str) -> None:
     files = sorted(p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_file())
+    kind = target.name.removeprefix(f"{source}-")  # references | docs
     lines = [
         "---",
         f"name: {target.name}",
-        f"description: Reference documents for the {source} simulator. "
+        f"description: {kind.capitalize()} documents for the {source} simulator. "
         "Read the file that matches the question.",
         "---",
         "",
-        f"# {source} references",
+        f"# {source} {kind}",
         "",
         *[f"- [{name}]({name})" for name in files],
         "",
