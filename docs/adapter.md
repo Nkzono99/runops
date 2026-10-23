@@ -49,6 +49,7 @@ class Adapter:
 | `keep_patterns() -> list[str]` | `tidy --purge-work` で残す glob |
 | `extend_inputs(src_run, run_dir, params) -> list[str]` | `runo new --from RUN --continue` の restart 設定 |
 | `agent_context_dir() -> Path | None` | 同梱 skill と reference の場所 |
+| `progress(run_dir) -> dict | None` | 進捗 `{"done", "total", "unit", "start"}`。`runo sync` が時刻付きで保存し、速度と残り時間を出す |
 
 `runtime` は `executable`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、
 `env`、`resolver_mode`、`build_dir` を持ちます。
@@ -76,14 +77,15 @@ project の `adapters/mysim.py` に `Adapter` という名前で置けば使え�
 <dir>/
   skills/<skill-name>/SKILL.md
   references/*.md
+  docs/*.md          # 任意。references と同じく展開する
 ```
 
 `runo init` と `runo update` は `skills/*` を project の `.agents/skills/` と
 `.claude/skills/` に同名でコピーし、`references/` を `<adapter>-references` として置きます。
 skill 名は package 側で名前空間を付けてください（例: `mysim-input-review`）。
 `runops-` で始まる名前は予約されています。skill から reference へは
-`../<adapter>-references/X.md` と書いてください。package 内の配置どおりの
-`../../references/X.md` は展開時にこの形へ書き換えます。`runo doctor` は展開済み skill の
+`../<adapter>-references/X.md`（`docs/` なら `../<adapter>-docs/X.md`）と書いてください。
+package 内の配置どおりの `../../references/X.md`、`../../docs/X.md` は展開時にこの形へ書き換えます。`runo doctor` は展開済み skill の
 相対リンク切れを報告します。展開した directory には
 `.managed-by-runops` が置かれ、更新時に上書きされます。利用者が作った同名 directory は
 上書きしません。

@@ -46,6 +46,6 @@ from the cwd; paths into another project's `runs/` are refused.
 
 `[run]` id, label, status, why, scratch, expires_at, pinned, tags, superseded_by, `[[notes]]`;
 `[origin]` case, sweep, parent_run; `[simulator]` executable and provenance;
-`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason); `[params]` final values;
+`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason, progress); `[params]` final values;
 `[variation].changed_keys`, `job_changed_keys`. Status: created -> submitted -> running ->
 completed | failed | cancelled; terminal runs can be archived.

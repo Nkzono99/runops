@@ -131,6 +131,11 @@ walltime は、同じ case・同じ資源で終わった run の実時間を元�
 `runo sync` は、active な run が何件あっても `squeue` と `sacct` を 1 回ずつしか呼びません。
 エージェントには `squeue` を直接叩かせず、`runo sync` を使わせてください。
 
+adapter が進捗に対応していれば（BEACH の batch、MPIEMSES3D の step）、`sync` のたびに時刻付きの
+観測を残し、`runo list` / `status` に `62% 0.198 s/batch eta 3.1h` のように進み具合、直近 10 分の
+速度、残り時間を出します。resume した run は再開点から数え、終わった run は終了時刻までで速度を出すので、
+版を切り替えた前後の比較にそのまま使えます（`--json` の `progress`）。
+
 ### 状態の決まり方
 
 run の状態は `created → submitted → running → completed | failed | cancelled` と進みます。
@@ -180,6 +185,7 @@ project の run だけが対象です。同じアカウントの別 project の�
 > R20261015-0003 の続きを 2 倍の step で。
 
 `runo new --from RUN --continue` で、終わった run の出力から再開する run を作ります。
+`--from` で作る run は元 run と同じ directory に置かれるので、同じ計算の継続は 1 つの directory に並びます。
 再開の方法は simulator ごとに違い、adapter が対応している場合だけ使えます
 （現在は MPIEMSES3D が対応し、`SNAPSHOT1` から再開します）。新しい run は元の run を `parent_run` として記録します。
 
