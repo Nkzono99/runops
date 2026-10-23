@@ -27,7 +27,7 @@ ACTIVE_STATES = frozenset({RunState.SUBMITTED, RunState.RUNNING})
 TERMINAL_STATES = frozenset({RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED})
 
 _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
-    RunState.CREATED: frozenset({RunState.SUBMITTED}),
+    RunState.CREATED: frozenset({RunState.SUBMITTED, RunState.ARCHIVED}),
     RunState.SUBMITTED: frozenset(
         {RunState.RUNNING, RunState.COMPLETED, RunState.FAILED, RunState.CANCELLED}
     ),
@@ -37,7 +37,7 @@ _TRANSITIONS: dict[RunState, frozenset[RunState]] = {
     RunState.COMPLETED: frozenset({RunState.ARCHIVED}),
     RunState.FAILED: frozenset({RunState.CREATED, RunState.ARCHIVED}),
     RunState.CANCELLED: frozenset({RunState.CREATED, RunState.ARCHIVED}),
-    RunState.ARCHIVED: frozenset(TERMINAL_STATES),
+    RunState.ARCHIVED: frozenset({*TERMINAL_STATES, RunState.CREATED}),
 }
 
 

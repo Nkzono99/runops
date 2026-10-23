@@ -586,6 +586,8 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             status += " [dim](scratch)[/]"
         if s["pinned"]:
             status += " [dim](pinned)[/]"
+        if s["superseded_by"]:
+            status += f" [dim](-> {', '.join(s['superseded_by'])})[/]"
         table.add_row(
             s["id"],
             status,
@@ -793,7 +795,7 @@ def archive(
     why: str = typer.Option("", "--why", help="Reason, recorded in each run's notes."),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
-    """Move terminal runs to runs/_archive/ (same relative path)."""
+    """Move created or finished runs to runs/_archive/ (same relative path)."""
     from datetime import datetime
 
     from runops.ops.tidy import ArchivePlan, archive_runs, plan_archive
