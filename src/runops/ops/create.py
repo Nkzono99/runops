@@ -344,11 +344,11 @@ def _materialize(
 ) -> CreateResult:
     ctx = sim_context(project, case.simulator)
     warnings = list(case.warnings) + list(project.config.warnings)
-    for spec in specs[:1]:
-        warnings += [
-            str(w) for w in optional(ctx.adapter, "validate_params", [], spec.params) or []
-        ]
     runtime, runtime_warnings = resolve_runtime(project, ctx.sim, ctx.adapter)
+    for spec in specs[:1]:
+        warnings += _param_warnings(
+            ctx, runtime, optional(ctx.adapter, "validate_params", [], spec.params) or []
+        )
     warnings += runtime_warnings
     launcher = project.config.launcher(case.launcher)
     created: list[Manifest] = []
@@ -392,6 +392,28 @@ def _materialize(
                     shutil.rmtree(leftover, ignore_errors=True)
             raise
     return CreateResult(created, warnings)
+
+
+def _param_warnings(ctx: SimContext, runtime: RuntimeInfo, messages: list[Any]) -> list[str]:
+    """Adapter validation messages, labelled with the adapter version that judged them."""
+    if not messages:
+        return []
+    resolved = ctx.resolved
+    judge = " ".join(
+        x for x in (f"adapter {ctx.sim.adapter}", resolved.distribution, resolved.version) if x
+    )
+    out = [f"{judge}: {m}" for m in messages]
+    mode = runtime.resolver_mode or ctx.sim.resolver_mode
+    if mode != "package":
+        # The executable does not come from the adapter's package, so it may be newer
+        # than the schema the adapter checks against.
+        build = runtime.git_commit[:12] or exe_str(runtime.executable) or mode
+        out.append(
+            f"these checks use the schema of {judge}, while runs use a {mode} executable "
+            f"({build}); a key it calls unknown may be valid for that executable. "
+            "Check with the simulator's own preflight, or update the package."
+        )
+    return out
 
 
 def _hash_index(project: Project) -> dict[str, list[tuple[str, str]]]:

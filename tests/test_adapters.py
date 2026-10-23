@@ -87,3 +87,31 @@ def test_set_dotted_and_toml_override(tmp_path: Path) -> None:
     path.write_text("[boundary]\nradius = 1.0\n")
     toml_override(path, {"boundary.radius": 7e-6, "output.dir": "latest"})
     assert path.read_text() == '[boundary]\nradius = 7e-06\n\n[output]\ndir = "latest"\n'
+
+
+def test_param_warnings_name_the_adapter_and_a_newer_executable(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    source = LOCAL_ADAPTER.format(name="schemasim") + (
+        "    def validate_params(self, params):\n"
+        "        return ['step_growth is not a known key']\n"
+    )
+    (project_dir / "adapters").mkdir()
+    (project_dir / "adapters/schemasim.py").write_text(source)
+    exe = project_dir / "bin/schemasim"
+    exe.parent.mkdir()
+    exe.write_text("#!/bin/sh\n")
+    exe.chmod(0o755)
+    cfg = project_dir / "runops.toml"
+    cfg.write_text(
+        cfg.read_text()
+        + '\n[simulators.schemasim]\nadapter = "schemasim"\n'
+        + 'resolver_mode = "local_executable"\nexecutable = "bin/schemasim"\n'
+    )
+    case = project_dir / "cases/sch"
+    case.mkdir()
+    (case / "case.toml").write_text(
+        '[case]\nname = "sch"\nsimulator = "schemasim"\n[job]\nwalltime = "1:00:00"\n'
+    )
+    res = cli("new", "sch", "--why", "w")
+    assert res.code == 0, res.err
+    assert "adapter schemasim: step_growth is not a known key" in res.err
+    assert "local_executable executable" in res.err
