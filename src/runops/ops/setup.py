@@ -19,6 +19,7 @@ from runops.harness import write_harness
 from runops.ops.common import sim_context
 from runops.ops.skills import (
     adapter_sources,
+    broken_skill_links,
     deploy,
     deployed_skill_names,
     read_lock,
@@ -373,6 +374,9 @@ def doctor(project: Project) -> list[Check]:
                     "run `runo update --skills-only`",
                 )
             )
+    for skill, links in broken_skill_links(project).items():
+        shown = ", ".join(dict.fromkeys(links))
+        checks.append(Check("warn", "skills", f"{skill}: links to missing files: {shown}"))
     leftovers = [name for name in V1_LEFTOVERS if (project.root / name).exists()]
     if leftovers:
         checks.append(
