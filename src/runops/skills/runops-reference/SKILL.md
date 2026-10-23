@@ -11,7 +11,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo doctor [--json]` | check config, adapters, executables, sbatch, skill freshness |
 | `runo update [--skills-only] [-y]` | upgrade simulator packages and redeploy skills / AGENTS.md block |
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit>-<hash> |
-| `runo context [--json]` | project summary for agents |
+| `runo context [--json]` | project summary and group analysis topics for agents |
 | `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run; `--job` sets this run's `[job]` values |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | derive a run with the source's params and `[job]` |
@@ -31,7 +31,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | move created or finished runs, or a series, to runs/_archive; record the replacement |
 | `runo restore RUN` | move back |
 | `runo delete RUN... [-y]` | remove created/failed/cancelled/scratch runs |
-| `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | cleanup (thresholds: `[defaults].tidy_failed_days` / `tidy_archive_days`) |
+| `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | cleanup runs, builds and `analysis-logs` (thresholds: `tidy_failed_days` / `tidy_archive_days`) |
 | `runo migrate-v1 [--dry-run]` | convert a runops v1 project |
 
 ## Layout
@@ -41,6 +41,8 @@ input files, `runs/<case>/<run_id>--<label>/` with `manifest.toml`, `input/`, `s
 `work/` (cwd for Slurm logs), `analysis/`, optional `notes.md`. Scratch runs live in
 `runs/_scratch/`, archived runs in `runs/_archive/`. `runo` acts on the project found
 from the cwd; paths into another project's `runs/` are refused.
+Group analysis lives in `runs/<group>/_analysis/<topic>/`; project analysis in
+`analysis/<topic>/`. A whole `archive DIR` includes group analysis; `restore RUN` does not.
 
 ## Manifest
 

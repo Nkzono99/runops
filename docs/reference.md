@@ -6,7 +6,7 @@
 ## runops.toml
 
 project root にあり、`runo` はここを上方向に探して project を特定します。
-command はこの project の `runs/` 配下だけを扱い、別 project の run directory や
+run を対象にする command はこの project の `runs/` 配下だけを扱い、別 project の run directory や
 directory を path で渡すとエラーになります。run id は project ごとなので、同じ id が
 別 project にあっても cwd の project の run を指します。
 
@@ -153,7 +153,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度とリンク切れを点検 |
 | `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
 | `runo build SIM [--force]` | `local_source` の simulator を build |
-| `runo context [--json]` | agent 向けの現在地 |
+| `runo context [--json]` | agent 向けの現在地と現用 group の解析 topic 名（JSON の `group_analysis` は group path → topic 名一覧） |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
 | `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。置き場所の既定は元 run と同じ directory。`--continue` は adapter の restart 対応が必要 |
@@ -173,7 +173,11 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 `list` は既定で active、created、直近 `list_since_days` 日、pinned の run を表示し、
 scratch と archived は表示しません。
 
-`tidy` の候補は次の 5 種類です。
+`archive DIR` が group 配下の全 run を移すときは、group の `_analysis/` も同じ相対 path で
+移動します。run が残る group の解析は残し、移動先が存在すれば全 run の移動前に拒否します。
+`archive RUN...` / `--older-than` と `restore RUN` は group の解析を移動しません。
+
+`tidy` の候補は次の 6 種類です。
 
 | kind | 条件 | 動作 |
 |---|---|---|
@@ -182,9 +186,17 @@ scratch と archived は表示しません。
 | `old-completed` | `tidy_archive_days`（既定 90）日より古い completed | archive |
 | `orphan-job` | Slurm が知らない submitted / running | sync |
 | `unused-build` | 非 archived run が参照しない `.runops/build/*` | delete |
+| `analysis-logs` | `tidy_failed_days` より古い解析 log。各 log directory・job 名の最新組は保持 | log のみ delete |
 
 日数は `runops.toml` の `[defaults]` で変えられます。`--older-than 14d` のように指定すると、
 その回だけ両方の日数をその値で置き換えます。pinned の run は `tidy` と `delete` の対象になりません。
 `--purge-work` は adapter を読み込めないと何も消さずにエラーにします。
+
+`analysis-logs` は project の `analysis/`、group の `_analysis/`、run の `analysis/` 配下の
+`logs/*.<jobid>.out/err`（topic の下も含む）に限定します。組の新しい方の更新時刻で年齢を判定し、
+最新組を残します。同時刻なら job id が大きい組を最新とします。片方だけの log も同じ扱いです。
+archived / pinned / submitted / running run の解析と symlink は対象外で、適用直前にも条件を
+確認します。`--json` の解析 log 候補は `files`（削除する project 相対 path）と `cutoff`
+（ISO 日時）も持ちます。確認後に条件が変われば削除せず、再度 tidy を実行するよう案内します。
 
 exit code は 0 が成功、1 が実行時エラー（sbatch 失敗など）、2 が使い方や設定のエラーです。

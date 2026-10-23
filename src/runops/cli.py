@@ -263,6 +263,8 @@ def context(as_json: bool = typer.Option(False, "--json")) -> None:
         )
     if data["notes_files"]:
         out.print("notes/: " + ", ".join(data["notes_files"]))
+    for group, topics in data["group_analysis"].items():
+        out.print(f"{group}/_analysis/: {', '.join(topics)}", markup=False)
     if data["log_tail"]:
         out.print("--- LOG.md (tail) ---")
         out.print(data["log_tail"], markup=False)
@@ -869,12 +871,22 @@ def archive(
         if m.id in plan.superseded_by:
             line += f"  -> {', '.join(plan.superseded_by[m.id])}"
         out.print(line)
+    for directory in plan.analysis_dirs:
+        dest = project.runs_dir / "_archive" / directory.relative_to(project.runs_dir)
+        out.print(f"  analysis {project.rel(directory)} -> {project.rel(dest)}", markup=False)
     _confirm(f"Archive {len(plan.targets)} runs?", yes)
     archived = archive_runs(
-        project, plan.targets, superseded_by=plan.superseded_by, why=why, by=_actor()
+        project,
+        plan.targets,
+        superseded_by=plan.superseded_by,
+        why=why,
+        by=_actor(),
+        analysis_dirs=plan.analysis_dirs,
     )
     for run_id, dst in archived:
         out.print(f"archived {run_id} -> {project.rel(dst)}")
+    for directory in plan.analysis_dirs:
+        out.print(f"archived analysis {project.rel(directory)}", markup=False)
 
 
 @app.command("mv")

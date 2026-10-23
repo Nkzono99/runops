@@ -119,12 +119,14 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
       <run_id>--<label>/           # 単発 run
       <sweep_label>/
         <run_id>--<label>/         # sweep で生成された run
+        _analysis/<topic>/        # この group に依存する調査（§9.1）
     _scratch/
       <run_id>--<label>/           # scratch run
     _archive/
       <case_name>/...              # archive された run（元の相対 path を保つ）
   adapters/                # 任意。project ローカル adapter `<name>.py`（§8.1）
   notes/                   # 永続的な知見。1 topic 1 file。runops は管理しない（§9）
+  analysis/<topic>/        # 複数 group にまたがる調査。共通コードは analysis/lib/（§9.1）
   LOG.md                   # project 全体の追記専用ログ（§9）
   AGENTS.md                # agent 向け入口（§10）
   CLAUDE.md                # `@AGENTS.md` のみ
@@ -147,7 +149,8 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
   `runs/` 配下の任意の場所に移動してよい。runops は manifest の `run.id` で run を
   見つける（§7.2）。
 - 既定の配置先は `runs/<case_name>/`。`--dest` で上書きできる。`_` で始まる
-  directory（`_scratch`、`_archive`）は runops が予約する。
+  directory（`_scratch`、`_archive`、`_analysis`）は runops が予約する。
+  `_analysis` は group の調査用で、run の発見・作成先から除く。
 - run directory の中（自身と子孫）には run を置けない。`--dest` が既存 run の中なら拒否し、
   `delete` は中に別の run があれば拒否する（§7.2 の走査は manifest のある directory で止まる）。
 - run id は `R<YYYYMMDD>-<NNNN>`。その日の既存 run と `.runops/last_run_id` の大きい方に 1 を足す。
@@ -160,7 +163,8 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
 - `materials/`、`refs/`、`scripts/` などユーザーが置く directory は runops の関知外。
   runops は `runs/`、`cases/`、`.runops/`、`.agents/skills/`、`.claude/skills/`、
   `AGENTS.md`、`CLAUDE.md`、`runops.toml` 以外を作成・変更しない（`LOG.md`、`notes/`
-  は `init` の雛形生成のみ）。
+  は `init` の雛形生成のみ）。例外として `tidy --apply --only analysis-logs` は
+  §7.5 の解析 log を削除できる。解析のスクリプト・結果・README は agent が書く。
 
 ---
 
@@ -503,7 +507,7 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 - `runs/` 配下（`_archive/` を含む）を再帰的に走査し `manifest.toml` を集める。
   `.runops/index.toml` に `run_id -> run_dir` の cache を持ち、manifest が cache の
   path に無ければ再走査して cache を更新する。cache は常に再生成可能で、
-  壊れていても動作に影響しない。
+  壊れていても動作に影響しない。`_analysis/` は走査せず、そこにある manifest は run と扱わない。
 - 走査対象は `runs/` のみ。project 外や `runs/` 外の run は扱わない。
 
 ### 7.3 command 一覧
@@ -514,7 +518,7 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo doctor [--json]` | `runops.toml` の妥当性、adapter の import 可否、executable の存在、`sbatch` の有無、skill の鮮度を検査 |
 | `runo update [--skills-only] [-y]` | adapter package を upgrade し、skill を再展開する |
 | `runo build SIM [--force]` | `local_source` simulator を `.runops/build/` に build する（§4.1） |
-| `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
+| `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行、現用 group の解析 topic 名（§9.1）。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
 | `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
 | `runo case list` | case 一覧 |
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--job k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
@@ -552,7 +556,7 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 
 ### 7.5 `tidy` の規則
 
-`tidy` は候補を 4 種に分けて表示する。`--apply` はすべてを実行し、
+`tidy` は候補を 6 種に分けて表示する。`--apply` はすべてを実行し、
 `--apply --only KIND` で絞れる。
 
 | kind | 条件 | 動作 |
@@ -562,8 +566,14 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `old-completed` | `completed` で `defaults.tidy_archive_days`（既定 90）日より古く、`pinned = false` | archive |
 | `orphan-job` | `submitted`/`running` だが squeue/sacct に job が無い | sync（state 確定） |
 | `unused-build` | `.runops/build/*` のうち、非 archived run の manifest から参照されないもの | delete |
+| `analysis-logs` | §9.1 の解析 directory 配下の `logs/` にある `*.<jobid>.out/err`。組の最終更新が `tidy_failed_days` より古く、同じ log directory・job 名の最新の組ではない | log file のみ delete |
 
 - `--older-than AGE`（例 `14d`）はその回だけ、上の 2 つの日数をどちらもこの値で置き換える。
+- `analysis-logs` は project の `analysis/`、group の `_analysis/`、run の `analysis/`
+  （topic の下も含む）を対象にする。stdout/stderr は同じ job id の組として更新時刻を比較し、
+  最新の組は常に残す。同時刻なら job id が大きい組を最新とする。片方だけの log も同じ扱い。
+  archived / pinned / submitted / running run の解析と、symlink は対象外。
+  適用直前にも対象範囲・更新時刻・最新組を再確認し、条件が変われば削除せず止まる。
 - `--purge-work RUN...` は指定 run の `work/` の中身を削除し `work_purged_at` を記録する。
   adapter が `keep_patterns()` を返す場合、一致するファイルは残す。`completed` 以外は拒否。
   adapter を読み込めない（残すファイルを判定できない）ときは何も消さずにエラーにする。
@@ -710,7 +720,7 @@ runops は `init` と `update` で次を行う。
 
 ### 8.3 runops 自身の skill
 
-runops は次の 5 skill だけを同梱し、simulator skill と同じ仕組みで展開する。
+runops は次の 6 skill だけを同梱し、simulator skill と同じ仕組みで展開する。
 利用者が覚えるコマンドは `runo init` だけとし、それ以外（simulator の追加、更新、v1 移行を含む）は
 エージェントへの依頼で行う。
 各 SKILL.md は 60 行以内に収める。
@@ -720,6 +730,7 @@ runops は次の 5 skill だけを同梱し、simulator skill と同じ仕組み
 | `runops-create-run` | `new` / `sweep` の使い方。`--why` を必ず書く、scratch の使い分け |
 | `runops-check-status` | `sync` → `list` → `log` の順。失敗時の `retry` と `tidy --purge-work` |
 | `runops-tidy` | `tidy` を定期的に実行する判断基準。pin の使い方 |
+| `runops-analyze` | 依存する run の範囲で調査の置き場所を決め、script・結果・log・README をまとめる |
 | `runops-reference` | command 一覧（§7.3 の表をそのまま載せる） |
 | `runops-maintain` | simulator の追加、runops と simulator package の更新、`migrate-v1`、`doctor` の読み方 |
 
@@ -748,7 +759,7 @@ v1 の `emses` / `beach` adapter は次の順で runops 本体から出す。
    見つかると使われなくなる（解決順 1 が優先）ので、ユーザーが消せばよい。
 ---
 
-## 9. ノート
+## 9. ノートと解析
 
 置き場所は 3 つに固定し、runops はどれも「管理」しない（schema、budget、rotation、
 seal、index を持たない）。
@@ -766,9 +777,32 @@ seal、index を持たない）。
   - 複数 run にまたがる結論と次の判断は `LOG.md` に日付付きで追記する
   - 再利用する式・手法・環境の落とし穴は `notes/<topic>.md` に書く。既存 file があれば追記し、
     似た topic の file を増やさない
-  - それ以外の場所（`research/`、`analysis/*.md`、`runs/` 直下など）に note file を作らない
+  - 調査の詳細は §9.1 の README にまとめ、LOG.md からリンクする
 - v1 の `research/results/`、`.runops/insights/`、`research/archive/legacy/` は移行時に
   `notes/legacy/` 配下へ **移動せず** そのまま残し、`notes/README.md` から path を案内する（§11）。
+
+### 9.1 解析の置き場所
+
+| 結果が依存する範囲 | 置き場所 |
+|---|---|
+| 1 run | `runs/.../<RUN>/analysis/`（必要なら `<topic>/`） |
+| 1 group（同じ directory に並ぶ系列・sweep） | `runs/<group>/_analysis/<topic>/` |
+| 複数 group・case または project 全体 | `analysis/<topic>/` |
+| 共通コード | `analysis/lib/` |
+
+- group は directory であり、新しい entity / ID / ledger を持たない。
+- 調査 directory は `README.md`（問い・対象 run id・方法・結果・制約）、`scripts/`
+  （Python、sbatch）、`out/`（図・JSON・CSV）、`logs/`（job の stdout/stderr）からなる。
+  topic は内容で名付け、同じ問いは README に日付付きで追記する。
+- `init` の `.gitignore` は `**/logs/`、`__pycache__/`、`.runops/analysis-env/` を含む。
+  既存 project のファイルは自動で再配置しない。
+- `context` は現用 group の `_analysis/*/README.md` がある topic 名を表示し、
+  `--json` では `group_analysis` に project 相対の group path → topic 名一覧を返す。
+  README 本文や `out/`、simulator の `work/` は読まない。
+- `archive DIR` が group 配下の全 run を移す場合、その group と配下の group の
+  `_analysis/` も同じ相対 path の `runs/_archive/` に移す。run が残る group の解析は残す。
+  確認表示に解析の移動先を含め、移動前に run と解析の全移動先を検査し、既存なら上書きしない。
+  `archive RUN...` / `--older-than` は group の解析を動かさず、`restore RUN` は run のみを戻す。
 
 ---
 
@@ -916,7 +950,7 @@ src/runops/
 | 項目 | 目標 |
 |---|---|
 | `src/runops/` の行数（skill の md を除く） | 8,000 行以下 |
-| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 24 |
+| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 25 |
 | ユーザーが編集する TOML | `runops.toml`、`case.toml` の 2 種 |
 | runops が書く TOML | `manifest.toml`、`.runops/skills.lock`、`.runops/index.toml` の 3 種 |
 | 依存 | `typer`、`rich`、`tomli-w`、`tomlkit`、`jinja2`、`packaging`（`mcp` を外す） |
@@ -954,6 +988,9 @@ src/runops/
 9b. 同名 adapter が entry point と `adapters/X.py` の両方にあるとき entry point が優先される。
    どちらも無く `generic` でもなければ exit code 2 で案内が出る。
 10. `manifest.toml` の書き込み途中で例外が起きても元のファイルが壊れない。
+11. 解析 log の tidy は最新組・新しい組・対象外ファイルを残し、確認後の更新も削除しない。
+    group の archive は全 run が対象のときだけ解析も移し、衝突時は何も動かさない。
+    context は調査の名前だけを読み、解析内の manifest を run と誤認しない。
 
 ### 13.3 ドキュメント
 
@@ -974,6 +1011,7 @@ v2 の文書は次の 4 ファイルだけにする。
 
 | 項目 | 決定 | 理由 |
 |---|---|---|
+| 解析の配置 2.6.0（2026-10-23） | 依存する run の範囲に応じて run 内 `analysis/`、group の `_analysis/<topic>/`、project の `analysis/<topic>/` にまとめる。skill、log の tidy、group archive、context を対応させる（§9.1） | 報告・図・script・job log が分散・混在していた。group は既存の directory として扱い、新しい entity や command は足さない。既存ファイルの整理は移動一覧を提示してから行う |
 | job の cwd | run_dir（v1 と同じ）。Slurm log は `work/` | v1 adapter の path 規約と実 project の job.sh をそのまま使える |
 | adapter の追加 hook | `configure(sim_config)`、`job_prelude(run_dir)` | generic の `command` 取得と、EMSES の `rm -f *_0000.h5` など v1 の setup command を表す |
 | launcher `kind = "none"` | MPI launcher を使わず program を直接実行 | OpenMP のみの BEACH run 用 |

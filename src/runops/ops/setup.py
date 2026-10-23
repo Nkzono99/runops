@@ -82,6 +82,9 @@ def resolve_site(site: str) -> tuple[str, bool]:
 
 GITIGNORE = """\
 .venv/
+.runops/analysis-env/
+**/logs/
+__pycache__/
 .runops/build/
 .runops/index.toml
 .runops/*.lock
