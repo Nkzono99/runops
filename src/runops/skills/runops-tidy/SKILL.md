@@ -17,10 +17,11 @@ description: Keep a runops project small (tidy, archive, pin, delete). Use when 
 3. Runs that matter (baselines, figures in a paper) should be pinned so `list` always
    shows them and tidy/delete never touch them:
    `runo pin RUN --reason "baseline for fig. 3"` (`--off` to unpin).
-4. `runo archive RUN` moves a finished run to `runs/_archive/` (same relative path);
-   `runo restore RUN` brings it back. Archived runs stay findable by id.
-   A directory archives a series: it lists the runs first and skips created/submitted/
-   running and pinned ones. For a replaced series add
+4. `runo archive RUN` moves a created or finished run to `runs/_archive/` (same relative
+   path); `runo restore RUN` brings it back. Archived runs stay findable by id, and an
+   archived scratch run is kept (no expiry).
+   A directory archives a series: it lists the runs first and skips submitted/running
+   and pinned ones, and created ones unless the series is replaced. For a replaced series add
    `--superseded-by NEW_DIR --why "..."`; each old run records its replacement
    (the new run derived from it, else the whole new series) in `superseded_by`.
 5. `runo delete RUN` removes created/failed/cancelled or scratch runs only.

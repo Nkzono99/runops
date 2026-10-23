@@ -105,8 +105,11 @@ run id、入力、sweep の帰属、ノートはそのままで、移動元は�
 投入、削除、整理、移行の前には、エージェントが対象の run、partition、資源量、core-hours を示して
 確認を取ります。`runo` 自体も、複数 run の投入や削除の前に確認を求めます。
 
-資源量（partition、walltime、並列数）は case の `[job]` に書きます。1 回だけ partition を
-変えるなら「今回は gr20001b で投げて」と頼めば `runo submit RUN --partition gr20001b` になります。
+資源量（partition、walltime、並列数）は case の `[job]` に書きます。run ごとに変えるときは
+「R… を 256 並列・72 時間で作り直して」と頼めば `runo new --from RUN --job processes=256 --job walltime=72:00:00`
+になり、case は変えません。`--from` で作る run は元 run の資源を引き継ぎ、作成時に元 run との
+params と資源の差分を表示します。1 回だけ partition を変えるなら「今回は gr20001b で投げて」と頼めば
+`runo submit RUN --partition gr20001b` になります。
 
 walltime は、同じ case・同じ資源で終わった run の実時間を元に決めます。`runo list --json` と
 `runo status` は、各 run の `elapsed`（最新の実行の実時間）、`walltime`、使った割合を示します。
@@ -209,7 +212,7 @@ run は消さなくても `runo list` が古いものを隠しますが、direct
 
 | 種類 | 条件 | 処理 |
 |---|---|---|
-| `expired-scratch` | 期限切れの scratch run | 削除 |
+| `expired-scratch` | 期限切れの scratch run（archive したものは除く） | 削除 |
 | `stale-failed` | 30 日より古い failed / cancelled で、`why` もノートも無い | 削除 |
 | `old-completed` | 90 日より古い completed | archive |
 | `orphan-job` | 投入済みなのに Slurm が知らない | `sync` で状態を確定 |
@@ -225,8 +228,8 @@ run id で引き続き見つかり、`runo restore` で戻せます。
 > 旧系列は不要。新系列で置き換えたと記録して archive して。
 
 で `runo archive runs/<case>/<旧系列> --superseded-by runs/<case>/<新系列> --why "..."` になります。
-系列の directory を渡すと、対象の run を先に表示し、投入中・実行中・作成のみの run と pin した run は
-除きます。各旧 run の `superseded_by` には、その run から `--from` で作った新 run（無ければ新系列の全 run）が
+系列の directory を渡すと、対象の run を先に表示し、投入中・実行中の run と pin した run は
+除きます。投入前の run（created）も `--superseded-by` を付けたときは archive でき、`runo restore` で戻せます。各旧 run の `superseded_by` には、その run から `--from` で作った新 run（無ければ新系列の全 run）が
 記録され、理由はノートに残ります。比較用に派生しただけの run は置き換えとは扱わないので、
 旧系列が不要かどうかは毎回確かめます。
 

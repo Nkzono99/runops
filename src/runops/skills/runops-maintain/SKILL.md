@@ -6,8 +6,8 @@ description: Maintain a runops project - add or change a simulator, update runop
 # Maintaining the project
 
 Start with `runo doctor`; it shows how each adapter resolves (entry-point,
-project-local, builtin), missing executables, Slurm availability, stale skills and
-v1 leftovers. Fix what it reports, then run it again.
+project-local, builtin), missing executables, Slurm availability, stale skills, skill
+links to missing files and v1 leftovers. Fix what it reports, then run it again.
 
 ## Add a simulator
 

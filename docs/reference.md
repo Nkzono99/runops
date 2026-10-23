@@ -112,7 +112,7 @@ runops だけが書きます。手で編集しないでください。主な fie
 | `[simulator]` | `name`、`adapter`、`adapter_source`、`adapter_version`、`executable`、`resolver_mode`、`package_version`、`exe_hash`、`git_commit`、`git_dirty`、`build_dir` |
 | `[job]` | case の `[job]` に加え `job_id`、`attempt`、`submitted_at`、`finished_at`、`last_slurm_state`、`exit_code`、`[[job.attempts]]`（attempt ごとの `job_id`、`started_at`、`exit_code`、`exe_hash`、`elapsed`、`cancel --why` の `cancel_reason`） |
 | `[params]` | case の params に `--set` を適用した最終値 |
-| `[variation]` | `changed_keys` |
+| `[variation]` | `changed_keys`、`job_changed_keys`（case の `[job]` と違う key） |
 | `[identity]` | `input_hash` |
 | `[storage]` | `work_purged_at` |
 | `[[notes]]` | `at`、`by`、`text` |
@@ -148,14 +148,14 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | command | 動作 |
 |---|---|
 | `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
-| `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度を点検 |
+| `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度とリンク切れを点検 |
 | `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
 | `runo build SIM [--force]` | `local_source` の simulator を build |
 | `runo context [--json]` | agent 向けの現在地 |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
-| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る |
-| `runo new --from RUN [--set k=v]... [--continue]` | 既存 run の params から派生。`--continue` は adapter の restart 対応が必要 |
-| `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
+| `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
+| `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。`--continue` は adapter の restart 対応が必要 |
+| `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--job k=v]... [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
 | `runo cancel RUN... [--why TEXT] [-y]` / `runo retry RUN [--submit] [-y]` | scancel（`--why` は note に残る）/ failed・cancelled を created に戻す（理由付きで cancel された run は確認を取る） |
 | `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
@@ -163,7 +163,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可。全対象を検査してから移し、1 件でも不可なら何も動かさない |
-| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。移動前に全対象を検査し、指定した RUN が終了していなければ何も動かさない。DIR は配下の run（系列）で、created / submitted / running と pinned を除いて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。対象は created と終了した run。移動前に全対象を検査し、対象外の RUN があれば何も動かさない。DIR は配下の run（系列）で、submitted / running と pinned を除き、created は `--superseded-by` のときだけ含めて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |
 | `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |
@@ -175,7 +175,7 @@ scratch と archived は表示しません。
 
 | kind | 条件 | 動作 |
 |---|---|---|
-| `expired-scratch` | 期限切れの scratch run | delete |
+| `expired-scratch` | 期限切れの scratch run（archived は除く） | delete |
 | `stale-failed` | `tidy_failed_days`（既定 30）日より古い failed / cancelled で、why も note も無い | delete |
 | `old-completed` | `tidy_archive_days`（既定 90）日より古い completed | archive |
 | `orphan-job` | Slurm が知らない submitted / running | sync |

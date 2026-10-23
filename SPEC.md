@@ -283,6 +283,12 @@ ntasks = 800
   adapter の `render_inputs()` が `[params]` を適用して上書きする。
 - `runo new` / `runo sweep` の `--set k=v` は `[params]` の上書きである。
   既存 key でなくても受け付ける（adapter の `validate_params()` が warning を出せる）。
+  warning には判定した adapter と package version を付け、executable が package 由来でない
+  （`local_source` / `local_executable`）ときは「schema が古いだけかもしれない」と添える。
+- run の `[job]` は、case から作る run では case の `[job]`、`new --from RUN`（`--continue` 含む）
+  では **元 run の `[job]`** を引き継ぐ。`--job k=v` で個別に上書きし（`[job]` の key のみ）、
+  `--job-from-case` で case の値に戻す。資源の変更に case の編集を要しない。作成時に、元 run
+  （または case）に対する params と資源の差分を表示する。
 - **variation は case ではなく run で表現する。** 「同じ物理設定で 1 つの値だけ変える」
   ために新しい case を作らない。`new CASE --set`、`new --from RUN --set`、`sweep` を使う。
   `case new --from CASE` は、base 入力ファイルの構造そのものが変わるときだけ使う。
@@ -388,6 +394,7 @@ cancel_reason = ""                # cancel --why の理由。retry はこれが�
 
 [variation]
 changed_keys = ["plasma.wc", "plasma.phiz"]   # case の params との差分 key
+job_changed_keys = ["walltime"]                # case の [job] との差分 key（--job / 元 run から）
 
 [identity]
 input_hash = "sha256:..."         # input/ 配下全ファイルの content hash
@@ -419,7 +426,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
    │                   └───cancel──────────────┴──────▶ cancelled
    │
    └────────────── archive ─────────────────────────▶ archived
-                   (completed / failed / cancelled から)
+                   (created / completed / failed / cancelled から)
 ```
 
 - `retry` は `failed` / `cancelled` を `created` に戻し `job.attempt` を +1 する。
@@ -494,9 +501,9 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
 | `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
 | `runo case list` | case 一覧 |
-| `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
-| `runo new --from RUN [--why] [--set k=v]... [--continue] [--submit]` | 既存 run の params から派生 run を作る。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
-| `runo sweep CASE --set k=v1,v2,... [--set ...] [--names KEY=n1,n2,...]... [--label L] [--dest DIR] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
+| `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--job k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
+| `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | 既存 run の params と `[job]` から派生 run を作る（§5）。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
+| `runo sweep CASE --set k=v1,v2,... [--set ...] [--names KEY=n1,n2,...]... [--job k=v]... [--label L] [--dest DIR] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否 |
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel して sync。`--why` は `cancelled: ...` の note として残す |
@@ -509,7 +516,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 | `runo pin RUN [--off] [--reason TEXT]` | `run.pinned` を切り替える。pinned は `list` に常に出て、`tidy` / `delete` の対象外 |
 | `runo summarize RUN... [--force]` | adapter の `summarize()` を呼び `analysis/summary.json` を書く。既存があれば `--force` なしではスキップ |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | run を `runs/` 配下で改名・移動する。id、入力、履歴は変えない（§7.7） |
-| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする。移動前に全対象を検査し、指定した RUN が終端でなければ何も動かさない。DIR は配下の run（系列）を指し、終端でない run と pinned を除いて表示する。`--superseded-by` は各 run に置き換え先（`parent_run` がその run の置き換え先 run、無ければ指定した全 run）を `run.superseded_by` に記録し、`--why` を note に残す |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする。対象は created と終端の run（created は job を持たないため）。移動前に全対象を検査し、指定した RUN が対象外なら何も動かさない。DIR は配下の run（系列）を指し、submitted / running と pinned を除いて表示する。created は `--superseded-by` があるときだけ含める。`--superseded-by` は各 run に置き換え先（`parent_run` がその run の置き換え先 run、無ければ指定した全 run）を `run.superseded_by` に記録し、`--why` を note に残す |
 | `runo restore RUN` | archive 前の場所に戻す。既に何かあれば拒否 |
 | `runo delete RUN... [-y]` | directory を削除。`created`/`failed`/`cancelled`/scratch のみ。`pinned` は拒否 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | 整理候補を表示する（§7.5）。`--apply` で実行 |
@@ -534,7 +541,7 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
 
 | kind | 条件 | 動作 |
 |---|---|---|
-| `expired-scratch` | `scratch = true` かつ `expires_at` を過ぎ、`pinned = false` | delete |
+| `expired-scratch` | `scratch = true` かつ `expires_at` を過ぎ、`pinned = false`、archived でない | delete |
 | `stale-failed` | `failed`/`cancelled` で `defaults.tidy_failed_days`（既定 30）日より古く、note も `why` も空 | delete |
 | `old-completed` | `completed` で `defaults.tidy_archive_days`（既定 90）日より古く、`pinned = false` | archive |
 | `orphan-job` | `submitted`/`running` だが squeue/sacct に job が無い | sync（state 確定） |
@@ -668,12 +675,15 @@ runops は `init` と `update` で次を行う。
    （例: `mpiemses3d-input-review`）。`runops-` で始まる名前は予約されており展開しない。
 2. `references/` を `.agents/skills/<adapter>-references/` にコピーし、
    `SKILL.md` が無ければ reference 一覧を列挙した `SKILL.md` を生成する。
+   展開した skill の `../../references/`（package 内の配置での参照）は
+   `../<adapter>-references/` に書き換える。
 3. 展開先には `.managed-by-runops` marker を置く。marker のある directory は
    `update` 時に **無条件で上書き** する。marker の無い同名 directory は触らず warning。
 4. `.runops/skills.lock` に adapter 名、package version、展開した directory、content hash を記録する。
 
 `doctor` は lock の package version と現在 install されている version を比較し、
-差があれば `runo update --skills-only` を提案する。
+差があれば `runo update --skills-only` を提案する。展開済み skill の相対リンクで
+存在しない file を指すものも報告する。
 
 既存の simulator repo（MPIEMSES3D、emout、BEACH）は `plugins/<name>-context/` に
 `skills/` と `references/` を既に持つ。各 package 側で必要な変更は
@@ -971,4 +981,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 置き換えた系列の整理（2026-10-21） | `archive` が DIR（系列）を受け、`--superseded-by` で置き換え先を manifest に記録する。新しい command と tidy の種別は足さない。skill は新系列を作ったら旧系列の要否を確かめ、不要なら archive して現用系列・archive 先・件数を報告する | 修正版を作った後に旧系列が作業領域に残り、毎回ユーザーが整理を頼んでいた。`parent_run` だけでは比較用の派生と置き換えを区別できないので、置き換えは明示操作で記録する。旧 `archive` は 1 件ずつ検査していて、途中の running run で一部だけ移動していた（#113） |
 | 生成ハーネスの書き方（2026-10-21） | AGENTS.md の Rules を「作業の進め方」5 項目に絞り、各項目を「何をするか」と短い理由で書く。skill は手順に専念し、AGENTS.md の方針（manifest を手で編集しない等）を繰り返さない | #112・#113 で規則が増え、禁止形（never / do not）が並んでいた。現行の Claude の prompting 指針は、しないことより何をするかを、理由と共に書くことを勧め、強い禁止語は過剰反応を招くとしている |
 | 複数 run の mv / archive（2026-10-22） | 1 回の `run.lock` の下で全対象を読み直して検査し、通ってから移す。途中の filesystem error では移し終えた run id を示して止まる | `mv A B C --dest X` は 1 件ずつ検査して移していたので、途中の submitted run で一部だけ移動していた。archive は表示の後で lock を取り直していて、その間に再投入された run で同じことが起き得た |
+| FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

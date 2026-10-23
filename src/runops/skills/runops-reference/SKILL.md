@@ -13,9 +13,9 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit>-<hash> |
 | `runo context [--json]` | project summary for agents |
 | `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases |
-| `runo new CASE [--why] [--label] [--set k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run |
-| `runo new --from RUN [--why] [--set k=v]... [--continue] [--submit]` | derive a run |
-| `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |
+| `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run; `--job` sets this run's `[job]` values |
+| `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | derive a run with the source's params and `[job]` |
+| `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--job k=v]... [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |
 | `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | sbatch created runs |
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel; `--why` is noted and `retry` asks before reviving |
@@ -28,7 +28,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo pin RUN [--off] [--reason TEXT]` | keep a run visible and safe from tidy/delete |
 | `runo summarize RUN... [--force]` | analysis/summary.json from the adapter |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | rename/move created or finished runs; id, inputs, sweep and notes kept |
-| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | move finished runs or a series to runs/_archive; record the replacement |
+| `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | move created or finished runs, or a series, to runs/_archive; record the replacement |
 | `runo restore RUN` | move back |
 | `runo delete RUN... [-y]` | remove created/failed/cancelled/scratch runs |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | cleanup (thresholds: `[defaults].tidy_failed_days` / `tidy_archive_days`) |
@@ -47,5 +47,5 @@ from the cwd; paths into another project's `runs/` are refused.
 `[run]` id, label, status, why, scratch, expires_at, pinned, tags, superseded_by, `[[notes]]`;
 `[origin]` case, sweep, parent_run; `[simulator]` executable and provenance;
 `[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason); `[params]` final values;
-`[variation].changed_keys`. Status: created -> submitted -> running ->
+`[variation].changed_keys`, `job_changed_keys`. Status: created -> submitted -> running ->
 completed | failed | cancelled; terminal runs can be archived.
