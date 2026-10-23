@@ -102,6 +102,7 @@ def test_runops_skills_are_short() -> None:
     root = Path(__file__).parents[1] / "src/runops/skills"
     names = sorted(p.name for p in root.iterdir() if p.is_dir())
     assert names == [
+        "runops-analyze",
         "runops-check-status",
         "runops-create-run",
         "runops-maintain",

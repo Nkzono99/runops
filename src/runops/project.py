@@ -77,7 +77,7 @@ class Project:
                 dirnames[:] = []  # a run dir never contains nested runs
                 yield Path(dirpath) / MANIFEST_FILE
                 continue
-            dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+            dirnames[:] = sorted(d for d in dirnames if not d.startswith(".") and d != "_analysis")
 
     def iter_runs(self, under: Path | None = None) -> Iterator[Manifest]:
         for path in self.iter_manifest_paths(under):
@@ -118,7 +118,11 @@ class Project:
         cached = index.get(run_id)
         if cached:
             path = self.root / cached / MANIFEST_FILE
-            if path.is_file() and _peek_run_id(path) == run_id:
+            if (
+                "_analysis" not in Path(cached).parts
+                and path.is_file()
+                and _peek_run_id(path) == run_id
+            ):
                 return Manifest.load(path)
         index = self.rebuild_index()
         cached = index.get(run_id)
@@ -179,12 +183,14 @@ class Project:
         # Commands act on the project found from the cwd (SPEC §7.1, §7.2). A path
         # into another project would otherwise be handled with this project's config.
         try:
-            path.resolve().relative_to(self.runs_dir.resolve())
+            relative = path.resolve().relative_to(self.runs_dir.resolve())
         except ValueError:
             raise UsageError(
                 f"{ref} is outside runs/ of this project ({self.root}); "
                 "run runo from the project that owns it"
             ) from None
+        if "_analysis" in relative.parts:
+            raise UsageError(f"{ref} is inside _analysis, reserved for group analysis")
 
     def enclosing_run(self, path: Path) -> Path | None:
         """The run directory at or above *path* (up to ``runs/``), if any."""

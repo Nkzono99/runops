@@ -12,7 +12,7 @@ END = "<!-- runops:end -->"
 COMMANDS = """\
 | command | effect |
 |---|---|
-| `runo context --json` | where the project stands: active runs, recent runs, LOG.md tail |
+| `runo context --json` | active runs, recent runs, group analysis topics, LOG.md tail |
 | `runo case list` / `runo case new NAME --simulator SIM [--from CASE]` | list / scaffold cases |
 | `runo new CASE --why TEXT [--set k=v]... [--job k=v]... [--scratch] [--submit]` | create one run |
 | `runo new --from RUN --why TEXT [--set k=v]... [--job k=v]... [--continue]` | derive a run (keeps its params and [job]) |
@@ -23,7 +23,7 @@ COMMANDS = """\
 | `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
 | `runo note RUN "text"` / `runo pin RUN --reason TEXT` | append an observation / protect a key run |
 | `runo summarize RUN` | adapter summary into analysis/summary.json |
-| `runo tidy` / `runo tidy --apply` | list / apply cleanup (expired scratch, stale failures, old runs) |
+| `runo tidy` / `runo tidy --apply` | list / apply cleanup (runs, builds, old analysis logs) |
 | `runo mv RUN... [--dest DIR] [--label L] --why TEXT` | rename / move runs, keeping ids and inputs |
 | `runo archive RUN\\|DIR... [--superseded-by RUN\\|DIR --why T]` | move created or finished runs (or a series) to runs/_archive |
 | `runo restore RUN` / `runo delete RUN` | move back / remove |
@@ -78,13 +78,25 @@ the project found from the current directory.
   stopped. When a new series replaces an old one, ask whether the old one is still
   needed and archive it with `--superseded-by`.
 
-## Notes
+## Notes and analysis
 
 Notes live in three places, where `runo context` and the next session find them:
 - one run: `runo note RUN "..."`;
 - conclusions across runs and next decisions: `LOG.md`, appended under a dated heading;
 - reusable knowledge (formulas, methods, pitfalls): `notes/<topic>.md`, extending the
   existing file for a topic.
+
+Place analysis by the runs its results depend on:
+
+| Scope | Location |
+|---|---|
+| One run | `runs/.../<RUN>/analysis/` |
+| One group (series or sweep directory) | `runs/<group>/_analysis/<topic>/` |
+| Multiple groups or the project | `analysis/<topic>/`; shared code in `analysis/lib/` |
+
+Keep each investigation's question, run ids, method, results and limits in its
+`README.md`, with `scripts/`, `out/` and `logs/` beside it. Link it from `LOG.md`.
+Use `runops-analyze` for this workflow; `runo context` lists group topics with a README.
 
 Analysis tools the simulator package does not bring go in `.runops/analysis-env/`
 (`uv venv .runops/analysis-env`), so `.venv` stays as `runo update` manages it. Run heavy

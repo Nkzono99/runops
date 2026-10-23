@@ -45,6 +45,7 @@ runo init
 | 資源を変えて作り直す | R20261015-0003 を 256 並列・72 時間で作り直して（case はそのまま） |
 | 片付ける | 古い run を整理して。消すものと archive するものを先に見せて |
 | 作り直した旧系列を片付ける | 旧系列は新系列で置き換えたので、対応を記録して archive して |
+| 解析する | この系列の速度を比較して。図とスクリプト、調査メモを系列の `_analysis/` にまとめて |
 | simulator を足す | パッチを当てた ~/BEACH-dev をビルドして、別の simulator として登録して |
 | 更新する | runops と simulator を最新にして |
 | v1 から移る | この project を runops v2 に移行して（`runo migrate-v1` を dry-run で確認してから） |
@@ -69,15 +70,19 @@ lunar-sheath/
 │   │   │   ├── work/            Slurm のログと出力
 │   │   │   └── analysis/
 │   │   └── wc-phiz-scan/        sweep はまとめて 1 階層
+│   │       └── _analysis/      系列・sweep の比較調査（topic ごと）
 │   ├── _scratch/                smoke / debug（期限付き）
 │   └── _archive/                archive した run
 ├── LOG.md                       run をまたぐ結論と次の判断
 ├── notes/                       再利用する知見
+├── analysis/                    複数系列にまたがる調査。共通コードは lib/
 └── AGENTS.md, .agents/skills/, .claude/skills/
 ```
 
 run は ID が変わらないので、directory を移動してもエージェントは見つけられます。
 `work/` は Git の対象外で、`manifest.toml`、`input/`、`job.sh` は Git で追えます。
+解析は依存する run の範囲で置き場所を選び、調査ごとに `README.md`、`scripts/`、`out/`、
+`logs/` をまとめます。判断は `LOG.md` からリンクし、古い解析 job の log は整理候補になります。
 
 ## 対応 simulator
 

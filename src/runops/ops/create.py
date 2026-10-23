@@ -185,9 +185,7 @@ def _split_values(raw: str) -> list[str]:
 def _dest_parent(project: Project, case: Case, dest: str, scratch: bool) -> Path:
     if scratch and not dest:
         return project.runs_dir / SCRATCH_DIR
-    if not dest:
-        return project.runs_dir / case.name
-    return resolve_dest(project, dest)
+    return resolve_dest(project, dest or case.name)
 
 
 def _beside(project: Project, source: Manifest) -> Path | None:

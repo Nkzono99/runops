@@ -49,6 +49,8 @@ def resolve_dest(project: Project, dest: str) -> Path:
         raise UsageError(f"--dest must be inside {project.runs_dir}")
     if inside(path, project.runs_dir / ARCHIVE_DIR):
         raise UsageError("--dest must not be inside runs/_archive")
+    if "_analysis" in path.resolve().relative_to(project.runs_dir.resolve()).parts:
+        raise UsageError("--dest must not be inside _analysis (reserved for group analysis)")
     enclosing = project.enclosing_run(path)
     if enclosing is not None:
         # Discovery stops at a run directory, so a run nested in it would be lost.

@@ -12,6 +12,7 @@ from runops.adapters.registry import optional
 from runops.case import slugify
 from runops.errors import RunError, RunopsError, UsageError
 from runops.manifest import ACTIVE_STATES, MANIFEST_FILE, Manifest, RunState
+from runops.ops.analysis import group_analysis_dirs, log_directories, old_log_pairs, plain_path
 from runops.ops.common import inside, resolve_dest, run_sim_context
 from runops.ops.submit import write_job_for
 from runops.ops.sync import sync_run
@@ -25,15 +26,18 @@ KINDS = (
     "old-completed",
     "orphan-job",
     "unused-build",
+    "analysis-logs",
 )
 
 
 @dataclass
 class Candidate:
     kind: str
-    target: str  # run id or build dir
+    target: str  # run id, build dir, or analysis job-name/id
     path: str
     reason: str
+    files: list[str] = field(default_factory=list)  # analysis log pair, project-relative
+    cutoff: str = ""  # preserve --older-than for apply-time revalidation
 
 
 @dataclass
@@ -118,7 +122,22 @@ def find_candidates(
                         "no non-archived run uses it",
                     )
                 )
-    return out
+    cutoff = now - failed_after
+    analysis_candidates: list[Candidate] = []
+    for directory in log_directories(project, runs):
+        for job, files in old_log_pairs(directory, cutoff).items():
+            analysis_candidates.append(
+                Candidate(
+                    "analysis-logs",
+                    job,
+                    project.rel(directory),
+                    f"older than {failed_after.days}d; newer logs for this job name exist",
+                    [project.rel(p) for p in files],
+                    cutoff.isoformat(),
+                )
+            )
+    # Logs must be handled before a containing run is moved or deleted by this tidy.
+    return analysis_candidates + out
 
 
 def apply_candidates(
@@ -132,6 +151,8 @@ def apply_candidates(
         try:
             if c.kind == "unused-build":
                 shutil.rmtree(project.build_dir / c.target)
+            elif c.kind == "analysis-logs":
+                _delete_analysis_logs(project, c)
             else:
                 manifest = project.resolve_run(c.target)
                 if c.kind in ("expired-scratch", "stale-failed"):
@@ -147,6 +168,20 @@ def apply_candidates(
     return report
 
 
+def _delete_analysis_logs(project: Project, candidate: Candidate) -> None:
+    with project.run_lock():
+        directory = project.root / candidate.path
+        cutoff = parse_iso(candidate.cutoff)
+        allowed = set(log_directories(project, list(project.iter_runs())))
+        if cutoff is None or directory not in allowed or not plain_path(directory, project.root):
+            raise UsageError("analysis log directory is no longer eligible; run tidy again")
+        files = old_log_pairs(directory, cutoff).get(candidate.target, [])
+        if not files or {project.rel(p) for p in files} != set(candidate.files):
+            raise UsageError("analysis logs changed or are now protected; run tidy again")
+        for path in files:
+            path.unlink()
+
+
 # ---- archive / restore / delete --------------------------------------
 
 
@@ -160,6 +195,7 @@ class ArchivePlan:
     targets: list[Manifest] = field(default_factory=list)
     skipped: list[tuple[Manifest, str]] = field(default_factory=list)
     superseded_by: dict[str, list[str]] = field(default_factory=dict)  # old id -> new ids
+    analysis_dirs: list[Path] = field(default_factory=list)
 
 
 def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") -> ArchivePlan:
@@ -175,8 +211,11 @@ def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") 
         raise UsageError("give at least one RUN or directory")
     explicit: dict[str, Manifest] = {}
     expanded: dict[str, Manifest] = {}
+    directories: set[Path] = set()
     for ref in refs:
         runs, is_dir = project.resolve_runs(ref)
+        if is_dir:
+            directories.add(project.runs_subdir(ref))
         for m in runs:
             (expanded if is_dir else explicit)[m.id] = m
     plan = ArchivePlan()
@@ -203,6 +242,16 @@ def plan_archive(project: Project, refs: list[str], *, superseded_by: str = "") 
         for m in plan.targets:
             derived = [r.id for r in new if r.parent_run == m.id]
             plan.superseded_by[m.id] = derived or [r.id for r in new]
+    target_ids = {m.id for m in plan.targets}
+    analyses = {a for d in directories for a in group_analysis_dirs(project, d)}
+    for analysis in sorted(analyses):
+        members = [
+            m
+            for m in project.iter_runs(analysis.parent)
+            if not inside(m.run_dir, project.runs_dir / ARCHIVE_DIR)
+        ]
+        if members and all(m.id in target_ids for m in members):
+            plan.analysis_dirs.append(analysis)
     return plan
 
 
@@ -228,14 +277,17 @@ def archive_runs(
     superseded_by: dict[str, list[str]] | None = None,
     why: str = "",
     by: str = "",
+    analysis_dirs: list[Path] | None = None,
 ) -> list[tuple[str, Path]]:
     """Archive several runs: all are checked under one ``run.lock`` before any moves."""
     replacements = superseded_by or {}
     done: list[tuple[str, Path]] = []
-    with project.run_lock():
+    with project.run_lock(), project.id_lock():
         for m in manifests:
             m.reload()
         dsts = [_archive_dst(project, m) for m in manifests]
+        analyses = analysis_dirs or []
+        analysis_dsts = [_analysis_archive_dst(project, a, manifests) for a in analyses]
         for m, dst in zip(manifests, dsts, strict=True):
             try:
                 _archive_locked(project, m, dst, replacements.get(m.id, []), why, by)
@@ -244,7 +296,32 @@ def archive_runs(
                 tail = f" (already archived: {moved})" if moved else ""
                 raise RunError(f"{m.id}: {exc}{tail}") from exc
             done.append((m.id, dst))
+        for src, dst in zip(analyses, analysis_dsts, strict=True):
+            try:
+                move_noreplace(src, dst)
+            except (RunopsError, OSError) as exc:
+                moved = ", ".join(run_id for run_id, _ in done)
+                raise RunError(f"{project.rel(src)}: {exc} (already archived: {moved})") from exc
+            _prune_empty(src.parent, project.runs_dir)
     return done
+
+
+def _analysis_archive_dst(project: Project, src: Path, manifests: list[Manifest]) -> Path:
+    if src not in set(group_analysis_dirs(project)):
+        raise UsageError(f"{src} is no longer a group analysis directory; plan archive again")
+    target_ids = {m.id for m in manifests}
+    if any(
+        m.id not in target_ids
+        for m in project.iter_runs(src.parent)
+        if not inside(m.run_dir, project.runs_dir / ARCHIVE_DIR)
+    ):
+        raise UsageError(f"{project.rel(src.parent)} still has runs; plan archive again")
+    dst = project.runs_dir / ARCHIVE_DIR / src.relative_to(project.runs_dir)
+    if dst.exists() or not plain_path(dst, project.root):
+        raise UsageError(f"{dst} already exists or has a symlink component")
+    if any(p.exists() and not p.is_dir() for p in dst.parents):
+        raise UsageError(f"{dst} has a parent that is not a directory")
+    return dst
 
 
 def _archive_dst(project: Project, manifest: Manifest) -> Path:

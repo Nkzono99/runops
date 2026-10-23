@@ -192,7 +192,7 @@ project の run だけが対象です。同じアカウントの別 project の�
 前の job が終わるのを待って投入したいときは、「R20261016-0005 が成功したら投げて」と頼めば
 `runo submit RUN --afterok <job_id>` になります。
 
-## 6. 記録を残す
+## 6. 解析して記録を残す
 
 記録の置き場所は 3 つに決まっています。
 
@@ -202,10 +202,40 @@ project の run だけが対象です。同じアカウントの別 project の�
 | 複数の run をまたぐ結論と次の判断 | `LOG.md` に日付見出しで追記 | 今日の scan の結論を LOG にまとめて |
 | 再利用する式、手法、落とし穴 | `notes/<topic>.md`（1 topic 1 file） | Debye 長の見積もり方を notes に残して |
 
-エージェントはこれ以外の場所（`research/`、`analysis/*.md`、`runs/` の下など）にノートを作りません。
 `notes/` に似た topic の file があれば、新しく作らずに追記します。
 
-`runo context` は `LOG.md` の末尾と `notes/` の file 名を表示します。エージェントは作業の始めに
+調査の詳細と図・スクリプトは、結果が依存する run の範囲に合わせてまとめます。
+
+> この系列の速度を比較して。図とスクリプト、調査メモを系列の `_analysis/` にまとめて。
+
+| 依存する範囲 | 置き場所 |
+|---|---|
+| 1 run | `<run_dir>/analysis/`（必要なら topic を切る） |
+| 1 系列・sweep | `runs/<group>/_analysis/<topic>/` |
+| 複数系列・case、project 全体 | `analysis/<topic>/` |
+| 共通コードとそのテスト | `analysis/lib/` |
+
+group は run が並ぶ directory です。登録や新しい ID は要りません。
+topic は `speed-by-version` のように問いの内容で名付け、同じ問いをやり直すときは
+同じ directory の結果を更新し、README に日付付きで追記します。
+
+```text
+<topic>/
+  README.md   問い・対象 run id と path・方法・結果・制約
+  scripts/    Python と sbatch
+  out/        図、JSON、CSV、HTML
+  logs/       解析 job の stdout/stderr（Git 管理外）
+```
+
+エージェントは `runops-analyze` skill を使い、調査の README と、そこへのリンクを含む
+`LOG.md` の判断を更新します。`notes/` は run に依存しない知見に使います。
+解析の追加依存は `.runops/analysis-env/` に置き、重い読み込みや作図はサイトの規則に従って
+計算ノードで実行します。sbatch は調査 directory から投入し、事前に `logs/` を作って
+`#SBATCH -o logs/%x.%j.out` と `#SBATCH -e logs/%x.%j.err` を指定します。
+既存 project のファイルは自動で移動しません。整理を頼むと、移動前に一覧を提示します。
+
+`runo context` は `LOG.md` の末尾、`notes/` の file 名、現用 group の
+`_analysis/*/README.md` がある topic 名を表示します。エージェントは作業の始めに
 これを読むので、前回の続きから話を始められます。
 
 ## 7. 整理する
@@ -221,6 +251,7 @@ run は消さなくても `runo list` が古いものを隠しますが、direct
 | `expired-scratch` | 期限切れの scratch run（archive したものは除く） | 削除 |
 | `stale-failed` | 30 日より古い failed / cancelled で、`why` もノートも無い | 削除 |
 | `old-completed` | 90 日より古い completed | archive |
+| `analysis-logs` | 30 日より古い解析 job の log（各 job 名の最新組は保持） | log のみ削除 |
 | `orphan-job` | 投入済みなのに Slurm が知らない | `sync` で状態を確定 |
 | `unused-build` | どの run も使っていない build cache | 削除 |
 
@@ -238,6 +269,14 @@ run id で引き続き見つかり、`runo restore` で戻せます。
 除きます。投入前の run（created）も `--superseded-by` を付けたときは archive でき、`runo restore` で戻せます。各旧 run の `superseded_by` には、その run から `--from` で作った新 run（無ければ新系列の全 run）が
 記録され、理由はノートに残ります。比較用に派生しただけの run は置き換えとは扱わないので、
 旧系列が不要かどうかは毎回確かめます。
+
+directory 指定で group の全 run を archive すると、その `_analysis/` も同じ相対 path で
+移動します。run が残る group の解析は元の場所に残り、移動先に既存の解析があれば、run を
+動かす前に停止します。`archive RUN...` と `restore RUN` は run だけを移動します。
+
+解析 log だけの整理は「古い解析 log を整理して」で `runo tidy --only analysis-logs` に
+なります。各 `logs/` の `*.<jobid>.out/err` を組で比較し、job 名ごとに最新の組を残します。
+片方が新しければ両方とも残し、README、script、結果は削除しません。
 
 論文の図に使う run や基準にする run は pin しておくと、`list` に常に表示され、`tidy` や `delete`
 の対象になりません。
