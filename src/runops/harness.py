@@ -12,14 +12,14 @@ END = "<!-- runops:end -->"
 COMMANDS = """\
 | command | effect |
 |---|---|
-| `runo context --json` | active runs, recent runs, group analysis topics, LOG.md tail |
+| `runo context --json` | all active runs (with progress), recent runs, group analysis topics, LOG.md tail |
 | `runo case list` / `runo case new NAME --simulator SIM [--from CASE]` | list / scaffold cases |
 | `runo new CASE --why TEXT [--set k=v]... [--job k=v]... [--scratch] [--submit]` | create one run |
 | `runo new --from RUN --why TEXT [--set k=v]... [--job k=v]... [--continue]` | derive a run (keeps its params and [job]) |
 | `runo sweep CASE --set k=v1,v2 [--names k=n1,n2] [--apply] [--submit]` | preview / create a parameter product |
 | `runo submit RUN... [--partition P]` / `runo submit --all DIR` | sbatch created runs |
 | `runo sync` / `runo status RUN` / `runo log RUN [--err]` | refresh state from Slurm / show / read logs |
-| `runo list [--all] [--case C] [--status S] [--json]` | recent + active runs (old, scratch, archived hidden) |
+| `runo list [--all] [--case C] [--status S] [--brief] [--json]` | recent + active runs (old, scratch, archived hidden); `--brief` drops params/why/notes |
 | `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
 | `runo note RUN "text"` / `runo pin RUN --reason TEXT` | append an observation / protect a key run |
 | `runo summarize RUN` | adapter summary into analysis/summary.json |

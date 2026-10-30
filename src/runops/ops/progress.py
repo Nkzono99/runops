@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timedelta
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,7 @@ from runops.util import parse_iso
 
 SAMPLES_KEPT = 1000  # per attempt; older samples are dropped when the file doubles
 RECENT_WINDOW = timedelta(minutes=10)
+STALL_WINDOW = timedelta(hours=1)  # no change across this much observed time -> stalled
 _START_MARK = "runops: start "
 
 
@@ -106,11 +108,23 @@ def summarize(
     reference = earlier[-1] if earlier else (points[0] if len(points) > 1 else origin)
     rate_attempt = _rate(origin, points[-1])
     rate_recent = _rate(reference, points[-1]) or rate_attempt
+    # When done last moved: the first sample, then every sample that exceeds the one before.
+    last_change_at = points[0][0]
+    for (_, prev_done), (at, now_done) in pairwise(points):
+        if now_done > prev_done:
+            last_change_at = at
+    stalled = last_at - last_change_at
     summary: dict[str, Any] = {
         "done": raw_done,
         "total": total,
         "unit": unit,
         "at": last_at.isoformat(timespec="seconds"),
+        "last_change_at": last_change_at.isoformat(timespec="seconds"),
+        "stalled_hours": (
+            round(stalled.total_seconds() / 3600, 1)
+            if not final and stalled >= STALL_WINDOW
+            else None
+        ),
         "fraction": round(done / total, 4) if total else None,
         "rate_recent_per_hour": _round(rate_recent),
         "rate_attempt_per_hour": _round(rate_attempt),
@@ -157,6 +171,8 @@ def format_progress(progress: dict[str, Any] | None) -> str:
         parts.append(f"{3600 / rate:.3g} s/{progress['unit']}")
     if progress.get("eta_hours") is not None:
         parts.append(f"eta {progress['eta_hours']:.1f}h")
+    if progress.get("stalled_hours") is not None:
+        parts.append(f"stalled {progress['stalled_hours']:.1f}h")
     return " ".join(parts)
 
 

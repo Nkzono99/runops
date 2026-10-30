@@ -141,7 +141,8 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 `list --json` と `status --json` は、walltime の根拠として `walltime`、最新 attempt の `elapsed`、
 `walltime_used`（elapsed / walltime）、`slurm_state` も返します。adapter が `progress()` を持てば
 `progress`（`done`、`total`、`unit`、`fraction`、`rate_recent_per_hour`、`rate_attempt_per_hour`、
-`eta_hours`）も返し、表の `progress` 列に `62% 0.198 s/batch eta 3.1h` と出します。表では `TIMEOUT` などを
+`eta_hours`、`last_change_at`、`stalled_hours`）も返し、表の `progress` 列に `62% 0.198 s/batch eta 3.1h` と出します。
+`sync` の観測で `done` が 1 時間以上増えていなければ `stalled 6.7h` が付きます（観測は `sync` のときだけ）。表では `TIMEOUT` などを
 `failed (TIMEOUT)` と示します。
 
 全 command は `--help` で option を確認できます。`RUN` には run id、run directory、
@@ -153,15 +154,15 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度とリンク切れを点検 |
 | `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
 | `runo build SIM [--force]` | `local_source` の simulator を build |
-| `runo context [--json]` | agent 向けの現在地と現用 group の解析 topic 名（JSON の `group_analysis` は group path → topic 名一覧） |
+| `runo context [--json]` | agent 向けの現在地。全 active run（`active`、`--brief` と同じ形）、直近 5 run、現用 group の解析 topic 名（JSON の `group_analysis` は group path → topic 名一覧） |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
 | `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。置き場所の既定は元 run と同じ directory。`--continue` は adapter の restart 対応が必要 |
 | `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--job k=v]... [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
 | `runo submit RUN... [-p P] [--qos Q] [--afterok JOB]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch |
 | `runo cancel RUN... [--why TEXT] [-y]` / `runo retry RUN [--submit] [-y]` | scancel（`--why` は note に残る）/ failed・cancelled を created に戻す（理由付きで cancel された run は確認を取る） |
-| `runo status [RUN...]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
-| `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--json]` | run 一覧 |
+| `runo status [RUN...] [--brief]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
+| `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--brief] [--json]` | run 一覧。`--brief` は `params`、`why`、note を省く（表では note / why 列） |
 | `runo note RUN [TEXT]` / `runo pin RUN [--off] [--reason]` | ノート追記・表示 / pin |
 | `runo summarize RUN... [--force]` | adapter の要約を `analysis/summary.json` に書く |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | `runs/` 配下で改名・移動。id、入力、sweep、ノートは保つ。submitted / running と archived は不可。全対象を検査してから移し、1 件でも不可なら何も動かさない |

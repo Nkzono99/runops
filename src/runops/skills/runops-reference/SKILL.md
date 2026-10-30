@@ -11,7 +11,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo doctor [--json]` | check config, adapters, executables, sbatch, skill freshness |
 | `runo update [--skills-only] [-y]` | upgrade simulator packages and redeploy skills / AGENTS.md block |
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit>-<hash> |
-| `runo context [--json]` | project summary and group analysis topics for agents |
+| `runo context [--json]` | project summary: all active runs with progress, recent runs, group analysis topics |
 | `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run; `--job` sets this run's `[job]` values |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | derive a run with the source's params and `[job]` |
@@ -20,10 +20,10 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel; `--why` is noted and `retry` asks before reviving |
 | `runo retry RUN [--submit] [-y]` | failed/cancelled -> created |
-| `runo status [RUN...] [--json]` | show manifest state (no Slurm call) |
+| `runo status [RUN...] [--brief] [--json]` | show manifest state (no Slurm call) |
 | `runo sync [RUN...] [--json]` | update state from Slurm |
 | `runo log RUN [--err] [-n N] [-f]` | latest job stdout/stderr |
-| `runo list [PATH] [--all] [--since 30d] [--case C] [--sweep L] [--status S] [--tag T] [--scratch] [--archived] [--json]` | runs |
+| `runo list [PATH] [--all] [--since 30d] [--case C] [--sweep L] [--status S] [--tag T] [--scratch] [--archived] [--brief] [--json]` | runs (`--brief`: no params/why/notes) |
 | `runo note RUN [TEXT] [--by WHO]` | append / show notes |
 | `runo pin RUN [--off] [--reason TEXT]` | keep a run visible and safe from tidy/delete |
 | `runo summarize RUN... [--force]` | analysis/summary.json from the adapter |

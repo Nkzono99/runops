@@ -64,11 +64,9 @@ def project_context(project: Project, *, log_lines: int = 20) -> dict[str, Any]:
             expires = parse_iso(str(m.run.get("expires_at", "")))
             if expires is not None and expires <= now:
                 expired += 1
-    recent = sorted(
-        (m for m in runs if m.status != RunState.ARCHIVED),
-        key=lambda m: m.created_at,
-        reverse=True,
-    )[:5]
+    by_created = sorted(runs, key=lambda m: m.created_at, reverse=True)
+    recent = [m for m in by_created if m.status != RunState.ARCHIVED][:5]
+    active = [m for m in by_created if m.status in ACTIVE_STATES]
     log_path = project.root / "LOG.md"
     log_tail = ""
     if log_path.is_file():
@@ -88,7 +86,9 @@ def project_context(project: Project, *, log_lines: int = 20) -> dict[str, Any]:
             for name, sim in project.config.simulators.items()
         },
         "status_counts": counts,
-        "active_runs": sum(1 for m in runs if m.status in ACTIVE_STATES),
+        "active_runs": len(active),
+        # Every submitted / running run, briefly (no params), so one call shows them all.
+        "active": [m.to_summary(project.root, brief=True) for m in active],
         "expired_scratch": expired,
         "recent_runs": [m.to_summary(project.root) for m in recent],
         "notes_files": note_files,

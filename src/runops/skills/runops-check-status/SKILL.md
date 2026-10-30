@@ -12,6 +12,10 @@ description: Check the progress or result of runops runs (sync, list, log, retry
 3. `runo status RUN` shows one run, with progress, recent speed and time left when the
    adapter reports progress (`--json` → `progress`; counted from the resume point, ending
    at the finish). Use it for speed comparisons instead of timing logs by hand.
+   `stalled 6.7h` means the progress has not moved across the last syncs for that long
+   while Slurm still says RUNNING: check `runo log RUN` and the output mtimes before
+   deciding to cancel. For all active runs at once use `runo context --json` (`active`)
+   or `runo list --status running --status submitted --brief --json`.
    `runo log RUN` and `runo log RUN --err` show the
    tail of the latest job's stdout / stderr (`-n 200` for more, `-f` to follow).
 4. For a failed run, read the stderr log and the adapter summary

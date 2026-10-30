@@ -475,8 +475,12 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
   上限 1000 件程度）。queue を離れたときの観測は終了時刻で記録し、終了後の待ち時間を速度に含めない。
 - 要約を `[[job.attempts]].progress` に置く: `done`、`total`、`unit`、`start`、`fraction`、
   `rate_recent_per_hour`（直近 10 分）、`rate_attempt_per_hour`（program 開始から。起点は
-  `start`）、`eta_hours`（running のみ）。program 開始時刻は job.sh が stdout に出す
+  `start`）、`eta_hours`（running のみ）、`last_change_at`（`done` が最後に増えた観測時刻）、
+  `stalled_hours`（最新観測が `last_change_at` から 1 時間以上進んでいないとき、その長さ。
+  終了後の観測には付けない）。program 開始時刻は job.sh が stdout に出す
   `runops: start` 行から取り、`started_at` に入れる。
+- `status` / `list` は `stalled_hours` があれば `stalled 6.7h` と表示する。観測は `sync` のときだけ
+  なので、停止の検出は `sync` の間隔より細かくならない。
 - `status` / `list` は要約だけを読む（file を開かない）。read-only command は観測を足さない。
 - 解析は adapter が行い、runops は保存と表示だけを持つ（§1.2 #4）。
 
@@ -497,7 +501,8 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
   `--json` は作成した run の同じ summary を返す。summary には `params`、`changed_keys`、
   `parent_run`、`exe_hash`、`input_hash` を含め、run 同士の比較に別 command を要らなくする。
   walltime の根拠として `walltime`、最新 attempt の `elapsed`、`walltime_used`（elapsed / walltime）、
-  `slurm_state`（`TIMEOUT` など）も含める。
+  `slurm_state`（`TIMEOUT` など）も含める。`list` / `status` の `--brief` は summary から
+  `params`、`why`、`last_note` を外す（多数の run を横断して渡すとき用。表では note / why 列を省く）。
 - 破壊的 command（`cancel`、`delete`、`tidy --apply`、`archive`）は対象を表示して
   確認を取る。`-y/--yes` で省略。
 - exit code: 0 成功、1 対象 run の実行時エラー（例: sbatch 失敗）、2 使用方法・設定エラー。
@@ -518,7 +523,7 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo doctor [--json]` | `runops.toml` の妥当性、adapter の import 可否、executable の存在、`sbatch` の有無、skill の鮮度を検査 |
 | `runo update [--skills-only] [-y]` | adapter package を upgrade し、skill を再展開する |
 | `runo build SIM [--force]` | `local_source` simulator を `.runops/build/` に build する（§4.1） |
-| `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行、現用 group の解析 topic 名（§9.1）。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
+| `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数と全 active run（`--brief` と同じ summary、`active`）、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行、現用 group の解析 topic 名（§9.1）。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
 | `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
 | `runo case list` | case 一覧 |
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--job k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
@@ -528,10 +533,10 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel して sync。`--why` は `cancelled: ...` の note として残す |
 | `runo retry RUN [--submit] [-y]` | `failed`/`cancelled` を `created` に戻す。直近の cancel に `--why` があれば理由を示して確認を取る |
-| `runo status [RUN...] [--json]` | manifest の状態を表示。Slurm を呼ばない |
+| `runo status [RUN...] [--brief] [--json]` | manifest の状態を表示。Slurm を呼ばない。`--brief` は §7.1 |
 | `runo sync [RUN...] [--json]` | squeue/sacct で状態を更新。引数なしは `submitted`/`running` 全件 |
 | `runo log RUN [--err] [-n N] [-f]` | 最新 job の stdout/stderr を表示。`-f` は tail -f |
-| `runo list [PATH] [--all] [--since 30d] [--case C] [--sweep L] [--status S]... [--tag T]... [--scratch] [--archived] [--json]` | run 一覧（§7.4） |
+| `runo list [PATH] [--all] [--since 30d] [--case C] [--sweep L] [--status S]... [--tag T]... [--scratch] [--archived] [--brief] [--json]` | run 一覧（§7.4） |
 | `runo note RUN [TEXT] [--by WHO]` | TEXT があれば `[[notes]]` に追記、なければ notes と `notes.md` を表示 |
 | `runo pin RUN [--off] [--reason TEXT]` | `run.pinned` を切り替える。pinned は `list` に常に出て、`tidy` / `delete` の対象外 |
 | `runo summarize RUN... [--force]` | adapter の `summarize()` を呼び `analysis/summary.json` を書く。既存があれば `--force` なしではスキップ |
@@ -550,7 +555,8 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 - 既定で表示しない: scratch run、archived run、上記以外の古い terminal run。
 - `--all` は scratch と archived 以外をすべて表示。`--scratch`、`--archived` は
   それぞれを **追加** する。
-- 表示列: id、status、label、case、sweep、created（相対時刻）、最新 note の先頭 60 文字、`why`。
+- 表示列: id、status、label、case、sweep、created（相対時刻）、elapsed、progress、最新 note の先頭 60 文字、`why`。
+  `--brief` は note と `why` の列を省く。
 - sort は `created_at` 降順。
 - `PATH` を与えた場合はその directory 配下に限定する。
 
@@ -1038,5 +1044,6 @@ v2 の文書は次の 4 ファイルだけにする。
 | 生成ハーネスの書き方（2026-10-21） | AGENTS.md の Rules を「作業の進め方」5 項目に絞り、各項目を「何をするか」と短い理由で書く。skill は手順に専念し、AGENTS.md の方針（manifest を手で編集しない等）を繰り返さない | #112・#113 で規則が増え、禁止形（never / do not）が並んでいた。現行の Claude の prompting 指針は、しないことより何をするかを、理由と共に書くことを勧め、強い禁止語は過剰反応を招くとしている |
 | 複数 run の mv / archive（2026-10-22） | 1 回の `run.lock` の下で全対象を読み直して検査し、通ってから移す。途中の filesystem error では移し終えた run id を示して止まる | `mv A B C --dest X` は 1 件ずつ検査して移していたので、途中の submitted run で一部だけ移動していた。archive は表示の後で lock を取り直していて、その間に再投入された run で同じことが起き得た |
 | 進捗と系列配置 2.5.0（2026-10-23） | adapter に任意の `progress()`、`sync` が時刻付き観測を保存し速度・残り時間を要約（§6.4）。`new --from` の既定置き場所を元 run と同じ directory に。agent context の `docs/` も展開 | 速度比較のために agent が時刻付き batch 観測を手で保存し、再開点や終了後の待ちを毎回補正していた（4 回）。継続世代が case 直下に並び、同じ計算の系列を見分けにくかった。skill が package の `docs/` を参照していたが展開されていなかった。進捗の解析は simulator 固有なので adapter が持ち、runops は保存と表示だけにする |
+| 横断の状態確認 2.7.0（2026-10-30） | `list` / `status` に `--brief`、`context` に全 active run の `active`、progress 要約に `last_change_at` と `stalled_hours`（§6.4、§7.1、§7.3） | hub で 4 project の active run を集めるのに `recent_runs` 5 件では足りず、全 `params` 付きの `list --json` は shell 引数長を超えた（3 回）。進捗が 6 時間止まった run を 49% と報告した。新しい command は足さず、既存の summary を小さくし、観測から止まりを出す |
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

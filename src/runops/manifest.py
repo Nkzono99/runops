@@ -188,14 +188,18 @@ class Manifest:
         notes = self.data.setdefault("notes", [])
         notes.append({"at": now_iso(), "by": by, "text": text})
 
-    def to_summary(self, root: Path) -> dict[str, Any]:
-        """Flat dict for ``list --json`` / ``status --json``."""
+    def to_summary(self, root: Path, *, brief: bool = False) -> dict[str, Any]:
+        """Flat dict for ``list --json`` / ``status --json``.
+
+        *brief* leaves out ``params``, ``why`` and ``last_note``, so a listing of many
+        runs stays small enough to pass around (e.g. a cross-project status table).
+        """
         notes = self.notes
         try:
             rel = self.run_dir.resolve().relative_to(root.resolve()).as_posix()
         except ValueError:
             rel = str(self.run_dir)
-        return {
+        summary = {
             "id": self.id,
             "status": self.status.value,
             "label": self.label,
@@ -222,6 +226,10 @@ class Manifest:
             **self.timing(),
             "progress": self.progress,
         }
+        if brief:
+            for key in ("params", "why", "last_note"):
+                del summary[key]
+        return summary
 
     @property
     def progress(self) -> dict[str, Any] | None:

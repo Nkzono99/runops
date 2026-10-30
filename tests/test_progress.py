@@ -118,3 +118,53 @@ def test_runs_without_progress_hook_are_unchanged(project_dir: Path, cli, fake_s
     m = Project.open(project_dir).resolve_run(run_id)
     assert "progress" not in m.job["attempts"][-1]
     assert not list((m.run_dir / "submit").glob("progress.*"))
+
+
+def test_summarize_flags_a_run_whose_progress_stopped_moving() -> None:
+    samples = [
+        {"at": _at(0), "done": 100},
+        {"at": _at(30), "done": 200},
+        {"at": _at(60), "done": 200},
+        {"at": _at(120), "done": 200},  # 90 min without a change
+    ]
+    out = summarize(samples, total=1000, unit="batch", start=0, started_at=None)
+    assert out["last_change_at"] == _at(30)
+    assert out["stalled_hours"] == 1.5
+    assert format_progress(out).endswith("stalled 1.5h")
+
+    moving = summarize(samples[:3], total=1000, unit="batch", start=0, started_at=None)
+    assert "stalled_hours" not in moving  # 30 min without a change is not yet a stall
+    final = summarize(samples, total=1000, unit="batch", start=0, started_at=None, final=True)
+    assert "stalled_hours" not in final  # a finished run is not stalled
+
+
+def test_brief_listing_and_context_active(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    _project_with_progress(project_dir)
+    (run_id,) = cli("new", "prog", "--submit", "--why", "p").run_ids()
+    cli("new", "demo", "--why", "a draft")
+    job = fake_slurm.last_job
+    m = Project.open(project_dir).resolve_run(run_id)
+    (m.run_dir / "work/progress.txt").write_text("2500 10000 0\n")
+    fake_slurm.states[job] = "RUNNING"
+    assert cli("sync").code == 0
+
+    full = json.loads(cli("list", "--json").out)
+    brief = json.loads(cli("list", "--brief", "--json").out)
+    assert {r["id"] for r in full} == {r["id"] for r in brief}
+    assert "params" in full[0] and "why" in full[0]
+    assert not {"params", "why", "last_note"} & set(brief[0])
+    assert brief[0]["progress"] is None or "done" in brief[0]["progress"]
+    table = cli("list", "--brief").out
+    assert "why" not in table.splitlines()[0] and run_id in table
+
+    status = json.loads(cli("status", "--brief", "--json").out)
+    assert [s["id"] for s in status] == [run_id] and "notes" not in status[0]
+
+    data = json.loads(cli("context", "--json").out)
+    assert data["active_runs"] == 1
+    assert [r["id"] for r in data["active"]] == [run_id]
+    assert "params" not in data["active"][0]
+    assert data["active"][0]["progress"]["done"] == 2500
+    assert len(data["recent_runs"]) == 2
+    text = cli("context").out
+    assert "active:" in text and "25%" in text

@@ -257,6 +257,16 @@ def context(as_json: bool = typer.Option(False, "--json")) -> None:
         f"runs: {counts or 'none'}; active: {data['active_runs']}; "
         f"expired scratch: {data['expired_scratch']}"
     )
+    if data["active"]:
+        from runops.ops.progress import format_progress
+
+        out.print("active:")
+        for run in data["active"]:
+            out.print(
+                f"  {run['id']} {run['status']:9} {run['case']} {run['label']}  "
+                f"{format_progress(run['progress'])}"
+            )
+    out.print("recent:")
     for run in data["recent_runs"]:
         out.print(
             f"  {run['id']} {run['status']:9} {run['case']} {run['label']}  {run['why'][:60]}"
@@ -592,23 +602,14 @@ def retry(
         _submit_each(project, [m])
 
 
-def _status_table(project: Project, manifests: list[Manifest]) -> Table:
+def _status_table(project: Project, manifests: list[Manifest], *, brief: bool = False) -> Table:
     from runops.ops.listing import relative_age
     from runops.ops.progress import format_progress
 
-    table = Table(
-        "id",
-        "status",
-        "label",
-        "case",
-        "sweep",
-        "created",
-        "elapsed",
-        "progress",
-        "note",
-        "why",
-        box=None,
-    )
+    columns = ["id", "status", "label", "case", "sweep", "created", "elapsed", "progress"]
+    if not brief:
+        columns += ["note", "why"]
+    table = Table(*columns, box=None)
     for m in manifests:
         s = m.to_summary(project.root)
         color = {
@@ -630,7 +631,7 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             status += " [dim](pinned)[/]"
         if s["superseded_by"]:
             status += f" [dim](-> {', '.join(s['superseded_by'])})[/]"
-        table.add_row(
+        row = [
             s["id"],
             status,
             s["label"],
@@ -639,15 +640,19 @@ def _status_table(project: Project, manifests: list[Manifest]) -> Table:
             relative_age(s["created_at"]),
             elapsed,
             format_progress(s["progress"]),
-            s["last_note"][:60],
-            s["why"][:60],
-        )
+        ]
+        if not brief:
+            row += [s["last_note"][:60], s["why"][:60]]
+        table.add_row(*row)
     return table
 
 
 @app.command()
 def status(
     runs: Optional[list[str]] = typer.Argument(None),
+    brief: bool = typer.Option(
+        False, "--brief", help="Leave out params, why, notes and the note/why columns."
+    ),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """Show manifest state (no Slurm query). Without RUN: active runs."""
@@ -662,18 +667,19 @@ def status(
     if as_json:
         data = []
         for m in targets:
-            s = m.to_summary(project.root)
-            s.update(
-                {
-                    "params": m.params,
-                    "job": {k: v for k, v in m.job.items() if k != "attempts"},
-                    "notes": m.notes,
-                }
-            )
+            s = m.to_summary(project.root, brief=brief)
+            if not brief:
+                s.update(
+                    {
+                        "params": m.params,
+                        "job": {k: v for k, v in m.job.items() if k != "attempts"},
+                        "notes": m.notes,
+                    }
+                )
             data.append(s)
         _print_json(data)
         return
-    out.print(_status_table(project, targets))
+    out.print(_status_table(project, targets, brief=brief))
 
 
 @app.command("sync")
@@ -730,6 +736,9 @@ def list_cmd(
     tags: Optional[list[str]] = typer.Option(None, "--tag"),
     scratch: bool = typer.Option(False, "--scratch", help="Also show scratch runs."),
     archived: bool = typer.Option(False, "--archived", help="Also show archived runs."),
+    brief: bool = typer.Option(
+        False, "--brief", help="Leave out params, why and notes (small JSON, short table)."
+    ),
     as_json: bool = typer.Option(False, "--json"),
 ) -> None:
     """List active and recent runs."""
@@ -752,12 +761,12 @@ def list_cmd(
     )
     runs = select_runs(project, flt)
     if as_json:
-        _print_json([m.to_summary(project.root) for m in runs])
+        _print_json([m.to_summary(project.root, brief=brief) for m in runs])
         return
     if not runs:
         out.print("no runs (try --all, --scratch, --archived)")
         return
-    out.print(_status_table(project, runs))
+    out.print(_status_table(project, runs, brief=brief))
 
 
 @app.command()
