@@ -9,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+from runops.adapters.generic import GenericAdapter
 from runops.errors import UsageError
 from runops.manifest import Manifest
 from runops.ops.submit import submit_run
@@ -129,6 +130,56 @@ def test_new_from_warns_when_case_inputs_changed(project_dir: Path, cli) -> None
     res = cli("new", "--from", src, "--set", "name=c")
     assert res.code == 0
     assert "input files changed" in res.err and src in res.err
+    assert "input.txt" in res.err  # a file that is not TOML is named as a whole
+
+
+def _toml_case(project_dir: Path, text: str) -> None:
+    (project_dir / "cases/demo/input.toml").write_text(text)
+
+
+def test_new_from_lists_the_input_keys_the_case_changed(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    base = "[plasma]\nn = {{ plasma.n }}\n[[species]]\nt = 0.1\n[[species]]\nt = 2.0\n"
+    _toml_case(project_dir, base)
+    (src,) = cli("new", "demo", "--set", "plasma.n=1").run_ids()
+    _toml_case(project_dir, base.replace("t = 0.1", "t = 10.0") + "[extra]\nn = 1\n")
+    res = cli("new", "--from", src, "--set", "plasma.n=2")
+    assert res.code == 0
+    assert "species.0.t: 0.1 -> 10.0" in res.err
+    assert "extra.n: - -> 1" in res.err
+    assert "plasma.n:" not in res.err  # --set is listed with the params, not as a surprise
+
+
+def test_new_from_is_quiet_when_a_case_edit_changes_no_input_value(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    _toml_case(project_dir, "t = 0.1\n")
+    (src,) = cli("new", "demo").run_ids()
+    _toml_case(project_dir, "# a comment about t\nt = 0.1\n")
+    res = cli("new", "--from", src)
+    assert res.code == 0 and "input files changed" not in res.err
+
+
+def test_new_from_shows_the_first_input_changes_and_counts_the_rest(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    _toml_case(project_dir, "".join(f"k{i:02d} = 0\n" for i in range(13)))
+    (src,) = cli("new", "demo").run_ids()
+    _toml_case(project_dir, "".join(f"k{i:02d} = 1\n" for i in range(13)))
+    res = cli("new", "--from", src)
+    assert "k09: 0 -> 1" in res.err and "k10" not in res.err and "and 3 more" in res.err
+
+
+def test_continue_leaves_out_the_keys_the_adapter_writes(  # type: ignore[no-untyped-def]
+    project_dir: Path, cli, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def extend_inputs(self, src_run: Path, run_dir: Path, params: dict) -> list[str]:  # type: ignore[no-untyped-def]
+        path = run_dir / "input" / "input.toml"
+        path.write_text(path.read_text() + f'[restart]\nfrom = "{src_run.name}"\n')
+        return ["input/input.toml"]
+
+    monkeypatch.setattr(GenericAdapter, "extend_inputs", extend_inputs, raising=False)
+    _toml_case(project_dir, "t = 0.1\n")
+    (src,) = cli("new", "demo").run_ids()
+    _toml_case(project_dir, "t = 10.0\n")
+    res = cli("new", "--from", src, "--continue")
+    assert res.code == 0
+    assert "t: 0.1 -> 10.0" in res.err and "restart.from" not in res.err
 
 
 def test_sync_reports_setup_failure(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]

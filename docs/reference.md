@@ -129,8 +129,10 @@ program を起動せずに終わり、`stage = "setup"` と exit code を記録�
 
 `submit` は executable を hash し直して attempt に記録し、作成時と違えば警告します。
 `new` と `sweep --apply` は同じ入力（`input_hash`）の run が既にあれば警告します。
-`new --from RUN` は、元の run を作った後に case の入力ファイルが変わっていれば警告します
-（入力は今の case から作るため）。どれも作成や投入は拒否しません。
+`new --from RUN` は、元の run を作った後に case の入力ファイルが変わり、そのために入力の値が
+元の run と違うとき、違う key と値を警告に並べます（入力は今の case から作るため）。TOML 以外の
+入力は file 名だけを示します。`--set` した key と、adapter が `--continue` のために書いた key は
+並べません。どれも作成や投入は拒否しません。
 
 `submit`、`cancel`、`retry`、`sync` は lock の中で manifest を読み直してから更新します。
 同じ run を 2 回指定しても、複数のエージェントが同時に投入しても sbatch は 1 回です。

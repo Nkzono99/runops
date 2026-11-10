@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import itertools
 import shutil
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -28,7 +30,17 @@ from runops.ops.common import SimContext, resolve_dest, sim_context
 from runops.ops.submit import write_job_for
 from runops.project import ARCHIVE_DIR, SCRATCH_DIR, Project
 from runops.runtime import resolve_runtime
-from runops.util import hash_tree, move_noreplace, now_iso, parse_value
+from runops.util import (
+    hash_file,
+    hash_tree,
+    load_toml,
+    move_noreplace,
+    now_iso,
+    parse_value,
+    tomllib,
+)
+
+SHOWN_INPUT_CHANGES = 10
 
 
 @dataclass
@@ -40,6 +52,7 @@ class RunSpec:
     sweep: str = ""
     job: dict[str, Any] = field(default_factory=dict)
     job_changed: list[str] = field(default_factory=list)
+    input_changes: list[str] = field(default_factory=list)  # set for a run derived from another
 
 
 @dataclass
@@ -116,6 +129,60 @@ def parse_job(items: list[str]) -> dict[str, Any]:
 
 def _job_keys(job: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in job.items() if k in JOB_KEYS}
+
+
+def _flat(value: Any, prefix: str = "") -> dict[str, Any]:
+    """The leaves of a TOML document under dotted keys, arrays of tables by index."""
+    items: Iterable[tuple[Any, Any]]
+    if isinstance(value, dict):
+        items = value.items()
+    elif isinstance(value, list) and any(isinstance(x, dict) for x in value):
+        items = enumerate(value)
+    else:
+        return {prefix: value}
+    flat: dict[str, Any] = {}
+    for key, item in items:
+        flat.update(_flat(item, f"{prefix}.{key}" if prefix else str(key)))
+    return flat
+
+
+def _input_values(input_dir: Path) -> dict[tuple[str, str], Any]:
+    """What a run's input files say: ``(file, dotted key)`` for TOML, ``(file, "")`` otherwise."""
+    values: dict[tuple[str, str], Any] = {}
+    for path in sorted(p for p in input_dir.rglob("*") if p.is_file()):
+        rel = path.relative_to(input_dir).as_posix()
+        document = None
+        if path.suffix == ".toml":
+            with contextlib.suppress(tomllib.TOMLDecodeError, UnicodeDecodeError):
+                document = load_toml(path)
+        if document is None:
+            values[(rel, "")] = hash_file(path)
+        else:
+            values.update({(rel, key): value for key, value in _flat(document).items()})
+    return values
+
+
+def _differing(
+    before: dict[tuple[str, str], Any], after: dict[tuple[str, str], Any]
+) -> list[tuple[str, str]]:
+    return sorted(k for k in before.keys() | after.keys() if before.get(k) != after.get(k))
+
+
+def _input_changes(
+    before: dict[tuple[str, str], Any],
+    after: dict[tuple[str, str], Any],
+    explained: set[str],
+) -> list[str]:
+    """What differs between two runs' inputs, leaving out the keys in *explained*."""
+    lines = []
+    for key in _differing(before, after):
+        rel, name = key
+        if not name:
+            lines.append(rel)
+        elif not any(name == k or name.startswith(f"{k}.") for k in explained):
+            old, new = (repr(side[key]) if key in side else "-" for side in (before, after))
+            lines.append(f"{name}: {old} -> {new}")
+    return lines
 
 
 def _diff(label: str, before: dict[str, Any], after: dict[str, Any]) -> str:
@@ -263,14 +330,15 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
         line = _diff("job vs case", dict(case.job), job)
         if line:
             result.changes.append(line)
-    if source is not None:
-        recorded = str(source.section("origin").get("case_input_hash", ""))
-        if recorded and recorded != case.input_hash():
-            # Inputs come from the case as it is now, not as it was for the source.
-            result.warnings.append(
-                f"case {case.name!r} input files changed since {source.id} was created; "
-                f"{result.manifests[0].id} differs from it by more than the inherited params"
-            )
+    if source is not None and spec.input_changes:
+        # Inputs come from the case as it is now, not as it was for the source.
+        shown = "; ".join(spec.input_changes[:SHOWN_INPUT_CHANGES])
+        hidden = len(spec.input_changes) - SHOWN_INPUT_CHANGES
+        more = f"; and {hidden} more" if hidden > 0 else ""
+        result.warnings.append(
+            f"case {case.name!r} input files changed since {source.id} was created; "
+            f"{result.manifests[0].id} differs from it beyond the params in: {shown}{more}"
+        )
     return result
 
 
@@ -483,8 +551,13 @@ def _populate(
         dst = input_dir / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
+    recorded = str(source.section("origin").get("case_input_hash", "")) if source else ""
+    case_moved = bool(recorded) and recorded != case.input_hash()
+    rendered: dict[tuple[str, str], Any] = {}
     try:
         ctx.adapter.render_inputs(dict(spec.params), stage)
+        if case_moved:
+            rendered = _input_values(input_dir)
         if request.continue_run and source is not None:
             extend = getattr(ctx.adapter, "extend_inputs", None)
             if not callable(extend):
@@ -497,6 +570,16 @@ def _populate(
                 ) from None
     except (ValueError, KeyError, OSError) as exc:
         raise RunError(f"{run_id}: render_inputs failed: {exc}") from exc
+    if case_moved and source is not None:
+        values = _input_values(input_dir)
+        # Keys the user set, or the adapter wrote to continue, are not case changes.
+        explained = {
+            k.replace("[", ".").replace("]", "") for k in changed_keys(source.params, spec.params)
+        }
+        explained |= {name for _, name in _differing(rendered, values) if name}
+        spec.input_changes = _input_changes(
+            _input_values(source.run_dir / "input"), values, explained
+        )
 
     now = now_iso()
     run: dict[str, Any] = {
