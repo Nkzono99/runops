@@ -1,6 +1,6 @@
 ---
 name: runops-analyze
-description: Analyze or compare run results in a runops project. Use when plotting, investigating a series or sweep, writing an analysis report, or choosing where analysis scripts and outputs belong.
+description: Analyze or compare run results in a runops project. Use when plotting, investigating a series or sweep, writing an analysis or comparison report for a reader, or choosing where analysis scripts and outputs belong.
 ---
 
 # Analyze run results
@@ -30,11 +30,16 @@ description: Analyze or compare run results in a runops project. Use when plotti
    In the script use `#SBATCH -o logs/%x.%j.out` and `#SBATCH -e logs/%x.%j.err`,
    the site's resource directives, and `srun` for the payload where required.
    Keep the working directory at the investigation root so `scripts/` and `out/` resolve.
-5. Update the investigation README, then append the decision and its README link to
+5. When the result is a report someone will read (a comparison of runs, a dependence,
+   "what changed and why"), write it by [report-guide.md](report-guide.md): question and
+   answer first, original fields side by side on one scale, each figure explained
+   before and after, provenance and checks at the end, as `README.md` plus a
+   self-contained `report.html`. [example-report/](example-report/README.md) shows it.
+6. Update the investigation README, then append the decision and its README link to
    `LOG.md`. Put reusable formulas, methods and pitfalls in `notes/<topic>.md`.
-6. `runo tidy --only analysis-logs` previews old job logs, retaining the newest pair per
+7. `runo tidy --only analysis-logs` previews old job logs, retaining the newest pair per
    job name in each logs directory. Apply with `runo tidy --apply --only analysis-logs`.
    Archiving a whole group directory also moves its `_analysis/`; a partial archive
    leaves shared analysis with the remaining runs. `restore RUN` restores only that run.
-7. For an existing project's scattered files, show source → destination paths before
+8. For an existing project's scattered files, show source → destination paths before
    moving anything, then fix affected script paths and document links. Keep results.

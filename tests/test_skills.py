@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -174,3 +177,43 @@ def test_package_reference_links_point_at_deployed_references(
     refs = root / ".agents/skills/refsim-references/Parameters.md"
     refs.write_text("see [src](../src/main.F90)\n")
     assert "main.F90" not in cli("doctor").out
+
+
+def test_analyze_report_guide_and_example_are_deployed(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    for base in (".agents/skills", ".claude/skills"):
+        skill = project_dir / base / "runops-analyze"
+        text = (skill / "SKILL.md").read_text()
+        assert "](report-guide.md)" in text and "](example-report/README.md)" in text
+        guide = (skill / "report-guide.md").read_text()
+        assert "](example-report/README.md)" in guide
+        example = skill / "example-report"
+        for name in (
+            "README.md",
+            "report.html",
+            "out/fig1_maps.png",
+            "out/fig2_dependence.png",
+            "out/values.csv",
+            "scripts/make_figures.py",
+            "scripts/build_html.py",
+        ):
+            assert (example / name).is_file(), name
+    assert "runops-analyze" not in cli("doctor").out  # no broken links reported
+
+
+def test_example_report_html_is_built_from_its_readme(tmp_path: Path) -> None:
+    source = Path(__file__).parents[1] / "src/runops/skills/runops-analyze/example-report"
+    topic = tmp_path / "topic"
+    shutil.copytree(source, topic)
+    build = [sys.executable, str(topic / "scripts/build_html.py")]
+    check = subprocess.run([*build, "--check"], capture_output=True, text=True)
+    assert check.returncode == 0, check.stdout + check.stderr
+    assert "2 image(s) embedded" in check.stdout
+    html = (topic / "report.html").read_text(encoding="utf-8")
+    readme = (topic / "README.md").read_text(encoding="utf-8")
+    assert html.count('src="data:image/png;base64,') == readme.count("](out/fig") == 2
+    assert 'src="out/' not in html
+
+    (topic / "README.md").write_text(readme + "\nAn added sentence.\n", encoding="utf-8")
+    assert subprocess.run([*build, "--check"], capture_output=True).returncode == 1
+    assert subprocess.run(build, capture_output=True).returncode == 0
+    assert subprocess.run([*build, "--check"], capture_output=True).returncode == 0

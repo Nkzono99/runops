@@ -232,6 +232,10 @@ topic は `speed-by-version` のように問いの内容で名付け、同じ問
 
 エージェントは `runops-analyze` skill を使い、調査の README と、そこへのリンクを含む
 `LOG.md` の判断を更新します。`notes/` は run に依存しない知見に使います。
+比較の結果を人に見せるレポートを頼むと（「この 3 条件を比較してレポートにまとめて」）、
+エージェントは skill 同梱の執筆ガイドと例に沿って、問いと結論、条件を同じ尺度で並べた図、
+図の読み方と結果の意味、再現情報の順に書きます。README.md と、図を埋め込んで単体で
+読める `report.html` の両方ができます。
 解析の追加依存は `.runops/analysis-env/` に置き、重い読み込みや作図はサイトの規則に従って
 計算ノードで実行します。sbatch は調査 directory から投入し、事前に `logs/` を作って
 `#SBATCH -o logs/%x.%j.out` と `#SBATCH -e logs/%x.%j.err` を指定します。

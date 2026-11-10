@@ -729,14 +729,14 @@ runops は `init` と `update` で次を行う。
 runops は次の 6 skill だけを同梱し、simulator skill と同じ仕組みで展開する。
 利用者が覚えるコマンドは `runo init` だけとし、それ以外（simulator の追加、更新、v1 移行を含む）は
 エージェントへの依頼で行う。
-各 SKILL.md は 60 行以内に収める。
+各 SKILL.md は 60 行以内に収める。詳しい指針や例が要る skill は、同じ directory に別 file として置き、SKILL.md から相対リンクで参照する。
 
 | skill | 内容 |
 |---|---|
 | `runops-create-run` | `new` / `sweep` の使い方。`--why` を必ず書く、scratch の使い分け |
 | `runops-check-status` | `sync` → `list` → `log` の順。失敗時の `retry` と `tidy --purge-work` |
 | `runops-tidy` | `tidy` を定期的に実行する判断基準。pin の使い方 |
-| `runops-analyze` | 依存する run の範囲で調査の置き場所を決め、script・結果・log・README をまとめる |
+| `runops-analyze` | 依存する run の範囲で調査の置き場所を決め、script・結果・log・README をまとめる。読み手に渡す比較レポートの書き方は同梱の `report-guide.md` と `example-report/` に置く |
 | `runops-reference` | command 一覧（§7.3 の表をそのまま載せる） |
 | `runops-maintain` | simulator の追加、runops と simulator package の更新、`migrate-v1`、`doctor` の読み方 |
 
@@ -1017,6 +1017,7 @@ v2 の文書は次の 4 ファイルだけにする。
 
 | 項目 | 決定 | 理由 |
 |---|---|---|
+| 比較レポートの書き方（2026-11-10） | `runops-analyze` に執筆ガイド `report-guide.md` と模擬データの例 `example-report/` を同梱する。README.md を本文の正本とし、例の `scripts/build_html.py` が図を埋め込んだ `report.html` を作る。command やレポート生成機構は足さない | 差分図と条件の列挙が中心のレポートは読み手に伝わらず、元の分布を同じ尺度で並べ、問い・観測・解釈をつなげて書き直すと伝わった（#119）。書き方は判断を伴うので、手順と例として skill に置く |
 | 解析の配置 2.6.0（2026-10-23） | 依存する run の範囲に応じて run 内 `analysis/`、group の `_analysis/<topic>/`、project の `analysis/<topic>/` にまとめる。skill、log の tidy、group archive、context を対応させる（§9.1） | 報告・図・script・job log が分散・混在していた。group は既存の directory として扱い、新しい entity や command は足さない。既存ファイルの整理は移動一覧を提示してから行う |
 | job の cwd | run_dir（v1 と同じ）。Slurm log は `work/` | v1 adapter の path 規約と実 project の job.sh をそのまま使える |
 | adapter の追加 hook | `configure(sim_config)`、`job_prelude(run_dir)` | generic の `command` 取得と、EMSES の `rm -f *_0000.h5` など v1 の setup command を表す |
