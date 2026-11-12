@@ -148,7 +148,9 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 `list --json` と `status --json` は、walltime の根拠として `walltime`、最新 attempt の `elapsed`、
 `walltime_used`（elapsed / walltime）、`slurm_state` も返します。adapter が `progress()` を持てば
 `progress`（`done`、`total`、`unit`、`fraction`、`rate_recent_per_hour`、`rate_attempt_per_hour`、
-`eta_hours`、`last_change_at`、`stalled_hours`）も返し、表の `progress` 列に `62% 0.198 s/batch eta 3.1h` と出します。
+`eta_hours`、`last_change_at`、`stalled_hours`、再開した run では今回の区間の割合 `attempt_fraction`）も返し、
+表の `progress` 列に `62% 0.198 s/batch eta 3.1h` と出します。再開した run は `74% (38% of this job)` のように
+累積と今回の job の割合を並べます。
 `sync` の観測で `done` が 1 時間以上増えていなければ `stalled 6.7h` が付きます（観測は `sync` のときだけ）。表では `TIMEOUT` などを
 `failed (TIMEOUT)` と示します。待機中の run は、`sync` が squeue から読んだ理由を `pending_reason` に持ち、
 表では `submitted (QOSGrpCpuLimit)` と出ます。理由が `Dependency` で始まるときは投入時の依存指定

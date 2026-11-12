@@ -132,6 +132,9 @@ def summarize(
     }
     if start is not None:
         summary["start"] = start
+        if start > 0 and total and total > start:
+            # A resumed run: how far this job is through its own stretch (start -> total).
+            summary["attempt_fraction"] = round(max(done - start, 0.0) / (total - start), 4)
     if not final and total and rate_recent:
         summary["eta_hours"] = round(max(total - done, 0.0) / rate_recent, 2)
     # TOML has no null: leave unknown values out.
@@ -158,12 +161,17 @@ def program_start(manifest: Manifest) -> str:
 
 
 def format_progress(progress: dict[str, Any] | None) -> str:
-    """Short text for tables: ``62% 0.198 s/batch eta 3.1h``."""
+    """Short text for tables: ``62% 0.198 s/batch eta 3.1h``.
+
+    A resumed run also shows this job's share: ``74% (38% of this job)``.
+    """
     if not progress:
         return ""
     parts = []
     if progress.get("fraction") is not None:
         parts.append(f"{progress['fraction']:.0%}")
+        if progress.get("attempt_fraction") is not None:
+            parts.append(f"({progress['attempt_fraction']:.0%} of this job)")
     else:
         parts.append(f"{progress['done']} {progress['unit']}")
     rate = progress.get("rate_recent_per_hour")

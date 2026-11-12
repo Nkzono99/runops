@@ -479,12 +479,14 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 - 観測は `submit/progress.<job_id>.jsonl` に `{at, done}` として追記する（attempt ごと、
   上限 1000 件程度）。queue を離れたときの観測は終了時刻で記録し、終了後の待ち時間を速度に含めない。
 - 要約を `[[job.attempts]].progress` に置く: `done`、`total`、`unit`、`start`、`fraction`、
+  `attempt_fraction`（`start` > 0 で `total` があるとき、今回の区間の割合 `(done - start) / (total - start)`）、
   `rate_recent_per_hour`（直近 10 分）、`rate_attempt_per_hour`（program 開始から。起点は
   `start`）、`eta_hours`（running のみ）、`last_change_at`（`done` が最後に増えた観測時刻）、
   `stalled_hours`（最新観測が `last_change_at` から 1 時間以上進んでいないとき、その長さ。
   終了後の観測には付けない）。program 開始時刻は job.sh が stdout に出す
   `runops: start` 行から取り、`started_at` に入れる。
-- `status` / `list` は `stalled_hours` があれば `stalled 6.7h` と表示する。観測は `sync` のときだけ
+- `status` / `list` は累積の割合に今回の区間を `74% (38% of this job)` と併記し、
+  `stalled_hours` があれば `stalled 6.7h` と表示する。観測は `sync` のときだけ
   なので、停止の検出は `sync` の間隔より細かくならない。
 - `status` / `list` は要約だけを読む（file を開かない）。read-only command は観測を足さない。
 - 解析は adapter が行い、runops は保存と表示だけを持つ（§1.2 #4）。
@@ -1057,5 +1059,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 進捗と系列配置 2.5.0（2026-10-23） | adapter に任意の `progress()`、`sync` が時刻付き観測を保存し速度・残り時間を要約（§6.4）。`new --from` の既定置き場所を元 run と同じ directory に。agent context の `docs/` も展開 | 速度比較のために agent が時刻付き batch 観測を手で保存し、再開点や終了後の待ちを毎回補正していた（4 回）。継続世代が case 直下に並び、同じ計算の系列を見分けにくかった。skill が package の `docs/` を参照していたが展開されていなかった。進捗の解析は simulator 固有なので adapter が持ち、runops は保存と表示だけにする |
 | 横断の状態確認 2.7.0（2026-10-30） | `list` / `status` に `--brief`、`context` に全 active run の `active`、progress 要約に `last_change_at` と `stalled_hours`（§6.4、§7.1、§7.3） | hub で 4 project の active run を集めるのに `recent_runs` 5 件では足りず、全 `params` 付きの `list --json` は shell 引数長を超えた（3 回）。進捗が 6 時間止まった run を 49% と報告した。新しい command は足さず、既存の summary を小さくし、観測から止まりを出す |
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
-| FEEDBACK 棚卸し 2.9.0（2026-11-12） | `case new --from` が `--simulator` を反映し有効な simulator を表示する。端末でない出力では表の cell を切らない。squeue の reason を `pending_reason`、投入時の依存を attempt の `dependency` に残して表と JSON に出し、`submit --dependency` で Slurm の依存指定を広げる。`submit` と `--submit` は 1 run の失敗で止まらず、未受理の run を要約し、`submit --json` が受理・未受理・受理不明を返す | case を複製して改造 build を使うつもりが元の binary で走った（2 回）。pipe で run id が `R20261111…` と欠けた。`QOSGrpCpuLimit` や前段 job の失敗による `DependencyNeverSatisfied` で止まった run が、台帳では理由の無い submitted だった（複数 project で繰り返し）。前段の検査 job に `afterany` で結ぶ手段が無かった。一括投入の一部失敗で、どれが created のままかを manifest から読み直していた。command は増やさない |
+| FEEDBACK 棚卸し 2.9.0（2026-11-12） | `case new --from` が `--simulator` を反映し有効な simulator を表示する。端末でない出力では表の cell を切らない。squeue の reason を `pending_reason`、投入時の依存を attempt の `dependency` に残して表と JSON に出し、`submit --dependency` で Slurm の依存指定を広げる。`submit` と `--submit` は 1 run の失敗で止まらず、未受理の run を要約し、`submit --json` が受理・未受理・受理不明を返す。継続 run の進捗に今回の区間の割合（`attempt_fraction`）を併記する | case を複製して改造 build を使うつもりが元の binary で走った（2 回）。pipe で run id が `R20261111…` と欠けた。`QOSGrpCpuLimit` や前段 job の失敗による `DependencyNeverSatisfied` で止まった run が、台帳では理由の無い submitted だった（複数 project で繰り返し）。前段の検査 job に `afterany` で結ぶ手段が無かった。一括投入の一部失敗で、どれが created のままかを manifest から読み直していた。継続 run の 74% が今回の job の進み具合と読み違えられた。command は増やさない |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

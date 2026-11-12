@@ -66,7 +66,8 @@ def test_summarize_counts_from_the_resume_point_and_the_recent_window() -> None:
     assert out["rate_recent_per_hour"] == 3600.0  # 600 in 10 min
     assert round(out["rate_attempt_per_hour"]) == round(2960 / (33.6 / 60))
     assert out["eta_hours"] == round(6040 / 3600, 2)
-    assert format_progress(out) == "40% 1 s/batch eta 1.7h"
+    assert out["attempt_fraction"] == round(2960 / 9000, 4)  # this job: 1000 -> 10000
+    assert format_progress(out) == "40% (33% of this job) 1 s/batch eta 1.7h"
 
     final = summarize(samples, total=10000, unit="batch", start=1000, started_at=start, final=True)
     assert "eta_hours" not in final
@@ -101,7 +102,7 @@ def test_sync_records_samples_and_the_final_rate(project_dir: Path, cli, fake_sl
     assert "eta_hours" in progress
     samples = (m.run_dir / f"submit/progress.{job}.jsonl").read_text().splitlines()
     assert json.loads(samples[-1])["done"] == 2500
-    assert "25%" in cli("list").out
+    assert "25% (17% of this job)" in cli("list").out
     assert json.loads(cli("status", run_id, "--json").out)[0]["progress"]["done"] == 2500
 
     (work / "progress.txt").write_text("10000 10000 1000\n")
@@ -128,6 +129,7 @@ def test_summarize_flags_a_run_whose_progress_stopped_moving() -> None:
         {"at": _at(120), "done": 200},  # 90 min without a change
     ]
     out = summarize(samples, total=1000, unit="batch", start=0, started_at=None)
+    assert "attempt_fraction" not in out  # a fresh run: the total fraction says it all
     assert out["last_change_at"] == _at(30)
     assert out["stalled_hours"] == 1.5
     assert format_progress(out).endswith("stalled 1.5h")

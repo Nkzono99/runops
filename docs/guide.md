@@ -135,7 +135,8 @@ walltime は、同じ case・同じ資源で終わった run の実時間を元�
 
 adapter が進捗に対応していれば（BEACH の batch、MPIEMSES3D の step）、`sync` のたびに時刻付きの
 観測を残し、`runo list` / `status` に `62% 0.198 s/batch eta 3.1h` のように進み具合、直近 10 分の
-速度、残り時間を出します。resume した run は再開点から数え、終わった run は終了時刻までで速度を出すので、
+速度、残り時間を出します。resume した run は `74% (38% of this job)` のように累積と今回の job の割合を並べ、
+速度は再開点から数え、終わった run は終了時刻までで速度を出すので、
 版を切り替えた前後の比較にそのまま使えます（`--json` の `progress`）。`sync` を重ねても進みが 1 時間以上
 変わらない run には `stalled 6.7h` が付くので、Slurm では RUNNING でも止まっている run を見分けられます。
 待機中の run は Slurm が示す理由付きで `submitted (QOSGrpCpuLimit)` のように表示されます。
