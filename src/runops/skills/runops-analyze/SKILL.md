@@ -20,7 +20,8 @@ description: Analyze or compare run results in a runops project. Use when plotti
    - `out/`: JSON, CSV, plots, HTML;
    - `logs/`: analysis job stdout and stderr.
 4. Use `.runops/analysis-env/` for extra analysis dependencies. Check the host and site
-   rules before running; heavy reads and plotting belong on compute nodes.
+   rules before running; heavy reads and plotting belong on compute nodes. Analysis jobs
+   are work outside runs: record and link them as AGENTS.md describes.
    Submit from the investigation directory, creating `logs/` before sbatch opens logs:
    ```bash
    cd <investigation-directory>

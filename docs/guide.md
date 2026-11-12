@@ -247,7 +247,10 @@ topic は `speed-by-version` のように問いの内容で名付け、同じ問
 図の読み方と結果の意味、再現情報の順に書きます。README.md と、図を埋め込んで単体で
 読める `report.html` の両方ができます。
 解析の追加依存は `.runops/analysis-env/` に置き、重い読み込みや作図はサイトの規則に従って
-計算ノードで実行します。sbatch は調査 directory から投入し、事前に `logs/` を作って
+計算ノードで実行します。run の作成・投入・取消・再試行は `runo` が行い、run の外の job（入力の照合、
+cache の準備、出力の検査、解析）は project 内の script をエージェントが `sbatch` します。対象 run、目的、
+job id、資源、依存、結果の場所は調査の README に残ります。run がそうした job の完了を待つときは
+`runo submit RUN --dependency afterok:<job_id>` で結び、依存先は run の記録に残ります。sbatch は調査 directory から投入し、事前に `logs/` を作って
 `#SBATCH -o logs/%x.%j.out` と `#SBATCH -e logs/%x.%j.err` を指定します。
 既存 project のファイルは自動で移動しません。整理を頼むと、移動前に一覧を提示します。
 

@@ -129,12 +129,18 @@ def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> 
     assert "act on them only when the user names them" in agents
     assert "runo cancel --why" in agents
     assert "--superseded-by" in agents
+    # runo owns managed runs; jobs outside runs are project scripts, linked by --dependency.
+    assert "Create, submit, cancel and retry the runs under `runs/`" in agents
+    assert "Run work outside runs as project scripts" in agents
+    assert "runo submit RUN --dependency afterok:JOBID" in agents
     skills = project_dir / ".agents/skills"
     status = (skills / "runops-check-status/SKILL.md").read_text()
     assert "`runo list --status failed --status cancelled`. These runs are the candidates" in status
     assert "stopped on purpose" in status
     assert "--superseded-by" in (skills / "runops-create-run/SKILL.md").read_text()
     assert "--superseded-by" in (skills / "runops-tidy/SKILL.md").read_text()
+    analyze = (skills / "runops-analyze/SKILL.md").read_text()
+    assert "work outside runs: record and link them as AGENTS.md describes" in analyze
     assert (
         "another project's `runs/` are refused"
         in (skills / "runops-reference/SKILL.md").read_text()

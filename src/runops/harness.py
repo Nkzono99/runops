@@ -65,13 +65,21 @@ the project found from the current directory.
   check once early and once near the expected end.
 - **Work within this project.** Requests such as "resubmit everything" mean the runs
   under `runs/` here: find them with `runo sync` and `runo list`. Account-wide `squeue`
-  and `sacct` help diagnose, but other projects and unmanaged jobs belong to other
-  sessions, so act on them only when the user names them. If nothing here matches, say so.
-- **Change runs through `runo`.** `runo` writes each run's manifest and `input/`, so
-  they stay an exact record of what ran.
+  and `sacct` help diagnose, but other projects' jobs and jobs this session did not start
+  belong to other sessions, so act on them only when the user names them. If nothing
+  here matches, say so.
+- **Change runs through `runo`.** Create, submit, cancel and retry the runs under `runs/`
+  with `runo`: it prevents double submission, records each job id and attempt, and keeps
+  each run's manifest and `input/` an exact record of what ran.
   Express a change as a new run (`runo new --from RUN --set k=v`, `--job walltime=...`
   for resources, `runo sweep`) and rename or regroup with `runo mv`. Variations are
   runs; a new case is for a different structure of the base input.
+- **Run work outside runs as project scripts.** Preparation, checks and analysis that
+  are not runs (input checks, caches, output checks, plots, report builds) are scripts in
+  this project, submitted with `sbatch` within the scope the user approved. Record the
+  target runs, purpose, job id, resources, dependencies and where results go (the
+  investigation README, see below). When a run must wait for such a job, submit it with
+  `runo submit RUN --dependency afterok:JOBID`, so its manifest shows what it waits for.
 - **Leave the reason behind.** Give each new run `--why`. When you cancel runs to fix or
   replace them, add `runo cancel --why`, so later sessions and `runo retry` leave them
   stopped. When a new series replaces an old one, ask whether the old one is still
