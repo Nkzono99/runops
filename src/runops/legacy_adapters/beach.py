@@ -11,7 +11,6 @@ Conventions (cwd of the job is the run directory):
 
 from __future__ import annotations
 
-import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -19,7 +18,6 @@ from typing import Any
 INPUT = "input/beach.toml"
 OUTPUT = "work/latest"
 ERROR_WORDS = ("error", "fatal", "killed", "oom")
-BATCH_RE = re.compile(r"\bbatch\s+(\d+)\s*/\s*(\d+)\b", re.IGNORECASE)
 TAIL_BYTES = 256 * 1024
 
 
@@ -84,27 +82,6 @@ class Adapter:
     def keep_patterns(self) -> list[str]:
         return ["summary.txt", "charges.csv", "stdout.*", "stderr.*", "*.out", "*.err"]
 
-    def summarize(self, run_dir: Path) -> dict[str, Any]:
-        summary: dict[str, Any] = {"status": self.detect_status(run_dir)}
-        path = _summary_file(run_dir)
-        if path is not None:
-            for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-                key, sep, value = line.partition("=")
-                if not sep:
-                    continue
-                value = value.strip()
-                try:
-                    summary[key.strip()] = int(value)
-                except ValueError:
-                    try:
-                        summary[key.strip()] = float(value)
-                    except ValueError:
-                        summary[key.strip()] = value
-        progress = _progress(run_dir)
-        if progress is not None:
-            summary["batch"], summary["batch_count"] = progress
-        return summary
-
 
 def _job_id(run_dir: Path) -> str:
     try:
@@ -122,17 +99,6 @@ def _summary_file(run_dir: Path) -> Path | None:
         if (directory / "summary.txt").is_file():
             return directory / "summary.txt"
     return None
-
-
-def _progress(run_dir: Path) -> tuple[int, int] | None:
-    work = run_dir / "work"
-    logs = sorted(
-        [*work.glob("stdout.*.log"), *work.glob("*.out")], key=lambda p: p.stat().st_mtime
-    )
-    if not logs:
-        return None
-    matches = BATCH_RE.findall(_tail(logs[-1]))
-    return (int(matches[-1][0]), int(matches[-1][1])) if matches else None
 
 
 def _tail(path: Path) -> str:

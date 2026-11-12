@@ -320,8 +320,7 @@ ntasks = 800
     sbatch.log           # 投入時の stdout/stderr（追記）
     exit.<job_id>        # job.sh が終了時に書く exit code、開始・終了時刻、stage（TOML）
   work/                  # simulator の出力。cwd はここ
-  analysis/
-    summary.json         # runo summarize の出力
+  analysis/              # run に依存する解析（§9.1）
 ```
 
 v1 の `status/` directory は廃止する。状態は manifest のみが持つ。
@@ -557,7 +556,6 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo list [PATH] [--all] [--since 30d] [--case C] [--sweep L] [--status S]... [--tag T]... [--scratch] [--archived] [--brief] [--json]` | run 一覧（§7.4） |
 | `runo note RUN [TEXT] [--by WHO]` | TEXT があれば `[[notes]]` に追記、なければ notes と `notes.md` を表示 |
 | `runo pin RUN [--off] [--reason TEXT]` | `run.pinned` を切り替える。pinned は `list` に常に出て、`tidy` / `delete` の対象外 |
-| `runo summarize RUN... [--force]` | adapter の `summarize()` を呼び `analysis/summary.json` を書く。既存があれば `--force` なしではスキップ |
 | `runo mv RUN... [--dest DIR] [--label L] [--why TEXT]` | run を `runs/` 配下で改名・移動する。id、入力、履歴は変えない（§7.7） |
 | `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT] [-y]` / `runo archive --older-than 90d [-y]` | `runs/_archive/<元の相対 path>` に移動して `archived` にする。対象は created と終端の run（created は job を持たないため）。移動前に全対象を検査し、指定した RUN が対象外なら何も動かさない。DIR は配下の run（系列）を指し、submitted / running と pinned を除いて表示する。created は `--superseded-by` があるときだけ含める。`--superseded-by` は各 run に置き換え先（`parent_run` がその run の置き換え先 run、無ければ指定した全 run）を `run.superseded_by` に記録し、`--why` を note に残す |
 | `runo restore RUN` | archive 前の場所に戻す。既に何かあれば拒否 |
@@ -665,7 +663,6 @@ class SimulatorAdapter(ABC):
     def resolve_runtime(self, sim_config: dict, venv: Path) -> RuntimeInfo: ...  # 既定: executable を .venv/bin → PATH の順で探す
     def collect_provenance(self, runtime: RuntimeInfo) -> dict[str, Any]: ...    # 既定: exe_hash, package_version
     def validate_params(self, params: dict) -> list[str]: return []              # warning 文字列
-    def summarize(self, run_dir: Path) -> dict[str, Any]: return {}
     def keep_patterns(self) -> list[str]: return []              # purge-work で残す glob
     def extend_inputs(self, src_run: Path, run_dir: Path, params: dict) -> list[str]:
         raise NotImplementedError                                # --continue 対応
@@ -687,7 +684,9 @@ class SimulatorAdapter(ABC):
   これにより case の `[params]` が空でも `--set` で variation を作れる。
 - v1 の `interactive_config`、`doc_repos`、`knowledge_sources`、`codex_plugins`、
   `parameter_schema`、`default_plot_recipes`、`required_outputs`、`probe_readiness`、
-  `agent_guide`、`build_version_capture_commands` は契約から外す。
+  `agent_guide`、`build_version_capture_commands` は契約から外す。2.8 までの任意 hook
+  `summarize(run_dir)` も外した（`runo summarize` と共に削除）。この method を持つ adapter は
+  そのまま動き、runops は呼ばない。
 - runops 本体に simulator 固有の adapter を **同梱しない**。同梱するのは `generic`（§8.4）だけ。
   v1 の `adapters/contrib/emses`、`adapters/contrib/beach` は §8.5 の手順で外に出す。
 - adapter は Python class だが、simulator package が `runops` を import する必要は無い。
@@ -933,7 +932,7 @@ src/runops/
     sync.py           # sync / status / log
     listing.py        # list の選択規則
     tidy.py           # tidy / archive / restore / delete / purge-work
-    notes.py          # note / context / summarize
+    notes.py          # note / context
     setup.py          # init / doctor / update
     skills.py         # agent context の展開、skills.lock
     migrate.py        # migrate-v1
@@ -959,7 +958,7 @@ src/runops/
 1. **骨格**: `config`、`project`、`manifest`、`cli` の `init` / `doctor` / `case new` /
    `new` / `status` / `list`。generic adapter。job.sh 生成なし。
 2. **投入**: `jobgen`、`launchers`、`slurm`、`build`（local_source）、`submit` / `sync` / `cancel` / `retry` / `log`。
-3. **整理**: `note` / `context` / `tidy` / `archive` / `restore` / `delete` / `summarize` / `sweep` / `new --from`。
+3. **整理**: `note` / `context` / `tidy` / `archive` / `restore` / `delete` / `sweep` / `new --from`。
 4. **連携**: `skills.py`、`harness.py`、`update`。MPIEMSES3D 側に entry point と
    `agent_context_dir` を足して end-to-end 確認。
 5. **移行**: `migrate-v1`。実在の v1 project で dry-run → apply を確認。
@@ -975,7 +974,7 @@ src/runops/
 | 項目 | 目標 |
 |---|---|
 | `src/runops/` の行数（skill の md を除く） | 8,000 行以下 |
-| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 25 |
+| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 24 |
 | ユーザーが編集する TOML | `runops.toml`、`case.toml` の 2 種 |
 | runops が書く TOML | `manifest.toml`、`.runops/skills.lock`、`.runops/index.toml` の 3 種 |
 | 依存 | `typer`、`rich`、`tomli-w`、`tomlkit`、`jinja2`、`packaging`（`mcp` を外す） |
@@ -1067,4 +1066,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 横断の状態確認 2.7.0（2026-10-30） | `list` / `status` に `--brief`、`context` に全 active run の `active`、progress 要約に `last_change_at` と `stalled_hours`（§6.4、§7.1、§7.3） | hub で 4 project の active run を集めるのに `recent_runs` 5 件では足りず、全 `params` 付きの `list --json` は shell 引数長を超えた（3 回）。進捗が 6 時間止まった run を 49% と報告した。新しい command は足さず、既存の summary を小さくし、観測から止まりを出す |
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
 | FEEDBACK 棚卸し 2.9.0（2026-11-12） | `case new --from` が `--simulator` を反映し有効な simulator を表示する。端末でない出力では表の cell を切らない。squeue の reason を `pending_reason`、投入時の依存を attempt の `dependency` に残して表と JSON に出し、`submit --dependency` で Slurm の依存指定を広げる。`submit` と `--submit` は 1 run の失敗で止まらず、未受理の run を要約し、`submit --json` が受理・未受理・受理不明を返す。継続 run の進捗に今回の区間の割合（`attempt_fraction`）を併記する。`tidy` の `unused-build` から pinned run の build と simulator の現在の build を外す。`list` は submitted / running の scratch run を既定で出す。`new` / `sweep` は run にコピーしない case 内の directory を 1 行で示す。`package` を指定した simulator でも adapter の `pip_packages()` の他の package（emses の emout）を入れ、`doctor` が欠落を示す | case を複製して改造 build を使うつもりが元の binary で走った（2 回）。pipe で run id が `R20261111…` と欠けた。`QOSGrpCpuLimit` や前段 job の失敗による `DependencyNeverSatisfied` で止まった run が、台帳では理由の無い submitted だった（複数 project で繰り返し）。前段の検査 job に `afterany` で結ぶ手段が無かった。一括投入の一部失敗で、どれが created のままかを manifest から読み直していた。継続 run の 74% が今回の job の進み具合と読み違えられた。保存のため pin した archived run の旧 build と、run を作る前の現行 build が削除候補に挙がった。実行中の smoke run が `list` に出ず、横断の状態表から漏れた。case の下位 directory に置いた配置表が run に入らず、気づかれなかった。`init emses` が書く `package` が adapter の `pip_packages()` を読ませず、emses project の `.venv` に解析 package（emout）が入らなかった（3 回）。runops 側に emses 用の一覧を持たず、adapter の契約で解く。command は増やさない |
+| command の削除（2026-11-12） | `runo summarize` と adapter の `summarize()` hook を外す（command 24）。既存 run の `analysis/summary.json` は消さず、読む機能も無い | 4 project の利用痕跡で v2 形式の summary は 6 件だけで、adapter の inspect や project の解析と重複していた。上限 25 の枠を常用の機能に残す |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

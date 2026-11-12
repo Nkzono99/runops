@@ -115,3 +115,25 @@ def test_param_warnings_name_the_adapter_and_a_newer_executable(project_dir: Pat
     assert res.code == 0, res.err
     assert "adapter schemasim: step_growth is not a known key" in res.err
     assert "local_executable executable" in res.err
+
+
+def test_an_adapter_keeping_summarize_still_works(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    """`summarize()` left the contract in 2.9; adapters that still define it are unaffected."""
+    source = LOCAL_ADAPTER.format(name="oldsim") + (
+        "    def summarize(self, run_dir):\n        raise AssertionError('not called')\n"
+    )
+    (project_dir / "adapters").mkdir()
+    (project_dir / "adapters/oldsim.py").write_text(source)
+    cfg = project_dir / "runops.toml"
+    cfg.write_text(
+        cfg.read_text() + '\n[simulators.oldsim]\nadapter = "oldsim"\n'
+        'resolver_mode = "local_executable"\nexecutable = "/bin/true"\n'
+    )
+    case = project_dir / "cases/oldcase"
+    case.mkdir()
+    (case / "case.toml").write_text('[case]\nsimulator = "oldsim"\n[job]\nwalltime = "1:00:00"\n')
+    (run_id,) = cli("new", "oldcase", "--submit").run_ids()
+    fake_slurm.states[fake_slurm.last_job] = "COMPLETED"
+    assert cli("sync").code == 0
+    assert cli("status", run_id, "--json").code == 0
+    assert "oldsim" in cli("doctor").out

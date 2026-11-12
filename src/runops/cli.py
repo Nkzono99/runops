@@ -917,23 +917,6 @@ def pin(
     out.print(f"{m.id} {'unpinned' if off else 'pinned'}")
 
 
-@app.command()
-def summarize(
-    runs: list[str] = typer.Argument(...),
-    force: bool = typer.Option(False, "--force"),
-) -> None:
-    """Write analysis/summary.json using the adapter's summarize()."""
-    from runops.ops.notes import summarize_run
-
-    project = _project()
-    for m in _resolve(project, runs):
-        written, payload = summarize_run(project, m, force=force)
-        state = "wrote" if written else "exists (use --force)"
-        out.print(f"{m.id}: {state} {project.rel(m.run_dir / 'analysis' / 'summary.json')}")
-        if len(runs) == 1:
-            _print_json(payload.get("summary", {}))
-
-
 # ---------------------------------------------------------------------------
 # lifecycle
 # ---------------------------------------------------------------------------

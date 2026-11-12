@@ -45,7 +45,6 @@ class Adapter:
 | `collect_provenance(runtime) -> dict` | manifest の `[simulator]` に足す値 |
 | `validate_params(params) -> list[str]` | warning 文字列 |
 | `job_prelude(run_dir) -> list[str]` | job.sh で実行直前に置く shell 行 |
-| `summarize(run_dir) -> dict` | `runo summarize` の内容 |
 | `keep_patterns() -> list[str]` | `tidy --purge-work` で残す glob |
 | `extend_inputs(src_run, run_dir, params) -> list[str]` | `runo new --from RUN --continue` の restart 設定 |
 | `agent_context_dir() -> Path | None` | 同梱 skill と reference の場所 |

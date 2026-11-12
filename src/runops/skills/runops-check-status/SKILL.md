@@ -21,8 +21,8 @@ description: Check the progress or result of runops runs (sync, list, log, retry
    `(DependencyNeverSatisfied: afterok:123)` the job it waits for failed, so check that job.
    `runo log RUN` and `runo log RUN --err` show the
    tail of the latest job's stdout / stderr (`-n 200` for more, `-f` to follow).
-4. For a failed run, read the stderr log and the adapter summary
-   (`runo summarize RUN`). Record the cause with `runo note RUN "..."`.
+4. For a failed run, read the stderr log, and the outputs with the simulator's own skills
+   when it has them. Record the cause with `runo note RUN "..."`.
    `failed (TIMEOUT)` means the walltime ran out: compare `elapsed` with `walltime`
    and give the next run more with `--job walltime=...`.
 5. To rerun the same inputs: `runo retry RUN` then `runo submit RUN` after confirming.

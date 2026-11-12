@@ -17,7 +17,6 @@ Optional (looked up with ``getattr``):
     resolve_runtime(sim_config: dict, venv: Path) -> RuntimeInfo
     collect_provenance(runtime) -> dict
     validate_params(params) -> list[str]
-    summarize(run_dir) -> dict
     keep_patterns() -> list[str]
     extend_inputs(src_run, run_dir, params) -> list[str]
     job_prelude(run_dir) -> list[str]
@@ -91,9 +90,6 @@ class SimulatorAdapter:
 
     def validate_params(self, params: dict[str, Any]) -> list[str]:
         return []
-
-    def summarize(self, run_dir: Path) -> dict[str, Any]:
-        return {}
 
     def keep_patterns(self) -> list[str]:
         return []

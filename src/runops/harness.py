@@ -22,7 +22,6 @@ COMMANDS = """\
 | `runo list [--all] [--case C] [--status S] [--brief] [--json]` | recent + active runs (old, archived and idle scratch hidden); `--brief` drops params/why/notes |
 | `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
 | `runo note RUN "text"` / `runo pin RUN --reason TEXT` | append an observation / protect a key run |
-| `runo summarize RUN` | adapter summary into analysis/summary.json |
 | `runo tidy` / `runo tidy --apply` | list / apply cleanup (runs, builds, old analysis logs) |
 | `runo mv RUN... [--dest DIR] [--label L] --why TEXT` | rename / move runs, keeping ids and inputs |
 | `runo archive RUN\\|DIR... [--superseded-by RUN\\|DIR --why T]` | move created or finished runs (or a series) to runs/_archive |

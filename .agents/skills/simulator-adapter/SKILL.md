@@ -25,7 +25,7 @@ Python package に置き、`runops.adapters` entry point で公開する。
      （BEACH: `"beach.agent_context" = "plugins/beach-context"`）
    - 配布 workflow が package をコピーして build する場合: build 前に stage する script
      （MPIEMSES3D: `tools/stage_agent_context.py`）
-5. テスト: `build_command`、`detect_status`、`summarize`、`agent_context_dir` は runops 無しで、
+5. テスト: `build_command`、`detect_status`、`agent_context_dir` は runops 無しで、
    `render_inputs` は runops があるときだけ（skip）。wheel の中身を確認できるなら
    `agent_context/skills/*/SKILL.md` と `entry_points.txt` の `[runops.adapters]` を見る。
 6. E2E: scratch project で `uv venv` → `uv pip install --no-deps <wheel or -e path>` →

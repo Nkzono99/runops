@@ -131,7 +131,6 @@ walltime は、同じ case・同じ資源で終わった run の実時間を元�
 | `runo list` | 実行中、作成済み、直近 30 日、pin した run を表示する |
 | `runo status RUN` | 1 つの run の状態（Slurm には問い合わせない） |
 | `runo log RUN --err` | 最新 job の stderr の末尾 |
-| `runo summarize RUN` | adapter による結果の要約を `analysis/summary.json` に書く |
 
 `runo sync` は、active な run が何件あっても `squeue` と `sacct` を 1 回ずつしか呼びません。
 エージェントには `squeue` を直接叩かせず、`runo sync` を使わせてください。
@@ -177,7 +176,7 @@ runops が知らない Slurm 状態の job は状態を変えず、`last_slurm_s
 
 | 状況 | 頼み方の例 | 裏のコマンド |
 |---|---|---|
-| 原因を調べる | R20261016-0003 が落ちた理由を調べて | `runo log RUN --err`、`runo summarize RUN`、`runo note RUN "..."` |
+| 原因を調べる | R20261016-0003 が落ちた理由を調べて | `runo log RUN --err`、`runo note RUN "..."` |
 | 一時的な障害で、同じ入力で流し直す | 同じ入力でもう一度投げて | `runo retry RUN`、`runo submit RUN` |
 | 入力を直して流し直す | dt を半分にして作り直して | `runo new --from RUN --set ... --why "..."` |
 | 止める | R20261016-0004 を止めて | `runo cancel RUN`（直すために止めるときは `--why`） |

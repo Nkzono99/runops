@@ -1,20 +1,17 @@
-"""``note``, ``context``, ``summarize`` (SPEC §7.3, §9)."""
+"""``note``, ``context`` (SPEC §7.3, §9)."""
 
 from __future__ import annotations
 
-import json
 from datetime import datetime
 from typing import Any
 
 from runops import __version__
-from runops.adapters.registry import optional
 from runops.errors import UsageError
 from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.analysis import group_topics
-from runops.ops.common import run_sim_context
 from runops.ops.skills import stale_runops_skills
 from runops.project import Project
-from runops.util import now_iso, parse_iso
+from runops.util import parse_iso
 
 
 def add_note(manifest: Manifest, text: str, by: str) -> None:
@@ -33,24 +30,6 @@ def read_notes(manifest: Manifest) -> dict[str, Any]:
         "notes": manifest.notes,
         "notes_md": notes_md.read_text(encoding="utf-8") if notes_md.is_file() else "",
     }
-
-
-def summarize_run(
-    project: Project, manifest: Manifest, *, force: bool = False
-) -> tuple[bool, dict[str, Any]]:
-    """Return (written, summary)."""
-    path = manifest.run_dir / "analysis" / "summary.json"
-    if path.exists() and not force:
-        return False, json.loads(path.read_text(encoding="utf-8"))
-    ctx = run_sim_context(project, manifest)
-    summary = dict(optional(ctx.adapter, "summarize", {}, manifest.run_dir) or {})
-    payload = {"run_id": manifest.id, "generated_at": now_iso(), "summary": summary}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(payload, indent=2, ensure_ascii=False, default=str) + "\n",
-        encoding="utf-8",
-    )
-    return True, payload
 
 
 def project_context(project: Project, *, log_lines: int = 20) -> dict[str, Any]:

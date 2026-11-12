@@ -84,18 +84,6 @@ class Adapter:
     def keep_patterns(self) -> list[str]:
         return ["energy*", "stdout.*", "stderr.*", "*.out", "*.err"]
 
-    def summarize(self, run_dir: Path) -> dict[str, Any]:
-        config = _config(run_dir)
-        tmgrid = config.get("tmgrid", {})
-        out = run_dir / OUTPUT
-        return {
-            "status": self.detect_status(run_dir),
-            "nstep": _nstep(run_dir),
-            "last_step": _last_energy_step(run_dir),
-            "grid": {k: tmgrid[k] for k in ("nx", "ny", "nz", "dt") if k in tmgrid},
-            "hdf5_files": len(list(out.glob("*.h5"))) if out.is_dir() else 0,
-        }
-
     def extend_inputs(self, src_run: Path, run_dir: Path, params: dict[str, Any]) -> list[str]:
         """Restart from the source run's SNAPSHOT1 (linked as SNAPSHOT0)."""
         snapshot = next(

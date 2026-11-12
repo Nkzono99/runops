@@ -197,14 +197,12 @@ def test_submit_all_requires_confirmation(project_dir: Path, cli, fake_slurm) ->
     assert sum(1 for c in fake_slurm.commands if c[0] == "sbatch") == 2
 
 
-def test_context_and_summarize(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+def test_context(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
     (run_id,) = cli("new", "demo", "--why", "ctx").run_ids()
     data = json.loads(cli("context", "--json").out)
     assert data["recent_runs"][0]["id"] == run_id
     assert data["simulators"]["generic"]["adapter"] == "generic"
-    res = cli("summarize", run_id)
-    assert res.code == 0
-    assert (_manifest(project_dir, run_id).run_dir / "analysis/summary.json").is_file()
+    assert cli("summarize", run_id).code == 2  # removed in 2.9: no such command
 
 
 def test_context_warns_about_stale_runops_skills(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]

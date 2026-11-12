@@ -50,9 +50,6 @@ def test_beach_adapter(project_dir: Path, cli, fake_slurm) -> None:  # type: ign
     cli("sync")
     m = Project.open(project_dir).resolve_run(run_id)
     assert m.status.value == "completed"
-    cli("summarize", run_id)
-    summary = (m.run_dir / "analysis/summary.json").read_text()
-    assert '"batches": 200' in summary
 
 
 def test_beach_failure_from_stderr(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
