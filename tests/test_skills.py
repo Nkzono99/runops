@@ -139,6 +139,8 @@ def test_harness_and_skills_scope_actions_to_this_project(project_dir: Path) -> 
     assert "stopped on purpose" in status
     assert "--superseded-by" in (skills / "runops-create-run/SKILL.md").read_text()
     assert "--superseded-by" in (skills / "runops-tidy/SKILL.md").read_text()
+    create = (skills / "runops-create-run/SKILL.md").read_text()
+    assert "## Start-up checks" in create and "one stands for no other" in create
     analyze = (skills / "runops-analyze/SKILL.md").read_text()
     assert "work outside runs: record and link them as AGENTS.md describes" in analyze
     assert (
