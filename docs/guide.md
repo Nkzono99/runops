@@ -52,6 +52,9 @@ runops が扱う名詞は case、run、sweep の 3 つです。
 | 構造が違う入力を作る | flat を元に、穴の空いた境界の case を作って | `runo case new hole --from flat` |
 | 同じ入力を別の build で流す | flat を改造版の emses-dev で流す case を作って | `runo case new flat_dev --from flat --simulator emses-dev` |
 
+run にコピーされるのは case 直下のファイルと `input/` の中身だけです。配置と付随する表のように
+複数のファイルで構造が違うなら case を分け、値の違いは `--set` にします。
+
 `--set` の key は base 入力の dotted key です（`plasma.wc`、配列なら `species.0.wp`）。
 値は TOML のリテラルとして読まれます（`3`、`1.5e-6`、`true`、`[1, 2]`）。
 

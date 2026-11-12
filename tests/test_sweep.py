@@ -63,3 +63,31 @@ def test_run_ids_are_unique_and_sequential(project_dir: Path, cli) -> None:  # t
     ids += cli("new", "demo").run_ids()
     numbers = [int(i.split("-")[1]) for i in ids]
     assert numbers == [1, 2, 3, 4]
+
+
+def test_new_and_sweep_name_case_directories_runs_do_not_get(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    case = project_dir / "cases/demo"
+    (case / "tables").mkdir()
+    (case / "tables/contact.csv").write_text("a,b\n")
+    (case / "input").mkdir()
+    (case / "input/extra.txt").write_text("x\n")
+    (case / ".cache").mkdir()
+    note = (
+        "case demo: tables/ not copied into runs (runs get the case's top-level files and input/)"
+    )
+
+    res = cli("new", "demo")
+    assert res.code == 0 and note in res.out and "warning" not in res.out
+    (run_id,) = res.run_ids()
+    run_dir = Project.open(project_dir).resolve_run(run_id).run_dir
+    assert (run_dir / "input/extra.txt").is_file() and not (run_dir / "input/tables").exists()
+
+    res = cli("new", "demo", "--json")
+    assert note in res.err and json.loads(res.out)
+
+    res = cli("sweep", "demo", "--set", "x=1,2,3", "--apply")
+    assert res.out.count(note) == 1  # once per sweep, not per run
+
+    (case / "tables/contact.csv").unlink()
+    (case / "tables").rmdir()
+    assert "not copied" not in cli("new", "demo").out

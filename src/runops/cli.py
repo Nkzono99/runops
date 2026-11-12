@@ -361,6 +361,12 @@ def case_list(as_json: bool = typer.Option(False, "--json")) -> None:
 # ---------------------------------------------------------------------------
 
 
+def _info(lines: list[str], as_json: bool) -> None:
+    """Information lines: stdout normally, stderr when stdout carries JSON."""
+    for line in lines:
+        (err if as_json else out).print(line, markup=False)
+
+
 def _print_created(
     project: Project, manifests: list[Manifest], changes: list[str] | None = None
 ) -> None:
@@ -472,6 +478,7 @@ def new(
     )
     result = create_run(project, request)
     _warn(result.warnings)
+    _info(result.info, as_json)
     if not why:
         _warn(["no --why given; consider `runo note RUN` to record the purpose"])
     if not as_json:
@@ -532,6 +539,7 @@ def sweep(
         names=parse_sweep_names(names or [], axes),
         job=parse_job(job or []),
     )
+    _info([line for line in [plan.case.uncopied_note()] if line], as_json)
     if as_json and not apply:
         _print_json(
             {

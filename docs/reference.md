@@ -70,7 +70,8 @@ module は site、launcher、simulator、case の順に結合されます。`gen
 ## case.toml
 
 `cases/<name>/case.toml` と、同じ directory の base 入力ファイルで case になります。
-`cases/<name>/input/` の中身も run の `input/` にコピーされます。
+`cases/<name>/input/` の中身も run の `input/` にコピーされます。それ以外の directory はコピーされず、
+`runo new` / `runo sweep` がその名前を 1 行で示します。
 
 ```toml
 [case]

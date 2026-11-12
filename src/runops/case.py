@@ -61,6 +61,25 @@ class Case:
                     items.append((path, path.relative_to(extra).as_posix()))
         return items
 
+    def uncopied_note(self) -> str:
+        """One line naming the case's directories that runs do not get, or ``""``.
+
+        Runs copy only the top-level files and ``input/`` (:meth:`input_sources`), so a
+        table kept in ``cases/<name>/tables/`` would silently stay behind.
+        """
+        dirs = sorted(
+            p.name
+            for p in self.dir.iterdir()
+            if p.is_dir() and p.name != "input" and not p.name.startswith(".")
+        )
+        if not dirs:
+            return ""
+        shown = ", ".join(f"{d}/" for d in dirs)
+        return (
+            f"case {self.name}: {shown} not copied into runs "
+            "(runs get the case's top-level files and input/)"
+        )
+
     def input_hash(self) -> str:
         """Content hash of :meth:`input_sources` (the base files a run is rendered from)."""
         digest = hashlib.sha256()

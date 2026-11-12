@@ -17,7 +17,8 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
 4. Smoke and debug runs use `--scratch`. `runo list` shows them while queued or
    running, and `runo tidy` deletes them after they expire.
 5. Create a new case (`runo case new NAME --from CASE`) only when the structure of the
-   base input file changes, not for a different value.
+   base input changes, not for a different value. Runs copy the case's top-level files and
+   `input/`, so a structure spread over several files (a layout and its tables) is its own case.
 6. Resources belong to the run: `--job walltime=72:00:00 --job processes=256` on `new` or
    `sweep`. Change the case's `[job]` only for future runs, after confirmation.
 7. Before submitting, show the run ids, partition, resources and core-hours and get

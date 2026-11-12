@@ -76,6 +76,7 @@ class CreateResult:
     manifests: list[Manifest]
     warnings: list[str]
     changes: list[str] = field(default_factory=list)  # input and resource differences, shown
+    info: list[str] = field(default_factory=list)  # facts worth a line, not warnings
 
 
 @dataclass
@@ -316,6 +317,7 @@ def create_run(project: Project, request: CreateRequest) -> CreateResult:
         job_changed=[k for k in job if case.job.get(k) != job[k]],
     )
     result = _materialize(project, case, [spec], request, source=source)
+    result.info += [line for line in [case.uncopied_note()] if line]
     if source is not None:
         against = f"vs {source.id}"
         result.changes += [
