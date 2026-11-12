@@ -534,6 +534,11 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 
 ### 7.3 command 一覧
 
+`runo --help` は command を常用と保守に分けた panel で示す: Create and submit（`case`、`new`、
+`sweep`、`submit`、`cancel`、`retry`）、Monitor（`context`、`status`、`sync`、`log`、`list`、`note`）、
+Organize（`pin`、`archive`、`mv`、`restore`、`delete`、`tidy`）、Project maintenance（`init`、`doctor`、
+`update`、`build`）。生成 AGENTS.md（§10）と `runops-reference` の command 表も常用と保守に分ける。
+
 | command | 効果 |
 |---|---|
 | `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | `runops.toml`、`cases/`、`runs/`、`LOG.md`、`AGENTS.md`、`.venv` を作る。SIM ごとに adapter package を `.venv` に install し、skill を展開する（§8）。端末から引数なしで実行すると site と simulator を尋ねる。`--site` が無ければ host 名から推定する（KUDPC のログインノードなら `kudpc`） |
@@ -832,7 +837,7 @@ seal、index を持たない）。
 
 `init` が生成する agent 向けファイルは次だけ。
 
-- `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表、作業の進め方、
+- `AGENTS.md`: 120 行以内。project 名、simulator、§7.3 の command 表（常用と保守に分ける）、作業の進め方、
   §9 のノート規約、展開済み skill の一覧。作業の進め方は次の 6 項目で、それぞれ「何をするか」と
   短い理由で書く（禁止事項の列挙にしない）。依頼が操作の範囲を決める、submit 前に対象と資源量を
   示して確認を取る、操作対象は起動した project の run と job、管理 run の作成・投入・取消・再試行は
@@ -1047,5 +1052,6 @@ v2 の文書は次の 4 ファイルだけにする。
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
 | FEEDBACK 棚卸し 2.9.0（2026-11-12） | `case new --from` が `--simulator` を反映し有効な simulator を表示する。端末でない出力では表の cell を切らない。squeue の reason を `pending_reason`、投入時の依存を attempt の `dependency` に残して表と JSON に出し、`submit --dependency` で Slurm の依存指定を広げる。`submit` と `--submit` は 1 run の失敗で止まらず、未受理の run を要約し、`submit --json` が受理・未受理・受理不明を返す。継続 run の進捗に今回の区間の割合（`attempt_fraction`）を併記する。`tidy` の `unused-build` から pinned run の build と simulator の現在の build を外す。`list` は submitted / running の scratch run を既定で出す。`new` / `sweep` は run にコピーしない case 内の directory を 1 行で示す。`package` を指定した simulator でも adapter の `pip_packages()` の他の package（emses の emout）を入れ、`doctor` が欠落を示す | case を複製して改造 build を使うつもりが元の binary で走った（2 回）。pipe で run id が `R20261111…` と欠けた。`QOSGrpCpuLimit` や前段 job の失敗による `DependencyNeverSatisfied` で止まった run が、台帳では理由の無い submitted だった（複数 project で繰り返し）。前段の検査 job に `afterany` で結ぶ手段が無かった。一括投入の一部失敗で、どれが created のままかを manifest から読み直していた。継続 run の 74% が今回の job の進み具合と読み違えられた。保存のため pin した archived run の旧 build と、run を作る前の現行 build が削除候補に挙がった。実行中の smoke run が `list` に出ず、横断の状態表から漏れた。case の下位 directory に置いた配置表が run に入らず、気づかれなかった。`init emses` が書く `package` が adapter の `pip_packages()` を読ませず、emses project の `.venv` に解析 package（emout）が入らなかった（3 回）。runops 側に emses 用の一覧を持たず、adapter の契約で解く。command は増やさない |
 | `runo` と直接の `sbatch` の範囲（2026-11-12） | 管理 run の作成・投入・取消・再試行は `runo`（二重投入の防止、job id と attempt の記録、状態更新）。run の外の準備・検査・解析 job は project 内の script を承認範囲で `sbatch` し、対象 run・目的・job id・資源・依存・結果の場所を記録する。run がそれに依存するときは `runo submit --dependency`（または `--afterok`）で結び、依存先を台帳に残す。本文は生成 AGENTS.md（§10）、skill は参照。job / DAG / campaign の entity は足さない | 利用痕跡（401 run 中、runo の投入記録が無いのは移行分だけ）では simulation の run は `runo submit` で投入され、直接の `sbatch` は入力照合・cache 準備・出力検査・解析・文書同期だった。`runops-analyze` が解析 job の `sbatch` を指示する一方、2026-10-21 の決定は生の `sbatch` を禁じる書き方で、範囲が食い違っていた。解析を generic adapter の run にすると描画ごとに case と run が増える |
+| 常用と保守の案内（2026-11-12） | `runo --help` を typer の `rich_help_panel` で 4 panel に分け、生成 AGENTS.md と `runops-reference` の表を常用（作成と投入、監視、整理）と保守（`init`、`doctor`、`update`、`build`）に分ける。command は削らない | 利用痕跡では作成・投入・監視・復旧・保管が常用で、保守の command は project の準備と更新のときだけ使われていた。常に読む案内を常用の command に寄せる |
 | command の削除（2026-11-12） | `runo summarize` と adapter の `summarize()` hook、`runo migrate-v1` と `ops/migrate.py` を外す（command 23）。既存 run の `analysis/summary.json` は消さず、読む機能も無い。v1 project には runops 2.8 の `migrate-v1` を案内する（§11）。`legacy_adapters/` は `init` が使うので残す | 4 project の利用痕跡で v2 形式の summary は 6 件だけで、adapter の inspect や project の解析と重複していた。v1 からの移行は一度限りで、残る v1 project も 2.8 で変換できる。上限 25 の枠を常用の機能に残す |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

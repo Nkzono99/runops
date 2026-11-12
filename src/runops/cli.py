@@ -14,6 +14,7 @@ import typer
 from rich.console import Console
 from rich.markup import escape
 from rich.table import Table
+from typer.core import TyperGroup
 
 from runops import __version__, slurm
 from runops.errors import RunopsError, UsageError
@@ -24,14 +25,34 @@ from runops.util import parse_age
 if TYPE_CHECKING:
     from runops.ops.submit import SubmitOptions, SubmitResult
 
+# `runo --help` groups commands: everyday work first, project upkeep last.
+CREATE = "Create and submit"
+MONITOR = "Monitor"
+ORGANIZE = "Organize"
+MAINTAIN = "Project maintenance"
+_PANELS = (CREATE, MONITOR, ORGANIZE, MAINTAIN)
+
+
+class _PanelOrder(TyperGroup):
+    """Lists commands panel by panel (help shows panels in the order commands come)."""
+
+    def list_commands(self, ctx: Any) -> list[str]:
+        def rank(name: str) -> int:
+            panel = getattr(self.commands[name], "rich_help_panel", None)
+            return _PANELS.index(panel) if panel in _PANELS else len(_PANELS)
+
+        return sorted(super().list_commands(ctx), key=rank)
+
+
 app = typer.Typer(
+    cls=_PanelOrder,
     add_completion=False,
     no_args_is_help=True,
     help="runops: run ledger and Slurm submission for simulation projects.",
     pretty_exceptions_enable=False,
 )
 case_app = typer.Typer(no_args_is_help=True, help="Manage cases (input templates).")
-app.add_typer(case_app, name="case")
+app.add_typer(case_app, name="case", rich_help_panel=CREATE)
 
 
 def _version_callback(value: bool) -> None:
@@ -145,7 +166,7 @@ def _resolve(project: Project, refs: list[str]) -> list[Manifest]:
 # ---------------------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel=MAINTAIN)
 def init(
     sims: Optional[list[str]] = typer.Argument(
         None, help="Simulators: NAME or NAME=package-spec (e.g. emses, beach, generic)."
@@ -215,7 +236,7 @@ def _prompt_site(guessed: str, host: str) -> str:
         err.print(f"[yellow]unknown site preset {answer!r}; choose {choices}[/]")
 
 
-@app.command()
+@app.command(rich_help_panel=MAINTAIN)
 def doctor(as_json: bool = typer.Option(False, "--json")) -> None:
     """Check configuration, adapters, executables, Slurm and skills."""
     from runops.ops.setup import doctor as run_doctor
@@ -231,7 +252,7 @@ def doctor(as_json: bool = typer.Option(False, "--json")) -> None:
         raise typer.Exit(2)
 
 
-@app.command()
+@app.command(rich_help_panel=MAINTAIN)
 def update(
     skills_only: bool = typer.Option(
         False, "--skills-only", help="Only redeploy skills and AGENTS.md block."
@@ -251,7 +272,7 @@ def update(
     out.print("skills and AGENTS.md block refreshed")
 
 
-@app.command()
+@app.command(rich_help_panel=MAINTAIN)
 def build(
     sim: str = typer.Argument(..., help="Simulator name with resolver_mode = local_source."),
     force: bool = typer.Option(False, "--force", help="Rebuild even if the build exists."),
@@ -264,7 +285,7 @@ def build(
     out.print(f"built {project.rel(target)}")
 
 
-@app.command()
+@app.command(rich_help_panel=MONITOR)
 def context(as_json: bool = typer.Option(False, "--json")) -> None:
     """Where the project stands (for agents)."""
     from runops.ops.notes import project_context
@@ -431,7 +452,7 @@ def _submit_summary(results: list[SubmitResult]) -> str:
     return "; ".join(parts)
 
 
-@app.command()
+@app.command(rich_help_panel=CREATE)
 def new(
     case: Optional[str] = typer.Argument(None, help="Case name (omit with --from)."),
     from_run: str = typer.Option("", "--from", help="Derive from an existing run."),
@@ -490,7 +511,7 @@ def new(
         raise typer.Exit(1)
 
 
-@app.command()
+@app.command(rich_help_panel=CREATE)
 def sweep(
     case: str = typer.Argument(...),
     sets: Optional[list[str]] = typer.Option(
@@ -602,7 +623,7 @@ def sweep(
 # ---------------------------------------------------------------------------
 
 
-@app.command("submit")
+@app.command("submit", rich_help_panel=CREATE)
 def submit_cmd(
     runs: Optional[list[str]] = typer.Argument(None, help="Runs (or a directory with --all)."),
     all_runs: bool = typer.Option(
@@ -659,7 +680,7 @@ def submit_cmd(
         raise typer.Exit(1)
 
 
-@app.command()
+@app.command(rich_help_panel=CREATE)
 def cancel(
     runs: list[str] = typer.Argument(...),
     why: str = typer.Option(
@@ -678,7 +699,7 @@ def cancel(
         out.print(f"cancelled {m.id}")
 
 
-@app.command()
+@app.command(rich_help_panel=CREATE)
 def retry(
     run: str = typer.Argument(...),
     submit: bool = typer.Option(False, "--submit"),
@@ -755,7 +776,7 @@ def _status_table(project: Project, manifests: list[Manifest], *, brief: bool = 
     return table
 
 
-@app.command()
+@app.command(rich_help_panel=MONITOR)
 def status(
     runs: Optional[list[str]] = typer.Argument(None),
     brief: bool = typer.Option(
@@ -790,7 +811,7 @@ def status(
     _print_table(_status_table(project, targets, brief=brief))
 
 
-@app.command("sync")
+@app.command("sync", rich_help_panel=MONITOR)
 def sync_cmd(
     runs: Optional[list[str]] = typer.Argument(None),
     as_json: bool = typer.Option(False, "--json"),
@@ -812,7 +833,7 @@ def sync_cmd(
         out.print(f"{r.run_id}  {change}  {r.slurm_state}{extra}")
 
 
-@app.command()
+@app.command(rich_help_panel=MONITOR)
 def log(
     run: str = typer.Argument(...),
     stderr: bool = typer.Option(False, "--err", help="Show stderr instead of stdout."),
@@ -831,7 +852,7 @@ def log(
     out.print(text, markup=False)
 
 
-@app.command("list")
+@app.command("list", rich_help_panel=MONITOR)
 def list_cmd(
     path: Optional[Path] = typer.Argument(None, help="Limit to runs under this directory."),
     show_all: bool = typer.Option(False, "--all", help="Include old terminal runs."),
@@ -877,7 +898,7 @@ def list_cmd(
     _print_table(_status_table(project, runs, brief=brief))
 
 
-@app.command()
+@app.command(rich_help_panel=MONITOR)
 def note(
     run: str = typer.Argument(...),
     text: Optional[str] = typer.Argument(None),
@@ -901,7 +922,7 @@ def note(
         out.print(data["notes_md"], markup=False)
 
 
-@app.command()
+@app.command(rich_help_panel=ORGANIZE)
 def pin(
     run: str = typer.Argument(...),
     off: bool = typer.Option(False, "--off", help="Unpin."),
@@ -922,7 +943,7 @@ def pin(
 # ---------------------------------------------------------------------------
 
 
-@app.command()
+@app.command(rich_help_panel=ORGANIZE)
 def archive(
     runs: Optional[list[str]] = typer.Argument(
         None, help="Runs, or directories under runs/ (a series)."
@@ -989,7 +1010,7 @@ def archive(
         out.print(f"archived analysis {project.rel(directory)}", markup=False)
 
 
-@app.command("mv")
+@app.command("mv", rich_help_panel=ORGANIZE)
 def mv_cmd(
     runs: list[str] = typer.Argument(...),
     dest: str = typer.Option("", "--dest", help="New parent directory under runs/."),
@@ -1013,7 +1034,7 @@ def mv_cmd(
     _warn([w for r in results for w in r.warnings])
 
 
-@app.command()
+@app.command(rich_help_panel=ORGANIZE)
 def restore(run: str = typer.Argument(...)) -> None:
     """Move an archived run back to where it was."""
     from runops.ops.tidy import restore_run
@@ -1024,7 +1045,7 @@ def restore(run: str = typer.Argument(...)) -> None:
     out.print(f"restored {m.id} -> {project.rel(dst)}")
 
 
-@app.command()
+@app.command(rich_help_panel=ORGANIZE)
 def delete(
     runs: list[str] = typer.Argument(...),
     yes: bool = typer.Option(False, "-y", "--yes"),
@@ -1043,7 +1064,7 @@ def delete(
         out.print(f"deleted {m.id}")
 
 
-@app.command()
+@app.command(rich_help_panel=ORGANIZE)
 def tidy(
     apply: bool = typer.Option(False, "--apply"),
     only: Optional[list[str]] = typer.Option(None, "--only", help="Restrict to a kind."),

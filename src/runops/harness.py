@@ -10,24 +10,31 @@ BEGIN = "<!-- runops:begin -->"
 END = "<!-- runops:end -->"
 
 COMMANDS = """\
+### Everyday: create and submit, monitor, organize
+
 | command | effect |
 |---|---|
-| `runo context --json` | all active runs (with progress), recent runs, group analysis topics, LOG.md tail |
-| `runo case list` / `runo case new NAME --simulator SIM [--from CASE]` | list / scaffold cases |
+| `runo case list` / `runo case new NAME --simulator SIM [--from CASE]` | list / scaffold or copy cases |
 | `runo new CASE --why TEXT [--set k=v]... [--job k=v]... [--scratch] [--submit]` | create one run |
 | `runo new --from RUN --why TEXT [--set k=v]... [--job k=v]... [--continue]` | derive a run (keeps its params and [job]) |
 | `runo sweep CASE --set k=v1,v2 [--names k=n1,n2] [--apply] [--submit]` | preview / create a parameter product |
-| `runo submit RUN... [--partition P] [--dependency afterok:JOBID]` / `runo submit --all DIR` | sbatch created runs |
+| `runo submit RUN... [--partition P] [--dependency afterok:JOBID] [--json]` / `runo submit --all DIR` | sbatch created runs |
+| `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
+| `runo context --json` | all active runs (with progress), recent runs, group analysis topics, LOG.md tail |
 | `runo sync` / `runo status RUN` / `runo log RUN [--err]` | refresh state from Slurm / show / read logs |
 | `runo list [--all] [--case C] [--status S] [--brief] [--json]` | recent + active runs (old, archived and idle scratch hidden); `--brief` drops params/why/notes |
-| `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |
 | `runo note RUN "text"` / `runo pin RUN --reason TEXT` | append an observation / protect a key run |
 | `runo tidy` / `runo tidy --apply` | list / apply cleanup (runs, builds, old analysis logs) |
 | `runo mv RUN... [--dest DIR] [--label L] --why TEXT` | rename / move runs, keeping ids and inputs |
 | `runo archive RUN\\|DIR... [--superseded-by RUN\\|DIR --why T]` | move created or finished runs (or a series) to runs/_archive |
 | `runo restore RUN` / `runo delete RUN` | move back / remove |
-| `runo build SIM` | build a local_source simulator into .runops/build |
-| `runo doctor` / `runo update` | check environment / upgrade simulator packages and skills |"""
+
+### Project maintenance (see `runops-maintain`)
+
+| command | effect |
+|---|---|
+| `runo doctor` / `runo update` | check environment / upgrade simulator packages and skills |
+| `runo build SIM` | build a local_source simulator into .runops/build |"""
 
 
 def render_block(project: Project, skills: list[str]) -> str:

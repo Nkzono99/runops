@@ -386,3 +386,23 @@ def test_beach_install_is_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     report = init_project(root, ["beach"], install=True)
     assert pip.installs == [[KNOWN_PACKAGES["beach"]]]
     assert report.installed == [KNOWN_PACKAGES["beach"]]
+
+
+def test_help_groups_everyday_commands_before_maintenance(cli) -> None:  # type: ignore[no-untyped-def]
+    out = cli("--help").out
+    panels = ["Create and submit", "Monitor", "Organize", "Project maintenance"]
+    positions = [out.index(p) for p in panels]
+    assert positions == sorted(positions)
+    maintenance = out[positions[-1] :]
+    for name in ("init", "doctor", "update", "build"):
+        assert f" {name} " in maintenance
+    assert " submit " in out[positions[0] : positions[1]]
+    assert "summarize" not in out and "migrate-v1" not in out
+
+
+def test_agents_md_splits_everyday_and_maintenance(project_dir: Path) -> None:
+    agents = (project_dir / "AGENTS.md").read_text()
+    everyday = agents.index("### Everyday")
+    maintenance = agents.index("### Project maintenance")
+    assert everyday < agents.index("`runo submit RUN...") < maintenance
+    assert maintenance < agents.index("`runo doctor` / `runo update`")

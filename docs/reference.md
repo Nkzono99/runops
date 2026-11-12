@@ -160,15 +160,12 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 表は、出力が端末でなく `COLUMNS` も無いとき（pipe やエージェントの shell）、cell を切らずに出します。
 端末では、または `COLUMNS` を指定すれば、その幅に収めます。
 
-全 command は `--help` で option を確認できます。`RUN` には run id、run directory、
+全 command は `--help` で option を確認できます。`runo --help` は command を「Create and submit」
+「Monitor」「Organize」「Project maintenance」の 4 つに分けて示します。`RUN` には run id、run directory、
 または directory 名の一意な部分文字列を渡せます。
 
 | command | 動作 |
 |---|---|
-| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
-| `runo doctor [--json]` | 設定、adapter の解決経路、`.venv` に無い package、executable、sbatch、skill の鮮度とリンク切れを点検 |
-| `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成。`package` を指定した simulator でも、adapter の `pip_packages()` にある他の package（emses の emout など）が `.venv` に無ければ入れる |
-| `runo build SIM [--force]` | `local_source` の simulator を build |
 | `runo context [--json]` | agent 向けの現在地。全 active run（`active`、`--brief` と同じ形）、直近 5 run、現用 group の解析 topic 名（JSON の `group_analysis` は group path → topic 名一覧） |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧。`--from` は複製で、`-s` があれば複製の simulator を替える。作成後に有効な simulator を表示 |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
@@ -183,6 +180,15 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。対象は created と終了した run。移動前に全対象を検査し、対象外の RUN があれば何も動かさない。DIR は配下の run（系列）で、submitted / running と pinned を除き、created は `--superseded-by` のときだけ含めて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |
+
+project の保守（設定、package、build）:
+
+| command | 動作 |
+|---|---|
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
+| `runo doctor [--json]` | 設定、adapter の解決経路、`.venv` に無い package、executable、sbatch、skill の鮮度とリンク切れを点検 |
+| `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成。`package` を指定した simulator でも、adapter の `pip_packages()` にある他の package（emses の emout など）が `.venv` に無ければ入れる |
+| `runo build SIM [--force]` | `local_source` の simulator を build |
 
 `list` は既定で active、created、直近 `list_since_days` 日、pinned の run を表示し、
 archived と scratch は表示しません。ただし submitted / running の scratch run は表示します（`--status` で絞ったときも）。
