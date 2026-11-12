@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -389,7 +390,8 @@ def test_beach_install_is_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
 
 def test_help_groups_everyday_commands_before_maintenance(cli) -> None:  # type: ignore[no-untyped-def]
-    out = cli("--help").out
+    # CI colours the help (rich honours GITHUB_ACTIONS), so compare the text without styling.
+    out = re.sub(r"\x1b\[[0-9;]*m", "", cli("--help").out)
     panels = ["Create and submit", "Monitor", "Organize", "Project maintenance"]
     positions = [out.index(p) for p in panels]
     assert positions == sorted(positions)
