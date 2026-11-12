@@ -330,16 +330,11 @@ simulator 用の adapter を自分で書く方法は [adapter ガイド](adapter
 
 ## 9. v1 の project から移る
 
-> この project を runops v2 に移行して。
-
-エージェントは先に `runo migrate-v1 --dry-run` で変換計画を見せます。確認すると変換を実行します。
-
-- v1 の設定と harness は `.runops/v1-backup/<日時>/` に退避され、削除はされません。
-- 各 run の v1 manifest は `manifest.v1.toml` として同じ directory に残ります。
-- `research/`、`materials/`、`refs/` は動かしません。場所は `notes/README.md` に追記されます。
-- run directory は移動しません。v1 の配置のまま `runo list --all` に表示されます。
-
-実運用中の project を移行するときは、先にコピーで試すよう頼むと安全です。
+v1 の project（`simulators.toml` がある）では、この版の `runo` は止まり、移行の方法を示します。
+移行の command `runo migrate-v1` は runops 2.8 にあります。「この project を runops 2.8 で移行して」と頼むと、
+エージェントは `uvx --from runops==2.8.0 runo migrate-v1 --dry-run` で変換計画を見せ、確認後に変換します。
+v1 の設定と manifest は `.runops/v1-backup/` と `manifest.v1.toml` に残り、run directory は動きません。
+変換後はこの版でそのまま使えます。実運用中の project は、先にコピーで試すよう頼むと安全です。
 
 ## 10. よくあるつまずき
 

@@ -31,7 +31,6 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo restore RUN` | move back |
 | `runo delete RUN... [-y]` | remove created/failed/cancelled/scratch runs |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | cleanup runs, builds and `analysis-logs` (thresholds: `tidy_failed_days` / `tidy_archive_days`) |
-| `runo migrate-v1 [--dry-run]` | convert a runops v1 project |
 
 ## Layout
 

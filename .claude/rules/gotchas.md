@@ -28,10 +28,3 @@
 
 pytest は軽量なのでログインノードで実行してよい。simulator の build（`runo build`、
 `local_source`）や他 repo の重いテストは、各 repo の規約に従い計算ノード（`tssrun`）で行う。
-
-## v1 project を触るとき
-
-実運用の v1 project（例: `~/large1/project_dust_release`）には `runo migrate-v1 --dry-run` だけを
-実行する。適用は `work/`、`.venv`、`refs/`、`materials/` を除いたコピーで行う。v1 の
-`.runops/work/<build>/src` は simulator repo の git worktree のことがある（migrate が
-`git worktree repair` する）。

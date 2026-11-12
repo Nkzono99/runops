@@ -94,7 +94,7 @@ wheel に含めるには、その directory を package data に入れます。s
 
 ## 既存の EMSES / BEACH adapter
 
-v1 から移植した adapter は `src/runops/legacy_adapters/` にあります。`runo migrate-v1` と、
+v1 から移植した adapter は `src/runops/legacy_adapters/` にあります。
 entry point が見つからないときの `runo init emses` / `runo init beach` が、project の
 `adapters/` にコピーします。MPIEMSES3D と BEACH の package が entry point を
 公開したら、legacy 版は削除できます。

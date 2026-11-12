@@ -42,13 +42,13 @@ uv run mypy src/
 ```text
 src/runops/
   cli.py        Typer。入力、確認、表示だけ
-  ops/          command ごとの処理（create, submit, sync, listing, tidy, notes, setup, skills, migrate）
+  ops/          command ごとの処理（create, submit, sync, listing, tidy, notes, setup, skills, analysis, progress）
   config.py project.py manifest.py case.py runtime.py jobgen.py launchers.py slurm.py util.py
   adapters/     契約（Protocol）、解決順、generic
-  legacy_adapters/  v1 emses / beach の移植（migrate-v1 と init 用）
+  legacy_adapters/  v1 emses / beach の移植（init が project にコピー）
   skills/       project に展開する runops skill（各 60 行以内）
   harness.py    project の AGENTS.md 管理 block
-tests/          受け入れ基準（SPEC §13.2）ごとのテスト、golden/、fixtures/v1-project/
+tests/          受け入れ基準（SPEC §13.2）ごとのテスト、golden/
 ```
 
 ## 守ること
@@ -56,4 +56,3 @@ tests/          受け入れ基準（SPEC §13.2）ごとのテスト、golden/�
 - 名詞は case / run / sweep。新しい永続 entity や ID 空間、作成前のゲートを足さない（SPEC §1.2）。
 - simulator 固有の知識を runops に置かない。adapter と skill は simulator package 側。
 - 利用者が覚えるコマンドは `runo init` だけ。それ以外はエージェントへの依頼で行える形に保つ。
-- 実運用の v1 project には `runo migrate-v1 --dry-run` 以外を実行しない。

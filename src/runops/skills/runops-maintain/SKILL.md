@@ -1,6 +1,6 @@
 ---
 name: runops-maintain
-description: Maintain a runops project - add or change a simulator, update runops or simulator packages, refresh skills, migrate a runops v1 project, fix environment problems. Use when the user asks to set up, upgrade, migrate, or add a simulator rather than to run simulations.
+description: Maintain a runops project - add or change a simulator, update runops or simulator packages, refresh skills, fix environment problems, or meet a runops v1 project. Use when the user asks to set up, upgrade, migrate, or add a simulator rather than to run simulations.
 ---
 
 # Maintaining the project
@@ -34,13 +34,12 @@ links to missing files and v1 leftovers. Fix what it reports, then run it again.
 - `runo update` rewrites only the `<!-- runops:begin/end -->` block of AGENTS.md and
   directories marked `.managed-by-runops`.
 
-## Migrate a runops v1 project
+## A runops v1 project
 
-A v1 project has `simulators.toml` / `site.toml`. Run `runo migrate-v1 --dry-run`,
-show the plan (configs and harness moved to `.runops/v1-backup/`, cases flattened,
-manifests converted with `manifest.v1.toml` kept, adapters added) and get confirmation.
-Then `runo migrate-v1 -y`, `runo doctor`, `runo list --all`. `research/`,
-`materials/`, `refs/` stay in place; point the user to `notes/README.md`.
+A v1 project has `simulators.toml` / `site.toml`; this runops stops there and names
+the way: convert it with runops 2.8, which still has `migrate-v1`
+(`uvx --from runops==2.8.0 runo migrate-v1 --dry-run`, then `-y` after the user
+confirms the plan), and continue with this version (`runo doctor`, `runo list --all`).
 
 Report what changed and anything the user must do (credentials, site-specific
 modules, deleting `.runops/v1-backup/` after review).

@@ -11,7 +11,7 @@ runops の挙動は複数の場所に書かれている。変更の種類から�
 |---|---|---|
 | command / option の追加・変更 | `SPEC.md` §7.3（先に更新。§13.1 の上限 25 を確認） | `docs/reference.md` の command 表、`src/runops/skills/runops-reference/SKILL.md`、`src/runops/harness.py` の `COMMANDS` |
 | `runops.toml` / `case.toml` の field | `SPEC.md` §4, §5 | `docs/reference.md`、`config.py` / `case.py` の既知 key 集合 |
-| manifest の field | `SPEC.md` §6.2 | `docs/reference.md` の manifest 表、`ops/migrate.py` の変換 |
+| manifest の field | `SPEC.md` §6.2 | `docs/reference.md` の manifest 表、`src/runops/skills/runops-reference/SKILL.md` の Manifest 節 |
 | adapter 契約・skill 同梱 | `SPEC.md` §8 | `docs/adapter.md`、`adapters/base.py` の docstring、`legacy_adapters/` |
 | エージェントの使い方・規則 | `src/runops/harness.py`（project の AGENTS.md block） | `src/runops/skills/*/SKILL.md`、README の依頼例、`docs/guide.md` |
 | 実装中の判断で SPEC 本文と違う結論になった | `SPEC.md` 本文を直し、§14 に理由を 1 行追加 | — |

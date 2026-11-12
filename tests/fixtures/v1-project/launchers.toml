@@ -1,3 +1,0 @@
-[launchers.camphor]
-type = "srun"
-use_slurm_ntasks = true

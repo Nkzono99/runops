@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from importlib import resources
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,7 @@ import tomli_w
 
 from runops.adapters.base import exe_str
 from runops.config import CONFIG_FILE, SCHEMA_VERSION, SimulatorConfig, load_config
-from runops.errors import RunError, RunopsError, UsageError
+from runops.errors import V1_MIGRATION, RunError, RunopsError, UsageError
 from runops.harness import write_harness
 from runops.ops.common import sim_context
 from runops.ops.skills import (
@@ -146,7 +147,7 @@ def init_project(
     if (root / CONFIG_FILE).exists():
         raise UsageError(f"{root / CONFIG_FILE} already exists")
     if (root / "simulators.toml").exists():
-        raise UsageError(f"{root} is a runops v1 project; use `runo migrate-v1`")
+        raise UsageError(f"{root} is a runops v1 project; {V1_MIGRATION}")
     site_key, detected = resolve_site(site)
     preset = SITE_PRESETS[site_key]
     report = InitReport(root, site=site_key, site_detected=detected)
@@ -215,10 +216,11 @@ def init_project(
     return report
 
 
+LEGACY_ADAPTERS = ("emses", "beach")
+
+
 def add_legacy_adapters(project: Project) -> list[str]:
     """Place the bundled emses/beach ports when no package provides the adapter yet."""
-    from runops.ops.migrate import LEGACY_ADAPTERS, install_legacy_adapter
-
     added: list[str] = []
     for sim in project.config.simulators.values():
         if sim.adapter not in LEGACY_ADAPTERS or f"adapters/{sim.adapter}.py" in added:
@@ -327,6 +329,15 @@ def update_project(project: Project, *, skills_only: bool = False) -> tuple[list
         installed, warnings = install_packages(project, upgrade=True)
     warnings += refresh_agent_files(project)
     return installed, warnings
+
+
+def install_legacy_adapter(root: Path, name: str) -> Path:
+    """Copy the bundled port of adapter *name* to ``<root>/adapters/<name>.py``."""
+    target = root / "adapters" / f"{name}.py"
+    target.parent.mkdir(exist_ok=True)
+    source = resources.files("runops.legacy_adapters") / f"{name}.py"
+    target.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return target
 
 
 # ---- doctor -----------------------------------------------------------

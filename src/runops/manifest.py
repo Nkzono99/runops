@@ -6,7 +6,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
-from runops.errors import UsageError
+from runops.errors import V1_MIGRATION, UsageError
 from runops.util import dump_toml, load_toml, now_iso, parse_duration, parse_iso, tomllib
 
 MANIFEST_FILE = "manifest.toml"
@@ -76,8 +76,8 @@ class Manifest:
         schema = data.get("schema")
         if schema != SCHEMA_VERSION:
             raise UsageError(
-                f"{path} has manifest schema {schema!r}; this looks like a "
-                "runops v1 run. Run `runo migrate-v1` in the project root."
+                f"{path} has manifest schema {schema!r}; this looks like a runops v1 run: "
+                f"{V1_MIGRATION}."
             )
         return cls(path, data)
 

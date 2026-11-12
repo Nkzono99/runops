@@ -1,8 +1,9 @@
 """runops v2 project-local adapter for MPIEMSES3D (ported from runops v1).
 
-``runo migrate-v1`` copies this file to ``<project>/adapters/emses.py``. Once
-the MPIEMSES3D Python package provides a ``runops.adapters`` entry point named
-``emses``, that one wins and the project copy can be deleted.
+``runo init`` copies this file to ``<project>/adapters/emses.py`` when no package
+provides the adapter. Once the MPIEMSES3D Python package provides a
+``runops.adapters`` entry point named ``emses``, that one wins and the project copy
+can be deleted.
 
 Conventions (cwd of the job is the run directory):
     input/plasma.toml   rendered from the case's plasma.toml + params

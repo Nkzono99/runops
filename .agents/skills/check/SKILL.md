@@ -23,7 +23,6 @@ mock する。実際の `sbatch` を呼ぶテストを書かない。
 |---|---|
 | rename / move / archive / 作成など filesystem 操作 | `uv run pytest -q -p no:cacheprovider --basetemp=/LARGE0/gr20001/b36291/claude_scratch/pytest-lustre` で Lustre 上でも通す（`RENAME_NOREPLACE` が EINVAL になる経路） |
 | adapter 解決、`.venv` の entry point、skill 展開 | `tests/test_skills.py` と `tests/test_adapters.py`。必要なら scratch project で `uv venv` + `uv pip install -e <simulator>` して `runo doctor` |
-| `migrate-v1` | `tests/test_migrate.py`。実 project には `runo migrate-v1 --dry-run` だけを実行し、適用は `work/` を除いたコピーで行う |
 | job.sh 生成 | `tests/golden/*.sh` との差分を目視し、意図した変更なら `UPDATE_GOLDEN=1 uv run pytest tests/test_jobgen.py` |
 | project に展開する skill / AGENTS.md block | `tests/test_skills.py`（行数上限）と `sync-docs` skill |
 | 開発ハーネス | `tests/test_dev_harness.py` |

@@ -183,7 +183,6 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo archive RUN\|DIR... [--superseded-by RUN\|DIR --why TEXT]` / `runo archive --older-than 90d` / `runo restore RUN` | `runs/_archive/` へ移動 / 戻す。対象は created と終了した run。移動前に全対象を検査し、対象外の RUN があれば何も動かさない。DIR は配下の run（系列）で、submitted / running と pinned を除き、created は `--superseded-by` のときだけ含めて表示する。`--superseded-by` は置き換え先（その run から `--from` で派生した run、無ければ指定した全 run）を `superseded_by` に記録し、`--why` をノートに残す |
 | `runo delete RUN... [-y]` | created・failed・cancelled・scratch の run を削除 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...]` | 整理候補の表示と実行 |
-| `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |
 
 `list` は既定で active、created、直近 `list_since_days` 日、pinned の run を表示し、
 archived と scratch は表示しません。ただし submitted / running の scratch run は表示します（`--status` で絞ったときも）。

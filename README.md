@@ -48,7 +48,6 @@ runo init
 | 解析する | この系列の速度を比較して。図とスクリプト、調査メモを系列の `_analysis/` にまとめて |
 | simulator を足す | パッチを当てた ~/BEACH-dev をビルドして、別の simulator として登録して |
 | 更新する | runops と simulator を最新にして |
-| v1 から移る | この project を runops v2 に移行して（`runo migrate-v1` を dry-run で確認してから） |
 
 投入、削除、整理、移行の前には、エージェントが対象と資源量を示して確認を取ります。
 範囲を言わない依頼（「全部再投入して」など）は、エージェントを起動した project の run だけが対象です。

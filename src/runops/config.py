@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from runops.errors import UsageError
+from runops.errors import V1_MIGRATION, UsageError
 from runops.util import load_toml, tomllib
 
 CONFIG_FILE = "runops.toml"
@@ -142,10 +142,7 @@ def find_project_root(start: Path | None = None) -> Path:
         if (candidate / CONFIG_FILE).is_file():
             return candidate
         if (candidate / "simulators.toml").is_file():
-            raise UsageError(
-                f"{candidate} looks like a runops v1 project; "
-                "run `runo migrate-v1 --dry-run` there first"
-            )
+            raise UsageError(f"{candidate} looks like a runops v1 project; {V1_MIGRATION}")
     raise UsageError(f"no {CONFIG_FILE} found in {current} or its parents; run `runo init`")
 
 
@@ -167,7 +164,7 @@ def parse_config(root: Path, data: dict[str, Any]) -> ProjectConfig:
     if schema != SCHEMA_VERSION:
         raise UsageError(
             f"runops.toml schema is {schema!r}, expected {SCHEMA_VERSION}. "
-            "If this is a v1 project, run `runo migrate-v1`."
+            f"If this is a v1 project, {V1_MIGRATION}."
         )
     _warn_unknown(data, _TOP_KEYS, "runops.toml", warnings)
 

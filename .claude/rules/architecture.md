@@ -15,7 +15,7 @@ cli.py  ──>  ops/*  ──>  config / project / manifest / case / runtime / 
   CLI は `slurm.default_runner` を呼び出し時に参照して渡す（テストは monkeypatch で差し替える）。
 - 基盤 module は `ops/` と `cli.py` を import しない。`adapters/` は runops の他 module に依存しない
   （`base.py` は `util.load_toml` のみ）。
-- `legacy_adapters/` は registry に登録しない。`ops/migrate.py` と `ops/setup.py` がファイルとして
+- `legacy_adapters/` は registry に登録しない。`ops/setup.py`（`init`）がファイルとして
   project にコピーするだけ。
 
 ## 不変条件

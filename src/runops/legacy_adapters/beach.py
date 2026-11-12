@@ -1,8 +1,9 @@
 """runops v2 project-local adapter for BEACH (ported from runops v1).
 
-``runo migrate-v1`` copies this file to ``<project>/adapters/beach.py``. Once
-the BEACH Python package (``beach-bem``) provides a ``runops.adapters`` entry
-point named ``beach``, that one wins and the project copy can be deleted.
+``runo init`` copies this file to ``<project>/adapters/beach.py`` when no package
+provides the adapter. Once the BEACH Python package (``beach-bem``) provides a
+``runops.adapters`` entry point named ``beach``, that one wins and the project copy
+can be deleted.
 
 Conventions (cwd of the job is the run directory):
     input/beach.toml    rendered from the case's beach.toml + params

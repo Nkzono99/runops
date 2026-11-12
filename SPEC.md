@@ -78,7 +78,7 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
 - research journal / CURRENT.md / rotation / bounded budget
 - knowledge / facts / knowledge source / profile
 - receipt 付き bundle archive / tombstone / forward recovery
-- project-state migration framework（v1→v2 の一回限りの変換 command は §11 で定義する）
+- project-state migration framework（v1→v2 の一回限りの変換は runops 2.8 の `migrate-v1` で行う。§11）
 - harness の versioned chain 更新（`update-harness --apply-chain`）
 - MCP server（CLI の `--json` 出力で代替する。agent は CLI を直接呼ぶ）
 - project 横断の knowledge source（`[knowledge]`、`refs/knowledge`、`hpc-shared-knowledge` の mount）。
@@ -138,7 +138,7 @@ v1 で運用した 2 つの project（`project_dust_release`: BEACH、run 120、
     id.lock                # run id 採番用 lock
     run.lock               # manifest の読み直し・更新用 lock（submit / cancel / retry / sync）
     last_run_id            # 最後に払い出した run id。削除後も同じ id を再利用しないため
-    v1-backup/<stamp>/     # migrate-v1 が退避した v1 の設定と harness（§11）
+    v1-backup/<stamp>/     # runops 2.8 の migrate-v1 が退避した v1 の設定と harness（§11）
     build/
       <sim>-<commit>/      # local_source の build cache（§4.1）
     .gitignore
@@ -561,7 +561,6 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo restore RUN` | archive 前の場所に戻す。既に何かあれば拒否 |
 | `runo delete RUN... [-y]` | directory を削除。`created`/`failed`/`cancelled`/scratch のみ。`pinned` は拒否 |
 | `runo tidy [--apply] [--only KIND] [--older-than AGE] [--purge-work RUN...] [--json]` | 整理候補を表示する（§7.5）。`--apply` で実行 |
-| `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project を v2 layout に変換する（§11） |
 | `runo --version` | version 表示 |
 
 ### 7.4 `list` の規則
@@ -756,7 +755,7 @@ runops は次の 6 skill だけを同梱し、simulator skill と同じ仕組み
 | `runops-tidy` | `tidy` を定期的に実行する判断基準。pin の使い方 |
 | `runops-analyze` | 依存する run の範囲で調査の置き場所を決め、script・結果・log・README をまとめる。読み手に渡す比較レポートの書き方は同梱の `report-guide.md` と `example-report/` に置く |
 | `runops-reference` | command 一覧（§7.3 の表をそのまま載せる） |
-| `runops-maintain` | simulator の追加、runops と simulator package の更新、`migrate-v1`、`doctor` の読み方 |
+| `runops-maintain` | simulator の追加、runops と simulator package の更新、v1 project の案内、`doctor` の読み方 |
 
 ### 8.4 generic adapter
 
@@ -773,11 +772,10 @@ simulator package が無くても使えるよう `generic` adapter を同梱す�
 v1 の `emses` / `beach` adapter は次の順で runops 本体から出す。
 
 1. v2 契約（§8.1）に移植した `emses.py` と `beach.py` を `src/runops/legacy_adapters/` に
-   置く。registry には登録しない。`migrate-v1` が実行時に読むため package に含める。
-2. `migrate-v1` は project の `simulators.*.adapter` が `emses` / `beach` のとき、
+   置く。registry には登録しない。`runo init` が実行時に読むため package に含める。
+2. `runo init` は `emses` / `beach` の adapter が entry point で見つからないとき、
    対応する file を project の `adapters/` にコピーする（既にあれば触らない）。
-   これで simulator repo の対応を待たずに旧 project が v2 で動く。`runo init` も、
-   `emses` / `beach` の adapter が entry point で見つからないときは同じ file を置く。
+   これで simulator repo の対応を待たずに project が動く。
 3. MPIEMSES3D と BEACH の Python package に entry point と `agent_context_dir()` を追加したら、
    `legacy_adapters/` の該当 file を削除する。project ローカルの copy は entry point が
    見つかると使われなくなる（解決順 1 が優先）ので、ユーザーが消せばよい。
@@ -851,35 +849,15 @@ seal、index を持たない）。
 
 ## 11. v1 からの移行
 
-`runo migrate-v1 [--dry-run]` は v1 project を次のように変換する。一回限りの command で、
-framework 化しない。
+v1 project の変換は、一回限りの command `runo migrate-v1` として runops 2.8 まで同梱した
+（変換の内容は 2.8 の本節）。2.9 で削除し、v1 project は runops 2.8 で変換してから更新する
+（`uvx --from runops==2.8.0 runo migrate-v1 --dry-run`）。
 
-| v1 | v2 |
-|---|---|
-| `simulators.toml` + `launchers.toml` + `site.toml` | `runops.toml` に統合。`codex_plugins` は捨てる。`[site.simulators.X].modules` は `[simulators.X].modules` に入れる。launcher の `type` は `kind` にする |
-| `cases/<sim>/<name>/` | `cases/<name>/` に移動。衝突時は `<sim>-<name>` |
-| `[classification]` | `case.tags` / `run.tags` に `model`、`submodel`、`tags` を平坦化 |
-| manifest `[intent].purpose` | `run.why` |
-| manifest `[storage].pinned` | `run.pinned` |
-| manifest `[params_snapshot]` | `[params]` |
-| manifest `status = purged` | `status = archived` + `storage.work_purged_at = <archived_at>` |
-| manifest `[path].bundle_archived_from` | `[path].archived_from` |
-| manifest `[path].run_dir`（絶対 path） | project root 相対に変換。project 外を指す場合は warning を出し現在の実 path で上書き |
-| manifest `[job].queue`、`last_slurm_state`、`[[job.attempts]]` | `queue` は捨てる。`last_slurm_state` と `[[job.attempts]]` はそのまま |
-| `[simulators.<name>]` の `executable` が `.runops/work/<name>-<hash>/bin/...` | `.runops/work/<dir>` を `.runops/build/<dir>` に移動し path を書き換える。移動できない場合は `local_executable` のまま残す |
-| `runs/**/survey.toml` | 同じ directory 配下の run の `origin.sweep` が空なら `survey.id`（無ければ directory 名）を補う。file 自体は残す |
-| `runs/_archive/` 配下の run（v1 の bundle archive を含む） | `status = archived`、`archived_from` は `_archive/` を外した path |
-| `runs/AGENTS.md`、`runs/CLAUDE.md`、`cases/**/AGENTS.md` など root 以外の harness file | `.runops/v1-backup/<stamp>/` へ移動 |
-| `.runops/test-runs/T*/` | 削除候補として表示（`--apply-delete-test-runs` で削除） |
-| `experiments/`、`research/`、`.runops/insights/`、`.runops/knowledge/`、`refs/`、`materials/`、`analysis/`、`harness-feedback/`、`.harnessops/` | 触らない。`notes/README.md` と `LOG.md` 末尾に「v1 の資料は以下に残る」と path 一覧を追記 |
-| `campaign.toml`、`SITE.md`、`.harness/`、`.runops/facts.toml`、`.runops/environment.toml`、`.runops/harness.lock` | 触らない（git 履歴で消せる）。`doctor` が「v1 の残骸」として列挙する |
-| v1 の `runops.toml`、`AGENTS.md`、`CLAUDE.md`、`.codex/`、`.claude/skills/runops-*`、`.agents/skills/runops-*` | `.runops/v1-backup/<stamp>/` へ移動し v2 の harness を生成 |
-| 各 run の v1 manifest | `manifest.v1.toml` として同じ run directory に残す |
-
-- 変換後の manifest は `schema = 2`。v2 の runops は `schema` が無い、または `1` の
-  manifest を読んだら `migrate-v1` を案内して exit code 2。
-- run directory の物理的な移動は行わない。`runs/sheath/wc_scan/R...` のような v1 の
-  配置はそのまま読める（§3 の規約通り）。
+- v2 の runops は、`simulators.toml` のある directory、`schema` が 2 でない `runops.toml`、
+  `schema` が無いか `1` の manifest を読むと、runops 2.8 の `migrate-v1` を案内して exit code 2。
+  `init` も `simulators.toml` のある directory では同じ案内で止まる。
+- 変換済みの project に残る `.runops/v1-backup/`、`manifest.v1.toml` は runops が読まない。
+  `doctor` は v1 の残骸（`campaign.toml` など）を列挙する。
 
 ---
 
@@ -935,12 +913,11 @@ src/runops/
     notes.py          # note / context
     setup.py          # init / doctor / update
     skills.py         # agent context の展開、skills.lock
-    migrate.py        # migrate-v1
   adapters/
     base.py           # Protocol、RuntimeInfo、toml_override、set_dotted
     registry.py
     generic.py
-  legacy_adapters/    # v1 emses / beach の移植（migrate-v1 がコピー）
+  legacy_adapters/    # v1 emses / beach の移植（init がコピー）
   launchers.py        # srun / mpirun / mpiexec / none
   jobgen.py
   slurm.py            # sbatch / scancel / squeue / sacct（runner 注入）
@@ -974,7 +951,7 @@ src/runops/
 | 項目 | 目標 |
 |---|---|
 | `src/runops/` の行数（skill の md を除く） | 8,000 行以下 |
-| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 24 |
+| CLI command 数（`case new` / `case list` を含む。同じ command の option 違いは数えない） | 25 以下。§7.3 の表の distinct command は 23 |
 | ユーザーが編集する TOML | `runops.toml`、`case.toml` の 2 種 |
 | runops が書く TOML | `manifest.toml`、`.runops/skills.lock`、`.runops/index.toml` の 3 種 |
 | 依存 | `typer`、`rich`、`tomli-w`、`tomlkit`、`jinja2`、`packaging`（`mcp` を外す） |
@@ -1005,10 +982,9 @@ src/runops/
 8b. `local_source` simulator で `runo new` したとき `.runops/build/<sim>-<commit>/` に
    build が走り（mock build_command）、manifest に `exe_hash` と `git_commit` が入る。
    2 回目は build が走らない。
-9. v1 の sample project（`tests/fixtures/v1-project/`）に `migrate-v1 --dry-run` が
-   変換計画を表示し、`migrate-v1` 後に `list --all` が v1 の run をすべて表示する。
-   fixture の simulator が `beach` なら `adapters/beach.py` がコピーされ、`doctor` が
-   「project ローカル」経路で解決したと表示する。
+9. v1 の project（`simulators.toml`、schema 1 の `runops.toml` / manifest）を開くと、runops 2.8 の
+   `migrate-v1` を案内して exit code 2 になる。`init emses` / `init beach` は adapter が entry point に
+   無いとき `adapters/<name>.py` を置き、run がそれを「project ローカル」経路で使う。
 9b. 同名 adapter が entry point と `adapters/X.py` の両方にあるとき entry point が優先される。
    どちらも無く `generic` でもなければ exit code 2 で案内が出る。
 10. `manifest.toml` の書き込み途中で例外が起きても元のファイルが壊れない。
@@ -1066,5 +1042,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 横断の状態確認 2.7.0（2026-10-30） | `list` / `status` に `--brief`、`context` に全 active run の `active`、progress 要約に `last_change_at` と `stalled_hours`（§6.4、§7.1、§7.3） | hub で 4 project の active run を集めるのに `recent_runs` 5 件では足りず、全 `params` 付きの `list --json` は shell 引数長を超えた（3 回）。進捗が 6 時間止まった run を 49% と報告した。新しい command は足さず、既存の summary を小さくし、観測から止まりを出す |
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
 | FEEDBACK 棚卸し 2.9.0（2026-11-12） | `case new --from` が `--simulator` を反映し有効な simulator を表示する。端末でない出力では表の cell を切らない。squeue の reason を `pending_reason`、投入時の依存を attempt の `dependency` に残して表と JSON に出し、`submit --dependency` で Slurm の依存指定を広げる。`submit` と `--submit` は 1 run の失敗で止まらず、未受理の run を要約し、`submit --json` が受理・未受理・受理不明を返す。継続 run の進捗に今回の区間の割合（`attempt_fraction`）を併記する。`tidy` の `unused-build` から pinned run の build と simulator の現在の build を外す。`list` は submitted / running の scratch run を既定で出す。`new` / `sweep` は run にコピーしない case 内の directory を 1 行で示す。`package` を指定した simulator でも adapter の `pip_packages()` の他の package（emses の emout）を入れ、`doctor` が欠落を示す | case を複製して改造 build を使うつもりが元の binary で走った（2 回）。pipe で run id が `R20261111…` と欠けた。`QOSGrpCpuLimit` や前段 job の失敗による `DependencyNeverSatisfied` で止まった run が、台帳では理由の無い submitted だった（複数 project で繰り返し）。前段の検査 job に `afterany` で結ぶ手段が無かった。一括投入の一部失敗で、どれが created のままかを manifest から読み直していた。継続 run の 74% が今回の job の進み具合と読み違えられた。保存のため pin した archived run の旧 build と、run を作る前の現行 build が削除候補に挙がった。実行中の smoke run が `list` に出ず、横断の状態表から漏れた。case の下位 directory に置いた配置表が run に入らず、気づかれなかった。`init emses` が書く `package` が adapter の `pip_packages()` を読ませず、emses project の `.venv` に解析 package（emout）が入らなかった（3 回）。runops 側に emses 用の一覧を持たず、adapter の契約で解く。command は増やさない |
-| command の削除（2026-11-12） | `runo summarize` と adapter の `summarize()` hook を外す（command 24）。既存 run の `analysis/summary.json` は消さず、読む機能も無い | 4 project の利用痕跡で v2 形式の summary は 6 件だけで、adapter の inspect や project の解析と重複していた。上限 25 の枠を常用の機能に残す |
+| command の削除（2026-11-12） | `runo summarize` と adapter の `summarize()` hook、`runo migrate-v1` と `ops/migrate.py` を外す（command 23）。既存 run の `analysis/summary.json` は消さず、読む機能も無い。v1 project には runops 2.8 の `migrate-v1` を案内する（§11）。`legacy_adapters/` は `init` が使うので残す | 4 project の利用痕跡で v2 形式の summary は 6 件だけで、adapter の inspect や project の解析と重複していた。v1 からの移行は一度限りで、残る v1 project も 2.8 で変換できる。上限 25 の枠を常用の機能に残す |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

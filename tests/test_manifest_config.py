@@ -11,6 +11,7 @@ from runops import util
 from runops.config import load_config
 from runops.errors import UsageError
 from runops.manifest import Manifest, RunState
+from runops.ops.setup import init_project
 from runops.project import Project
 
 
@@ -59,7 +60,7 @@ def test_state_transitions(tmp_path: Path) -> None:
 def test_v1_manifest_rejected(tmp_path: Path) -> None:
     path = tmp_path / "manifest.toml"
     path.write_text(tomli_w.dumps({"run": {"id": "R1", "status": "completed"}}))
-    with pytest.raises(UsageError, match="migrate-v1"):
+    with pytest.raises(UsageError, match=r"migrate-v1` of runops 2\.8"):
         Manifest.load(path)
 
 
@@ -75,7 +76,8 @@ def test_config_errors(project_dir: Path, cli) -> None:  # type: ignore[no-untyp
     text = cfg.read_text()
     cfg.write_text(text.replace("schema = 2", "schema = 1"))
     res = cli("list")
-    assert res.code == 2 and "migrate-v1" in res.err
+    assert res.code == 2 and "runops==2.8.0 runo migrate-v1" in res.err
+    assert cli("migrate-v1").code == 2  # removed in 2.9
     cfg.write_text(text.replace('resource_style = "standard"', 'resource_style = "weird"'))
     assert cli("list").code == 2
 
@@ -86,7 +88,9 @@ def test_no_project(tmp_path: Path, cli, monkeypatch: pytest.MonkeyPatch) -> Non
     assert res.code == 2 and "runo init" in res.err
     (tmp_path / "simulators.toml").write_text("")
     res = cli("list")
-    assert res.code == 2 and "v1" in res.err
+    assert res.code == 2 and "v1" in res.err and "runops==2.8.0" in res.err
+    with pytest.raises(UsageError, match=r"runops 2\.8"):
+        init_project(tmp_path, [], install=False)
 
 
 def test_parse_value() -> None:

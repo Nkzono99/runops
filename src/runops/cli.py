@@ -1111,28 +1111,6 @@ def tidy(
         raise typer.Exit(1)
 
 
-@app.command("migrate-v1")
-def migrate_v1(
-    dry_run: bool = typer.Option(False, "--dry-run", help="Only show the plan."),
-    delete_test_runs: bool = typer.Option(
-        False, "--apply-delete-test-runs", help="Also delete .runops/test-runs/."
-    ),
-    yes: bool = typer.Option(False, "-y", "--yes"),
-) -> None:
-    """Convert a runops v1 project in the current directory to v2."""
-    from runops.ops.migrate import apply_plan, plan_migration
-
-    root = Path.cwd()
-    plan = plan_migration(root)
-    for line in plan.describe():
-        out.print(line, markup=False)
-    if dry_run:
-        return
-    _confirm("Apply this migration?", yes)
-    for line in apply_plan(plan, delete_test_runs=delete_test_runs):
-        out.print(line, markup=False)
-
-
 # ---------------------------------------------------------------------------
 
 

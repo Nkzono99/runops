@@ -32,13 +32,6 @@ prefix_rule(
 )
 
 prefix_rule(
-    pattern = ["runo", "migrate-v1"],
-    decision = "prompt",
-    justification = "Migration rewrites a project; run --dry-run and review first.",
-    match = ["runo migrate-v1 -y"],
-)
-
-prefix_rule(
     pattern = ["rm", "-rf"],
     decision = "forbidden",
     justification = "Avoid broad recursive deletion; use runo delete / tidy.",
