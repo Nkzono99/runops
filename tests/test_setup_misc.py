@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import io
 import json
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -281,3 +283,106 @@ def test_tables_off_a_terminal_keep_whole_cells(
     # A width the caller asked for still applies (as in a terminal).
     monkeypatch.setenv("COLUMNS", "60")
     assert run_id not in cli("list").out
+
+
+SIM_ADAPTER = """
+class Adapter:
+    name = "{name}"
+
+    def render_inputs(self, params, run_dir):
+        return []
+
+    def build_command(self, runtime, run_dir):
+        return ["{name}"]
+
+    def detect_status(self, run_dir):
+        return "unknown"
+
+    def pip_packages(self):
+        return {packages!r}
+"""
+
+
+class FakePip:
+    """Stands in for `uv venv` / `pip install`: records specs and writes dist-info."""
+
+    def __init__(self, root: Path) -> None:
+        self.root = root
+        self.installs: list[list[str]] = []
+
+    @property
+    def site(self) -> Path:
+        return self.root / ".venv/lib/python3.99/site-packages"
+
+    def __call__(self, cmd: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        from runops.runtime import requirement_name
+
+        from .test_adapters import write_dist
+
+        if "venv" in cmd:
+            (self.root / ".venv/bin").mkdir(parents=True)
+            (self.root / ".venv/bin/python").write_text("")
+            self.site.mkdir(parents=True)
+            return subprocess.CompletedProcess(cmd, 0, "", "")
+        args = cmd[cmd.index("install") + 1 :]
+        specs = [
+            a for i, a in enumerate(args) if not a.startswith("--") and args[i - 1] != "--python"
+        ]
+        self.installs.append([*(["--upgrade"] if "--upgrade" in args else []), *specs])
+        for spec in specs:
+            name = requirement_name(spec)
+            info = self.site / f"{name}-1.0.dist-info"
+            info.mkdir(exist_ok=True)
+            (info / "METADATA").write_text(f"Metadata-Version: 2.1\nName: {name}\nVersion: 1.0\n")
+            if name == "mpiemses3d":  # the simulator package brings the adapter
+                packages = [spec, "emout"]
+                write_dist(self.site, "emses", SIM_ADAPTER.format(name="emses", packages=packages))
+            if name == "beach-bem":
+                packages = ["beach-bem"]
+                write_dist(self.site, "beach", SIM_ADAPTER.format(name="beach", packages=packages))
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+
+def test_emses_install_brings_the_adapters_other_packages(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, cli
+) -> None:  # type: ignore[no-untyped-def]
+    from runops.ops.setup import KNOWN_PACKAGES, update_project
+
+    root = tmp_path / "emses-proj"
+    pip = FakePip(root)
+    monkeypatch.setattr("runops.ops.setup.subprocess.run", pip)
+    report = init_project(root, ["emses"], install=True)
+    package = KNOWN_PACKAGES["emses"]
+    # runops.toml names the simulator package; the adapter it brings also wants emout.
+    assert load_toml(root / "runops.toml")["simulators"]["emses"]["package"] == package
+    assert pip.installs == [[package], ["emout"]]
+    assert report.installed == [package, "emout"]
+    assert (pip.site / "emout-1.0.dist-info").is_dir()
+
+    # An existing project (runops.toml unchanged) without emout gets it on update,
+    # and doctor names what is missing.
+    for info in pip.site.glob("emout-*.dist-info"):
+        shutil.rmtree(info)
+    monkeypatch.chdir(root)
+    assert "not installed in .venv: emout; run `runo update`" in cli("doctor").out
+    pip.installs.clear()
+    installed, _ = update_project(Project.open(root))
+    assert pip.installs == [["--upgrade", package, "emout"]]
+    assert installed == [package, "emout"]
+    assert "not installed in .venv" not in cli("doctor").out
+
+    # With emout present, an update upgrades the simulator package only.
+    pip.installs.clear()
+    update_project(Project.open(root))
+    assert pip.installs == [["--upgrade", package]]
+
+
+def test_beach_install_is_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from runops.ops.setup import KNOWN_PACKAGES
+
+    root = tmp_path / "beach-proj"
+    pip = FakePip(root)
+    monkeypatch.setattr("runops.ops.setup.subprocess.run", pip)
+    report = init_project(root, ["beach"], install=True)
+    assert pip.installs == [[KNOWN_PACKAGES["beach"]]]
+    assert report.installed == [KNOWN_PACKAGES["beach"]]

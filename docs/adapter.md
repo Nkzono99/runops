@@ -40,7 +40,7 @@ class Adapter:
 |---|---|
 | `configure(sim_config)` | `runops.toml` の `[simulators.X]` を受け取る |
 | `case_template() -> dict[str, str]` | `runo case new` が置く base file |
-| `pip_packages() -> list[str]` | `runo init` / `runo update` が `.venv` に入れる package |
+| `pip_packages() -> list[str]` | `runo init` / `runo update` が `.venv` に入れる package。`runops.toml` に `package` があれば simulator 自身はそちらで入れ、ここに挙げた他の package（解析 package など）は `.venv` に無いときに入れる |
 | `resolve_runtime(sim_config, venv) -> RuntimeInfo` | executable 解決を自前で行う場合 |
 | `collect_provenance(runtime) -> dict` | manifest の `[simulator]` に足す値 |
 | `validate_params(params) -> list[str]` | warning 文字列 |

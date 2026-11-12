@@ -30,7 +30,7 @@ OMP_PROC_BIND = "spread"
 
 [simulators.emses]
 adapter = "emses"                 # adapter 名（entry point / adapters/<name>.py / generic）
-package = "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git"
+package = "MPIEMSES3D @ git+https://github.com/CS12-Laboratory/MPIEMSES3D.git"  # 省略時は adapter の pip_packages()
 executable = "mpiemses3D"
 resolver_mode = "package"         # package | local_executable | local_source
 modules = ["hdf5/1.12.2_intel-2023.2-impi"]
@@ -166,8 +166,8 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | command | 動作 |
 |---|---|
 | `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
-| `runo doctor [--json]` | 設定、adapter の解決経路、executable、sbatch、skill の鮮度とリンク切れを点検 |
-| `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
+| `runo doctor [--json]` | 設定、adapter の解決経路、`.venv` に無い package、executable、sbatch、skill の鮮度とリンク切れを点検 |
+| `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成。`package` を指定した simulator でも、adapter の `pip_packages()` にある他の package（emses の emout など）が `.venv` に無ければ入れる |
 | `runo build SIM [--force]` | `local_source` の simulator を build |
 | `runo context [--json]` | agent 向けの現在地。全 active run（`active`、`--brief` と同じ形）、直近 5 run、現用 group の解析 topic 名（JSON の `group_analysis` は group path → topic 名一覧） |
 | `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧。`--from` は複製で、`-s` があれば複製の simulator を替える。作成後に有効な simulator を表示 |

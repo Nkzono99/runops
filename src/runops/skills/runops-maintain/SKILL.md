@@ -15,7 +15,8 @@ links to missing files and v1 leftovers. Fix what it reports, then run it again.
    `executable`, optional `package` (pip spec), `modules`. Several entries may share an
    adapter (e.g. a patched build). See `runops-reference` for fields.
 2. Packaged simulator: `runo update -y` installs the package into `.venv`, finds its
-   `runops.adapters` entry point and deploys its skills.
+   `runops.adapters` entry point, adds the other packages its adapter lists when missing
+   (emout for emses) and deploys its skills. `runo doctor` names any that are missing.
 3. Source build: `resolver_mode = "local_source"` with `source_repo`, `build_command`,
    `executable` (relative to the build dir); `runo build <name>` builds into
    `.runops/build/`. Builds compile code; on HPC login nodes follow the site's rule for

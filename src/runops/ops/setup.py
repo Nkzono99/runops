@@ -13,7 +13,7 @@ from typing import Any
 import tomli_w
 
 from runops.adapters.base import exe_str
-from runops.config import CONFIG_FILE, SCHEMA_VERSION, load_config
+from runops.config import CONFIG_FILE, SCHEMA_VERSION, SimulatorConfig, load_config
 from runops.errors import RunError, RunopsError, UsageError
 from runops.harness import write_harness
 from runops.ops.common import sim_context
@@ -26,7 +26,13 @@ from runops.ops.skills import (
     runops_source,
 )
 from runops.project import Project
-from runops.runtime import package_specs, resolve_runtime
+from runops.runtime import (
+    companion_specs,
+    package_specs,
+    requirement_name,
+    resolve_runtime,
+    venv_version,
+)
 
 # Package specs for simulators whose adapter lives in their own package.
 KNOWN_PACKAGES = {
@@ -226,10 +232,22 @@ def add_legacy_adapters(project: Project) -> list[str]:
 
 
 def _pending_specs(project: Project, warnings: list[str]) -> list[str]:
+    """Specs to install: each simulator's ``package`` (else the adapter's ``pip_packages()``),
+    plus the adapter's other packages that ``.venv`` lacks (see ``companion_specs``)."""
     specs: list[str] = []
     for sim in project.config.simulators.values():
         if sim.package:
             specs.append(sim.package)
+            try:
+                ctx = sim_context(project, sim.name)
+            except RunopsError:
+                continue  # e.g. before the package that brings the adapter is installed
+            # Companions are only added when missing, so an upgrade never replaces them.
+            specs += [
+                s
+                for s in companion_specs(sim, ctx.adapter)
+                if not venv_version(project, requirement_name(s))
+            ]
             continue
         try:
             ctx = sim_context(project, sim.name)
@@ -268,6 +286,17 @@ def install_packages(project: Project, *, upgrade: bool) -> tuple[list[str], lis
     if not specs:
         return [], warnings
     python = ensure_venv(project)
+    _pip_install(python, specs, upgrade=upgrade)
+    # The packages just installed may bring the adapter (a new project), and with it
+    # companion packages such as an analysis library: install those in a second pass.
+    names = {requirement_name(s) or s for s in specs}
+    more = [s for s in _pending_specs(project, []) if (requirement_name(s) or s) not in names]
+    if more:
+        _pip_install(python, more, upgrade=upgrade)
+    return specs + more, warnings
+
+
+def _pip_install(python: Path, specs: list[str], *, upgrade: bool) -> None:
     uv = shutil.which("uv")
     if uv:
         cmd = [uv, "pip", "install", "--python", str(python)]
@@ -280,7 +309,6 @@ def install_packages(project: Project, *, upgrade: bool) -> tuple[list[str], lis
         raise RunError(
             "package install failed:\n" + "\n".join(result.stderr.strip().splitlines()[-15:])
         )
-    return specs, warnings
 
 
 def refresh_agent_files(project: Project) -> list[str]:
@@ -341,6 +369,7 @@ def doctor(project: Project) -> list[Check]:
                 f"adapter {sim.adapter!r} resolved via {ctx.resolved.source} ({where}){version}",
             )
         )
+        checks += _package_checks(project, sim, ctx.adapter)
         try:
             runtime, warns = resolve_runtime(project, sim, ctx.adapter, build=False)
             for w in warns:
@@ -390,6 +419,26 @@ def doctor(project: Project) -> list[Check]:
             )
         )
     return checks
+
+
+def _package_checks(project: Project, sim: SimulatorConfig, adapter: Any) -> list[Check]:
+    """Warn about packages `runo update` would install that ``.venv`` lacks."""
+    if not project.venv_dir.is_dir():
+        return []  # set up without packages (--no-install); nothing to compare
+    missing = [
+        spec
+        for spec in [*package_specs(sim, adapter), *companion_specs(sim, adapter)]
+        if requirement_name(spec) and not venv_version(project, requirement_name(spec))
+    ]
+    if not missing:
+        return []
+    return [
+        Check(
+            "warn",
+            f"simulator {sim.name}",
+            f"not installed in .venv: {', '.join(missing)}; run `runo update`",
+        )
+    ]
 
 
 def _current_skill_version(project: Project, source: str) -> str:

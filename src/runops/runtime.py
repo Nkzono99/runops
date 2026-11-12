@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from packaging.requirements import InvalidRequirement, Requirement
+from packaging.utils import canonicalize_name
 
 from runops.adapters.base import RuntimeInfo, exe_str
 from runops.adapters.registry import optional, venv_site_packages
@@ -25,14 +26,45 @@ def package_specs(sim: SimulatorConfig, adapter: Any) -> list[str]:
     return list(optional(adapter, "pip_packages", []) or [])
 
 
-def installed_version(project: Project, spec: str) -> str:
+def companion_specs(sim: SimulatorConfig, adapter: Any) -> list[str]:
+    """The adapter's ``pip_packages()`` that ``package`` does not name (e.g. ``emout``).
+
+    ``package`` pins how the simulator itself is installed; the adapter may list other
+    packages its project needs, such as an analysis library, and those still belong in
+    ``.venv``. Specs without a readable name are left out: they could be the simulator.
+    """
+    if not sim.package:
+        return []
+    own = requirement_name(sim.package)
+    out = []
+    for spec in optional(adapter, "pip_packages", []) or []:
+        name = requirement_name(str(spec))
+        if name and name != own:
+            out.append(str(spec))
+    return out
+
+
+def requirement_name(spec: str) -> str:
+    """Normalized distribution name of a pip spec; ``""`` for a path or other non-requirement."""
     try:
-        name = Requirement(spec).name
+        return canonicalize_name(Requirement(spec).name)
     except InvalidRequirement:
-        name = spec
+        return ""
+
+
+def venv_version(project: Project, name: str) -> str:
+    """Version of distribution *name* in the project's ``.venv``; ``""`` if absent."""
     for site in venv_site_packages(project.venv_dir):
         for dist in md.distributions(path=[str(site)], name=name):
             return dist.version
+    return ""
+
+
+def installed_version(project: Project, spec: str) -> str:
+    name = requirement_name(spec) or spec
+    version = venv_version(project, name)
+    if version:
+        return version
     try:
         return md.version(name)
     except md.PackageNotFoundError:
