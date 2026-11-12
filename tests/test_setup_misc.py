@@ -71,6 +71,33 @@ def test_case_list_and_copy(project_dir: Path, cli) -> None:  # type: ignore[no-
     assert cli("case", "new", "bad name", "-s", "generic").code == 2
 
 
+def test_case_copy_takes_the_given_simulator(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    cfg = project_dir / "runops.toml"
+    cfg.write_text(
+        cfg.read_text()
+        + '\n[simulators.patched]\nadapter = "generic"\nresolver_mode = "local_executable"\n'
+        'command = "./run.sh"\n'
+    )
+    (project_dir / "cases/demo/case.toml").write_text(
+        "# kept comment\n" + (project_dir / "cases/demo/case.toml").read_text()
+    )
+    res = cli("case", "new", "demo_patched", "--from", "demo", "--simulator", "patched")
+    assert res.code == 0, res.err
+    text = (project_dir / "cases/demo_patched/case.toml").read_text()
+    assert "# kept comment" in text
+    case = load_toml(project_dir / "cases/demo_patched/case.toml")["case"]
+    assert case["simulator"] == "patched" and case["name"] == "demo_patched"
+    assert "simulator: patched (cases/demo uses generic)" in res.out
+    assert load_toml(project_dir / "cases/demo/case.toml")["case"]["simulator"] == "generic"
+
+    res = cli("case", "new", "demo_copy", "--from", "demo")
+    assert res.code == 0 and "simulator: generic" in res.out
+
+    res = cli("case", "new", "demo_bad", "--from", "demo", "--simulator", "nosuch")
+    assert res.code == 2 and "nosuch" in res.err
+    assert not (project_dir / "cases/demo_bad").exists()
+
+
 def test_dest_must_stay_in_runs(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
     assert cli("new", "demo", "--dest", "/tmp").code == 2
     res = cli("new", "demo", "--dest", "topic/a", "--label", "x")

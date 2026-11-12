@@ -157,7 +157,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成 |
 | `runo build SIM [--force]` | `local_source` の simulator を build |
 | `runo context [--json]` | agent 向けの現在地。全 active run（`active`、`--brief` と同じ形）、直近 5 run、現用 group の解析 topic 名（JSON の `group_analysis` は group path → topic 名一覧） |
-| `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧 |
+| `runo case new NAME [-s SIM] [--from CASE]` / `runo case list` | case の作成と一覧。`--from` は複製で、`-s` があれば複製の simulator を替える。作成後に有効な simulator を表示 |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
 | `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。置き場所の既定は元 run と同じ directory。`--continue` は adapter の restart 対応が必要 |
 | `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--job k=v]... [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |

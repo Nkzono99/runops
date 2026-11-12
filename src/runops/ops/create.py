@@ -641,6 +641,7 @@ def _populate(
 
 
 def new_case(project: Project, name: str, simulator: str, from_case: str = "") -> Path:
+    """Scaffold ``cases/NAME``, or copy *from_case* (switching to *simulator* if given)."""
     name = name.strip()
     if not name or slugify(name, 200) != name:
         raise UsageError(f"invalid case name {name!r}; use letters, digits, . _ + -")
@@ -649,8 +650,10 @@ def new_case(project: Project, name: str, simulator: str, from_case: str = "") -
         raise UsageError(f"{target} already exists")
     if from_case:
         src = load_case(project.cases_dir, from_case)
+        if simulator:
+            project.config.simulator(simulator)  # unknown names stop before any copy
         shutil.copytree(src.dir, target)
-        _rewrite_case_name(target / CASE_FILE, name)
+        _rewrite_case(target / CASE_FILE, name, simulator)
         return target
     if not simulator:
         if len(project.config.simulators) == 1:
@@ -692,7 +695,8 @@ walltime = "01:00:00"
     return target
 
 
-def _rewrite_case_name(path: Path, name: str) -> None:
+def _rewrite_case(path: Path, name: str, simulator: str = "") -> None:
+    """Set ``[case].name`` (and ``simulator`` when given) of a copied case, keeping comments."""
     import tomlkit
 
     doc = tomlkit.parse(path.read_text(encoding="utf-8"))
@@ -701,6 +705,8 @@ def _rewrite_case_name(path: Path, name: str) -> None:
         case = tomlkit.table()
         doc["case"] = case
     case["name"] = name
+    if simulator:
+        case["simulator"] = simulator
     path.write_text(tomlkit.dumps(doc), encoding="utf-8")
 
 

@@ -12,7 +12,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo update [--skills-only] [-y]` | upgrade simulator packages and redeploy skills / AGENTS.md block |
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit>-<hash> |
 | `runo context [--json]` | project summary: all active runs with progress, recent runs, group analysis topics |
-| `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases |
+| `runo case new NAME [--simulator SIM] [--from CASE]` / `runo case list` | scaffold / list cases; `--from` copies, and `--simulator` switches the copy's simulator |
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run; `--job` sets this run's `[job]` values |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | derive a run with the source's params and `[job]` |
 | `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--job k=v]... [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |

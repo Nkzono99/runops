@@ -524,7 +524,7 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo update [--skills-only] [-y]` | adapter package を upgrade し、skill を再展開する |
 | `runo build SIM [--force]` | `local_source` simulator を `.runops/build/` に build する（§4.1） |
 | `runo context [--json]` | agent 向け現在地。project 名、simulator、active run 数と全 active run（`--brief` と同じ summary、`active`）、直近 run 5 件、scratch 期限切れ数、`LOG.md` 末尾 20 行、現用 group の解析 topic 名（§9.1）。配置した runops skill が install 済みの runops より古ければ `runo update --skills-only` を促す warning |
-| `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開 |
+| `runo case new NAME --simulator SIM [--from CASE]` | case をスキャフォールド。adapter の `case_template()` を展開。`--from` は case を複製し、`--simulator` があれば複製の `[case].simulator` をそれに替える（`runops.toml` に無い名前は何も作らずエラー）。作成後に有効な simulator を表示する |
 | `runo case list` | case 一覧 |
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--job k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | 既存 run の params と `[job]` から派生 run を作る（§5）。置き場所の既定は元 run と同じ directory（元 run が archive / scratch なら `runs/<case>/`）。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |

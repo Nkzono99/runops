@@ -50,6 +50,7 @@ runops が扱う名詞は case、run、sweep の 3 つです。
 | 前の run から少し変える | R20261015-0002 の nx だけ倍にして | `runo new --from R20261015-0002 --set tmgrid.nx=8000 --why "..."` |
 | 値を振る | wc を 0, 0.147, 0.294 で振って | `runo sweep flat --set plasma.wc=0,0.147,0.294 --why "..."` |
 | 構造が違う入力を作る | flat を元に、穴の空いた境界の case を作って | `runo case new hole --from flat` |
+| 同じ入力を別の build で流す | flat を改造版の emses-dev で流す case を作って | `runo case new flat_dev --from flat --simulator emses-dev` |
 
 `--set` の key は base 入力の dotted key です（`plasma.wc`、配列なら `species.0.wp`）。
 値は TOML のリテラルとして読まれます（`3`、`1.5e-6`、`true`、`[1, 2]`）。

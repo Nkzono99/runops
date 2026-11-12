@@ -288,15 +288,26 @@ def context(as_json: bool = typer.Option(False, "--json")) -> None:
 @case_app.command("new")
 def case_new(
     name: str = typer.Argument(...),
-    simulator: str = typer.Option("", "--simulator", "-s"),
+    simulator: str = typer.Option(
+        "", "--simulator", "-s", help="Simulator; with --from it replaces the copied one."
+    ),
     from_case: str = typer.Option("", "--from", help="Copy an existing case."),
 ) -> None:
     """Scaffold cases/NAME from the adapter template (or copy --from CASE)."""
+    from runops.case import load_case
     from runops.ops.create import new_case
 
     project = _project()
     path = new_case(project, name, simulator, from_case)
     out.print(f"created {project.rel(path)}")
+    # Say which simulator the case runs, so a copy meant for another build is visible.
+    effective = load_case(project.cases_dir, path.name).simulator
+    line = f"simulator: {effective}"
+    if from_case:
+        source = load_case(project.cases_dir, from_case).simulator
+        if source != effective:
+            line += f" (cases/{from_case} uses {source})"
+    out.print(line, markup=False)
 
 
 @case_app.command("list")
