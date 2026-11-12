@@ -55,6 +55,9 @@ have to supply the meaning.
   or masked or neither. Put anything easy to misread next to the figure it concerns:
   blank regions on a log scale, the sign convention of a current, the direction of
   vectors.
+- For a figure of a representative value (a mean, a total), state in the text the region
+  it averages over, the weighting, and the reference it is measured from (such as the
+  zero of a potential).
 
 ## 3. State what makes the comparison valid, and where interpretation stops
 
@@ -63,6 +66,9 @@ have to supply the meaning.
   differ only in what the report says they differ in.
 - Compare like with like: a run still in progress against the control at the same
   elapsed time, the same averaging window on both sides.
+- Design a reproducibility check as separate questions: bitwise agreement, the scatter
+  between samples, and a tolerance on the physical quantity you compare. Parallel runs
+  may sum in a different order, so they can differ bitwise while agreeing physically.
 - Keep what was observed apart from what you infer from it. Name a limit where it
   affects a reading of this result, and say which reading: "density is higher here, but
   that alone does not show the net current is larger"; "streamlines of the mean flow are
