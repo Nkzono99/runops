@@ -147,6 +147,9 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 `sync` の観測で `done` が 1 時間以上増えていなければ `stalled 6.7h` が付きます（観測は `sync` のときだけ）。表では `TIMEOUT` などを
 `failed (TIMEOUT)` と示します。
 
+表は、出力が端末でなく `COLUMNS` も無いとき（pipe やエージェントの shell）、cell を切らずに出します。
+端末では、または `COLUMNS` を指定すれば、その幅に収めます。
+
 全 command は `--help` で option を確認できます。`RUN` には run id、run directory、
 または directory 名の一意な部分文字列を渡せます。
 

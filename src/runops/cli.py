@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 import os
 import subprocess
@@ -71,6 +72,26 @@ def _actor() -> str:
 def _project() -> Project:
     project = Project.open()
     return project
+
+
+_UNCUT_WIDTH = 100_000  # wider than any table; a table without expand= keeps its own width
+
+
+def _print_table(table: Table) -> None:
+    """Print *table*, whole when no terminal or ``COLUMNS`` gives a width.
+
+    In a pipe or an agent's shell rich would assume 80 columns and cut cells (run ids
+    become ``R20261111…``). There the table is laid out at its natural width and each
+    line loses its trailing padding.
+    """
+    if out.is_terminal or os.environ.get("COLUMNS", "").isdigit():
+        out.print(table)
+        return
+    buffer = io.StringIO()
+    Console(file=buffer, width=_UNCUT_WIDTH, highlight=False, soft_wrap=True).print(table)
+    lines = buffer.getvalue().splitlines()
+    out.file.write("".join(line.rstrip() + "\n" for line in lines))
+    out.file.flush()
 
 
 def _print_json(data: Any) -> None:
@@ -327,7 +348,7 @@ def case_list(as_json: bool = typer.Option(False, "--json")) -> None:
             str(row.get("params", "")),
             row["description"],
         )
-    out.print(table)
+    _print_table(table)
 
 
 # ---------------------------------------------------------------------------
@@ -484,7 +505,7 @@ def sweep(
         )
         for p in plan.points:
             table.add_row(p.ref, *(str(v) for v in p.values.values()), p.label)
-        out.print(table)
+        _print_table(table)
         out.print(
             f"{len(plan.points)} runs -> {project.rel(plan.parent)}/  "
             f"(~{plan.core_hours:.1f} core-hours)"
@@ -690,7 +711,7 @@ def status(
             data.append(s)
         _print_json(data)
         return
-    out.print(_status_table(project, targets, brief=brief))
+    _print_table(_status_table(project, targets, brief=brief))
 
 
 @app.command("sync")
@@ -777,7 +798,7 @@ def list_cmd(
     if not runs:
         out.print("no runs (try --all, --scratch, --archived)")
         return
-    out.print(_status_table(project, runs, brief=brief))
+    _print_table(_status_table(project, runs, brief=brief))
 
 
 @app.command()
@@ -1017,7 +1038,7 @@ def tidy(
     table = Table("kind", "target", "path", "reason", box=None)
     for c in candidates:
         table.add_row(c.kind, c.target, c.path, c.reason)
-    out.print(table)
+    _print_table(table)
     if not apply:
         out.print("preview only; add --apply (optionally --only KIND) to perform")
         return

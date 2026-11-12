@@ -263,3 +263,21 @@ def test_init_finishes_when_install_fails(
         assert (tmp_path / name).exists(), name
     assert load_toml(tmp_path / "runops.toml")["simulators"]["beach"]["package"] == "beach-bem>=3.0"
     assert (tmp_path / "adapters/beach.py").is_file()  # no entry point yet -> bundled port
+
+
+def test_tables_off_a_terminal_keep_whole_cells(
+    project_dir: Path, cli, monkeypatch: pytest.MonkeyPatch
+) -> None:  # type: ignore[no-untyped-def]
+    label = "a_rather_long_label_that_fills_the_column"
+    why = "why text long enough to push the table past 80 columns"
+    (run_id,) = cli("new", "demo", "--label", label, "--why", why).run_ids()
+    monkeypatch.delenv("COLUMNS")
+    out = cli("list").out
+    assert run_id in out and label in out and "demo" in out and why in out
+    assert "…" not in out
+    lines = out.splitlines()
+    assert all(line == line.rstrip() for line in lines)  # no padding to a huge width
+    assert max(len(line) for line in lines) < 400
+    # A width the caller asked for still applies (as in a terminal).
+    monkeypatch.setenv("COLUMNS", "60")
+    assert run_id not in cli("list").out

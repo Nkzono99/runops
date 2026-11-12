@@ -503,6 +503,9 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
   walltime の根拠として `walltime`、最新 attempt の `elapsed`、`walltime_used`（elapsed / walltime）、
   `slurm_state`（`TIMEOUT` など）も含める。`list` / `status` の `--brief` は summary から
   `params`、`why`、`last_note` を外す（多数の run を横断して渡すとき用。表では note / why 列を省く）。
+- 表（`list`、`status`、`case list`、`sweep`、`tidy`）は、stdout が端末でなく `COLUMNS` も無いとき
+  cell を切らずに自然な幅で出し、行末の空白を落とす（pipe や agent の shell で run id が欠けないように）。
+  端末と `COLUMNS` 指定時はその幅に収める。
 - 破壊的 command（`cancel`、`delete`、`tidy --apply`、`archive`）は対象を表示して
   確認を取る。`-y/--yes` で省略。
 - exit code: 0 成功、1 対象 run の実行時エラー（例: sbatch 失敗）、2 使用方法・設定エラー。
