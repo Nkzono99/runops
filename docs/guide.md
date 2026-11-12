@@ -268,7 +268,7 @@ run は消さなくても `runo list` が古いものを隠しますが、direct
 | `old-completed` | 90 日より古い completed | archive |
 | `analysis-logs` | 30 日より古い解析 job の log（各 job 名の最新組は保持） | log のみ削除 |
 | `orphan-job` | 投入済みなのに Slurm が知らない | `sync` で状態を確定 |
-| `unused-build` | どの run も使っていない build cache | 削除 |
+| `unused-build` | archive していない run と pin した run が使わず、simulator の現在の build でもない build cache | 削除 |
 
 候補を確認したら `runo tidy --apply` で実行します。archive は `runs/_archive/` への移動で、
 run id で引き続き見つかり、`runo restore` で戻せます。

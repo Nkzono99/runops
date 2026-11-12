@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
@@ -148,3 +149,34 @@ def test_build_command_change_rebuilds(project: Project, tmp_path: Path) -> None
     assert first != second
     assert (second / "bin/sim").read_text() == "B\n"
     assert counter.read_text().count("built") == 2
+
+
+def test_tidy_keeps_pinned_and_current_builds(project_dir: Path, tmp_path: Path, cli) -> None:  # type: ignore[no-untyped-def]
+    repo = _make_repo(tmp_path)
+    _add_sim(project_dir, repo, tmp_path / "count.txt", "mkdir -p bin && cp main.sh bin/sim")
+    case = project_dir / "cases/srccase"
+    case.mkdir()
+    (case / "case.toml").write_text('[case]\nsimulator = "mysim"\n[job]\nwalltime = "0:10:00"\n')
+
+    # The build the simulator resolves to is kept although no run uses it yet.
+    assert cli("build", "mysim").code == 0
+    (old,) = [p.name for p in (project_dir / ".runops/build").iterdir()]
+    assert json.loads(cli("tidy", "--json").out) == []
+
+    # Two runs on that build, both archived, one pinned; then the source moves on.
+    (pinned,) = cli("new", "srccase").run_ids()
+    (plain,) = cli("new", "srccase").run_ids()
+    for run_id in (pinned, plain):
+        assert cli("archive", run_id, "-y").code == 0
+    assert cli("pin", pinned).code == 0
+    (repo / "main.sh").write_text("#!/bin/sh\necho new\n")
+    _git(repo, "commit", "-qam", "new")
+    assert json.loads(cli("tidy", "--json").out) == []  # a pinned run still uses it
+
+    assert cli("pin", pinned, "--off").code == 0
+    (cand,) = json.loads(cli("tidy", "--json").out)
+    assert (cand["kind"], cand["target"]) == ("unused-build", old)
+    assert cand["reason"] == "used only by 2 archived, unpinned runs"
+    (project_dir / ".runops/build/sim-orphan").mkdir()
+    reasons = {c["target"]: c["reason"] for c in json.loads(cli("tidy", "--json").out)}
+    assert reasons == {old: cand["reason"], "sim-orphan": "no run uses it"}

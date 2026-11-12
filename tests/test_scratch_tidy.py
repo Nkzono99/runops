@@ -84,6 +84,13 @@ def test_purge_work(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore
 def test_unused_build(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
     build = project_dir / ".runops/build/sim-abc"
     build.mkdir(parents=True)
+    # A simulator whose executable lives in a build (e.g. a migrated one) keeps that build.
+    (project_dir / ".runops/build/sim-kept/bin").mkdir(parents=True)
+    cfg = project_dir / "runops.toml"
+    cfg.write_text(
+        cfg.read_text() + '\n[simulators.kept]\nadapter = "generic"\n'
+        'resolver_mode = "local_executable"\nexecutable = ".runops/build/sim-kept/bin/sim"\n'
+    )
     cands = json.loads(cli("tidy", "--json").out)
     assert [(c["kind"], c["target"]) for c in cands] == [("unused-build", "sim-abc")]
     cli("tidy", "--apply", "-y")

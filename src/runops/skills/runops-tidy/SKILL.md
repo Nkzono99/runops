@@ -11,7 +11,8 @@ description: Keep a runops project small (tidy, archive, pin, delete). Use when 
      `why` and no notes -> delete
    - `old-completed`: completed runs older than `tidy_archive_days` (default 90) -> archive
    - `orphan-job`: submitted/running runs that Slurm no longer knows -> sync
-   - `unused-build`: build caches no active run uses -> delete
+   - `unused-build`: build caches that no non-archived or pinned run uses and no simulator
+     resolves to now -> delete (the reason counts archived runs that still reference it)
    - `analysis-logs`: old `logs/*.<jobid>.out/err` under analysis directories -> delete;
      retain the newest pair per job name and directory (`tidy_failed_days` threshold)
 2. Show the list to the user. Apply with `runo tidy --apply`, or one kind with

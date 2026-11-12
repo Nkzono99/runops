@@ -17,6 +17,7 @@ from runops.ops.common import inside, resolve_dest, run_sim_context
 from runops.ops.submit import write_job_for
 from runops.ops.sync import sync_run
 from runops.project import ARCHIVE_DIR, Project
+from runops.runtime import source_state
 from runops.slurm import CommandRunner, JobState, default_runner, query_many
 from runops.util import move_noreplace, now_iso, parse_iso
 
@@ -63,7 +64,10 @@ def find_candidates(
     if archive_after is None:
         archive_after = timedelta(days=defaults.tidy_archive_days)
     out: list[Candidate] = []
-    referenced: set[str] = set()
+    # A build stays while a live or pinned run (archived ones too) uses it, or while a
+    # simulator resolves to it now (it may have no run yet).
+    referenced: set[str] = _current_builds(project)
+    archived_users: dict[str, int] = {}
     runs = list(project.iter_runs())
     known: dict[str, JobState | None] = {}
     if check_slurm:
@@ -75,8 +79,11 @@ def find_candidates(
             check_slurm = False
     for m in runs:
         build_dir = str(m.section("simulator").get("build_dir", ""))
-        if build_dir and m.status != RunState.ARCHIVED:
+        if build_dir and (m.status != RunState.ARCHIVED or m.pinned):
             referenced.add(Path(build_dir).name)
+        elif build_dir:
+            name = Path(build_dir).name
+            archived_users[name] = archived_users.get(name, 0) + 1
         created = m.created_datetime()
         age = now - created if created else timedelta(0)
         rel = project.rel(m.run_dir)
@@ -114,14 +121,13 @@ def find_candidates(
     if project.build_dir.is_dir():
         for build in sorted(project.build_dir.iterdir()):
             if build.is_dir() and not build.name.startswith(".") and build.name not in referenced:
-                out.append(
-                    Candidate(
-                        "unused-build",
-                        build.name,
-                        project.rel(build),
-                        "no non-archived run uses it",
-                    )
+                users = archived_users.get(build.name, 0)
+                reason = (
+                    f"used only by {users} archived, unpinned run{'s' if users > 1 else ''}"
+                    if users
+                    else "no run uses it"
                 )
+                out.append(Candidate("unused-build", build.name, project.rel(build), reason))
     cutoff = now - failed_after
     analysis_candidates: list[Candidate] = []
     for directory in log_directories(project, runs):
@@ -138,6 +144,29 @@ def find_candidates(
             )
     # Logs must be handled before a containing run is moved or deleted by this tidy.
     return analysis_candidates + out
+
+
+def _current_builds(project: Project) -> set[str]:
+    """Names of the build directories the configured simulators resolve to now."""
+    names: set[str] = set()
+    root = project.build_dir.resolve()
+    for sim in project.config.simulators.values():
+        if sim.resolver_mode == "local_source":
+            try:
+                names.add(source_state(project, sim)[3])
+            except (RunopsError, OSError):
+                continue  # repo missing or not a git tree: nothing resolves to a build
+        elif sim.executable:
+            # e.g. a migrated build referenced by path: .runops/build/<dir>/bin/sim
+            exe = Path(sim.executable).expanduser()
+            exe = exe if exe.is_absolute() else project.root / exe
+            try:
+                parts = exe.resolve().relative_to(root).parts
+            except ValueError:
+                continue
+            if len(parts) > 1:
+                names.add(parts[0])
+    return names
 
 
 def apply_candidates(

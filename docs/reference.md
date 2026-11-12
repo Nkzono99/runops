@@ -200,7 +200,7 @@ scratch と archived は表示しません。
 | `stale-failed` | `tidy_failed_days`（既定 30）日より古い failed / cancelled で、why も note も無い | delete |
 | `old-completed` | `tidy_archive_days`（既定 90）日より古い completed | archive |
 | `orphan-job` | Slurm が知らない submitted / running | sync |
-| `unused-build` | 非 archived run が参照しない `.runops/build/*` | delete |
+| `unused-build` | 非 archived run と pinned run（archived を含む）が参照せず、simulator の現在の build でもない `.runops/build/*`。理由に参照する archived run の数を示す | delete |
 | `analysis-logs` | `tidy_failed_days` より古い解析 log。各 log directory・job 名の最新組は保持 | log のみ delete |
 
 日数は `runops.toml` の `[defaults]` で変えられます。`--older-than 14d` のように指定すると、
