@@ -37,16 +37,12 @@ def venv_site_packages(venv: Path) -> list[Path]:
     return sorted(p for p in lib.glob("python*/site-packages") if p.is_dir())
 
 
-def _entry_point(
-    name: str, project_root: Path | None
-) -> tuple[Any, md.Distribution | None, str] | None:
-    for ep in md.entry_points(group=ENTRY_POINT_GROUP):
-        if ep.name == name:
-            return ep, getattr(ep, "dist", None), ""
-    if project_root is None:
-        return None
-    # Metadata directory listings are cached by mtime; on filesystems with
-    # one-second mtime (Lustre) a package installed moments ago would be missed.
+def invalidate_metadata_caches() -> None:
+    """Forget cached site-packages listings before reading ``.venv`` metadata.
+
+    Metadata directory listings are cached by mtime; on filesystems with one-second
+    mtime (Lustre) a package installed or removed moments ago would be missed.
+    """
     importlib.invalidate_caches()
     # Python 3.10's importlib.invalidate_caches() does not reach the metadata
     # finder's FastPath cache; clear it explicitly.
@@ -55,6 +51,17 @@ def _entry_point(
         finder.invalidate_caches()
     except TypeError:  # 3.10 defines it without @classmethod
         finder.invalidate_caches(finder)
+
+
+def _entry_point(
+    name: str, project_root: Path | None
+) -> tuple[Any, md.Distribution | None, str] | None:
+    for ep in md.entry_points(group=ENTRY_POINT_GROUP):
+        if ep.name == name:
+            return ep, getattr(ep, "dist", None), ""
+    if project_root is None:
+        return None
+    invalidate_metadata_caches()
     for site in venv_site_packages(project_root / ".venv"):
         for dist in md.distributions(path=[str(site)]):
             for ep in dist.entry_points:

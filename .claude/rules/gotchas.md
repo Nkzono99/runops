@@ -9,7 +9,8 @@
 ## importlib.metadata のキャッシュ
 
 `.venv` の dist-info 一覧は directory の mtime でキャッシュされる。Lustre の mtime は秒単位のため、
-同じ秒に入れ替えた package を見落とす。`registry._entry_point` は探索前に
+同じ秒に入れ替えた package を見落とす。`.venv` の metadata を読む前（`registry._entry_point`、
+`runtime.venv_version`）に `registry.invalidate_metadata_caches()` で
 `importlib.invalidate_caches()` と `MetadataPathFinder.invalidate_caches()` を呼ぶ
 （Python 3.10 では前者だけでは metadata のキャッシュが消えない）。`.pth`（editable install）を効かせるため
 `sys.path.append` ではなく `site.addsitedir` を使う。

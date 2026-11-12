@@ -13,7 +13,7 @@ from packaging.requirements import InvalidRequirement, Requirement
 from packaging.utils import canonicalize_name
 
 from runops.adapters.base import RuntimeInfo, exe_str
-from runops.adapters.registry import optional, venv_site_packages
+from runops.adapters.registry import invalidate_metadata_caches, optional, venv_site_packages
 from runops.config import SimulatorConfig
 from runops.errors import RunError, UsageError
 from runops.project import Project
@@ -54,6 +54,7 @@ def requirement_name(spec: str) -> str:
 
 def venv_version(project: Project, name: str) -> str:
     """Version of distribution *name* in the project's ``.venv``; ``""`` if absent."""
+    invalidate_metadata_caches()
     for site in venv_site_packages(project.venv_dir):
         for dist in md.distributions(path=[str(site)], name=name):
             return dist.version
