@@ -375,6 +375,7 @@ walltime = "120:00:00"
 submitted_at = "2026-10-15T10:31:00+09:00"
 finished_at = ""
 last_slurm_state = "COMPLETED"
+pending_reason = ""               # 待機中の squeue の reason（QOSGrpCpuLimit など）。待機を離れたら消す
 attempt = 1                       # retry で +1
 exit_code = "0"                   # sacct の ExitCode、無ければ exit record の値
 
@@ -390,6 +391,7 @@ exit_code = 0                     # exit record から
 exe_hash = "sha256:..."           # submit 時点の executable の hash
 elapsed = "15:42:10"              # sacct の Elapsed、無ければ exit record の開始・終了から
 cancel_reason = ""                # cancel --why の理由。retry はこれがあれば確認を取る
+dependency = "afterok:12300"      # submit --dependency / --afterok で sbatch に渡した依存。無ければ書かない
 
 [params]
 "tmgrid.nx" = 4000
@@ -441,7 +443,10 @@ created ──submit──▶ submitted ──(slurm)──▶ running ──▶
   `detect_status()` を呼ぶ。Slurm が `COMPLETED` でも adapter が `failed` を返せば
   `failed` にする。Slurm が `FAILED` なら adapter の結果にかかわらず `failed`。
 - `sync` は対象 run の job id をまとめて 1 回の `squeue --jobs=...` で問い合わせ、そこに無い
-  job だけを 1 回の `sacct --jobs=...` で引く。`tidy` の `orphan-job` 判定も同じ。
+  job だけを 1 回の `sacct --jobs=...` で引く。squeue は `%i|%T|%r` で読み、reason は空白や `,` を
+  含み得るので最後の field として扱う。Slurm が待機中（runops の `submitted`）と返す job の reason
+  （`None` と空は除く）を `[job].pending_reason` に置き、待機中でなくなった `sync`、`cancel`、`retry`、
+  次の `submit` で消す。`tidy` の `orphan-job` 判定も同じ。
   scheduler への問い合わせ回数は run 数に依存しない。
   runops が対応づけていない Slurm 状態の job は状態を変えずに `last_slurm_state` だけ残し、
   他の run の更新は続ける。
@@ -501,7 +506,9 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
   `--json` は作成した run の同じ summary を返す。summary には `params`、`changed_keys`、
   `parent_run`、`exe_hash`、`input_hash` を含め、run 同士の比較に別 command を要らなくする。
   walltime の根拠として `walltime`、最新 attempt の `elapsed`、`walltime_used`（elapsed / walltime）、
-  `slurm_state`（`TIMEOUT` など）も含める。`list` / `status` の `--brief` は summary から
+  `slurm_state`（`TIMEOUT` など）も含める。待機の理由 `pending_reason` と最新 attempt の
+  `dependency` も含め（`--brief` と `context` の `active` にも残す）、表は `submitted (QOSGrpCpuLimit)`、
+  reason が `Dependency` で始まるときは `submitted (DependencyNeverSatisfied: afterok:123)` と示す。`list` / `status` の `--brief` は summary から
   `params`、`why`、`last_note` を外す（多数の run を横断して渡すとき用。表では note / why 列を省く）。
 - 表（`list`、`status`、`case list`、`sweep`、`tidy`）は、stdout が端末でなく `COLUMNS` も無いとき
   cell を切らずに自然な幅で出し、行末の空白を落とす（pipe や agent の shell で run id が欠けないように）。
@@ -532,7 +539,7 @@ adapter が `progress(run_dir)` を持つとき、`sync` は running の run と
 | `runo new CASE [--why TEXT] [--label L] [--set k=v]... [--job k=v]... [--tag T]... [--scratch] [--dest DIR] [--submit] [--created-by WHO] [--json]` | 単発 run を作る |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | 既存 run の params と `[job]` から派生 run を作る（§5）。置き場所の既定は元 run と同じ directory（元 run が archive / scratch なら `runs/<case>/`）。`--continue` は adapter が `extend_inputs()` を実装する場合のみ有効（§8.1） |
 | `runo sweep CASE --set k=v1,v2,... [--set ...] [--names KEY=n1,n2,...]... [--job k=v]... [--label L] [--dest DIR] [--why TEXT] [--apply] [--submit] [--limit N] [--json]` | 直積の候補を表示する。`--apply` で生成。`--submit` は `--apply` と同時のみ有効 |
-| `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否 |
+| `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID \| --dependency SPEC] [-y]` | job.sh を生成して sbatch。`created` 以外は拒否。`--dependency` は Slurm の依存指定（`afterany:123,afterok:456`、`?` 区切りは「いずれか」、`singleton`）をそのまま渡し、種類名と job id 以外の値は exit code 2。`--afterok J` は `--dependency afterok:J` と同じで、両方の指定は exit code 2。渡した値は attempt の `dependency` に残す |
 | `runo submit --all [DIR] [-y]` | DIR 配下の `created` run をすべて投入。件数と概算 core-hours を表示して確認 |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel して sync。`--why` は `cancelled: ...` の note として残す |
 | `runo retry RUN [--submit] [-y]` | `failed`/`cancelled` を `created` に戻す。直近の cancel に `--why` があれば理由を示して確認を取る |
@@ -1050,4 +1057,5 @@ v2 の文書は次の 4 ファイルだけにする。
 | 進捗と系列配置 2.5.0（2026-10-23） | adapter に任意の `progress()`、`sync` が時刻付き観測を保存し速度・残り時間を要約（§6.4）。`new --from` の既定置き場所を元 run と同じ directory に。agent context の `docs/` も展開 | 速度比較のために agent が時刻付き batch 観測を手で保存し、再開点や終了後の待ちを毎回補正していた（4 回）。継続世代が case 直下に並び、同じ計算の系列を見分けにくかった。skill が package の `docs/` を参照していたが展開されていなかった。進捗の解析は simulator 固有なので adapter が持ち、runops は保存と表示だけにする |
 | 横断の状態確認 2.7.0（2026-10-30） | `list` / `status` に `--brief`、`context` に全 active run の `active`、progress 要約に `last_change_at` と `stalled_hours`（§6.4、§7.1、§7.3） | hub で 4 project の active run を集めるのに `recent_runs` 5 件では足りず、全 `params` 付きの `list --json` は shell 引数長を超えた（3 回）。進捗が 6 時間止まった run を 49% と報告した。新しい command は足さず、既存の summary を小さくし、観測から止まりを出す |
 | FEEDBACK 棚卸し 2.4.0（2026-10-23） | `--job k=v` と `new --from` の `[job]` 継承、created の archive / restore、archived scratch を期限削除しない、展開 skill の references 参照の書き換えと `doctor` のリンク検査、adapter warning への版の併記、生成 AGENTS.md に解析環境の置き場所 | hub の FEEDBACK で、資源変更のための case 編集（3 回）、置換済み draft を archive できず helper で迂回（2 回）、保管目的の archive が期限削除される、skill から reference に辿れない、新版の正規キーが誤記に見える、解析依存の置き場所が project ごとに違う、が記録された。いずれも既存 command の拡張で、command 数は増やさない |
+| FEEDBACK 棚卸し 2.9.0（2026-11-12） | `case new --from` が `--simulator` を反映し有効な simulator を表示する。端末でない出力では表の cell を切らない。squeue の reason を `pending_reason`、投入時の依存を attempt の `dependency` に残して表と JSON に出し、`submit --dependency` で Slurm の依存指定を広げる | case を複製して改造 build を使うつもりが元の binary で走った（2 回）。pipe で run id が `R20261111…` と欠けた。`QOSGrpCpuLimit` や前段 job の失敗による `DependencyNeverSatisfied` で止まった run が、台帳では理由の無い submitted だった（複数 project で繰り返し）。前段の検査 job に `afterany` で結ぶ手段が無かった。command は増やさない |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

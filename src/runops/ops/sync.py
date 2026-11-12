@@ -65,6 +65,7 @@ def _settle(project: Project, manifest: Manifest, job: JobState | None) -> SyncR
         return SyncResult(manifest.id, before.value, before.value, "", "no job id")
     record = read_exit_record(manifest.run_dir, manifest.job_id)
     message = ""
+    _keep_pending_reason(manifest, job)
     if job is None:
         slurm_state = "UNKNOWN"
         if record is None:
@@ -123,6 +124,14 @@ def _settle(project: Project, manifest: Manifest, job: JobState | None) -> SyncR
     manifest.set_status(new_state)
     manifest.save()
     return SyncResult(manifest.id, before.value, new_state.value, slurm_state, message)
+
+
+def _keep_pending_reason(manifest: Manifest, job: JobState | None) -> None:
+    """Record why a queued job waits (squeue's reason); drop it once the job is not queued."""
+    if job is not None and job.state == RunState.SUBMITTED and job.reason:
+        manifest.job["pending_reason"] = job.reason
+    else:
+        manifest.job.pop("pending_reason", None)
 
 
 def _elapsed(job: JobState | None, record: dict[str, Any] | None) -> str:

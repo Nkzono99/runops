@@ -161,9 +161,83 @@ def test_squeue_unmapped_state_skips_sacct() -> None:
 
     def runner(cmd: list[str]) -> CommandResult:
         calls.append(cmd)
-        return CommandResult(0, "7 SOMETHING_NEW\n8 REQUEUE_HOLD\n", "")
+        return CommandResult(0, "7|SOMETHING_NEW|None\n8|REQUEUE_HOLD|JobHeldUser\n", "")
 
     states = query_many(["7", "8"], runner=runner)
     assert [c[0] for c in calls] == ["squeue"]
     assert states["7"] == JobState(None, "SOMETHING_NEW")
-    assert states["8"] == JobState(RunState.SUBMITTED, "REQUEUE_HOLD")
+    assert states["8"] == JobState(RunState.SUBMITTED, "REQUEUE_HOLD", reason="JobHeldUser")
+
+
+def test_squeue_reason_keeps_spaces_and_commas() -> None:
+    def runner(cmd: list[str]) -> CommandResult:
+        assert "--format=%i|%T|%r" in cmd
+        return CommandResult(
+            0, "7|PENDING|ReqNodeNotAvail, UnavailableNodes:n[1-2]\n8|RUNNING|None\n", ""
+        )
+
+    states = query_many(["7", "8"], runner=runner)
+    assert states["7"] == JobState(
+        RunState.SUBMITTED, "PENDING", reason="ReqNodeNotAvail, UnavailableNodes:n[1-2]"
+    )
+    assert states["8"] == JobState(RunState.RUNNING, "RUNNING")
+
+
+def test_sync_keeps_the_pending_reason_while_queued(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (run_id,) = cli("new", "demo", "--submit").run_ids()
+    job = _manifest(project_dir, run_id).job_id
+    fake_slurm.reasons[job] = "QOSGrpCpuLimit"
+    cli("sync")
+    assert _manifest(project_dir, run_id).job["pending_reason"] == "QOSGrpCpuLimit"
+    assert "submitted (QOSGrpCpuLimit)" in cli("status").out
+    assert "submitted (QOSGrpCpuLimit)" in cli("list").out
+    [row] = json.loads(cli("list", "--brief", "--json").out)
+    assert row["pending_reason"] == "QOSGrpCpuLimit" and row["dependency"] == ""
+    [active] = json.loads(cli("context", "--json").out)["active"]
+    assert active["pending_reason"] == "QOSGrpCpuLimit"
+
+    fake_slurm.reasons[job] = "None"  # Slurm's word for no reason
+    cli("sync")
+    assert "pending_reason" not in _manifest(project_dir, run_id).job
+    fake_slurm.reasons[job] = "Priority"
+    cli("sync")
+    fake_slurm.states[job] = "RUNNING"
+    cli("sync")
+    m = _manifest(project_dir, run_id)
+    assert m.status.value == "running" and "pending_reason" not in m.job
+
+
+def test_submit_dependency_is_passed_recorded_and_shown(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (first,) = cli("new", "demo").run_ids()
+    (second,) = cli("new", "demo").run_ids()
+    (third,) = cli("new", "demo").run_ids()
+    res = cli("submit", first, "--dependency", "afterany:123,afterok:456_7")
+    assert res.code == 0, res.err
+    assert "--dependency=afterany:123,afterok:456_7" in fake_slurm.commands[-1]
+    m = _manifest(project_dir, first)
+    assert m.job["attempts"][-1]["dependency"] == "afterany:123,afterok:456_7"
+    assert "dependency" not in m.job  # recorded per attempt, not as a job setting
+    assert "--dependency" not in (m.run_dir / "submit/job.sh").read_text()
+    [status] = json.loads(cli("status", first, "--json").out)
+    assert status["dependency"] == "afterany:123,afterok:456_7"
+    fake_slurm.reasons[m.job_id] = "DependencyNeverSatisfied"
+    cli("sync")
+    assert "submitted (DependencyNeverSatisfied: afterany:123,afterok:456_7)" in cli("list").out
+
+    assert cli("submit", second, "--afterok", "99").code == 0
+    assert "--dependency=afterok:99" in fake_slurm.commands[-1]
+    assert _manifest(project_dir, second).dependency == "afterok:99"
+
+    sbatches = len([c for c in fake_slurm.commands if c[0] == "sbatch"])
+    for bad in (
+        ["--dependency", "afterok:1 --wrap=x"],
+        ["--dependency", "afterok:1,afterany:2?afterok:3"],
+        ["--dependency", "before:1"],
+        ["--dependency", "afterok"],
+        ["--afterok", "1", "--dependency", "afterany:2"],
+    ):
+        res = cli("submit", third, *bad)
+        assert res.code == 2, bad
+    assert len([c for c in fake_slurm.commands if c[0] == "sbatch"]) == sbatches
+    assert cli("submit", third, "--dependency", "singleton").code == 0
+    assert cli("submit", "--help").code == 0

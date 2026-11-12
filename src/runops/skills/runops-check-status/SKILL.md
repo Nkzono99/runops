@@ -16,6 +16,8 @@ description: Check the progress or result of runops runs (sync, list, log, retry
    while Slurm still says RUNNING: check `runo log RUN` and the output mtimes before
    deciding to cancel. For all active runs at once use `runo context --json` (`active`)
    or `runo list --status running --status submitted --brief --json`.
+   A queued run shows why it waits, e.g. `submitted (QOSGrpCpuLimit)`; with
+   `(DependencyNeverSatisfied: afterok:123)` the job it waits for failed, so check that job.
    `runo log RUN` and `runo log RUN --err` show the
    tail of the latest job's stdout / stderr (`-n 200` for more, `-f` to follow).
 4. For a failed run, read the stderr log and the adapter summary

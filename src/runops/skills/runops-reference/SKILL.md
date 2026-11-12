@@ -16,7 +16,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run; `--job` sets this run's `[job]` values |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | derive a run with the source's params and `[job]` |
 | `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--job k=v]... [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |
-| `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID] [-y]` | sbatch created runs |
+| `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID \| --dependency SPEC] [-y]` | sbatch created runs; `--dependency afterany:123,afterok:456` is recorded on the attempt |
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel; `--why` is noted and `retry` asks before reviving |
 | `runo retry RUN [--submit] [-y]` | failed/cancelled -> created |
@@ -48,6 +48,6 @@ Group analysis lives in `runs/<group>/_analysis/<topic>/`; project analysis in
 
 `[run]` id, label, status, why, scratch, expires_at, pinned, tags, superseded_by, `[[notes]]`;
 `[origin]` case, sweep, parent_run; `[simulator]` executable and provenance;
-`[job]` resources, job_id, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason, progress); `[params]` final values;
+`[job]` resources, job_id, pending_reason, `[[job.attempts]]` (job_id, exit_code, elapsed, cancel_reason, dependency, progress); `[params]` final values;
 `[variation].changed_keys`, `job_changed_keys`. Status: created -> submitted -> running ->
 completed | failed | cancelled; terminal runs can be archived.

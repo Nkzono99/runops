@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -61,6 +62,7 @@ _RUNTIME_JOB_KEYS = {
     "finished_at",
     "last_slurm_state",
     "exit_code",
+    "pending_reason",
 }
 
 
@@ -77,7 +79,34 @@ def estimate_core_hours(project: Project, manifests: list[Manifest]) -> float:
 class SubmitOptions:
     partition: str = ""
     qos: str = ""
-    afterok: str = ""
+    dependency: str = ""  # Slurm --dependency value, checked by dependency_spec()
+
+
+_DEPENDENCY_TYPES = ("after", "afterany", "afterburstbuffer", "aftercorr", "afternotok", "afterok")
+_DEPENDENCY_ITEM = re.compile(rf"(?:{'|'.join(_DEPENDENCY_TYPES)})(?::\d+(?:_\d+)?)+|singleton")
+
+
+def dependency_spec(afterok: str = "", dependency: str = "") -> str:
+    """The ``--dependency`` value for sbatch from ``--afterok`` or ``--dependency``.
+
+    Only dependency types with job ids are accepted (``afterany:123,afterok:456``, or
+    ``?`` between items for "any of"), so the value is a dependency and nothing else.
+    """
+    if afterok and dependency:
+        raise UsageError(
+            "give --afterok or --dependency, not both "
+            f"(--dependency afterok:{afterok},... combines them)"
+        )
+    value = f"afterok:{afterok.strip()}" if afterok else dependency.strip()
+    if not value:
+        return ""
+    items = re.split(r"[,?]", value)
+    if ("," in value and "?" in value) or not all(_DEPENDENCY_ITEM.fullmatch(i) for i in items):
+        raise UsageError(
+            f"invalid dependency {value!r}: use TYPE:JOBID[:JOBID...] items joined by ',' "
+            f"(all) or '?' (any), with TYPE in {', '.join(_DEPENDENCY_TYPES)}, or singleton"
+        )
+    return value
 
 
 def submit_run(
@@ -116,7 +145,7 @@ def _submit_locked(
         manifest.job["qos"] = options.qos
     manifest.save()
     job_sh = write_job_for(project, manifest)
-    extra = [f"--dependency=afterok:{options.afterok}"] if options.afterok else []
+    extra = [f"--dependency={options.dependency}"] if options.dependency else []
     work = manifest.run_dir.resolve() / "work"
     work.mkdir(exist_ok=True)
     log_path = manifest.run_dir / "submit" / "sbatch.log"
@@ -138,6 +167,7 @@ def _submit_locked(
         }
     )
     manifest.job.pop("exit_code", None)
+    manifest.job.pop("pending_reason", None)
     attempts = manifest.job.setdefault("attempts", [])
     entry: dict[str, Any] = {
         "attempt": attempt,
@@ -147,6 +177,8 @@ def _submit_locked(
         "finished_at": "",
         "slurm_state": "PENDING",
     }
+    if options.dependency:
+        entry["dependency"] = options.dependency  # what the job waits for, as given to sbatch
     exe_hash = _current_exe_hash(manifest)
     if exe_hash:
         entry["exe_hash"] = exe_hash
@@ -188,6 +220,7 @@ def cancel_run(
         now = now_iso()
         manifest.job["finished_at"] = now
         manifest.job["last_slurm_state"] = "CANCELLED"
+        manifest.job.pop("pending_reason", None)
         attempts = manifest.job.get("attempts") or []
         if attempts:
             attempts[-1]["finished_at"] = now
@@ -219,6 +252,7 @@ def retry_run(project: Project, manifest: Manifest) -> None:
         manifest.set_status(RunState.CREATED)
         manifest.job["job_id"] = ""
         manifest.job["finished_at"] = ""
+        manifest.job.pop("pending_reason", None)
         manifest.save()
 
 

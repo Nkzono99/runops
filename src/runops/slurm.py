@@ -69,6 +69,7 @@ class JobState:
     slurm_state: str
     exit_code: str = ""
     elapsed: str = ""  # sacct Elapsed; empty for squeue rows
+    reason: str = ""  # squeue %r while queued (e.g. QOSGrpCpuLimit); "" if none
 
 
 def map_state(raw: str) -> RunState | None:
@@ -115,12 +116,17 @@ def query_many(job_ids: list[str], *, runner: CommandRunner) -> dict[str, JobSta
     states: dict[str, JobState | None] = dict.fromkeys(ids)
     if not ids:
         return states
-    result = runner(["squeue", f"--jobs={','.join(ids)}", "--noheader", "--format=%i %T"])
+    # The reason is last and may hold spaces or commas ("ReqNodeNotAvail, ..."), so the
+    # fields are split on "|" at most twice.
+    result = runner(["squeue", f"--jobs={','.join(ids)}", "--noheader", "--format=%i|%T|%r"])
     if result.returncode == 0:
         for line in result.stdout.splitlines():
-            parts = line.split()
-            if len(parts) >= 2 and parts[0] in states:
-                states[parts[0]] = JobState(map_state(parts[1]), parts[1].rstrip("+"))
+            parts = [p.strip() for p in line.split("|", 2)]
+            if len(parts) >= 2 and parts[0] in states and parts[1]:
+                reason = parts[2] if len(parts) > 2 and parts[2] != "None" else ""
+                states[parts[0]] = JobState(
+                    map_state(parts[1]), parts[1].split()[0].rstrip("+"), reason=reason
+                )
     pending = [j for j in ids if states[j] is None]
     if not pending:
         return states

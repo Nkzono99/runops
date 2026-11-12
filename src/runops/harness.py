@@ -17,7 +17,7 @@ COMMANDS = """\
 | `runo new CASE --why TEXT [--set k=v]... [--job k=v]... [--scratch] [--submit]` | create one run |
 | `runo new --from RUN --why TEXT [--set k=v]... [--job k=v]... [--continue]` | derive a run (keeps its params and [job]) |
 | `runo sweep CASE --set k=v1,v2 [--names k=n1,n2] [--apply] [--submit]` | preview / create a parameter product |
-| `runo submit RUN... [--partition P]` / `runo submit --all DIR` | sbatch created runs |
+| `runo submit RUN... [--partition P] [--dependency afterok:JOBID]` / `runo submit --all DIR` | sbatch created runs |
 | `runo sync` / `runo status RUN` / `runo log RUN [--err]` | refresh state from Slurm / show / read logs |
 | `runo list [--all] [--case C] [--status S] [--brief] [--json]` | recent + active runs (old, scratch, archived hidden); `--brief` drops params/why/notes |
 | `runo cancel RUN [--why T]` / `runo retry RUN` | stop a job / reset failed or cancelled to created |

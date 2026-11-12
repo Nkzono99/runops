@@ -138,6 +138,9 @@ adapter が進捗に対応していれば（BEACH の batch、MPIEMSES3D の ste
 速度、残り時間を出します。resume した run は再開点から数え、終わった run は終了時刻までで速度を出すので、
 版を切り替えた前後の比較にそのまま使えます（`--json` の `progress`）。`sync` を重ねても進みが 1 時間以上
 変わらない run には `stalled 6.7h` が付くので、Slurm では RUNNING でも止まっている run を見分けられます。
+待機中の run は Slurm が示す理由付きで `submitted (QOSGrpCpuLimit)` のように表示されます。
+前段の job に依存させた run が `submitted (DependencyNeverSatisfied: afterok:123)` なら、前段の job が
+失敗して、この run は始まりません。
 全 project を横断して見るときは `runo context --json` の `active`（全 active run）か `runo list --brief --json`
 （`params` や note を省いた小さい JSON）を使います。
 
@@ -195,7 +198,9 @@ project の run だけが対象です。同じアカウントの別 project の�
 （現在は MPIEMSES3D が対応し、`SNAPSHOT1` から再開します）。新しい run は元の run を `parent_run` として記録します。
 
 前の job が終わるのを待って投入したいときは、「R20261016-0005 が成功したら投げて」と頼めば
-`runo submit RUN --afterok <job_id>` になります。
+`runo submit RUN --afterok <job_id>` になります。成否にかかわらず終わったら始めるなら
+`--dependency afterany:<job_id>`、複数の条件なら `--dependency afterok:123,afterany:456` です。
+依存先は attempt の記録に残り、`runo status` で読めます。
 
 ## 6. 解析して記録を残す
 

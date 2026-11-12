@@ -12,6 +12,7 @@ from typing import Any, Optional
 
 import typer
 from rich.console import Console
+from rich.markup import escape
 from rich.table import Table
 
 from runops import __version__, slurm
@@ -284,8 +285,9 @@ def context(as_json: bool = typer.Option(False, "--json")) -> None:
         out.print("active:")
         for run in data["active"]:
             out.print(
-                f"  {run['id']} {run['status']:9} {run['case']} {run['label']}  "
-                f"{format_progress(run['progress'])}"
+                f"  {run['id']} {run['status']:9}{_waiting(run)} {run['case']} {run['label']}  "
+                f"{format_progress(run['progress'])}",
+                markup=False,
             )
     out.print("recent:")
     for run in data["recent_runs"]:
@@ -552,11 +554,22 @@ def submit_cmd(
     partition: str = typer.Option("", "--partition", "-p"),
     qos: str = typer.Option("", "--qos"),
     afterok: str = typer.Option("", "--afterok", help="Start after this job id succeeds."),
+    dependency: str = typer.Option(
+        "",
+        "--dependency",
+        help="Slurm dependency, e.g. afterany:123,afterok:456 (recorded on the attempt).",
+    ),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
     """Generate job.sh and sbatch created runs."""
-    from runops.ops.submit import SubmitOptions, estimate_core_hours, submit_run
+    from runops.ops.submit import (
+        SubmitOptions,
+        dependency_spec,
+        estimate_core_hours,
+        submit_run,
+    )
 
+    depends = dependency_spec(afterok, dependency)
     project = _project()
     if all_runs:
         if runs and len(runs) > 1:
@@ -579,7 +592,7 @@ def submit_cmd(
         if len(targets) > 1:
             hours = estimate_core_hours(project, targets)
             _confirm(f"Submit {len(targets)} runs (~{hours:.1f} core-hours)?", yes)
-    options = SubmitOptions(partition=partition, qos=qos, afterok=afterok)
+    options = SubmitOptions(partition=partition, qos=qos, dependency=depends)
     failures = 0
     warnings: list[str] = []
     for m in targets:
@@ -634,6 +647,16 @@ def retry(
         _submit_each(project, [m])
 
 
+def _waiting(summary: dict[str, Any]) -> str:
+    """`` (QOSGrpCpuLimit)`` for a queued run; a Dependency reason also names the dependency."""
+    reason = summary.get("pending_reason", "")
+    if summary["status"] != "submitted" or not reason:
+        return ""
+    if reason.startswith("Dependency") and summary.get("dependency"):
+        reason += f": {summary['dependency']}"
+    return f" ({reason})"
+
+
 def _status_table(project: Project, manifests: list[Manifest], *, brief: bool = False) -> Table:
     from runops.ops.listing import relative_age
     from runops.ops.progress import format_progress
@@ -654,6 +677,7 @@ def _status_table(project: Project, manifests: list[Manifest], *, brief: bool = 
         status = f"[{color}]{s['status']}[/]" if color else s["status"]
         if s["status"] == "failed" and s["slurm_state"] not in ("", "FAILED", "UNKNOWN"):
             status += f" ({s['slurm_state']})"  # e.g. TIMEOUT, OUT_OF_MEMORY
+        status += escape(_waiting(s))
         elapsed = s["elapsed"]
         if elapsed and s["walltime_used"] is not None:
             elapsed += f" ({s['walltime_used']:.0%})"

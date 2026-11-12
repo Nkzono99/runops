@@ -222,6 +222,9 @@ class Manifest:
             "superseded_by": self.superseded_by,
             "exe_hash": str(self.section("simulator").get("exe_hash", "")),
             "input_hash": str(self.section("identity").get("input_hash", "")),
+            # Why a queued job waits (squeue) and what its latest attempt depends on.
+            "pending_reason": str(self.job.get("pending_reason", "")),
+            "dependency": self.dependency,
             # Walltime evidence for the next run: elapsed of the latest attempt.
             **self.timing(),
             "progress": self.progress,
@@ -230,6 +233,12 @@ class Manifest:
             for key in ("params", "why", "last_note"):
                 del summary[key]
         return summary
+
+    @property
+    def dependency(self) -> str:
+        """The Slurm dependency the latest attempt was submitted with (``""`` if none)."""
+        attempts = self.job.get("attempts") or []
+        return str(attempts[-1].get("dependency", "")) if attempts else ""
 
     @property
     def progress(self) -> dict[str, Any] | None:
