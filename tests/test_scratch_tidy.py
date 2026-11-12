@@ -147,3 +147,21 @@ def test_label_max_length_from_config(project_dir: Path, cli) -> None:  # type: 
     (run_id,) = cli("new", "demo", "--set", "a_long_parameter_name=123456").run_ids()
     label = Project.open(project_dir).resolve_run(run_id).label
     assert label == "a_long_par"
+
+
+def test_list_shows_active_scratch_runs(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    (queued,) = cli("new", "demo", "--scratch", "--submit").run_ids()
+    (running,) = cli("new", "demo", "--scratch", "--submit").run_ids()
+    (idle,) = cli("new", "demo", "--scratch").run_ids()
+    (done,) = cli("new", "demo", "--scratch", "--submit").run_ids()
+    fake_slurm.states[Project.open(project_dir).resolve_run(running).job_id] = "RUNNING"
+    fake_slurm.states[Project.open(project_dir).resolve_run(done).job_id] = "COMPLETED"
+    cli("sync")
+
+    def ids(*args: str) -> set[str]:
+        return {r["id"] for r in json.loads(cli("list", *args, "--json").out)}
+
+    assert ids() == {queued, running}  # created and finished scratch runs stay hidden
+    assert ids("--status", "submitted", "--status", "running") == {queued, running}
+    assert ids("--scratch") == {queued, running, idle, done}
+    assert "(scratch)" in cli("list").out

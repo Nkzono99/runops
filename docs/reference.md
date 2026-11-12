@@ -186,7 +186,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo migrate-v1 [--dry-run] [--apply-delete-test-runs] [-y]` | v1 project の変換 |
 
 `list` は既定で active、created、直近 `list_since_days` 日、pinned の run を表示し、
-scratch と archived は表示しません。
+archived と scratch は表示しません。ただし submitted / running の scratch run は表示します（`--status` で絞ったときも）。
 
 `archive DIR` が group 配下の全 run を移すときは、group の `_analysis/` も同じ相対 path で
 移動します。run が残る group の解析は残し、移動先が存在すれば全 run の移動前に拒否します。

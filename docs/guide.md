@@ -89,7 +89,7 @@ run id、入力、sweep の帰属、ノートはそのままで、移動元は�
 エージェントは次の順に進めます。
 
 1. `runo new flat --scratch --set ... --why "smoke"` で scratch run を作って投入する。
-   scratch run は `runs/_scratch/` に置かれ、既定の `runo list` には出ません。
+   scratch run は `runs/_scratch/` に置かれ、投入中・実行中のあいだだけ既定の `runo list` に出ます。
    `scratch_ttl_days`（既定 7 日）を過ぎると `runo tidy` の削除候補になります。
 2. `runo sync` と `runo log RUN --err` で、起動直後に落ちていないか確かめる。
 3. `runo sweep flat --set plasma.wc=0,0.147,0.294 --why "..."` で候補を表示する。

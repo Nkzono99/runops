@@ -14,8 +14,8 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
    - a product of values: `runo sweep CASE --set a=1,2 --set b=x,y --why "..."`
      shows the points and core-hours without creating anything; add `--apply` to create.
 3. Always write `--why`: the question this run answers, in one sentence.
-4. Smoke and debug runs use `--scratch`. They are hidden from `runo list` and
-   `runo tidy` deletes them after they expire.
+4. Smoke and debug runs use `--scratch`. `runo list` shows them while queued or
+   running, and `runo tidy` deletes them after they expire.
 5. Create a new case (`runo case new NAME --from CASE`) only when the structure of the
    base input file changes, not for a different value.
 6. Resources belong to the run: `--job walltime=72:00:00 --job processes=256` on `new` or

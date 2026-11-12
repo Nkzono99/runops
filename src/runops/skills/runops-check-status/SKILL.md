@@ -7,8 +7,8 @@ description: Check the progress or result of runops runs (sync, list, log, retry
 
 1. `runo sync` refreshes every submitted/running run from squeue/sacct.
 2. `runo list` shows active and recent runs. `--all`, `--case C`, `--status failed`
-   and `--json` narrow or widen the view. Scratch and archived runs are hidden unless
-   `--scratch` / `--archived` is given.
+   and `--json` narrow or widen the view. Archived runs, and scratch runs that are not
+   queued or running, are hidden unless `--archived` / `--scratch` is given.
 3. `runo status RUN` shows one run, with progress, recent speed and time left when the
    adapter reports progress (`--json` → `progress`; counted from the resume point, ending
    at the finish); a resumed run reads `74% (38% of this job)`, the total and then this

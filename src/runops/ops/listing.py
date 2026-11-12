@@ -44,17 +44,14 @@ def select_runs(project: Project, flt: ListFilter, now: datetime | None = None) 
         explicit_status = RunState.ARCHIVED.value in flt.statuses
         if archived and not (flt.archived or explicit_status):
             continue
-        if manifest.scratch and not archived and not flt.scratch:
+        # A scratch run in the queue or running is current work, so it is shown anyway.
+        active = manifest.status in ACTIVE_STATES
+        if manifest.scratch and not archived and not active and not flt.scratch:
             continue
         if not (flt.show_all or archived or manifest.scratch or flt.statuses):
             created = manifest.created_datetime()
             recent = created is not None and now - created <= since
-            if not (
-                manifest.status in ACTIVE_STATES
-                or manifest.status == RunState.CREATED
-                or recent
-                or manifest.pinned
-            ):
+            if not (active or manifest.status == RunState.CREATED or recent or manifest.pinned):
                 continue
         selected.append(manifest)
     selected.sort(key=lambda m: m.created_at, reverse=True)
