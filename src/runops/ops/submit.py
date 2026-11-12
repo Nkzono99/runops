@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,7 @@ from typing import Any
 from runops.adapters.base import exe_str
 from runops.adapters.registry import optional
 from runops.case import core_hours
-from runops.errors import RunError, UsageError
+from runops.errors import RunError, RunopsError, SlurmTimeoutError, UsageError
 from runops.jobgen import render_job_script, write_job_script
 from runops.manifest import ACTIVE_STATES, Manifest, RunState
 from runops.ops.common import SimContext, run_sim_context
@@ -151,6 +152,14 @@ def _submit_locked(
     log_path = manifest.run_dir / "submit" / "sbatch.log"
     try:
         job_id, result = sbatch(job_sh, work, extra=extra, runner=runner)
+    except SlurmTimeoutError as exc:
+        # Slurm may have queued the job without answering; a blind resubmit could double it.
+        _append(log_path, f"[{now_iso()}] UNKNOWN: {exc}; Slurm may have accepted the job\n")
+        name = str(manifest.job.get("job_name") or manifest.id)
+        raise SlurmTimeoutError(
+            f"{manifest.id}: {exc}; acceptance unknown (the run stays created). Before "
+            f"submitting it again, check squeue (or sacct) for a job named {name}"
+        ) from None
     except RunError as exc:
         _append(log_path, f"[{now_iso()}] FAILED: {exc}\n")
         raise RunError(f"{manifest.id}: {exc}") from None
@@ -192,6 +201,48 @@ def _submit_locked(
     manifest.set_status(RunState.SUBMITTED)
     manifest.save()
     return job_id
+
+
+@dataclass
+class SubmitResult:
+    """One run of a multi-run submit (``submit --json``)."""
+
+    id: str
+    job_id: str = ""
+    result: str = "submitted"  # submitted | not_submitted | unknown (sbatch timed out)
+    status: str = ""  # the run's status afterwards
+    error: str = ""
+
+
+def submit_runs(
+    project: Project,
+    manifests: list[Manifest],
+    options: SubmitOptions | None = None,
+    *,
+    runner: CommandRunner = default_runner,
+    warnings: list[str] | None = None,
+    on_result: Callable[[SubmitResult], None] | None = None,
+) -> list[SubmitResult]:
+    """Submit each run in turn; a failure is recorded and the next run still goes."""
+    results: list[SubmitResult] = []
+    for manifest in manifests:
+        try:
+            job_id = submit_run(project, manifest, options, runner=runner, warnings=warnings)
+            result = SubmitResult(manifest.id, job_id, status=manifest.status.value)
+        except RunopsError as exc:
+            outcome = "unknown" if isinstance(exc, SlurmTimeoutError) else "not_submitted"
+            result = SubmitResult(manifest.id, "", outcome, _status_of(manifest), str(exc))
+        results.append(result)
+        if on_result is not None:
+            on_result(result)
+    return results
+
+
+def _status_of(manifest: Manifest) -> str:
+    try:
+        return manifest.status.value
+    except UsageError:
+        return ""
 
 
 def _current_exe_hash(manifest: Manifest) -> str:

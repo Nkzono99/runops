@@ -16,7 +16,7 @@ description: Full runops (runo) command reference, project layout and manifest f
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | create a run; `--job` sets this run's `[job]` values |
 | `runo new --from RUN [--why] [--set k=v]... [--job k=v]... [--job-from-case] [--continue] [--submit]` | derive a run with the source's params and `[job]` |
 | `runo sweep CASE --set k=v1,v2... [--names k=n1,n2...] [--job k=v]... [--label L] [--dest DIR] [--why] [--apply] [--submit] [--limit N] [--json]` | product of values; `--names` gives each value a short run label |
-| `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID \| --dependency SPEC] [-y]` | sbatch created runs; `--dependency afterany:123,afterok:456` is recorded on the attempt |
+| `runo submit RUN... [--partition P] [--qos Q] [--afterok JOBID \| --dependency SPEC] [--json] [-y]` | sbatch created runs, going on past failures (summary of runs still created); `--dependency afterany:123,afterok:456` is recorded on the attempt |
 | `runo submit --all [DIR] [-y]` | sbatch every created run under DIR |
 | `runo cancel RUN... [--why TEXT] [-y]` | scancel; `--why` is noted and `retry` asks before reviving |
 | `runo retry RUN [--submit] [-y]` | failed/cancelled -> created |

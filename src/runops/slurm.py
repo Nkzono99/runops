@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import NamedTuple
 
-from runops.errors import RunError
+from runops.errors import RunError, SlurmTimeoutError
 from runops.manifest import RunState
 
 
@@ -28,7 +28,7 @@ def default_runner(cmd: list[str]) -> CommandResult:
     except FileNotFoundError:
         raise RunError(f"{cmd[0]} not found; is Slurm available on this host?") from None
     except subprocess.TimeoutExpired:
-        raise RunError(f"{cmd[0]} timed out after 120 s") from None
+        raise SlurmTimeoutError(f"{cmd[0]} timed out after 120 s") from None
     return CommandResult(proc.returncode, proc.stdout, proc.stderr)
 
 

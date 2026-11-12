@@ -231,3 +231,76 @@ def test_cancel_why_guards_retry(project_dir: Path, cli, fake_slurm) -> None:  #
     assert cli("submit", run_id).code == 0
     assert cli("cancel", run_id, "-y").code == 0
     assert cli("retry", run_id).code == 0
+
+
+def test_submit_goes_on_past_a_failure_and_summarizes(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    ids = [cli("new", "demo").run_ids()[0] for _ in range(3)]
+    fake_slurm.fail_on = {2}
+    res = cli("submit", *ids, "-y")
+    assert res.code == 1
+    assert f"submitted {ids[0]} as job" in res.out and f"submitted {ids[2]} as job" in res.out
+    assert "invalid partition" in res.err
+    assert f"submitted 2; not submitted 1 (still created): {ids[1]}" in res.err
+    assert [_manifest(project_dir, i).status.value for i in ids] == [
+        "submitted",
+        "created",
+        "submitted",
+    ]
+    # Resubmitting the same list sends only the run that is still created.
+    res = cli("submit", *ids, "-y")
+    assert res.code == 1
+    assert f"submitted {ids[1]} as job" in res.out
+    assert (
+        f"submitted 1; refused 2 (not created): {ids[0]} (submitted), {ids[2]} (submitted)"
+        in res.err
+    )
+    assert fake_slurm.sbatch_calls == 4
+
+
+def test_submit_json_and_an_unanswered_sbatch(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    ids = [cli("new", "demo").run_ids()[0] for _ in range(2)]
+    fake_slurm.timeout_on = {2}
+    res = cli("submit", *ids, "-y", "--json")
+    assert res.code == 1
+    first, second = json.loads(res.out)  # stdout holds only the JSON
+    assert first == {
+        "id": ids[0],
+        "job_id": fake_slurm.last_job,
+        "result": "submitted",
+        "status": "submitted",
+        "error": "",
+    }
+    assert second["result"] == "unknown" and second["status"] == "created"
+    assert "acceptance unknown" in second["error"] and "squeue" in second["error"]
+    assert f"acceptance unknown 1 (check squeue before resubmitting): {ids[1]}" in res.err
+    log = (_manifest(project_dir, ids[1]).run_dir / "submit/sbatch.log").read_text()
+    assert "UNKNOWN" in log
+    assert json.loads(cli("submit", "--all", "-y", "--json").out)[0]["result"] == "submitted"
+    assert json.loads(cli("submit", "--all", "-y", "--json").out) == []
+
+
+def test_new_and_sweep_submit_go_on_past_a_failure(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+    fake_slurm.fail_on = {2}
+    res = cli("sweep", "demo", "--set", "x=1,2,3", "--apply", "--submit", "-y")
+    assert res.code == 1
+    ids = res.run_ids()
+    assert len(ids) == 3
+    assert [_manifest(project_dir, i).status.value for i in ids] == [
+        "submitted",
+        "created",
+        "submitted",
+    ]
+    assert f"submitted 2; not submitted 1 (still created): {ids[1]}" in res.err
+
+    fake_slurm.fail_on = {4}
+    res = cli("new", "demo", "--submit", "--json")
+    assert res.code == 1
+    [row] = json.loads(res.out)
+    assert row["status"] == "created" and "not submitted 1 (still created)" in res.err
+
+    fake_slurm.fail_on = {5}
+    m = _manifest(project_dir, ids[0])
+    fake_slurm.states[m.job_id] = "FAILED"
+    cli("sync")
+    res = cli("retry", ids[0], "--submit")
+    assert res.code == 1 and f"not submitted 1 (still created): {ids[0]}" in res.err

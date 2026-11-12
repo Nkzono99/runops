@@ -21,7 +21,9 @@ description: Create simulation runs with runops (runo new / new --from / sweep).
 6. Resources belong to the run: `--job walltime=72:00:00 --job processes=256` on `new` or
    `sweep`. Change the case's `[job]` only for future runs, after confirmation.
 7. Before submitting, show the run ids, partition, resources and core-hours and get
-   confirmation. Then `runo submit RUN...` or create with `--submit`.
+   confirmation. Then `runo submit RUN...` or create with `--submit`. If only some are
+   accepted, resubmit just the runs the summary lists as still created with
+   `runo submit <id...>`; accepted runs are no longer created, so they are refused.
 8. When the new runs replace an old series (a bug or wrong input in the old one), ask
    whether the old series is still needed. Deriving with `--from` alone does not make
    the source obsolete. If it is not needed (finished runs, or created drafts):

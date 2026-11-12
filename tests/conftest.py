@@ -10,6 +10,7 @@ import pytest
 
 from runops import slurm
 from runops.cli import main
+from runops.errors import SlurmTimeoutError
 from runops.ops.setup import init_project
 from runops.project import Project
 from runops.slurm import CommandResult
@@ -42,12 +43,18 @@ class FakeSlurm:
     reasons: dict[str, str] = field(default_factory=dict)  # job id -> squeue %r
     commands: list[list[str]] = field(default_factory=list)
     fail_sbatch: bool = False
+    fail_on: set[int] = field(default_factory=set)  # sbatch call numbers (1-based) that fail
+    timeout_on: set[int] = field(default_factory=set)  # ... that time out (no answer)
+    sbatch_calls: int = 0
 
     def __call__(self, cmd: list[str]) -> CommandResult:
         self.commands.append(cmd)
         tool = cmd[0]
         if tool == "sbatch":
-            if self.fail_sbatch:
+            self.sbatch_calls += 1
+            if self.sbatch_calls in self.timeout_on:
+                raise SlurmTimeoutError("sbatch timed out after 120 s")
+            if self.fail_sbatch or self.sbatch_calls in self.fail_on:
                 return CommandResult(1, "", "sbatch: error: invalid partition")
             self.next_id += 1
             job = str(self.next_id)

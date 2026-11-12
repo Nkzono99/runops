@@ -134,6 +134,11 @@ program を起動せずに終わり、`stage = "setup"` と exit code を記録�
 入力は file 名だけを示します。`--set` した key と、adapter が `--continue` のために書いた key は
 並べません。どれも作成や投入は拒否しません。
 
+一括投入で一部の run が受理されなかったときは、`submitted 2; not submitted 1 (still created): R…` の
+要約が出ます。created のままの run だけを `runo submit` し直せば足ります（受理済みの run は created でないので
+拒否されます）。sbatch が 120 秒応答しなかった run は `unknown`（受理不明）で、Slurm が受け付けている
+ことがあるので、squeue で job 名（既定は run id）を確かめてから投入し直します。
+
 `submit`、`cancel`、`retry`、`sync` は lock の中で manifest を読み直してから更新します。
 同じ run を 2 回指定しても、複数のエージェントが同時に投入しても sbatch は 1 回です。
 run id は削除後も再利用しません。`--dest` に既存 run の中は指定できません。
@@ -166,7 +171,7 @@ run id は削除後も再利用しません。`--dest` に既存 run の中は�
 | `runo new CASE [--why] [--label] [--set k=v]... [--job k=v]... [--tag] [--scratch] [--dest DIR] [--submit] [--json]` | run を 1 つ作る。`--job` はこの run の `[job]` の値 |
 | `runo new --from RUN [--set k=v]... [--job k=v]... [--job-from-case] [--continue]` | 既存 run の params と `[job]` から派生（`--job-from-case` で `[job]` は case から）。置き場所の既定は元 run と同じ directory。`--continue` は adapter の restart 対応が必要 |
 | `runo sweep CASE --set k=v1,v2 ... [--names k=n1,n2...] [--job k=v]... [--label] [--dest DIR] [--limit N] [--apply] [--submit] [--json]` | 直積の候補表示。`--apply` で作成。`--names` は各値の短い label、`--dest` は sweep directory の親 |
-| `runo submit RUN... [-p P] [--qos Q] [--afterok JOB \| --dependency SPEC]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch。`--dependency` は `afterany:123,afterok:456` のような Slurm の依存指定（種類名と job id だけ。`?` 区切りは「いずれか」、`singleton` も可）。`--afterok J` は `--dependency afterok:J` の略で、両方は指定できない。依存は attempt の `dependency` に残る |
+| `runo submit RUN... [-p P] [--qos Q] [--afterok JOB \| --dependency SPEC] [--json]` / `runo submit --all [DIR] [-y]` | job.sh を生成して sbatch。`--dependency` は `afterany:123,afterok:456` のような Slurm の依存指定（種類名と job id だけ。`?` 区切りは「いずれか」、`singleton` も可）。`--afterok J` は `--dependency afterok:J` の略で、両方は指定できない。依存は attempt の `dependency` に残る。1 run が失敗しても残りを投入し、最後に未投入の run を要約して exit code 1（`new` / `sweep` / `retry` の `--submit` も同じ）。`--json` は run ごとの `id`、`job_id`、`result`（`submitted` / `not_submitted` / `unknown`）、`status`、`error` |
 | `runo cancel RUN... [--why TEXT] [-y]` / `runo retry RUN [--submit] [-y]` | scancel（`--why` は note に残る）/ failed・cancelled を created に戻す（理由付きで cancel された run は確認を取る） |
 | `runo status [RUN...] [--brief]` / `runo sync [RUN...]` / `runo log RUN [--err] [-n N] [-f]` | 状態表示 / Slurm から更新 / log 表示 |
 | `runo list [PATH] [--all] [--since 30d] [--case] [--sweep] [--status] [--tag] [--scratch] [--archived] [--brief] [--json]` | run 一覧。`--brief` は `params`、`why`、note を省く（表では note / why 列） |

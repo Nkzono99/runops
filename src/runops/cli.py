@@ -8,7 +8,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import TYPE_CHECKING, Any, Optional
 
 import typer
 from rich.console import Console
@@ -20,6 +20,9 @@ from runops.errors import RunopsError, UsageError
 from runops.manifest import Manifest, RunState
 from runops.project import Project
 from runops.util import parse_age
+
+if TYPE_CHECKING:
+    from runops.ops.submit import SubmitOptions, SubmitResult
 
 app = typer.Typer(
     add_completion=False,
@@ -367,15 +370,59 @@ def _print_created(
         out.print(f"  {line}", markup=False)
 
 
-def _submit_each(project: Project, manifests: list[Manifest], *, quiet: bool = False) -> None:
-    from runops.ops.submit import submit_run
+def _submit_each(
+    project: Project,
+    manifests: list[Manifest],
+    options: SubmitOptions | None = None,
+    *,
+    quiet: bool = False,
+) -> list[SubmitResult]:
+    """Submit every run, going on past failures; print each outcome and, if any run
+    did not go, a summary on stderr. *quiet* keeps the per-run lines off stdout."""
+    from runops.ops.submit import submit_runs
+
+    def show(r: SubmitResult) -> None:
+        if r.result != "submitted":
+            err.print(f"[red]error:[/] {escape(r.error)}")
+        elif not quiet:
+            out.print(f"submitted {r.id} as job {r.job_id}")
 
     warnings: list[str] = []
-    for m in manifests:
-        job_id = submit_run(project, m, runner=_runner(), warnings=warnings)
-        if not quiet:
-            out.print(f"submitted {m.id} as job {job_id}")
+    results = submit_runs(
+        project, manifests, options, runner=_runner(), warnings=warnings, on_result=show
+    )
     _warn(warnings)
+    summary = _submit_summary(results)
+    if summary:
+        err.print(summary, markup=False)
+    return results
+
+
+def _all_submitted(results: list[SubmitResult]) -> bool:
+    return all(r.result == "submitted" for r in results)
+
+
+def _submit_summary(results: list[SubmitResult]) -> str:
+    """``submitted 2; not submitted 1 (still created): R...`` when a run did not go."""
+    left = [r for r in results if r.result == "not_submitted" and r.status == "created"]
+    unknown = [r for r in results if r.result == "unknown"]
+    refused = [r for r in results if r.result == "not_submitted" and r.status != "created"]
+    if not (left or unknown or refused):
+        return ""
+    parts = [f"submitted {sum(r.result == 'submitted' for r in results)}"]
+    if left:
+        parts.append(f"not submitted {len(left)} (still created): {', '.join(r.id for r in left)}")
+    if unknown:
+        parts.append(
+            f"acceptance unknown {len(unknown)} (check squeue before resubmitting): "
+            + ", ".join(r.id for r in unknown)
+        )
+    if refused:
+        parts.append(
+            f"refused {len(refused)} (not created): "
+            + ", ".join(f"{r.id} ({r.status or '?'})" for r in refused)
+        )
+    return "; ".join(parts)
 
 
 @app.command()
@@ -429,10 +476,11 @@ def new(
         _warn(["no --why given; consider `runo note RUN` to record the purpose"])
     if not as_json:
         _print_created(project, result.manifests, result.changes)
-    if submit:
-        _submit_each(project, result.manifests, quiet=as_json)
+    submitted = _submit_each(project, result.manifests, quiet=as_json) if submit else []
     if as_json:
         _print_json([m.to_summary(project.root) for m in result.manifests])
+    if not _all_submitted(submitted):
+        raise typer.Exit(1)
 
 
 @app.command()
@@ -534,10 +582,11 @@ def sweep(
     _warn(result.warnings)
     if not as_json:
         _print_created(project, result.manifests, result.changes)
-    if submit:
-        _submit_each(project, result.manifests, quiet=as_json)
+    submitted = _submit_each(project, result.manifests, quiet=as_json) if submit else []
     if as_json:
         _print_json([m.to_summary(project.root) for m in result.manifests])
+    if not _all_submitted(submitted):
+        raise typer.Exit(1)
 
 
 # ---------------------------------------------------------------------------
@@ -560,17 +609,16 @@ def submit_cmd(
         help="Slurm dependency, e.g. afterany:123,afterok:456 (recorded on the attempt).",
     ),
     yes: bool = typer.Option(False, "-y", "--yes"),
+    as_json: bool = typer.Option(
+        False, "--json", help="Print id, job_id, result, status and error for each run."
+    ),
 ) -> None:
-    """Generate job.sh and sbatch created runs."""
-    from runops.ops.submit import (
-        SubmitOptions,
-        dependency_spec,
-        estimate_core_hours,
-        submit_run,
-    )
+    """Generate job.sh and sbatch created runs (one failure does not stop the rest)."""
+    from runops.ops.submit import SubmitOptions, dependency_spec, estimate_core_hours
 
     depends = dependency_spec(afterok, dependency)
     project = _project()
+    say = err if as_json else out  # with --json, stdout holds only the JSON
     if all_runs:
         if runs and len(runs) > 1:
             raise UsageError("--all takes at most one DIR")
@@ -581,11 +629,14 @@ def submit_cmd(
             if m.status == RunState.CREATED and "_archive" not in m.run_dir.parts
         ]
         if not targets:
-            out.print("no created runs")
+            if as_json:
+                _print_json([])
+            else:
+                out.print("no created runs")
             return
         hours = estimate_core_hours(project, targets)
         for m in targets:
-            out.print(f"  {m.id}  {project.rel(m.run_dir)}")
+            say.print(f"  {m.id}  {project.rel(m.run_dir)}")
         _confirm(f"Submit {len(targets)} runs (~{hours:.1f} core-hours)?", yes)
     else:
         targets = _resolve(project, runs or [])
@@ -593,17 +644,10 @@ def submit_cmd(
             hours = estimate_core_hours(project, targets)
             _confirm(f"Submit {len(targets)} runs (~{hours:.1f} core-hours)?", yes)
     options = SubmitOptions(partition=partition, qos=qos, dependency=depends)
-    failures = 0
-    warnings: list[str] = []
-    for m in targets:
-        try:
-            job_id = submit_run(project, m, options, runner=_runner(), warnings=warnings)
-            out.print(f"submitted {m.id} as job {job_id}")
-        except RunopsError as exc:
-            failures += 1
-            err.print(f"[red]error:[/] {exc}")
-    _warn(warnings)
-    if failures:
+    results = _submit_each(project, targets, options, quiet=as_json)
+    if as_json:
+        _print_json([r.__dict__ for r in results])
+    if not _all_submitted(results):
         raise typer.Exit(1)
 
 
@@ -643,8 +687,8 @@ def retry(
         _confirm(f"{m.id} was cancelled: {reason}. Retry anyway?", yes)
     retry_run(project, m)
     out.print(f"{m.id} -> created")
-    if submit:
-        _submit_each(project, [m])
+    if submit and not _all_submitted(_submit_each(project, [m])):
+        raise typer.Exit(1)
 
 
 def _waiting(summary: dict[str, Any]) -> str:

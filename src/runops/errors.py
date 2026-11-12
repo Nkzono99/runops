@@ -19,3 +19,7 @@ class RunError(RunopsError):
     """Runtime failure on a target run, e.g. sbatch rejected (exit code 1)."""
 
     exit_code = 1
+
+
+class SlurmTimeoutError(RunError):
+    """A Slurm command gave no answer in time; after sbatch, acceptance is unknown."""
