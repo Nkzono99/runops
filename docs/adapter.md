@@ -98,3 +98,12 @@ v1 から移植した adapter は `src/runops/legacy_adapters/` にあります�
 entry point が見つからないときの `runo init emses` / `runo init beach` が、project の
 `adapters/` にコピーします。MPIEMSES3D と BEACH の package が entry point を
 公開したら、legacy 版は削除できます。
+
+EMSES の legacy adapter は、元の run の `work/latest/SNAPSHOT1`、次に
+`work/SNAPSHOT1` を探し、新しい run 直下の `SNAPSHOT0` にリンクします。
+native reader はジョブの CWD から `SNAPSHOT0` を読み、`-o work/latest` は出力先だけを
+指定するためです。
+
+既存 project にコピー済みの `adapters/emses.py` は runops の更新だけでは書き換わりません。
+古いコピーが `work/latest/SNAPSHOT0` や `work/SNAPSHOT0` にリンクする場合は、リンク先を
+run 直下へ修正するか、`mpiemses3d-tools` 4.22.1 以降の entry point を使用してください。

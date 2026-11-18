@@ -5,6 +5,8 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
+import pytest
+
 from runops.project import Project
 from runops.util import load_toml
 
@@ -63,7 +65,10 @@ def test_beach_failure_from_stderr(project_dir: Path, cli, fake_slurm) -> None: 
     assert Project.open(project_dir).resolve_run(run_id).status.value == "failed"
 
 
-def test_emses_adapter_and_continue(project_dir: Path, cli, fake_slurm) -> None:  # type: ignore[no-untyped-def]
+@pytest.mark.parametrize("snapshot_parent", ["work/latest", "work"])
+def test_emses_adapter_and_continue(
+    project_dir: Path, cli, fake_slurm, snapshot_parent: str
+) -> None:  # type: ignore[no-untyped-def]
     _add_sim(
         project_dir,
         "emses",
@@ -78,7 +83,9 @@ def test_emses_adapter_and_continue(project_dir: Path, cli, fake_slurm) -> None:
     assert "export EMSES_DEBUG=no" in job
 
     (m.run_dir / "work/latest/energy").write_text("50 1.0\n100 1.0\n")
-    (m.run_dir / "work/latest/SNAPSHOT1").mkdir()
+    snapshot = m.run_dir / snapshot_parent / "SNAPSHOT1"
+    snapshot.mkdir()
+    (snapshot / "esdat0000.h5").write_bytes(b"restart path fixture")
     fake_slurm.states[fake_slurm.last_job] = "COMPLETED"
     cli("sync")
     assert Project.open(project_dir).resolve_run(run_id).status.value == "completed"
@@ -90,6 +97,8 @@ def test_emses_adapter_and_continue(project_dir: Path, cli, fake_slurm) -> None:
     plasma = load_toml(c.run_dir / "input/plasma.toml")
     assert plasma["jobcon"] == {"nstep": 200, "jobnum": [1, 1]}
     assert plasma["tmgrid"]["nx"] == 32
-    link = c.run_dir / "work/latest/SNAPSHOT0"
-    assert link.is_symlink() and link.resolve() == (m.run_dir / "work/latest/SNAPSHOT1").resolve()
+    # The native reader opens this path from the run root, even with -o work/latest.
+    link = c.run_dir / "SNAPSHOT0"
+    assert link.is_symlink() and link.resolve() == snapshot.resolve()
+    assert (link / "esdat0000.h5").read_bytes() == b"restart path fixture"
     assert c.label.endswith("-cont")

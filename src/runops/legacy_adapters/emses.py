@@ -99,8 +99,8 @@ class Adapter:
             raise ValueError(f"{src_run} has no SNAPSHOT1 to continue from")
         import tomli_w
 
-        rel_parent = snapshot.parent.relative_to(src_run)
-        link = run_dir / rel_parent / "SNAPSHOT0"
+        # Native restart paths are relative to the job's CWD, independently of -o.
+        link = run_dir / "SNAPSHOT0"
         link.parent.mkdir(parents=True, exist_ok=True)
         os.symlink(snapshot.resolve(), link)
         path = run_dir / INPUT

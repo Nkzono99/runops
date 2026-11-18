@@ -91,6 +91,8 @@ run は ID が変わらないので、directory を移動してもエージェ�
 | BEACH | `beach-bem` ≥ 3.0 | adapter とエージェント向け skill を同梱 |
 | その他 | 自作の adapter、または `generic` | [adapter ガイド](https://github.com/Nkzono99/runops/blob/main/docs/adapter.md) |
 
+MPIEMSES3D の継続計算には `mpiemses3d-tools` 4.22.1 以降を使用してください。
+
 ---
 
 [使い方ガイド](https://github.com/Nkzono99/runops/blob/main/docs/guide.md) ·
