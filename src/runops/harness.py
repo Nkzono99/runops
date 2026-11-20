@@ -97,8 +97,8 @@ the project found from the current directory.
 Notes live in three places, where `runo context` and the next session find them:
 - one run: `runo note RUN "..."`;
 - conclusions across runs and next decisions: `LOG.md`, appended under a dated heading;
-- reusable knowledge (formulas, methods, pitfalls): `notes/<topic>.md`, extending the
-  existing file for a topic.
+- reusable definitions, methods and pitfalls: consult the topic in `notes/` before reusing it.
+  Update the same note with its scope and a link to the supporting report or data.
 
 Place analysis by the runs its results depend on:
 

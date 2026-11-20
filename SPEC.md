@@ -802,8 +802,11 @@ seal、index を持たない）。
 - agent harness（`AGENTS.md`）は次を指示する。
   - run に関する観察は `runo note RUN "..."` に書く
   - 複数 run にまたがる結論と次の判断は `LOG.md` に日付付きで追記する
-  - 再利用する式・手法・環境の落とし穴は `notes/<topic>.md` に書く。既存 file があれば追記し、
-    似た topic の file を増やさない
+  - 次の実験で同じ指標や手法を使うときは、`context` に出た該当ノートを開き、適用条件を確かめる
+  - 再利用する知見は既存の `notes/<topic>.md` にまとめる。定義と適用条件を本文に書き、
+    根拠となる解析 README や集計表をノートからの相対リンクで示す。新しい topic のみ file を作る
+  - 機械可読の出典が必要なノートは、Open Knowledge Format (OKF) の YAML frontmatter に
+    `type` と `sources[].resource` を書ける。通常の Markdown も同じ手順で扱う
   - 調査の詳細は §9.1 の README にまとめ、LOG.md からリンクする
 - v1 の `research/results/`、`.runops/insights/`、`research/archive/legacy/` は移行時に
   `notes/legacy/` 配下へ **移動せず** そのまま残し、`notes/README.md` から path を案内する（§11）。

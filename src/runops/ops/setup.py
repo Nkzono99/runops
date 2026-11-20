@@ -110,8 +110,26 @@ Run-specific observations go to `runo note RUN "..."`.
 NOTES_README = """\
 # notes
 
-Reusable knowledge: one topic per file (formulas, methods, environment pitfalls).
-Extend an existing file instead of creating a similar one.
+Keep one Markdown file per topic. Before reusing a result, open the relevant note
+and check its scope. When an analysis clarifies a definition, method or pitfall,
+update that topic with the finding, the conditions where it applies and a link
+to the supporting report or data. Resolve local paths from the note itself.
+
+For machine-readable sources, a topic note can start with Open Knowledge Format
+(OKF) frontmatter. For example, a note about a time average might start like this
+(use the paths to your own analysis):
+
+```yaml
+---
+type: Metric
+title: Steady-state mean temperature
+sources:
+  - resource: ../analysis/steady-state/README.md
+  - resource: ../analysis/steady-state/out/means.csv
+---
+```
+
+In the body, give the averaging window and weighting that make two runs comparable.
 """
 
 

@@ -5,8 +5,9 @@ description: Analyze or compare run results in a runops project. Use when plotti
 
 # Analyze run results
 
-1. Read `runo context`, identify the question and target run ids, and check existing
-   analysis directories for the same topic. Use simulator skills for physical methods.
+1. Read `runo context` and identify the question and target run ids. Open relevant
+   notes under `notes/` and check their definitions and scope against the current runs.
+   Look for an existing investigation on the topic. Use simulator skills for physical methods.
 2. Choose the location by the runs the result depends on:
    - one run: `<run_dir>/analysis/` (or a topic inside it);
    - one series or sweep directory: `runs/<group>/_analysis/<topic>/`;
@@ -37,7 +38,12 @@ description: Analyze or compare run results in a runops project. Use when plotti
    before and after, provenance and checks at the end, as `README.md` plus a
    self-contained `report.html`. [example-report/](example-report/README.md) shows it.
 6. Update the investigation README, then append the decision and its README link to
-   `LOG.md`. Put reusable formulas, methods and pitfalls in `notes/<topic>.md`.
+   `LOG.md`. If another investigation could reuse a definition, method or finding,
+   update the matching `notes/<topic>.md`. State when it applies (e.g. the denominator
+   and time window of a fraction). Link the supporting README and the data behind a
+   numerical claim, using paths relative to the note. Include the relevant run ids.
+   Plain Markdown works. For machine-readable provenance, a topic note can start with
+   OKF frontmatter: a `type` such as `Metric` and a `sources` list of `resource` paths or URLs.
 7. `runo tidy --only analysis-logs` previews old job logs, retaining the newest pair per
    job name in each logs directory. Apply with `runo tidy --apply --only analysis-logs`.
    Archiving a whole group directory also moves its `_analysis/`; a partial archive

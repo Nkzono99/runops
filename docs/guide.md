@@ -221,7 +221,12 @@ project の run だけが対象です。同じアカウントの別 project の�
 | 複数の run をまたぐ結論と次の判断 | `LOG.md` に日付見出しで追記 | 今日の scan の結論を LOG にまとめて |
 | 再利用する式、手法、落とし穴 | `notes/<topic>.md`（1 topic 1 file） | Debye 長の見積もり方を notes に残して |
 
-`notes/` に似た topic の file があれば、新しく作らずに追記します。
+次の実験でも使う定義や手法は、その topic のノートに追記します。たとえば「平均速度」なら、
+どの粒子を対象に、どの時間幅で、どう重み付けしたかを書き、根拠となる解析 README と集計表に
+ノートから相対リンクを張ります。次に同じ量を比べるときは、エージェントがその条件を確認します。
+通常の Markdown で書けます。機械可読の出典も残したいときは、ノートの先頭に YAML の
+`type`（例 `Metric`）と `sources` を置き、各項目の `resource` に相対パスか URL を書きます。
+新規 project の `notes/README.md` に記入例があります。[Open Knowledge Format 仕様](https://github.com/open-knowledge-format/open-knowledge-format/blob/main/SPEC.md)
 
 調査の詳細と図・スクリプトは、結果が依存する run の範囲に合わせてまとめます。
 
@@ -247,7 +252,7 @@ topic は `speed-by-version` のように問いの内容で名付け、同じ問
 ```
 
 エージェントは `runops-analyze` skill を使い、調査の README と、そこへのリンクを含む
-`LOG.md` の判断を更新します。`notes/` は run に依存しない知見に使います。
+`LOG.md` の判断を更新します。
 比較の結果を人に見せるレポートを頼むと（「この 3 条件を比較してレポートにまとめて」）、
 エージェントは skill 同梱の執筆ガイドと例に沿って、問いと結論、条件を同じ尺度で並べた図、
 図の読み方と結果の意味、再現情報の順に書きます。README.md と、図を埋め込んで単体で
