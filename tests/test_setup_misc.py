@@ -31,6 +31,52 @@ def test_init_camphor_preset(tmp_path: Path) -> None:
     assert not (root / "adapters/mysim.py").exists()
 
 
+def _git_identity(monkeypatch: pytest.MonkeyPatch) -> None:
+    for key in ("GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"):
+        monkeypatch.setenv(key, "runops test")
+    for key in ("GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"):
+        monkeypatch.setenv(key, "test@example.invalid")
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
+def test_init_starts_git_with_first_commit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _git_identity(monkeypatch)
+    root = tmp_path / "p"
+    report = init_project(root, ["generic"], install=False)
+    assert report.git_started and not report.warnings
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(root), *args], capture_output=True, text=True, check=True
+        ).stdout
+
+    assert git("rev-parse", "--abbrev-ref", "HEAD").strip() == "main"
+    assert git("log", "--format=%s").strip() == "runo init"
+    tracked = git("ls-files").split()
+    assert "runops.toml" in tracked and "LOG.md" in tracked and "AGENTS.md" in tracked
+    assert git("status", "--porcelain") == ""
+    (root / ".runops" / "snapshots").mkdir()
+    (root / ".runops" / "snapshots" / "big.h5").write_text("x")
+    (root / ".runops" / "last_run_id").write_text("R1\n")
+    assert git("status", "--porcelain", "--untracked-files=all").split() == [
+        "??",
+        ".runops/last_run_id",
+    ]
+
+
+@pytest.mark.skipif(shutil.which("git") is None, reason="git not installed")
+def test_init_inside_a_repository_or_with_no_git_leaves_git_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _git_identity(monkeypatch)
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    inner = init_project(tmp_path / "inner", ["generic"], install=False)
+    assert not inner.git_started and not (tmp_path / "inner" / ".git").exists()
+    other = tmp_path.parent / f"{tmp_path.name}-nogit"
+    report = init_project(other, ["generic"], install=False, git=False)
+    assert not report.git_started and not (other / ".git").exists()
+
+
 def test_init_refuses_existing(project_dir: Path, cli) -> None:  # type: ignore[no-untyped-def]
     res = cli("init", "generic", "--no-install")
     assert res.code == 2 and "already exists" in res.err
@@ -352,7 +398,7 @@ def test_emses_install_brings_the_adapters_other_packages(
     root = tmp_path / "emses-proj"
     pip = FakePip(root)
     monkeypatch.setattr("runops.ops.setup.subprocess.run", pip)
-    report = init_project(root, ["emses"], install=True)
+    report = init_project(root, ["emses"], install=True, git=False)
     package = KNOWN_PACKAGES["emses"]
     # runops.toml names the simulator package; the adapter it brings also wants emout.
     assert load_toml(root / "runops.toml")["simulators"]["emses"]["package"] == package
@@ -384,7 +430,7 @@ def test_beach_install_is_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPa
     root = tmp_path / "beach-proj"
     pip = FakePip(root)
     monkeypatch.setattr("runops.ops.setup.subprocess.run", pip)
-    report = init_project(root, ["beach"], install=True)
+    report = init_project(root, ["beach"], install=True, git=False)
     assert pip.installs == [[KNOWN_PACKAGES["beach"]]]
     assert report.installed == [KNOWN_PACKAGES["beach"]]
 

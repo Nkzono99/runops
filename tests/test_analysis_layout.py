@@ -261,9 +261,7 @@ def test_analysis_skill_and_ignore_template_are_deployed(project_dir: Path, cli)
     for base in (".agents/skills", ".claude/skills"):
         assert (project_dir / base / "runops-analyze/SKILL.md").is_file()
     ignore = (project_dir / ".gitignore").read_text()
-    assert all(
-        pattern in ignore for pattern in ("**/logs/", "__pycache__/", ".runops/analysis-env/")
-    )
+    assert all(pattern in ignore for pattern in ("**/logs/", "__pycache__/", ".runops/*"))
     assert "Notes and analysis" in (project_dir / "AGENTS.md").read_text()
     assert cli("update", "--skills-only").code == 0
 

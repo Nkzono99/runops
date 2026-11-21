@@ -89,13 +89,13 @@ def resolve_site(site: str) -> tuple[str, bool]:
 
 GITIGNORE = """\
 .venv/
-.runops/analysis-env/
+.runops/*
+!.runops/last_run_id
+!.runops/skills.lock
 **/logs/
 __pycache__/
-.runops/build/
-.runops/index.toml
-.runops/*.lock
 runs/**/work/
+analysis/**/work/
 CLAUDE.local.md
 .claude/settings.local.json
 """
@@ -139,6 +139,7 @@ class InitReport:
     site: str = ""
     site_detected: bool = False
     install_failed: bool = False
+    git_started: bool = False
     created: list[str] = field(default_factory=list)
     installed: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
@@ -160,6 +161,7 @@ def init_project(
     site: str = "",
     name: str = "",
     install: bool = True,
+    git: bool = True,
 ) -> InitReport:
     root = root.resolve()
     if (root / CONFIG_FILE).exists():
@@ -231,7 +233,39 @@ def init_project(
     report.created += add_legacy_adapters(project)
     report.warnings += refresh_agent_files(project)
     report.created += ["AGENTS.md", "CLAUDE.md", ".agents/skills/", ".claude/skills/"]
+    if git:
+        report.git_started, git_warnings = start_git(root)
+        report.warnings += git_warnings
     return report
+
+
+def start_git(root: Path) -> tuple[bool, list[str]]:
+    """Make ``root`` a git repository with a first commit, unless it already is in one.
+
+    Returns whether a repository was started, and warnings. A missing ``git`` or a
+    failed commit (no user identity, a hook) leaves the project usable without git.
+    """
+    exe = shutil.which("git")
+    if exe is None:
+        return False, ["git not found; the project is not under git (run `git init` later)"]
+
+    def run(*args: str) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [exe, "-C", str(root), *args], capture_output=True, text=True, check=False
+        )
+
+    inside = run("rev-parse", "--is-inside-work-tree")
+    if inside.returncode == 0 and inside.stdout.strip() == "true":
+        return False, []
+    for args in (("init", "-q"), ("symbolic-ref", "HEAD", "refs/heads/main"), ("add", "-A")):
+        res = run(*args)
+        if res.returncode != 0:
+            return False, [f"git {args[0]} failed: {res.stderr.strip()}"]
+    res = run("commit", "-q", "-m", "runo init")
+    if res.returncode != 0:
+        detail = res.stderr.strip().splitlines()[-1:] or ["unknown error"]
+        return True, [f"git repository started, but the first commit failed: {detail[0]}"]
+    return True, []
 
 
 LEGACY_ADAPTERS = ("emses", "beach")

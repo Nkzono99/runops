@@ -104,7 +104,7 @@ def fake_slurm(monkeypatch: pytest.MonkeyPatch) -> FakeSlurm:
 @pytest.fixture
 def project_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     root = tmp_path / "proj"
-    init_project(root, ["generic"], install=False)
+    init_project(root, ["generic"], install=False, git=False)
     case = root / "cases" / "demo"
     case.mkdir(parents=True)
     (case / "case.toml").write_text(CASE_TOML)

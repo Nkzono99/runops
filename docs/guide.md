@@ -22,6 +22,7 @@ runo init
 | `cases/`、`runs/` | 入力テンプレートと、実行した run の置き場所 |
 | `LOG.md`、`notes/` | 判断の記録と、再利用する知見の置き場所（[6 節](#6-記録を残す)） |
 | `.venv/` | simulator の Python package（adapter と skill を含む） |
+| `.git/`、`.gitignore` | 入力と記録の履歴。最初の commit まで `runo init` が作る（計算の出力と `.runops/` の cache は外す） |
 | `AGENTS.md`、`CLAUDE.md`、`.agents/skills/`、`.claude/skills/` | エージェント向けの規則と skill |
 
 この directory で Codex か Claude Code を起動し、調べたいことを話しかけてください。

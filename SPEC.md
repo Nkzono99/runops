@@ -541,7 +541,7 @@ Organize（`pin`、`archive`、`mv`、`restore`、`delete`、`tidy`）、Project
 
 | command | 効果 |
 |---|---|
-| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | `runops.toml`、`cases/`、`runs/`、`LOG.md`、`AGENTS.md`、`.venv` を作る。SIM ごとに adapter package を `.venv` に install し、skill を展開する（§8）。端末から引数なしで実行すると site と simulator を尋ねる。`--site` が無ければ host 名から推定する（KUDPC のログインノードなら `kudpc`） |
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [--no-git] [-y]` | `runops.toml`、`cases/`、`runs/`、`LOG.md`、`AGENTS.md`、`.venv` を作る。git repository の外なら `git init`（branch `main`）して、作ったものを最初の commit（`runo init`）にする（`--no-git` で行わない）。SIM ごとに adapter package を `.venv` に install し、skill を展開する（§8）。端末から引数なしで実行すると site と simulator を尋ねる。`--site` が無ければ host 名から推定する（KUDPC のログインノードなら `kudpc`） |
 | `runo doctor [--json]` | `runops.toml` の妥当性、adapter の import 可否、`.venv` に無い package（§4）、executable の存在、`sbatch` の有無、skill の鮮度を検査 |
 | `runo update [--skills-only] [-y]` | adapter package を upgrade し、skill を再展開する |
 | `runo build SIM [--force]` | `local_source` simulator を `.runops/build/` に build する（§4.1） |
@@ -824,7 +824,8 @@ seal、index を持たない）。
 - 調査 directory は `README.md`（問い・対象 run id・方法・結果・制約）、`scripts/`
   （Python、sbatch）、`out/`（図・JSON・CSV）、`logs/`（job の stdout/stderr）からなる。
   topic は内容で名付け、同じ問いは README に日付付きで追記する。
-- `init` の `.gitignore` は `**/logs/`、`__pycache__/`、`.runops/analysis-env/` を含む。
+- `init` の `.gitignore` は `.runops/*`（`last_run_id` と `skills.lock` は残す）、`**/logs/`、`__pycache__/`、
+  `runs/**/work/`、`analysis/**/work/` を含む。
   既存 project のファイルは自動で再配置しない。
 - `context` は現用 group の `_analysis/*/README.md` がある topic 名を表示し、
   `--json` では `group_analysis` に project 相対の group path → topic 名一覧を返す。
@@ -1058,5 +1059,6 @@ v2 の文書は次の 4 ファイルだけにする。
 | 常用と保守の案内（2026-11-12） | `runo --help` を typer の `rich_help_panel` で 4 panel に分け、生成 AGENTS.md と `runops-reference` の表を常用（作成と投入、監視、整理）と保守（`init`、`doctor`、`update`、`build`）に分ける。command は削らない | 利用痕跡では作成・投入・監視・復旧・保管が常用で、保守の command は project の準備と更新のときだけ使われていた。常に読む案内を常用の command に寄せる |
 | 代表値と再現性の書き方（2026-11-12） | `runops-analyze` の `report-guide.md` に 2 点を足す: 代表値の図には平均する領域・重み・基準を本文に書く。再現性の検査は bitwise の一致、標本のばらつき、物理量の許容差を分けて設計する | 面積平均した電位の基準と領域が読み手と食い違った。並列 Monte Carlo の逐点一致を求めて、加算順序の違いを不一致と取り違えた |
 | 起動検査の書き方（2026-11-12） | `runops-create-run` に節を置く: 短い起動検査は起動と物理設定の成立だけを判定し、定常性・統計誤差・収束は別に評価する。止める条件と警告を分け、閾値に根拠と分母を添え、項目ごとの判定・実測値・単位・閾値・script の版を JSON に残す。代表 1 配置の検査を他の配置に広げない。runops は判定を持たない（§1.4） | 起動検査に運用判断を混ぜて厳しくしすぎた例と、代表 1 配置の試験が他の配置の不良を拾えなかった例が続いた。判定の記録を runops が持つ案は、2 例目が出るまで見送る |
+| `init` が git を始める（2026-11-21） | git repository の外で `init` すると `git init` と最初の commit を行う。`git` が無い、commit に失敗した（user の設定が無いなど）ときは warning を出して続ける。`.gitignore` は `.runops/*` を外して記録の file だけ戻す | project は git 管理を想定していたのに `init` は `.gitignore` を書くだけで、10 project のうち git だったのは自前の repository を持つ 1 つだけだった。`.runops/` の下の cache（snapshot、source、実行 file）が数 GB になり、個別に外す方式では追いつかなかった |
 | command の削除（2026-11-12） | `runo summarize` と adapter の `summarize()` hook、`runo migrate-v1` と `ops/migrate.py` を外す（command 23）。既存 run の `analysis/summary.json` は消さず、読む機能も無い。v1 project には runops 2.8 の `migrate-v1` を案内する（§11）。`legacy_adapters/` は `init` が使うので残す | 4 project の利用痕跡で v2 形式の summary は 6 件だけで、adapter の inspect や project の解析と重複していた。v1 からの移行は一度限りで、残る v1 project も 2.8 で変換できる。上限 25 の枠を常用の機能に残す |
 | 使い方ガイド | `docs/guide.md` を追加し、文書を 4 ファイルにする（§13.3） | README の依頼例の表と command 一覧の間を埋める、場面ごとの流れ（case と run の分け方、smoke から本計算、状態の決まり方、整理）の置き場所が無かった |

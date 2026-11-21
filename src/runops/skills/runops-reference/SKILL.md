@@ -36,7 +36,7 @@ Setup, packages and builds; `runops-maintain` has the procedures.
 
 | command | effect |
 |---|---|
-| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | create runops.toml, cases/, runs/, LOG.md, notes/, AGENTS.md, skills; install simulator packages. Site defaults to a guess from the host name; asks interactively only in a terminal without arguments |
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [--no-git] [-y]` | create runops.toml, cases/, runs/, LOG.md, notes/, AGENTS.md, skills; install simulator packages; outside a git repository, `git init` and a first commit. Site defaults to a guess from the host name; asks interactively only in a terminal without arguments |
 | `runo doctor [--json]` | check config, adapters, packages missing from .venv, executables, sbatch, skill freshness |
 | `runo update [--skills-only] [-y]` | upgrade simulator packages and redeploy skills / AGENTS.md block |
 | `runo build SIM [--force]` | build a local_source simulator into .runops/build/<sim>-<commit>-<hash> |

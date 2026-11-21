@@ -185,7 +185,7 @@ project の保守（設定、package、build）:
 
 | command | 動作 |
 |---|---|
-| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [-y]` | project を作る。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
+| `runo init [SIM...] [--site kudpc\|standard] [--no-install] [--no-git] [-y]` | project を作る。git repository の外なら `git init` して最初の commit を作る（`--no-git` で行わない）。`SIM` は `emses` や `name=package-spec`。端末から引数なしで実行すると site と simulator を尋ねる。`--site` の既定はホスト名から推定（KUDPC のログインノードなら `kudpc`、`camphor` も同義） |
 | `runo doctor [--json]` | 設定、adapter の解決経路、`.venv` に無い package、executable、sbatch、skill の鮮度とリンク切れを点検 |
 | `runo update [--skills-only] [-y]` | simulator package を更新し skill と AGENTS.md の管理 block を再生成。`package` を指定した simulator でも、adapter の `pip_packages()` にある他の package（emses の emout など）が `.venv` に無ければ入れる |
 | `runo build SIM [--force]` | `local_source` の simulator を build |

@@ -178,6 +178,9 @@ def init(
     no_install: bool = typer.Option(
         False, "--no-install", help="Do not create .venv or install packages."
     ),
+    no_git: bool = typer.Option(
+        False, "--no-git", help="Do not start a git repository (none is started inside one)."
+    ),
     yes: bool = typer.Option(False, "-y", "--yes"),
 ) -> None:
     """Create a runops project in the current directory.
@@ -200,7 +203,7 @@ def init(
     install = not no_install
     if sims and install and any(s.split("=")[0] != "generic" for s in sims):
         install = _ask_install(root, yes)
-    report = init_project(root, sims, site=site, name=name, install=install)
+    report = init_project(root, sims, site=site, name=name, install=install, git=not no_git)
     if report.site_detected:
         out.print(f"site: {report.site} (guessed from host {hostname()}; use --site to change)")
     if report.install_failed:
@@ -214,6 +217,8 @@ def init(
         out.print(f"created {item}")
     for spec in report.installed:
         out.print(f"installed {spec}")
+    if report.git_started:
+        out.print("started a git repository (first commit: runo init)")
     _warn(report.warnings)
     out.print(
         "next: start your agent (Codex / Claude Code) here and describe what to simulate; "
